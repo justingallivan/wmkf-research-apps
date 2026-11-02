@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { requestEnvelope } from '../../utils/api-request';
 import { Button, Card } from '../Layout';
-import { integrityRetentionLabel, integrityIdentityLabel, integrityDatasetLabel, integrityIncomplete } from '../../utils/integrity-evidence';
+import { isManualPubPeerSource, manualPubPeerSource, integrityResultLabel, integrityRetentionLabel, integrityIdentityLabel, integrityDatasetLabel, integrityIncomplete } from '../../utils/integrity-evidence';
 
 const SOURCES = [
   ['retraction_watch', 'Retraction Watch'],
@@ -75,7 +75,8 @@ function RunFindings({ run }) {
   ) : <p className="mt-3 text-sm text-amber-800">This saved run has no person results to display.</p>;
 }
 
-function SourceSummary({ sourceKey, label, source }) {
+function SourceSummary({ sourceKey, label, source, screenedName }) {
+  const manual = sourceKey === 'pubpeer' && isManualPubPeerSource(source);
   const searched = source?.searched === true;
   const matches = sourceKey === 'retraction_watch' && Array.isArray(source?.matches) ? source.matches : [];
   const hasConcerns = source?.hasConcerns === true || matches.length > 0;
@@ -86,7 +87,7 @@ function SourceSummary({ sourceKey, label, source }) {
     <li className="py-2">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
         <span className="font-medium text-gray-900">{label}</span>
-        <span className={source?.error ? 'text-red-700' : 'text-gray-600'}>{sourceState(source)}</span>
+        <span className={source?.error ? 'text-red-700' : 'text-gray-600'}>{manual ? 'Not checked automatically' : sourceState(source)}</span>
         {searched && !source?.error && (
           sourceKey === 'retraction_watch'
             ? <span className="text-gray-600">{hasConcerns ? `${matches.length} potential record${matches.length === 1 ? '' : 's'}` : 'No matches reported'}</span>
@@ -121,9 +122,9 @@ function SourceSummary({ sourceKey, label, source }) {
           <a className="text-blue-700 underline underline-offset-2" href={item.link} target="_blank" rel="noopener noreferrer">{item.title || item.link}</a>
         </p>
       ))}
-      {source?.searchUrl && /^https?:\/\//i.test(source.searchUrl) && <a className="mt-1 inline-block text-sm text-blue-700 underline underline-offset-2" href={source.searchUrl} target="_blank" rel="noopener noreferrer">Open source search</a>}
+      {(manual || source?.searchUrl && /^https?:\/\//i.test(source.searchUrl)) && <a className="mt-1 inline-block text-sm text-blue-700 underline underline-offset-2" href={manual ? manualPubPeerSource(screenedName).searchUrl : source.searchUrl} target="_blank" rel="noopener noreferrer">{manual ? 'Open PubPeer manually' : 'Open source search'}</a>}
       {source?.error && <p className="mt-1 text-sm text-red-700">{source.error}</p>}
-      {!searched && !source?.error && <p className="mt-1 text-sm text-gray-600">This source was not searched.</p>}
+      {!manual && !searched && !source?.error && <p className="mt-1 text-sm text-gray-600">This source was not searched.</p>}
     </li>
   );
 }
@@ -142,12 +143,12 @@ function PersonResult({ result }) {
           {result?.institution && <p className="mt-0.5 text-sm text-gray-600">{result.institution}</p>}
         </div>
         <p className={hasConcerns || incomplete ? 'text-sm font-medium text-amber-800' : 'text-sm text-gray-600'}>
-          {hasConcerns ? `${matches > 0 ? `${matches} item${matches === 1 ? '' : 's'}` : 'Concerns flagged'} for human review${incomplete ? ' · Incomplete screen' : ''}` : incomplete ? 'Incomplete screen' : 'No concerns reported'}
+          {hasConcerns ? `${matches > 0 ? `${matches} item${matches === 1 ? '' : 's'}` : 'Concerns flagged'} for human review${incomplete ? ' · Incomplete screen' : ''}` : integrityResultLabel(result)}
         </p>
       </div>
       <ul className="mt-3 divide-y divide-gray-100">
         {SOURCES.map(([key, label]) => (
-          <SourceSummary key={key} sourceKey={key} label={label} source={result?.sources?.[key]} />
+          <SourceSummary key={key} sourceKey={key} label={label} source={result?.sources?.[key]} screenedName={result?.name} />
         ))}
       </ul>
       {incomplete && <p className="mt-2 text-xs text-amber-800">Review the source status and error above; this result is not a complete screen.</p>}
@@ -224,7 +225,7 @@ export default function IntegrityTab({ requestId }) {
 
   const runScreen = async () => {
     if (!requestId || running || reviewSubmitting || refreshingRun || uncertainRun || reviewUncertain || people.length === 0 || missingNames.length > 0) return;
-    const confirmed = window.confirm(`Run an integrity screen for ${people.length} ${people.length === 1 ? 'person' : 'people'}? This uses Claude and SerpAPI credits for each person.`);
+    const confirmed = window.confirm(`Run an integrity screen for ${people.length} ${people.length === 1 ? 'person' : 'people'}? This uses Claude and SerpAPI credits for each person. PubPeer is not checked automatically.`);
     if (!confirmed) return;
     const id = requestId;
     const current = generation.current;
@@ -472,7 +473,7 @@ export default function IntegrityTab({ requestId }) {
             )}
           </div>
         )}
-        <p className="mt-4 text-xs text-gray-500">Staff should review the cited source material and context before drawing conclusions.</p>
+        <p className="mt-4 text-xs text-gray-500">Staff should review the cited source material and context before drawing conclusions. PubPeer is not checked automatically; opening its link does not record a completed manual check.</p>
       </Card>
       {latestRun && (() => {
         const earlierRuns = (Array.isArray(record?.history) ? record.history : [])

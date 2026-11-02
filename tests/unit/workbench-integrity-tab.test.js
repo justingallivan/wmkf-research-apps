@@ -321,3 +321,16 @@ test('retained matches visibly distinguish their prior-corpus provenance',async(
   requestEnvelope.mockResolvedValue(ok({...loaded,latestRun:{...savedRun,results:[retained]}}));render(<IntegrityTab requestId={requestId}/>);
   expect(await screen.findByText(/Retained from prior corpus/)).toBeInTheDocument();
 });
+
+
+test('current policy shows PubPeer as manual without an incomplete or clean PubPeer claim', async () => {
+  const result = { ...completeResult, sourceCoverageVersion: 3,
+    sources: { ...completeResult.sources, pubpeer: require('../../shared/utils/integrity-evidence').manualPubPeerSource('Ada Example') } };
+  requestEnvelope.mockResolvedValue(ok({ ...loaded, latestRun: { ...savedRun, results: [result] } }));
+  render(<IntegrityTab requestId={requestId} />);
+  expect(await screen.findByText('Not checked automatically')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Open PubPeer manually' })).toHaveAttribute('href', 'https://pubpeer.com/search?q=Ada%20Example');
+  expect(screen.getByText('No concerns reported by automated sources')).toBeInTheDocument();
+  expect(screen.queryByText('Incomplete screen')).toBeNull();
+  expect(screen.getByText(/No manual check is recorded/)).toBeInTheDocument();
+});

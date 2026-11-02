@@ -22,21 +22,39 @@ function integrityDatasetUnverified(dataset) {
     || !Number.isFinite(Date.parse(dataset.publishedAt)) || !Number.isFinite(Date.parse(dataset.lastCheckedAt));
 }
 
+function manualPubPeerSource(name) {
+  const cleanName = String(name || '').replace(/\b(dr|prof|professor)\b\.?\s*/gi, '').trim();
+  return {
+    mode: 'manual', searched: false, error: null,
+    summary: 'Not checked automatically. Open PubPeer to review publications manually. No manual check is recorded by this screen.',
+    searchUrl: `https://pubpeer.com/search?q=${encodeURIComponent(cleanName)}`,
+  };
+}
+
+function isManualPubPeerSource(source) {
+  return source?.mode === 'manual' && source.searched === false && !source.error
+    && !source.hasConcerns && source.resultCount === undefined && source.rawResults === undefined;
+}
+
 function integrityIncomplete(result) {
   if (integrityDatasetUnverified(result?.sources?.retraction_watch?.dataset)) return true;
-  return ['retraction_watch', 'pubpeer', 'news'].some((key) => (
+  if (result?.sourceCoverageVersion === 3 && !isManualPubPeerSource(result?.sources?.pubpeer)) return true;
+  const required = result?.sourceCoverageVersion === 3 ? ['retraction_watch', 'news'] : ['retraction_watch', 'pubpeer', 'news'];
+  return required.some((key) => (
     result?.sources?.[key]?.searched !== true || Boolean(result.sources[key].error)
   ));
 }
 
 function integritySourceLabel(source) {
+  if (isManualPubPeerSource(source)) return 'Not checked automatically';
   if (!source || source.searched !== true || source.error || integrityDatasetUnverified(source.dataset)) return 'Incomplete source';
   return source.hasConcerns ? 'Flagged for human review' : 'No concerns reported';
 }
 
 function integrityResultLabel(result) {
   if (integrityIncomplete(result)) return 'Incomplete screen';
-  return result?.hasConcerns ? 'Items for human review' : 'No concerns reported';
+  return result?.hasConcerns ? 'Items for human review'
+    : result?.sourceCoverageVersion === 3 ? 'No concerns reported by automated sources' : 'No concerns reported';
 }
 
 function integrityRetentionLabel(match) {
@@ -53,4 +71,4 @@ function integrityDatasetLabel(dataset, now = Date.now()) {
   return `Dataset ${dataset.generation} (upstream ${dataset.checksum.slice(0, 12)}) · published ${dataset.publishedAt.slice(0, 10)} · checked ${dataset.lastCheckedAt.slice(0, 10)}${dataset.retainedRecords?.length ? ` · ${dataset.sourceRowCount} upstream + ${dataset.retainedRecords.length} retained legacy records` : ''}${stale ? ' · Freshness warning: last successful check is over 45 days old.' : ''}`;
 }
 
-module.exports = { integrityIdentityLabel, integrityIncomplete, integritySourceLabel, integrityResultLabel, integrityDatasetLabel, integrityDatasetUnverified, integrityRetentionLabel };
+module.exports = { manualPubPeerSource, isManualPubPeerSource, integrityIdentityLabel, integrityIncomplete, integritySourceLabel, integrityResultLabel, integrityDatasetLabel, integrityDatasetUnverified, integrityRetentionLabel };

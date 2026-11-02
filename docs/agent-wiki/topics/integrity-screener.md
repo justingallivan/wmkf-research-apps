@@ -45,12 +45,10 @@ applicant against several signals and surfaces a per-applicant `hasConcerns` fla
 `summary` for **human review** — it never makes an automated decision. Sources:
 
 - **Source 1 — Retraction Watch** (local database; FREE, no SerpAPI).
-- **Source 2 — PubPeer** — name-based `site:pubpeer.com` Google search **via SerpAPI** (`searchPubPeer`).
+- **Source 2 — PubPeer** — manual link only in policy version 3; not searched, summarized, cached or counted as evidence.
 - **Source 3 — News** — `google_news` **via SerpAPI** (`searchNews`).
 
-Sources 2 + 3 are both gated behind one `effectiveSerpKey` today (`integrity-service.js`); the UI/export
-consume a `sources.pubpeer` shape (`hasConcerns`, `summary`, `resultCount`, `searchUrl`, …) rendered in
-`pages/integrity-screener.js`.
+Only news uses `effectiveSerpKey` in policy version 3. `sources.pubpeer` carries mode=manual, searched=false, error=null, explanatory summary and a name-search link; it carries no concern count, raw results or completed-check assertion. Screens and exports retain this distinction. Source-built change is not yet deployed; [rollout receipt](../../audits/integrity-pubpeer-manual-2026-11-02.md).
 
 ## Checked-out source and production boundary
 
@@ -61,14 +59,13 @@ consume a `sources.pubpeer` shape (`hasConcerns`, `summary`, `resultCount`, `sea
 - The standalone `/integrity-screener` remains the manual-name screening page. The Workbench request page has a separate Integrity tab gated by the `integrity-screener` app grant.
 - In the Workbench flow, the server loads the request's Project Leader and PI/Co-PI junction contacts from Dataverse, deduplicates by contact, and supplies names and institutions to the existing screening engine. The route accepts the request GUID and does not use browser-supplied people or identities.
 - The tab shows the server-resolved people before a confirmation that screening uses Claude and SerpAPI credits per person. The request-scoped service refuses an empty list, missing names, or more than 10 people; the cap is a defensive spend bound.
-- New Workbench runs use strict coverage version 2 and name-evidence version 2. Explicit conflicting names are excluded; all retained name candidates remain identity-unverified. The standalone save contract remains fail-soft, but PubPeer retrieval/analysis failures are now explicit source errors in both callers. PubPeer off-domain or mixed results fail coverage before summarization; successful empty indexed searches are described as indexed coverage only.
+- New runs use source coverage version 3 and name-evidence version 2. Retraction Watch and news remain automated; PubPeer is manual-only. The engine has no automated PubPeer search method or analysis prompt. Earlier saved evidence is not rewritten.
 - Completed Workbench runs are saved with a nullable `integrity_screenings.request_id`. GET returns the latest run plus newest-first history pages of 20. `beforeRunId` is a request-scoped cursor. Migration 056 supplies the linkage column and latest-by-request index; migration 057 adds append-only review decisions.
-- The Workbench review endpoint allows the request's lead Program Director or a fresh-role superuser to record `approved` or `hold` on the latest run. New approval requires an unchanged current roster and complete version-2 coverage for Retraction Watch, PubPeer, and News, including validated PubPeer evidence. Previously recorded version-1 approvals remain historical approvals when roster and latest-decision precedence still allow it; unapproved older runs require a new screen; hold requires a note. The UI shows earlier decisions read-only. Approval means **Integrity review complete**; it records a human review after staff recommend funding and is not a funding decision or progression gate. Do not add automatic screening or an earlier gate.
+- The Workbench review endpoint allows the request's lead Program Director or a fresh-role superuser to record `approved` or `hold` on the latest run. New approval requires an unchanged current roster and complete version-3 automated coverage for Retraction Watch and News, verified dataset provenance and the explicit PubPeer manual marker. A manual PubPeer check is not an approval prerequisite. Previously recorded version-1/version-2 approvals remain historical approvals when roster and latest-decision precedence still allow it; unapproved older runs require a new screen; hold requires a note. The UI shows earlier decisions read-only. Approval means **Integrity review complete**; it records a human review after staff recommend funding and is not a funding decision or progression gate. Do not add automatic screening or an earlier gate.
 - The Workbench history/review surfaces are **live since 2026-09-30** (PR #366 merged as `fdaec0b1f`, deployed to Production; S552). Migrations 056 and 057 were applied and verified by a schema probe the same day, and a read-only production smoke passed. The standalone dismiss route is owner-scoped since PR #367 (`4d482d958`).
 - Standalone history and dismissal API primitives exist. The standalone page's Dismiss handler remains a placeholder: it logs and alerts but does not call the dismissal API. `screenApplicants` does not read prior dismissals, so future-screen suppression is not implemented.
 - Since PR #151 (2026-09-05) the source descriptions on the page no longer say
-  "(requires SERP API)" for PubPeer and News; both are still gated behind
-  `effectiveSerpKey` server-side, so the label removal is copy, not a gating change.
+  "(requires SERP API)" for PubPeer and News; that was a historical copy-only change. Policy version 3 subsequently removes automated PubPeer access entirely.
 - The current Dismiss handler is explicitly a placeholder: it logs and alerts but
   does not call the dismissal API. `screenApplicants` also does not read prior
   dismissals, so future-screen suppression is not implemented.
@@ -85,50 +82,10 @@ Screens fence all people’s corpus queries with a monotonic publication generat
 - SerpAPI cost/posture: `project-serpapi-budget-latency`, `project-serpapi-capability-erosion`.
 - External platform verification posture: `feedback-verify-external-platform-claims`, `feedback-cite-ground-truth`.
 
-## SerpAPI migration status (S251)
+## PubPeer access decision — owner instruction 2026-11-02
 
-The reviewer-finder SerpAPI→free-stack migration (`docs/REVIEWER_FINDER_SERPAPI_MIGRATION_PLAN.md`)
-moved the reviewer-finder metrics/literature paths to OpenAlex. For the integrity screener, **PubPeer
-(#6) and News (#7) remain on SerpAPI** — News is an irreducible keeper (no free equivalent), and
-PubPeer is the parked future item below. Retraction Watch was already free.
+The owner supplied June 2026 correspondence: PubPeer offered paid DOI and author-name APIs, proposed real-time use without caching or AI training, and offered limited documentation/trial access. This supersedes the earlier claim that no sanctioned API exists. The logged-in account presently exposes no API menu; why is unverified. Saved screening history and LLM summarization permissions were not established by that correspondence.
 
-## Parked Future Item — Migrate PubPeer Off SerpAPI (Contingent; Recall Only on Request)
+The owner declines purchasing access and explicitly requested removal of automated PubPeer searches, a manual link, and a review-completion update. Do not call the undocumented extension endpoint or reuse its embedded devkey. Do not run Google site-search or AI analysis for PubPeer. Do not buy or reactivate access. Any future API integration requires a new owner decision and suitable provider terms. The previous assertion that Google-based access was unambiguously permitted is withdrawn; no legal conclusion is needed for this product decision.
 
-> This is a low-priority, externally gated maybe, not active work. Recall it only if Justin asks
-> or PubPeer responds about API access. The old "Slice 3" label for this is retired.
-
-**The problem:** we'd like PubPeer integrity to use precise DOI/PMID lookups instead of a fuzzy,
-name-based Google search via the (being-retired) SerpAPI. **But there is no usable sanctioned API.**
-Verified S251 from primary sources:
-- PubPeer's FAQ (`pubpeer.com/static/faq`) says an API is **"coming soon — contact us for a key"**:
-  not generally available, no published endpoint/terms.
-- The ONLY working programmatic surface is the **official browser extension's undocumented endpoint**
-  (`PubPeerFoundation/PubPeerBrowserExtensions`, `js/contentScript/pubpeer.js`):
-  `POST https://pubpeer.com/v3/publications?devkey=PubMed<BrowserName>`, `Content-Type: application/json`,
-  body = DOIs/PMIDs, response `{ feedbacks: [...] }`. The `devkey` (`PubMed<Browser>`) is **hardcoded
-  into the public extension** — NOT a per-developer key issued to us.
-
-**Decision (S251):** PubPeer stays on SerpAPI. A sanctioned-access request **email was sent to PubPeer**
-(volume pitched: ≈1 batched request per person vetted, ~hundreds per review cycle, cacheable). Do **NOT**
-call `/v3/publications` server-side without explicit sanction.
-
-**Load vs authorization (why the direct endpoint is not the current route — two axes, opposite ways):**
-- *Load:* the SerpAPI `site:pubpeer.com` route hits **Google's index, not PubPeer** → zero real-time load
-  on PubPeer. The `/v3/publications` endpoint is the ONLY route that touches PubPeer's DB. So the Google
-  route is *lighter* on PubPeer — "gentler on their infrastructure" is the WRONG argument.
-- *Authorization:* querying Google's public index is unambiguously fine; calling PubPeer's undocumented
-  endpoint with **their extension's** devkey, for a use it wasn't offered for (batch server screening, not
-  interactive per-pageview), with no permitting terms, is the grey part.
-- The real reasons to want sanctioned access are **accuracy** (DOI-based vs fuzzy name search) and
-  **consent/durability** (our own key, won't break on an extension build) — not load.
-
-**If/when sanctioned access is granted, the build (per the migration plan's Slice-3 scope) is:** add
-`PUBPEER_API_KEY` to `lib/utils/tracked-secrets.js` + `docs/CREDENTIALS_RUNBOOK.md`; add the API host to
-the `safeFetch` allowlist; reshape `searchPubPeer` to DOI/PMID lookups feeding the existing Haiku
-summarizer; **split the PubPeer + News availability gating** (currently one `effectiveSerpKey`) so News can
-run while PubPeer is unconfigured and vice-versa; and **preserve the `sources.pubpeer` shape** the
-integrity UI/export consume. Applicant DOIs/PMIDs already come from the PubMed/OpenAlex enrichment data
-(no extra PubPeer calls to obtain them).
-
-**Verification posture:** the S250 plan scoped a "PubPeer Developer API" migration around an API that
-doesn't exist. Confirm external capabilities from primary sources before scoping work around them.
+Reviewer-finder contact search and integrity news remain on SerpAPI. OpenAlex migrations remain unchanged. Earlier S251 migration planning is historical. Current source/review/deployment status is tracked in the [manual-link receipt](../../audits/integrity-pubpeer-manual-2026-11-02.md).

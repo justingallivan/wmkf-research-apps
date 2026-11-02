@@ -1,12 +1,12 @@
 ---
 name: project-serpapi-capability-erosion
-description: "SerpAPI WAS the project's largest monthly line item ($150/mo Production 15k); DOWNGRADED to Developer ($75/mo, 5k) 2026-06-28 by Justin after the S251 migration cut usage to ~1.7%. A 2026-06-11 audit found its value eroded: google_scholar_profiles is DEAD (Google login wall). MIGRATION STATUS (S251): Scholar metrics+domain (#2/#3, Slice 1b) and lit/PI-pubs (#4/#5, Slice 2) SHIPPED off SerpAPI → OpenAlex (NOT Semantic Scholar). PubPeer (#6) stays on SerpAPI — no public PubPeer API exists (verified); its migration is retired as a slice + parked as a contingent future item (full context in the integrity-screener agent-wiki topic). Residual = contact (#1) + PubPeer (#6) + news (#7)."
+description: "SerpAPI WAS the project's largest monthly line item ($150/mo Production 15k); DOWNGRADED to Developer ($75/mo, 5k) 2026-06-28 by Justin after the S251 migration cut usage to ~1.7%. A 2026-06-11 audit found its value eroded: google_scholar_profiles is DEAD (Google login wall). MIGRATION STATUS (S251): Scholar metrics+domain (#2/#3, Slice 1b) and lit/PI-pubs (#4/#5, Slice 2) SHIPPED off SerpAPI → OpenAlex (NOT Semantic Scholar). PubPeer automation is removed in source under the owner-approved 2026-11-02 manual-link policy (not deployed yet); paid DOI/author API access was offered, but the owner declines purchase. Current SerpAPI consumers in that source policy are contact (#1) and news (#7)."
 metadata:
   node_type: memory
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-06-28 — DOWNGRADED to Developer ($75/mo, 5k), confirmed via account API (was 259/cycle on 15k Production); 1b+2 shipped via OpenAlex (S251); PubPeer API non-existence verified
+  last_verified: 2026-06-28 — DOWNGRADED to Developer ($75/mo, 5k), confirmed via account API (was 259/cycle on 15k Production); 1b+2 shipped via OpenAlex (S251); S251 API availability claim superseded by owner-supplied June correspondence (2026-11-02)
 ---
 
 ## Recall Rule
@@ -48,16 +48,12 @@ discovered 2026-06-28). This is the data source the parked admin-observability i
     (**Slice 1b**); kills the login-wall risk + removes the 2 hot-path paid calls.
   - `google_scholar` lit/novelty + PI-pubs → OpenAlex works `searchWorks`/`getWorksByAuthor`
     (**Slice 2**).
-- **PubPeer (`site:pubpeer.com` via `google`) — NOT replaced; stays on SerpAPI. The "PubPeer
-  Developer API" does not exist** (verified S251 from primary sources). Its migration is retired as
-  a slice + parked as a contingent future item — full context (facts, endpoint, load-vs-auth,
-  build-if-granted) in `docs/agent-wiki/topics/integrity-screener.md`. Do NOT re-assume an API is
-  available, and do NOT proactively resurface it (Justin recalls it on demand if PubPeer replies).
+- **PubPeer — manual-only policy, owner decision 2026-11-02.** Source on `codex/integrity-pubpeer-manual` removes automated Google searches and Claude PubPeer analysis; deployment pending. The owner supplied correspondence offering paid DOI/author APIs and limited trial documentation. The earlier claim that no sanctioned API exists is superseded. The owner declines paid access; no undocumented endpoint or extension key may be used. The manual link records no check and does not block version-3 review completion; existing history remains unchanged. See `docs/agent-wiki/topics/integrity-screener.md` and `docs/audits/integrity-pubpeer-manual-2026-11-02.md`.
 - **Downgrade DONE 2026-06-28 — Justin switched to Developer ($75/mo, 5,000), confirmed via
   account API.** Saves ~$75/mo vs Production. Basis [VERIFIED via account API]: `this_month_usage`
   = **259** when checked; the billing cycle resets ~the 20th (account created 2025-11-20), so 259
   was only ~8 days of a cycle → a full cycle projects to ~900–1,000 at that rate — which is exactly
-  why Developer (5,000), not Starter (1,000): a peak review cycle (~3 residual SerpAPI calls/candidate:
+  why Developer (5,000), not Starter (1,000): a peak review cycle (the original ~3 residual SerpAPI calls/candidate:
   contact #1 + PubPeer #6 + news #7) could clear 1,000. Re-check a full peak
   J27 reviewer-work window—proposals arrive in early December 2026, date TBD—before
   considering Starter. Ladder: Free $0/250 · Starter $25/1k · Developer $75/5k · Production

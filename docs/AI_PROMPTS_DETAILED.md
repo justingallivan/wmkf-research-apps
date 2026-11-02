@@ -63,7 +63,7 @@ They do not enumerate every prompt currently sent to an AI provider.
   - [Theme Synthesis](#peer-review-themes)
   - [Action Items](#peer-review-actions)
 - [Integrity Screener](#integrity-screener)
-  - [PubPeer Analysis](#integrity-pubpeer)
+  - [PubPeer — Manual Link Only](#integrity-pubpeer)
   - [News Analysis](#integrity-news)
 - [Dynamics Explorer](#dynamics-explorer)
 
@@ -810,35 +810,9 @@ This app runs five stages. The initial analysis is similar to the Concept Evalua
 ## Integrity Screener
 
 <a name="integrity-pubpeer"></a>
-### PubPeer Analysis
+### PubPeer — Manual Link Only
 
-> You are a research integrity specialist reviewing PubPeer search results for a grant applicant.
->
-> **Applicant:** [Name], [Institution]
->
-> Analyze these PubPeer search results and identify any comments that indicate research integrity concerns.
->
-> **Look for:**
-> - Data fabrication or manipulation
-> - Image manipulation or duplication
-> - Statistical irregularities
-> - Plagiarism allegations
-> - Authorship disputes
-> - Concerns about reproducibility
-> - Peer review manipulation
->
-> **Important:**
-> - Only report findings that are DIRECTLY relevant to this person (not papers where they are one of many co-authors on a large collaboration)
-> - Consider name commonality — there may be multiple researchers with similar names
-> - If results mention a DIFFERENT institution than provided, note this explicitly (could be prior affiliation)
-> - Focus on substantive concerns, not minor formatting issues
-> - Be objective and factual in your summary
->
-> **If concerns found:** Provide a brief summary of each concern (1-2 sentences each), include the paper title, note the institution (if different), note whether this is a direct accusation or general discussion.
->
-> **If no concerns found:** Simply respond: "No concerns found. The search returned X results but none indicate research integrity issues."
->
-> Keep your response concise (under 200 words unless there are multiple serious concerns).
+Source policy 3 (not deployed yet) removes the PubPeer analysis prompt and automated search. Both screens and exports say Not checked automatically and provide a manual name-search link. Opening the link records no completed manual check. Historical screening evidence is preserved. News analysis remains below.
 
 ---
 
