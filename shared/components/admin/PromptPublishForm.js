@@ -92,7 +92,9 @@ export default function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome
   const modelCeiling = modelOutputCeiling(model, modelCatalog);
   const maxTokensValidation = validateMaxTokensInput(maxTokensText, modelCeiling);
   const validation = validatePromptForSave(prompt.name, body);
-  const unchanged = maxTokensText.trim() === initialMaxTokens
+  // A draft (no current version) can be published as-is: that IS the change.
+  const unchanged = prompt.hasCurrent
+    && maxTokensText.trim() === initialMaxTokens
     && body === (prompt.body || '')
     && systemPrompt === (prompt.systemPrompt || '')
     && outputSchema === (prompt.outputSchema || '')
@@ -240,7 +242,7 @@ export default function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome
 
       {!prompt.hasCurrent && (
         <div className="text-xs px-3 py-2 rounded border bg-amber-50 text-amber-800 border-amber-200">
-          This prompt has rows but no published current version, so it can&apos;t be versioned from here. Recover a current version with the seed&apos;s <code>--force</code> path (publishes max+1), or resolve in Dynamics.
+          This prompt has no published version yet. Publishing copies the draft (with any edits above) into a new version v{(prompt.version ?? 0) + 1} and makes it live. The draft row in Dataverse is left unchanged.
         </div>
       )}
 
@@ -262,7 +264,7 @@ export default function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome
         <button
           onClick={submit}
           disabled={submitting || !validation.valid || !outputSchemaValidation.valid
-            || !maxTokensValidation.valid || unchanged || !prompt.hasCurrent || !nativeModelCompatible}
+            || !maxTokensValidation.valid || unchanged || !nativeModelCompatible}
           className="px-4 py-1.5 bg-gray-900 text-white text-sm font-medium rounded hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {submitting ? 'Publishing…' : `Publish v${(prompt.version ?? 0) + 1}`}

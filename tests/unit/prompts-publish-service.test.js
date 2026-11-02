@@ -524,3 +524,82 @@ describe('publishPrompt', () => {
     });
   });
 });
+
+describe('publishPrompt — first publish of a draft-only name', () => {
+  const draftRow = (over = {}) => ({
+    ...currentRow({ version: 1, id: 'draft-id', model: 'sonnet', ...over }),
+    wmkf_ai_iscurrent: false,
+    wmkf_ai_promptstatus: 682090000,
+    wmkf_ai_displaytitle: 'Draft title',
+  });
+  const args = (over = {}) => ({ name: NAME, body: VALID_BODY, profileId: 7, ...over });
+  const auditInserts = () => sql.mock.calls.filter(([strings]) => strings.join('?').includes('INSERT INTO prompt_publish_audit'));
+
+  beforeEach(() => {
+    aiPrompt.queryCurrentRows.mockResolvedValue({ records: [] });
+    aiPrompt.listVersions.mockResolvedValue({ records: [draftRow()] });
+    aiPrompt.queryCurrentIdVersions.mockResolvedValue({ records: [{ wmkf_ai_promptid: 'new-row' }] });
+  });
+
+  it('copies the latest draft into a new current row at max+1 without touching the draft', async () => {
+    aiPrompt.listVersions.mockResolvedValue({ records: [draftRow({ version: 2 }), draftRow({ version: 1, id: 'older' })] });
+    const r = await publishPrompt(args({ expectedVersion: 2 }));
+    expect(r).toMatchObject({ status: 'completed', newPromptId: 'new-row', targetVersion: 3, firstPublish: true, warnings: [] });
+    expect(aiPrompt.create).toHaveBeenCalledWith(expect.objectContaining({
+      wmkf_ai_promptname: NAME,
+      wmkf_ai_promptbody: VALID_BODY,
+      wmkf_ai_iscurrent: true,
+      wmkf_promptversion: 3,
+      wmkf_ai_promptstatus: 682090001,
+      wmkf_ai_displaytitle: 'Draft title',
+    }));
+    expect(aiPrompt.setIsCurrent).not.toHaveBeenCalled();
+    expect(aiPrompt.getIdOnly).not.toHaveBeenCalled();
+    const [pending, final] = auditInserts();
+    expect(pending.slice(1)).toEqual(expect.arrayContaining(['draft-id', 3]));
+    expect(final.slice(1)).toEqual(expect.arrayContaining(['draft-id', 'completed']));
+  });
+
+  it('publishes an unchanged draft (body equal to the draft row)', async () => {
+    const r = await publishPrompt(args());
+    expect(r).toMatchObject({ status: 'completed', targetVersion: 2 });
+  });
+
+  it('404 no_current_row when the name has no rows at all', async () => {
+    aiPrompt.listVersions.mockResolvedValue({ records: [] });
+    await expect(publishPrompt(args())).rejects.toMatchObject({
+      httpStatus: 404,
+      body: expect.objectContaining({ status: 'no_current_row' }),
+    });
+    expect(aiPrompt.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a stale expectedVersion (a newer draft row appeared) before audit or write', async () => {
+    await expect(publishPrompt(args({ expectedVersion: 0 }))).rejects.toMatchObject({
+      httpStatus: 409,
+      body: expect.objectContaining({ status: 'concurrency_conflict' }),
+    });
+    expect(aiPrompt.create).not.toHaveBeenCalled();
+  });
+
+  it('two simultaneous first publishes surface as partial with the current-count warning', async () => {
+    aiPrompt.queryCurrentIdVersions.mockResolvedValue({ records: [{ wmkf_ai_promptid: 'a' }, { wmkf_ai_promptid: 'b' }] });
+    const r = await publishPrompt(args());
+    expect(r).toMatchObject({ status: 'partial', warnings: ['invariant_violation_current_count_2'] });
+  });
+
+  it('a retry after a lost final audit resumes against the row it created', async () => {
+    const created = currentRow({ version: 2, id: 'new-row' });
+    aiPrompt.queryCurrentRows.mockResolvedValue({ records: [created] });
+    const bodyHash = publishHash({
+      body: VALID_BODY, systemPrompt: '', variables: ANALYZE_VARIABLES, outputSchema: null,
+      model: 'sonnet', temperature: null, maxTokens: null,
+    });
+    sql.mockResolvedValueOnce({
+      rows: [{ phase: 'pending', target_version: 2, prior_prompt_id: 'draft-id', body_hash: bodyHash, outcome_json: {} }],
+    });
+    const r = await publishPrompt(args({ requestId: 'retry', expectedVersion: 1 }));
+    expect(r).toMatchObject({ status: 'completed', resumed: true, newPromptId: 'new-row', targetVersion: 2 });
+    expect(aiPrompt.create).not.toHaveBeenCalled();
+  });
+});

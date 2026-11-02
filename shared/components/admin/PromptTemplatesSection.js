@@ -7,7 +7,8 @@
  * (same validators the server enforces), and surfaces outcomes.
  *
  * Editing is immutable-by-version: a publish creates a NEW wmkf_ai_prompt row
- * (iscurrent=true, version+1) and flips the prior row down.
+ * (iscurrent=true, version+1) and flips the prior row down. A draft-only name
+ * (no current row) publishes its first version as a copy of the draft row.
  */
 import { useEffect, useRef, useState } from 'react';
 import DataverseFieldInfoButton from './DataverseFieldInfoButton';
@@ -33,7 +34,7 @@ const STATUS_COPY = {
   already_published:     { tone: 'gray',  text: 'No change — that request was already published.' },
   partial:               { tone: 'amber', text: 'Published with warnings — see details below.' },
   concurrency_conflict:  { tone: 'amber', text: 'Another admin published while you were editing. Reload and re-apply.' },
-  no_current_row:        { tone: 'red',   text: 'Prompt rows exist but none is current — use the seed --force recovery path, or resolve in Dynamics.' },
+  no_current_row:        { tone: 'red',   text: 'No rows exist for this prompt name. Reload the list.' },
   duplicate_current_rows:{ tone: 'red',   text: 'Multiple current rows (store corruption). Resolve in Dynamics.' },
   invalid_body:          { tone: 'red',   text: 'Prompt body failed validation.' },
   invalid_model:         { tone: 'red',   text: 'The selected model is not compatible with this prompt.' },
@@ -242,22 +243,12 @@ function PromptPanel({ prompt, modelCatalog, executorBudgetConfig, onPublished }
           >
             {editingDetails ? 'Close details' : 'Edit details'}
           </button>
-          {prompt.hasCurrent ? (
-            <button
-              onClick={() => { setExpanded((e) => !e); setEditingDetails(false); }}
-              className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded hover:bg-gray-800"
-            >
-              {expanded ? 'Cancel' : 'Edit & publish'}
-            </button>
-          ) : (
-            <button
-              onClick={() => { setExpanded((e) => !e); setEditingDetails(false); }}
-              className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded hover:bg-gray-100"
-              title="No published current version. View the body; publishing requires seeding a current version first."
-            >
-              {expanded ? 'Hide' : 'View'}
-            </button>
-          )}
+          <button
+            onClick={() => { setExpanded((e) => !e); setEditingDetails(false); }}
+            className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded hover:bg-gray-800"
+          >
+            {expanded ? 'Cancel' : (prompt.hasCurrent ? 'Edit & publish' : 'Review & publish')}
+          </button>
         </div>
       </div>
 
