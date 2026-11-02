@@ -143,9 +143,8 @@ strings are corrected in merged PR #600 and deployed as Production deployment
 locations and the named Request 1003222 headings. The remaining error/history
 paths were not all triggered in the browser. Root has separately updated two
 legacy-client error messages on `codex/legacy-terminology-final-check`, with
-156 tests across 3 suites, scoped lint, text-only AST review, and independent
-review reported passing. Both HTTP 400 responses and machine codes are
-preserved; that change still needs a PR and Production deployment. Do not call
+135 tests across 3 suites (including 22 verifier cases), scoped lint, text-only AST review, and independent review reported passing. Both HTTP 400 responses and machine codes are
+preserved. PR #601 is merged as `73d270b93`; the autonomous release verifier confirmed the latest GitHub-reported Production deployment and scoped checkout/dependency match, then passed nine synthetic guard cases. It made no application HTTP/browser request, so deployed error responses were not exercised. Do not call
 the full terminology migration complete. A fresh read-only inventory reports 46 email fields / 4 personal
 records and 60 prompt versions / 39 current; only the three scoped shared
 fields, cleared Duncan invitation override, and two published prompt families
