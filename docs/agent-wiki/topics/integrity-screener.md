@@ -54,7 +54,7 @@ consume a `sources.pubpeer` shape (`hasConcerns`, `summary`, `resultCount`, `sea
 
 ## Checked-out source and production boundary
 
-[VERIFIED via PR #604, Ready production deployment and authenticated dry-run, 2026-11-02] Accuracy fixes and the controlled refresh/retention implementation are deployed. Migration 092 is applied. Manual production worker is enabled with strict bearer auth, but no monthly schedule exists. Production dry-run proposes 73,519 upstream + 2 retained records, 5,286 additions, 1,846 updates and 13 removals. Live corpus remains 68,248 with unchanged full hash and no publication metadata rows; first publication needs owner approval. Current evidence: `docs/audits/integrity-production-release-2026-11-02.md`.
+[VERIFIED via PR #604, Ready production deployment and authenticated dry-run, 2026-11-02] Accuracy fixes and the controlled refresh/retention implementation are deployed. Migration 092 is applied. Manual production worker is enabled with strict bearer auth, but no monthly schedule exists. Production dry-run proposes 73,519 upstream + 2 retained records, 5,286 additions, 1,846 updates and 13 removals. The approved first publication is verified: 73,521 records and generation 1, with both retained records and a completed audit. Current evidence: `docs/audits/integrity-production-release-2026-11-02.md`.
 
 ## Current UI boundaries
 
@@ -76,9 +76,9 @@ consume a `sources.pubpeer` shape (`hasConcerns`, `summary`, `resultCount`, `sea
 - Owner decision (2026-10-01): any user holding both `integrity-screener` and `reviewers` may start a new screen on an already-approved request, which returns it to needs-review. This is intended, not a gap.
 - UI, PDF and Markdown show name evidence and unverified identity, not heuristic percentages. JSON retains numeric similarity only with an explicit non-probability explanation. Older evidence is labeled as earlier rules; saved histories/counts/decisions are not rewritten. Exports expose incomplete sources and do not contain durable dismissals.
 
-## Corpus provenance (deployed; first publication held)
+## Corpus provenance (deployed; first publication verified)
 
-Screens fence all people’s corpus queries with a monotonic publication generation and save recorded metadata under each `sources.retraction_watch.dataset`. Changed/unverified metadata makes final corpus evidence incomplete; old runs remain version-not-recorded. The worker requires strict bearer auth, production environment and literal enablement; it has no registered cron schedule. Migration 092 is applied; first production publication still needs approval. The legacy importer refuses the managed schema, and cutover must also confirm no old/external writer is already running.
+Screens fence all people’s corpus queries with a monotonic publication generation and save recorded metadata under each `sources.retraction_watch.dataset`. Changed/unverified metadata makes final corpus evidence incomplete; old runs remain version-not-recorded. The worker requires strict bearer auth, production environment and literal enablement; it has no registered cron schedule. Migration 092 and the owner-approved first publication are verified; generation 1 has 73,521 records. The legacy importer refuses the managed schema, and cutover must also confirm no old/external writer is already running.
 
 ## Durable Memory
 

@@ -3,7 +3,7 @@ title: Integrity screening accuracy and monthly Retraction Watch refresh
 domain: integrity-screener
 kind: plan
 status: active
-summary: "Reject conflicting author names, replace identity-confidence claims, validate PubPeer evidence, and safely refresh Retraction Watch monthly. Screening and controlled refresh code deployed through PR #604 after Fable review. Migration and production dry-run verified; first publication and monthly scheduling remain held."
+summary: "Reject conflicting author names, replace identity-confidence claims, validate PubPeer evidence, and safely refresh Retraction Watch monthly. Screening and controlled refresh code deployed through PR #604 after Fable review. Migration and production dry-run verified; first publication verified; monthly scheduling remains off."
 canonical: false
 cataloged: 2026-11-01
 owner: product-engineering
@@ -17,7 +17,7 @@ related:
 
 ## 1. Scope, authority, and status
 
-[VERIFIED via branch, reviews and authorized preflight] Owner: Codex. Branch: `codex/integrity-screening-discussion`. Worktree: `/private/tmp/wmkf-integrity-screening`. Justin authorized implementation on this isolated branch on 2026-11-02, starting with Increment A and requiring Fable review before merge or production work. Increment A is tested/Fable-reviewed and now deployed through PR #604. Increment B is source-built with isolated tests, full official-CSV rehearsal, passing release checks and Fable READY FOR OWNER REVIEW. Justin authorized read-only production preflight, which is recorded in the [preflight receipt](../audits/integrity-production-preflight-2026-11-02.md). Justin subsequently authorized migration/merge/deployed dry-run while holding first publication and monthly activation. Migration 092 is now applied in Production with unchanged corpus; the [live release receipt](../audits/integrity-production-release-2026-11-02.md) records completed promotion and successful deployed dry-run, with unchanged live corpus and first publication held.
+[VERIFIED via branch, reviews and authorized preflight] Owner: Codex. Branch: `codex/integrity-screening-discussion`. Worktree: `/private/tmp/wmkf-integrity-screening`. Justin authorized implementation on this isolated branch on 2026-11-02, starting with Increment A and requiring Fable review before merge or production work. Increment A is tested/Fable-reviewed and now deployed through PR #604. Increment B is source-built with isolated tests, full official-CSV rehearsal, passing release checks and Fable READY FOR OWNER REVIEW. Justin authorized read-only production preflight, which is recorded in the [preflight receipt](../audits/integrity-production-preflight-2026-11-02.md). Justin subsequently authorized migration/merge/deployed dry-run while holding first publication and monthly activation. Migration 092 is applied; the [live release receipt](../audits/integrity-production-release-2026-11-02.md) records completed promotion, successful deployed dry-run and the subsequently owner-approved first publication: 73,521 records, generation 1. Monthly scheduling remains off.
 
 [VERIFIED via owner messages, 2026-11-01] Justin requested three initial fixes after inspecting request 1002852: reject conflicting names, use honest identity labels, and validate PubPeer sources. He additionally requested a Retraction Watch update and selected a **monthly** refresh. The proposed timing is **the 1st of every month at 06:00 UTC**, expression `0 6 1 * *`; only the monthly cadence was owner-selected, while the exact time is a planning default.
 
@@ -97,7 +97,7 @@ related:
 
 [PLANNED] Preserve existing caller authentication, request-owned roster, per-request history, staff authority, and standalone versus Workbench save semantics. Retain existing generation/mounted/request guards across every new async result or failure update. No new funding decision or progression requirement is introduced.
 
-## 4. Historical accepted Increment B design (code deployed; first publication held)
+## 4. Historical accepted Increment B design (code deployed; first publication verified)
 
 ### B1. Execution preflight and schema
 
@@ -215,6 +215,10 @@ related:
 [VERIFIED via restored production snapshot] Rehearsal produced 73,521 rows (73,519 upstream + 2 retained), 5,286 additions, 1,846 updates and 13 removals; both retained primary keys stayed stable; repeated unchanged check did not republish. No production write occurred. Fable delta review and closure returned READY FOR OWNER REVIEW, and source checks passed; the [retention receipt](../audits/integrity-retention-fable-review-2026-11-02.md) owns the current verdict and remaining operational gates.
 
 
-## 12. Live release checkpoint — 2026-11-02
+## 12. Historical pre-publication release checkpoint — 2026-11-02
 
 [VERIFIED via canonical migration runner, PR #604, Ready deployment and authenticated production dry-run] Migration 092 is applied; reviewed code is merged as b95a6f04c26440d4254a3c529d9fe4f16e93860c and deployed. Dry-run: 73,519 upstream + 2 retained = 73,521 candidate rows; 5,286 additions, 1,846 updates, 13 removals; checked maintenance receipt 281992. Actual corpus remains 68,248 with unchanged full hash and zero publication metadata rows. Production manual worker flag is on; no monthly schedule exists. First publication is not authorized and no non-dry-run call was made. The [release receipt](../audits/integrity-production-release-2026-11-02.md) is current execution authority; earlier numbered design/checkpoint material preserves its dated implementation context.
+
+## 13. Current publication checkpoint — 2026-11-02
+
+[VERIFIED via owner approval, fresh exact dry-run and independent production readback] The first managed publication is complete: 73,521 records (73,519 upstream + 2 retained), generation 1; 5,286 additions, 1,846 updates and 13 removals. Audit 282049 completed. Monthly scheduling remains off. See the current publication section of the [release receipt](../audits/integrity-production-release-2026-11-02.md). Earlier design and execution checkpoints are historical; no provider-backed re-screen has been run.

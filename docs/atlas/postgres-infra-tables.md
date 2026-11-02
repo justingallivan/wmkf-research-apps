@@ -175,7 +175,7 @@ future-cycle reconciliation; see the roster Contact-link plan F5.
 
 ### `integrity_screenings` (41 rows), `screening_dismissals` (0 rows)
 **Source of truth:** Postgres.
-Per-applicant screening history. `retractions` (68,248 rows) is the Retraction Watch dataset (org-wide).
+Per-applicant screening history. `retractions` (73,521 rows; verified 2026-11-02) is the Retraction Watch dataset (org-wide).
 **Request linkage/history:** Migration 056 adds nullable `request_id UUID` plus
 the `idx_integrity_screenings_request_latest` partial index for newest-first
 lookup. The Workbench integrity service reads the request's PI/Co-PI identities
@@ -227,7 +227,7 @@ does not authorize funding or gate later workflow progression. **[LIVE since 202
 
 **[LIVE via PR #604 — 2026-11-02]** New runs/approvals use coverage version 2 with validated PubPeer source results and explicit unverified name evidence. New approval requires current policy; historical version-1 approval status uses its original completeness rules and unchanged roster/latest-decision precedence. No saved JSON or staff decisions are rewritten, and no schema/migration is needed for this JSON-only accuracy increment. The preceding Production description is the dated deployed baseline. Managed refresh code/schema are live; deployed dry-run succeeded, corpus remains unchanged and monthly schedule is absent; see the retraction metadata page below.
 
-### `retractions` (68,248 rows)
+### `retractions` (73,521 rows; verified 2026-11-02)
 **Source of truth:** Postgres; the displayed count is an historical production snapshot, not a fresh probe. No managed cron has been activated by this work.
 **Read paths:** `lib/services/integrity-service.js` searches authors and records managed generation metadata where available. **[LIVE via PR #604 — 2026-11-02]** `retraction-refresh-service.js` and the manual-only `/api/cron/refresh-retractions` worker validate/stage/atomically merge the official corpus and `retraction_dataset` metadata. The legacy importer upserts a local CSV and optionally clears first; it now refuses managed schema. Migration 092 is applied with unchanged corpus; no production refresh publication was run. See [managed dataset metadata](postgres-retraction-dataset.md) for provenance, guards, tests and remaining release prerequisites.
 
