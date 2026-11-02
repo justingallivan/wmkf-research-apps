@@ -2,6 +2,8 @@
 
 Screen grant applicants for research integrity concerns using multiple data sources and AI analysis.
 
+**Source status (2026-11-02):** The accuracy changes below are built on `codex/integrity-screening-discussion` and are not deployed. Managed monthly refresh is also source-built, disabled and unscheduled; no production dataset was updated. See [refresh operating guide](RETRACTION_WATCH_REFRESH.md).
+
 ## Overview
 
 The Integrity Screener searches for retractions, corrections, and integrity-related news for a list of applicant names. It combines database lookups with AI-powered analysis to surface potential concerns.
@@ -33,15 +35,18 @@ The Integrity Screener searches for retractions, corrections, and integrity-rela
 Each applicant gets a results card showing:
 
 - **Match count** per source (Retraction Watch, PubPeer, News)
-- **Confidence level** — how closely the match aligns with the applicant's name
+- **Name evidence** — what matched, with identity explicitly unverified
 - **Source summaries** — PubPeer and news searches can include AI-written summaries for that source
 - **Individual matches** — expandable details for each hit
 
-#### Understanding Confidence Levels
+#### Understanding name evidence
 
-- **High** — Exact or near-exact name match with strong corroborating evidence
-- **Medium** — Partial name match or common name with some supporting context
-- **Low** — Weak match that may be a different person with the same name
+- **Exact name match**, **Initials match**, and **Name variant** describe name compatibility only; identity remains unverified.
+- **Possible namesake** identifies an ambiguous candidate. Identical names alone do not establish the person.
+- Explicit conflicting given/middle names are excluded. An absent middle name or different current institution alone is not an exclusion.
+- Older runs say **Earlier matching rules · identity not established**; their saved results and decisions are unchanged.
+- Paper-wide affiliation is not proof of affiliation for the matched author. A correction or retraction alone does not establish misconduct.
+- PubPeer results must be HTTPS links on the accepted PubPeer hosts. Off-domain, mixed-domain, malformed, failed or unsearched sources are incomplete, never a clean search. A successful empty indexed search is not a direct search of PubPeer's complete database.
 
 ### 4. Record False Positives
 
@@ -59,8 +64,7 @@ application UI to retrieve earlier runs.
 ## Exporting Results
 
 - Click **Export** to download screening results
-- PDF, JSON, and Markdown exports include the current run's matches, confidence
-  values, and available PubPeer/news summaries
+- PDF, JSON, and Markdown exports include name evidence, source errors, and available summaries. Human-readable exports omit identity percentages. JSON describes any retained numeric confidence as a heuristic similarity score, never an identity probability
 - Dismissal records are not included because the current dismissal UI is not
   persistently wired
 
@@ -69,5 +73,5 @@ application UI to retrieve earlier runs.
 - **Name ambiguity** — Common names may produce false positives. Always review matches carefully before drawing conclusions.
 - **Coverage gaps** — Not all retractions or concerns appear in these databases. A clean screening does not guarantee no issues exist.
 - **Context matters** — A retraction doesn't necessarily indicate misconduct. Papers can be retracted for honest errors, journal issues, or administrative reasons. Read the retraction notice.
-- **Timeliness** — Retraction Watch and PubPeer are updated regularly but may lag behind recent events. News search provides the most current coverage.
+- **Timeliness** — Retraction Watch uses the locally imported dataset. Its current freshness is unverified; managed monthly refresh is source-built but remains disabled pending migration, initial publication approval and separate schedule activation. Indexed PubPeer results and news can also have coverage gaps.
 - **Use as a starting point** — Screening results should inform further investigation, not serve as a final determination.

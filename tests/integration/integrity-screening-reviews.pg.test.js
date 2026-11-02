@@ -40,11 +40,12 @@ const PERSON = { contactId: CONTACT_ID, name: 'Ada Example', institution: 'North
 const RESULT = {
   name: PERSON.name,
   institution: PERSON.institution,
-  sourceCoverageVersion: 1,
+  sourceCoverageVersion: 2,
+  matchingVersion: 2,
   matchCount: 0,
   sources: {
-    retraction_watch: { searched: true, matches: [], error: null },
-    pubpeer: { searched: true, summary: 'No results', error: null },
+    retraction_watch: { searched: true, matches: [], error: null, dataset: { status: 'unrecorded', state: 'unmanaged' } },
+    pubpeer: { searched: true, sourceValidationVersion: 2, resultCount: 0, summary: 'No results', error: null },
     news: { searched: true, summary: 'No results', error: null },
   },
 };
@@ -115,6 +116,21 @@ describeIf('integrity screening reviews (live Postgres, migrations 056-057)', ()
     await pg.client.query(MIGRATION_057);
     await pg.client.query(MIGRATION_057);
     service = await import('../../lib/services/workbench/integrity-service.js');
+  });
+
+  test('recorded v1 approval survives while a new v1 approval is refused', async () => {
+    const id = await insertRun({ createdAt: '2099-01-01T00:00:00Z' });
+    const legacy = { ...RESULT, sourceCoverageVersion: 1, matchingVersion: undefined };
+    await pg.client.query('UPDATE integrity_screenings SET results = $1 WHERE id = $2', [JSON.stringify([legacy]), id]);
+    const args = { requestId: REQUEST_ID, screeningId: id, decision: 'approved', notes: '', profileId, actingUserSystemId: SYSTEM_ID };
+    await expect(service.recordWorkbenchIntegrityReview(args, dataverseDependencies()))
+      .rejects.toMatchObject({ body: { code: 'integrity_screen_incomplete' } });
+    await insertReview([id, REQUEST_ID, profileId, SYSTEM_ID, 'approved', 'Recorded before new policy']);
+    const context = await service.getWorkbenchIntegrityContext(args, dataverseDependencies());
+    expect(context.review).toMatchObject({ status: 'approved', canApprove: false });
+    // Keep this proof from altering the ordering assumptions of the other tests.
+    await pg.client.query('DELETE FROM integrity_screening_reviews WHERE screening_id = $1', [id]);
+    await pg.client.query('DELETE FROM integrity_screenings WHERE id = $1', [id]);
   });
 
   afterAll(async () => {

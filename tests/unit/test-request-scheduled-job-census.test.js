@@ -53,6 +53,7 @@ const RECORDED_CRONS = {
   'pricing-canary': { scheduled: true, class: 'operational' },
   'pricing-refresh': { scheduled: true, class: 'operational' },
   'reconcile-identities': { scheduled: true, class: 'operational' },
+  'refresh-retractions': { scheduled: false, class: 'operational', note: 'org-wide reference corpus only; no request selection, screening or email; monthly schedule intentionally absent during manual first-refresh approval' },
   'refresh-irs-bmf': { scheduled: true, class: 'operational' },
   'reviewer-email-reconcile': { scheduled: true, class: 'guarded', guardFiles: ['lib/services/reviewer-email-reconciler.js'] },
   'reviewer-reminders': { scheduled: false, class: 'guarded', guardFiles: ['lib/services/reviewer-reminder-sweep.js'] },
@@ -71,7 +72,7 @@ test('every cron route is recorded', () => {
     .filter((name) => name.endsWith('.js'))
     .map((name) => name.replace(/\.js$/, ''))
     .sort();
-  expect(routes).toHaveLength(33);
+  expect(routes).toHaveLength(34);
   expect(routes).toEqual(Object.keys(RECORDED_CRONS).sort());
 });
 

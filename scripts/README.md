@@ -118,7 +118,8 @@ DATAVERSE_PROD_WRITE_ACK="request Quick Find view $(date -u +%F)" \
 
 | Script | Description |
 |--------|-------------|
-| `import-retraction-watch.js` | Import Retraction Watch CSV into database |
+| `import-retraction-watch.js` | Legacy CSV import; refuses managed metadata schema |
+| `rehearse-retraction-refresh.cjs` | Explicit loopback-only managed refresh rehearsal; dry-run by default |
 | `test-retractions.js` | Verify Retraction Watch database search functionality |
 | `test-name-matching.js` | Test name matching variants and order swapping (41 tests) |
 

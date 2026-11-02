@@ -15,7 +15,7 @@ beforeEach(() => {
   jest.spyOn(IntegrityMatchingService, 'buildTextSearchPatterns').mockReturnValue(['%example%']);
   mockSql.mockReset().mockImplementation((parts) => {
     const query = Array.isArray(parts) ? parts.join('?') : String(parts);
-    return Promise.resolve({ rows: query.includes('SELECT EXISTS') ? [{ available: true }] : [] });
+    return Promise.resolve({ rows: query.includes('SELECT EXISTS') ? [{ available: true }] : query.includes('to_regclass') ? [{ relation: null }] : [] });
   });
   mockComplete.mockReset().mockResolvedValue({ text: 'No concerns found.' });
   global.fetch = jest.fn().mockImplementation(emptyResponse);
@@ -32,7 +32,7 @@ async function screen(options = strict) {
 
 test('strict source coverage is explicit and successful empty searches are complete', async () => {
   const result = await screen();
-  expect(result.sourceCoverageVersion).toBe(1);
+  expect(result.sourceCoverageVersion).toBe(2);
   expect(Object.keys(result.sources)).toHaveLength(3);
   for (const source of Object.values(result.sources)) expect(source).toMatchObject({ searched: true, error: null });
   expect(global.fetch).toHaveBeenCalledTimes(4);
@@ -159,9 +159,14 @@ test.each([
 });
 
 test.each([1, 2])('Retraction Watch query failure at query %i cannot become clean empty results', async (query) => {
-  mockSql.mockResolvedValueOnce({ rows: [{ available: true }] });
-  if (query === 2) mockSql.mockResolvedValueOnce({ rows: [] });
-  mockSql.mockRejectedValueOnce(new Error('database unavailable'));
+  let corpusQueries = 0;
+  mockSql.mockImplementation((parts) => {
+    const text = parts.join('?');
+    if (text.includes('SELECT EXISTS')) return Promise.resolve({ rows: [{ available: true }] });
+    if (text.includes('to_regclass')) return Promise.resolve({ rows: [{ relation: null }] });
+    if (++corpusQueries === query) return Promise.reject(new Error('database unavailable'));
+    return Promise.resolve({ rows: [] });
+  });
   const result = await screen();
   expect(result.sources.retraction_watch.error).toBe('Retraction Watch query failed');
 });
@@ -178,7 +183,7 @@ test('legacy defaults retain fail-soft search and analysis behavior', async () =
 
 test('strict summary failure is exposed by the generator and cannot be approved as complete', async () => {
   global.fetch.mockImplementation((url) => ({ ok: true, json: async () => ({
-    search_metadata: { status: 'Success' }, [new URL(url).searchParams.get('engine') === 'google_news' ? 'news_results' : 'organic_results']: [{ title: 'Fixture', link: 'https://example.org' }],
+    search_metadata: { status: 'Success' }, [new URL(url).searchParams.get('engine') === 'google_news' ? 'news_results' : 'organic_results']: [{ title: 'Fixture', link: new URL(url).searchParams.get('engine') === 'google_news' ? 'https://example.org' : 'https://pubpeer.com/publications/fixture' }],
   }) }));
   mockComplete.mockRejectedValue(new Error('provider unavailable'));
   const result = await screen();
@@ -229,4 +234,76 @@ test('strict mode keeps specific source-failure messages and names a timeout', a
   mockComplete.mockResolvedValue({ text: '   ' });
   await expect(IntegrityService.analyzeWithHaiku([{ title: 'Fixture', link: 'https://example.org', snippet: '' }], 'Fixture', 'fixture', strict))
     .rejects.toThrow('Invalid response from Claude API');
+});
+
+describe('PubPeer source identity validation (both callers)', () => {
+  const pubpeer = (link) => ({ title: 'Discussion', link, snippet: 'Image concern on a publication' });
+  const response = (items) => ({ ok: true, json: async () => ({ search_metadata: { status: 'Success' }, organic_results: items }) });
+  test.each([
+    'https://example.org/person', 'https://pubpeer.com.evil.org/publications/a',
+    'https://pubpeer.com@evil.org/a', 'https://user@pubpeer.com/publications/a',
+    'http://pubpeer.com/publications/a', 'https://pubpeer.com:8443/publications/a',
+  ])('rejects off-domain or unsafe URL before analysis: %s', async (link) => {
+    global.fetch.mockResolvedValue(response([pubpeer(link)]));
+    await expect(IntegrityService.searchPubPeer('Ada Example', '', 'fixture', 'fixture'))
+      .rejects.toMatchObject({ excludedResultCount: 1 });
+    expect(mockComplete).not.toHaveBeenCalled();
+  });
+  test('mixed results and an invalid narrow response cannot pass validation', async () => {
+    global.fetch.mockResolvedValueOnce(response([pubpeer('https://pubpeer.com/publications/a')]))
+      .mockResolvedValueOnce(response([pubpeer('https://example.org/a'), pubpeer('https://pubpeer.com/publications/a')]));
+    await expect(IntegrityService.searchPubPeer('Ada Example', 'Example University', 'fixture', 'fixture')).rejects.toThrow('unrelated sources');
+    expect(mockComplete).not.toHaveBeenCalled();
+  });
+  test('valid URLs are analyzed, deduplicated and versioned', async () => {
+    global.fetch.mockResolvedValue(response([pubpeer('https://pubpeer.com/publications/a')]));
+    const result = await IntegrityService.searchPubPeer('Ada Example', 'Example University', 'fixture', 'fixture');
+    expect(result).toMatchObject({ sourceValidationVersion: 2, resultCount: 1, hasConcerns: false });
+    expect(mockComplete).toHaveBeenCalledTimes(1);
+  });
+  test('standalone HTTP failure cannot become a successful empty search', async () => {
+    global.fetch.mockResolvedValue({ ok: false, status: 429 });
+    await expect(IntegrityService.searchPubPeer('Ada Example', '', 'fixture', 'fixture')).rejects.toThrow('Search provider request failed');
+  });
+  test('accepted empty responses use indexed-search wording', async () => {
+    const result = await IntegrityService.searchPubPeer('Ada Example', '', 'fixture', 'fixture');
+    expect(result).toMatchObject({ sourceValidationVersion: 2, resultCount: 0 });
+    expect(result.summary).toContain('not a direct search');
+  });
+});
+
+test('engine excludes the reported conflicting authors and keeps namesakes unverified', async () => {
+  const rows = [{ record_id: 'fixture-1', authors: 'Robert A Leung', title: 'Unrelated paper' },
+    { record_id: 'fixture-2', authors: 'Aileen M Bailey', title: 'Another unrelated paper' },
+    { record_id: 'fixture-3', authors: 'He, Yuan', title: 'Possible namesake paper' }];
+  mockSql.mockImplementation((parts) => Promise.resolve({ rows: parts.join('?').includes('SELECT EXISTS') ? [{ available: true }] : parts.join('?').includes('to_regclass') ? [{ relation: null }] : rows }));
+  let complete;
+  for await (const e of IntegrityService.screenApplicants([{ name: 'Anthony Leung' }, { name: 'Scott Bailey' }, { name: 'Yuan He' }], 'fixture', 'fixture', null, strict)) {
+    if (e.type === 'complete') complete = e;
+  }
+  expect(complete.results.map((r) => r.matchCount)).toEqual([0, 0, 1]);
+  expect(complete.results[2].sources.retraction_watch.matches[0]).not.toHaveProperty('confidenceLevel');
+  expect(complete.results[2].sources.retraction_watch.matches[0]).toMatchObject({ matchedAuthor: 'He, Yuan', identityStatus: 'unverified', matchingVersion: 2 });
+});
+
+test('actual retrieval terms fetch the raw all-caps surname before matching', async () => {
+  // Unlike earlier engine fixtures, use the actual builders: a matcher-only
+  // test cannot catch a candidate that the indexed lookup never retrieved.
+  IntegrityMatchingService.buildDatabaseSearchTerms.mockRestore();
+  IntegrityMatchingService.buildTextSearchPatterns.mockRestore();
+  mockSql.mockImplementation((parts, term) => Promise.resolve({ rows:
+    parts.join('?').includes('authors_normalized') && term === 'li wei'
+      ? [{ record_id: 'raw-surname', authors: 'Li Wei', title: 'Retrieved by raw name term' }] : [],
+  }));
+  const matches = await IntegrityService.searchRetractionWatch('LI Wei', '', strict);
+  expect(matches).toHaveLength(1);
+  expect(matches[0]).toMatchObject({ matchedAuthor: 'Li Wei', identityStatus: 'unverified' });
+});
+
+describe('whole-run corpus generation fence',()=>{
+  const meta=(generation)=>({generation:String(generation),source_url:'https://gitlab.com/crossref/retraction-watch-data',source_checksum:'a'.repeat(64),published_at:'2026-11-01T00:00:00Z',last_checked_at:'2026-11-01T00:00:00Z',row_count:10,source_row_count:10,retained_records:[],format_version:1});
+  function managed(before,after){let reads=0;mockSql.mockImplementation(parts=>{const q=parts.join('?');if(q.includes('SELECT EXISTS'))return Promise.resolve({rows:[{available:true}]});if(q.includes('to_regclass'))return Promise.resolve({rows:[{relation:'retraction_dataset'}]});if(q.includes('FROM retraction_dataset'))return Promise.resolve({rows:[meta(reads++===0?before:after)]});return Promise.resolve({rows:[{record_id:'fixture',authors:'Ada Example',title:'A candidate'}]});});}
+  test('unchanged generation records provenance',async()=>{managed(1,1);const r=await screen();expect(r.sources.retraction_watch.dataset).toMatchObject({status:'recorded',generation:'1'});expect(r.sources.retraction_watch.error).toBeNull();});
+  test('A→B→A still invalidates provisional matches because generation changed',async()=>{managed(1,3);const r=await screen();expect(r.sources.retraction_watch.error).toContain('dataset changed');expect(r.sources.retraction_watch.matches).toEqual([]);expect(r.sources.retraction_watch.dataset.status).toBe('unverified');expect(r.matchCount).toBe(0);expect(r.hasConcerns).toBe(false);});
+  test('metadata failure is incomplete, never a clean corpus',async()=>{managed(1,1);const impl=mockSql.getMockImplementation();mockSql.mockImplementation(parts=>parts.join('?').includes('to_regclass')?Promise.reject(new Error('offline')):impl(parts));const r=await screen();expect(r.sources.retraction_watch.error).toBeTruthy();});
 });

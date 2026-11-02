@@ -1,0 +1,81 @@
+[
+  {
+    "data": {
+      "record_id": "13045",
+      "title": "Development of synthetic of peptide-functionalized liposome for enhanced targeted ovarian carcinoma therapy",
+      "authors": "Hong Wu;Li Yao;Jiazhuan Mei;Feng Li",
+      "authors_normalized": [
+        "hong wu",
+        "li yao",
+        "jiazhuan mei",
+        "feng li"
+      ],
+      "journal": "International Journal of Clinical and Experimental Medicine",
+      "publisher": "e-Century Publishing Corporation",
+      "subject": "(BLS) Biochemistry;(BLS) Biology - Cancer;(BLS) Biology - Cellular;(BLS) Biology - Molecular;(HSC) Medicine - Drug Design;",
+      "institution": "Department of Gynecology, Zhengzhou People’s Hospital, 33 Huanghe Road, Zhengzhou 450003, China; Department of Oncology, Zhengzhou People’s Hospital, 33 Huanghe Road, Zhengzhou 450003, China;",
+      "country": "China",
+      "retraction_date": "2017-09-02",
+      "original_paper_doi": "unavailable",
+      "retraction_nature": "Retraction",
+      "retraction_reasons": [
+        "Error in Analyses",
+        "Error in Data",
+        "Error in Results and/or Conclusions"
+      ],
+      "urls": null
+    },
+    "provenance": {
+      "kind": "retained_legacy_record",
+      "recordId": "13045",
+      "reviewedAt": "2026-11-02",
+      "backupSha256": "4fbd26264805cc2c08590fe14b295f9c31a80ae5b7e6309a45b9f1e19249092e",
+      "noticeUrl": "https://e-century.us/files/ijcem/10/9/ijcem1709001.pdf",
+      "reason": "Publisher-confirmed retraction; same-title upstream entry is a different journal publication."
+    }
+  },
+  {
+    "data": {
+      "record_id": "67801",
+      "title": "Microencapsulation using a novel wall material prepared via Maillard reaction-derived mung bean protein-peach gum conjugates to enhance stability and functionality of chia seed oil",
+      "authors": "Mahbuba Siddiquy;Qais Ali Al-Maqtari;Mohamed Ghamry;Norzila Othman;Jian Li;Khin Su Su Hlaing;Lianfu Zhang",
+      "authors_normalized": [
+        "mahbuba siddiquy",
+        "qais ali almaqtari",
+        "mohamed ghamry",
+        "norzila othman",
+        "jian li",
+        "khin su su hlaing",
+        "lianfu zhang"
+      ],
+      "journal": "International Journal of Biological Macromolecules",
+      "publisher": "Elsevier",
+      "subject": "(B/T) Business - Manufacturing;(ENV) Food Science;(PHY) Chemistry;",
+      "institution": "State Key Laboratory of Food Science and Technology, Jiangnan University, Wuxi, Jiangsu 214122, PR China; School of Food Science and Technology, Jiangnan University, Wuxi, Jiangsu 214122, PR China; Micro-Pollutant Research Centre (MPRC), Faculty of Civil Engineering and Built Environment, Universiti Tun Hussein Onn Malaysia (UTHM), 86400 Parit Raja, Batu Pahat, Johor, Malaysia; Department of Food Science and Nutrition, Faculty of Agriculture, Food and Environment, Sana'a University, Sana'a, Yemen; Food Technology Department, Faculty of Agriculture, 13736 Moshtohor, Benha University, Egypt; College of Food and Biological Engineering, Jimei University, Xiamen 361021, PR China;",
+      "country": "China;Egypt;Malaysia;Yemen",
+      "retraction_date": "2025-06-27",
+      "original_paper_doi": "10.1016/j.ijbiomac.2025.139959",
+      "retraction_nature": "Retraction",
+      "retraction_reasons": [
+        "Concerns/Issues about Data",
+        "Concerns/Issues about Image",
+        "Duplication of/in Image",
+        "Euphemisms for Plagiarism",
+        "Lack of Approval from Third Party",
+        "Objections by Third Party",
+        "Original Data and/or Images not Provided and/or not Available",
+        "Plagiarism of Data",
+        "Unreliable Data"
+      ],
+      "urls": null
+    },
+    "provenance": {
+      "kind": "retained_legacy_record",
+      "recordId": "67801",
+      "reviewedAt": "2026-11-02",
+      "backupSha256": "4fbd26264805cc2c08590fe14b295f9c31a80ae5b7e6309a45b9f1e19249092e",
+      "noticeUrl": "https://pubmed.ncbi.nlm.nih.gov/40579249/",
+      "reason": "Publisher and NLM confirm retraction; no replacement found in upstream feed."
+    }
+  }
+]

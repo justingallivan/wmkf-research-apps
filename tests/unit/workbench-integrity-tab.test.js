@@ -16,6 +16,7 @@ const person = { contactId: 'contact-a', name: 'Ada Example', institution: 'Nort
 const completeResult = {
   name: person.name,
   institution: person.institution,
+  matchingVersion: 2,
   matchCount: 0,
   hasConcerns: false,
   sources: {
@@ -69,7 +70,8 @@ test('renders Retraction Watch persisted fields and safe semicolon-separated sou
   requestEnvelope.mockResolvedValue(ok({ ...loaded, latestRun: { ...savedRun, matchCount: 1, results: [result] } }));
   render(<IntegrityTab requestId={requestId} />);
   expect(await screen.findByText('A retracted study')).toBeInTheDocument();
-  expect(screen.getByText(/Match confidence: high \(92%\)/)).toBeInTheDocument();
+  expect(screen.getByText('Earlier matching rules · identity not established')).toBeInTheDocument();
+  expect(screen.queryByText(/92%/)).toBeNull();
   expect(screen.getByText('Matched author: Ada Example')).toBeInTheDocument();
   expect(screen.getByText('Action: Retraction')).toBeInTheDocument();
   expect(screen.getByText('Reasons: Data issues, Image concern')).toBeInTheDocument();
@@ -312,4 +314,10 @@ test('a deferred response cannot replace fresh state after A to B to A navigatio
   resolveOld(ok({ ...loaded, people: [{ ...person, name: 'Ari Stale' }] }));
   await waitFor(() => expect(screen.queryByText('Ari Stale')).toBeNull());
   expect(screen.getByText('Ari Fresh')).toBeInTheDocument();
+});
+
+test('retained matches visibly distinguish their prior-corpus provenance',async()=>{
+  const retained={...completeResult,sources:{...completeResult.sources,retraction_watch:{searched:true,error:null,matches:[{recordId:'13045',title:'Retained paper',retentionProvenance:{kind:'retained_legacy_record',reviewedAt:'2026-11-02',noticeUrl:'https://example.org/notice'}}]}}};
+  requestEnvelope.mockResolvedValue(ok({...loaded,latestRun:{...savedRun,results:[retained]}}));render(<IntegrityTab requestId={requestId}/>);
+  expect(await screen.findByText(/Retained from prior corpus/)).toBeInTheDocument();
 });

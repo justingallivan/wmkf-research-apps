@@ -71,7 +71,7 @@ section('Name Matching with Variants');
 
 let result = IntegrityMatchingService.calculateNameMatch('Robert Smith', 'Bob Smith');
 assert(result.matches && result.matchType === 'name_variant', 'Robert Smith matches Bob Smith (name_variant)');
-assert(result.confidence === 90, `Confidence is 90% (got ${result.confidence}%)`);
+assert(result.confidence === 90, `Heuristic ordering score is 90 (got ${result.confidence}); identity unverified`);
 
 result = IntegrityMatchingService.calculateNameMatch('William Johnson', 'Bill Johnson');
 assert(result.matches && result.matchType === 'name_variant', 'William Johnson matches Bill Johnson');
@@ -86,7 +86,7 @@ section('Asian Name Order Swapping');
 
 result = IntegrityMatchingService.calculateNameMatch('Wei Zhang', 'Zhang Wei');
 assert(result.matches && result.matchType === 'name_order_swap', 'Wei Zhang matches Zhang Wei (name_order_swap)');
-assert(result.confidence === 85, `Confidence is 85% (got ${result.confidence}%)`);
+assert(result.confidence === 85, `Heuristic ordering score is 85 (got ${result.confidence}); identity unverified`);
 
 result = IntegrityMatchingService.calculateNameMatch('Jing Liu', 'Liu Jing');
 assert(result.matches && result.matchType === 'name_order_swap', 'Jing Liu matches Liu Jing');
@@ -102,7 +102,7 @@ section('Combined: Variant + Order Swap');
 result = IntegrityMatchingService.calculateNameMatch('Bob Zhang', 'Zhang Robert');
 assert(result.matches && result.matchType === 'name_order_swap_variant',
   'Bob Zhang matches Zhang Robert (name_order_swap_variant)');
-assert(result.confidence === 75, `Confidence is 75% (got ${result.confidence}%)`);
+assert(result.confidence === 75, `Heuristic ordering score is 75 (got ${result.confidence}); identity unverified`);
 
 // ============================================
 // TEST: Database Search Terms
@@ -157,7 +157,7 @@ assert(result.matches && result.matchType === 'last_first_initial' && result.con
 
 result = IntegrityMatchingService.calculateNameMatch('John Smith', 'John P Smith');
 assert(result.matches && result.matchType === 'first_last_exact' && result.confidence === 95,
-  'First+Last exact ignores middle name');
+  'First+Last candidate tolerates an absent middle name, never an explicit conflict');
 
 // ============================================
 // Summary

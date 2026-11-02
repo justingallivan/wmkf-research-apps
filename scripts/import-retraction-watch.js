@@ -1,5 +1,8 @@
 /**
- * Import Retraction Watch Database
+ * Legacy, unmanaged Retraction Watch import.
+ * Managed datasets must use the reviewed refresh service; this tool refuses
+ * once the metadata schema exists, and is never an automatic-refresh fallback.
+ * Initial cutover must also confirm no earlier legacy import is still running.
  *
  * Usage:
  *   node scripts/import-retraction-watch.js --file /path/to/local.csv
@@ -170,6 +173,12 @@ async function main() {
   if (!fs.existsSync(customFilePath)) {
     console.error(`File not found: ${customFilePath}`);
     process.exit(1);
+  }
+
+  // Prevent an unmanaged rewrite from bypassing publication generations.
+  const managed = await pool.query("SELECT to_regclass('retraction_dataset')::text AS relation");
+  if (managed.rows[0]?.relation) {
+    throw new Error('Managed Retraction Watch schema exists; use the controlled refresh workflow instead of the legacy importer.');
   }
 
   // Clear if requested

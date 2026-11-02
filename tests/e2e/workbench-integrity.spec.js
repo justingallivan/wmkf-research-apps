@@ -8,20 +8,21 @@ const REQUEST_ID = '00000000-0000-4000-8000-000000000001';
 const NEXTAUTH_SECRET = 'e2e-throwaway-nextauth-secret-32-chars';
 const INSTITUTION = 'Northwestern Center for Interdisciplinary Biomedical and Translational Research at the University of Example';
 const PEOPLE = [{ contactId: '11111111-1111-4111-8111-111111111111', name: 'Ada Integrity Example', institution: INSTITUTION, role: 'PI' }];
+const RETAINED = {kind:'retained_legacy_record',recordId:'13045',reviewedAt:'2026-11-02',noticeUrl:'https://notice.example/retraction',backupSha256:'b'.repeat(64),recordSha256:'c'.repeat(64)};
 const RESULT = {
   name: PEOPLE[0].name,
   institution: INSTITUTION,
   isCommonName: true,
-  sourceCoverageVersion: 1,
+  sourceCoverageVersion: 2, matchingVersion: 2,
   matchCount: 1,
   hasConcerns: true,
   sources: {
-    retraction_watch: { searched: true, matches: [{
-      title: 'A retracted public study', matchedAuthor: PEOPLE[0].name, confidence: 92, confidenceLevel: 'high',
+    retraction_watch: { searched: true, dataset: {status:'recorded',generation:'7',checksum:'a'.repeat(64),sourceUrl:'https://gitlab.com/crossref/retraction-watch-data/-/raw/main/retraction_watch.csv',rowCount:73521,sourceRowCount:73519,retainedRecords:[RETAINED,{...RETAINED,recordId:'67801'}],publishedAt:'2026-11-01T00:00:00.000Z',lastCheckedAt:'2026-11-02T00:00:00.000Z'}, matches: [{
+      recordId:'13045',retentionProvenance:RETAINED,title: 'A retracted public study', matchedAuthor: PEOPLE[0].name, confidence: 92, matchingVersion: 2, identityStatus: 'unverified', nameEvidence: 'exact_name',
       retractionNature: 'Retraction', reasons: ['Data concern'], doi: '10.1000/example',
       urls: 'https://retraction.example/one; https://retraction.example/two',
     }], error: null },
-    pubpeer: { searched: true, summary: 'A source summary for human review.', resultCount: 1, hasConcerns: false, rawResults: [{ title: 'Public discussion', link: 'https://pubpeer.com/publication/example' }], error: null },
+    pubpeer: { searched: true, sourceValidationVersion: 2, summary: 'A source summary for human review.', resultCount: 1, hasConcerns: false, rawResults: [{ title: 'Public discussion', link: 'https://pubpeer.com/publication/example' }], error: null },
     news: { searched: true, summary: 'No relevant news found.', resultCount: 0, hasConcerns: false, error: null },
   },
 };
@@ -117,9 +118,13 @@ test('Integrity tab loads, confirms before spending, and renders saved findings 
   });
   await page.getByRole('button', { name: 'Run screen' }).click();
   await expect(page.getByText('Latest saved screen')).toBeVisible();
+  await expect(page.getByText(/Earlier matching rules/)).toHaveCount(0);
   await expect(page.getByText('1 item for human review')).toBeVisible();
   await expect(page.getByText('Incomplete screen')).toHaveCount(0);
   await expect(page.getByText('A retracted public study')).toBeVisible();
+  await expect(page.getByText(/^Dataset 7 /)).toBeVisible();
+  await expect(page.getByText(/73519 upstream \+ 2 retained legacy records/)).toBeVisible();
+  await expect(page.getByText(/Retained from prior corpus/)).toBeVisible();
   await expect(page.getByText('Common name — verify identity carefully')).toBeVisible();
   await expect(page.getByRole('link', { name: 'View Source' }).first()).toHaveAttribute('href', 'https://retraction.example/one');
   await expect(page.getByRole('link', { name: 'Public discussion' })).toHaveAttribute('href', 'https://pubpeer.com/publication/example');

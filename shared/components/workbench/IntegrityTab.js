@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { requestEnvelope } from '../../utils/api-request';
 import { Button, Card } from '../Layout';
+import { integrityRetentionLabel, integrityIdentityLabel, integrityDatasetLabel, integrityIncomplete } from '../../utils/integrity-evidence';
 
 const SOURCES = [
   ['retraction_watch', 'Retraction Watch'],
@@ -16,10 +17,7 @@ function sourceState(source) {
 }
 
 function isIncomplete(result) {
-  return SOURCES.some(([key]) => {
-    const source = result?.sources?.[key];
-    return !source || source.searched !== true || Boolean(source.error);
-  });
+  return integrityIncomplete(result);
 }
 
 function formatDate(value) {
@@ -91,7 +89,7 @@ function SourceSummary({ sourceKey, label, source }) {
         <span className={source?.error ? 'text-red-700' : 'text-gray-600'}>{sourceState(source)}</span>
         {searched && !source?.error && (
           sourceKey === 'retraction_watch'
-            ? <span className="text-gray-600">{hasConcerns ? `${matches.length} match${matches.length === 1 ? '' : 'es'}` : 'No matches reported'}</span>
+            ? <span className="text-gray-600">{hasConcerns ? `${matches.length} potential record${matches.length === 1 ? '' : 's'}` : 'No matches reported'}</span>
             : hasConcerns
               ? <span className="text-gray-600">Flagged for human review{hasResultCount ? ` · ${source.resultCount} search results` : ''}</span>
               : hasResultCount
@@ -99,13 +97,17 @@ function SourceSummary({ sourceKey, label, source }) {
                 : <span className="text-gray-600">No concerns reported by this source</span>
         )}
       </div>
+      {sourceKey === 'retraction_watch' && <p className="mt-1 text-xs text-gray-600">{integrityDatasetLabel(source?.dataset)}</p>}
       {summary && <p className="mt-1 text-sm text-gray-700 whitespace-pre-wrap">{summary}</p>}
       {matches.map((match, index) => (
         <div key={`${match.sourceIdentifier || match.doi || match.title || 'match'}-${index}`} className="mt-1 text-sm text-gray-700">
           <p className="font-medium text-gray-900">{match.title || 'Retraction Watch match'}</p>
-          {match.confidenceLevel && <p className="mt-0.5 text-xs text-gray-600">Match confidence: {match.confidenceLevel}{typeof match.confidence === 'number' && Number.isFinite(match.confidence) ? ` (${match.confidence}%)` : ''}</p>}
+          <p className="mt-0.5 text-xs text-gray-600">{integrityIdentityLabel(match)}</p>
+          {match.retentionProvenance && <p className="mt-0.5 text-xs text-amber-800">{integrityRetentionLabel(match)}</p>}
           {match.matchedAuthor && <p className="mt-0.5 text-sm">Matched author: {match.matchedAuthor}</p>}
+          {match.institution && <p className="mt-0.5 text-sm">Paper-wide affiliation: {match.institution}</p>}
           {match.source && <span className="text-gray-500"> · {match.source}</span>}
+          <p className="mt-1 text-xs text-gray-600">A correction or retraction alone does not establish misconduct.</p>
           {match.retractionNature && <p className="mt-1">Action: {match.retractionNature}</p>}
           {Array.isArray(match.reasons) && match.reasons.length > 0 && <p className="mt-1">Reasons: {match.reasons.join(', ')}</p>}
           {match.doi && <p className="mt-1">DOI: <a className="text-blue-700 underline underline-offset-2" href={`https://doi.org/${match.doi.split('/').map(encodeURIComponent).join('/')}`} target="_blank" rel="noopener noreferrer">{match.doi}</a></p>}
@@ -135,6 +137,7 @@ function PersonResult({ result }) {
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h3 className="font-semibold text-gray-900">{result?.name || 'Unnamed person'}</h3>
+          {result?.matchingVersion !== 2 && <p className="mt-0.5 text-xs text-gray-600">Earlier matching rules · identity not established</p>}
           {result?.isCommonName && <p className="mt-0.5 text-xs font-medium text-blue-800">Common name — verify identity carefully</p>}
           {result?.institution && <p className="mt-0.5 text-sm text-gray-600">{result.institution}</p>}
         </div>

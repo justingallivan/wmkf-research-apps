@@ -259,7 +259,7 @@ Last". Sixth distinct honorific token set (`phd`/`md` included, `sir`
 included, but as mid-string word-boundary matches rather than leading-anchor
 — structurally different matching strategy from every other stripper here).
 - **Callers**: `extractNameParts`, `isCommonName`, `calculateNameMatch` (the
-  7-tier confidence scorer used by Retraction Watch integrity screening —
+  conservative name-candidate scorer used by Retraction Watch integrity screening on the Integrity branch (source-built, not deployed, 2026-11-02; the historical baseline used seven tiers) —
   `findMatchesInAuthors`), `buildDatabaseSearchTerms`,
   `buildTextSearchPatterns`. This is retraction/integrity screening's OWN
   independent nickname map too — see §3.2.
@@ -406,7 +406,7 @@ institutions instead — not exported, defined inline inside
   BONUS (+15 exact, +10 partial-contains, +10 on ≥2-significant-word-overlap
   after stripping a small stopword list `{of,the,and,at,in,for,university,
   college,institute}`) layered on top of `calculateNameMatch`'s (§1.14)
-  person-name confidence tiers, for Retraction Watch integrity screening.
+  person-name candidate matching, for Retraction Watch integrity screening; scores are heuristic and do not establish identity.
 
 ### 2.9 `institutionTokens` — `lib/services/contact-enrichment/domain-evidence.js:18`
 ```
@@ -466,9 +466,9 @@ formal name vs. many nicknames), different coverage (§3.2 has international
 variants, §3.1 doesn't), and — the caller-risk finding — used at completely
 different seams: §3.1 gates PubMed byline identity CONFIRMATION for a
 suggested reviewer (discovery/name-matching.js); §3.2 gates Retraction Watch
-NAME-MATCH CONFIDENCE scoring for integrity screening. **"Chris" and
-"Christopher" are the same person for retraction screening and for PubMed
-byline confirmation, but nowhere else** — the roster dedup key (§1.3), the
+NAME-CANDIDATE scoring for integrity screening. **"Chris" and
+"Christopher" are compatible name candidates for retraction screening and for PubMed
+byline confirmation, not proof of the same person** — the roster dedup key (§1.3), the
 proposal-author COI exclusion filter (§1.1/§1.2), the save-candidates
 promotion dedup key (§1.13), and the reviewer-exclusion partition (§1.3) all
 have NO nickname awareness at all and would treat "Chris Cheung" and
@@ -491,7 +491,7 @@ have NO nickname awareness at all and would treat "Chris Cheung" and
 | 11 | `comparableName` | reviewer-works-first.js:107 | stripHonorific(#8)+NFKC+hyphen-unify, NO lowercase |
 | 12 | `normalizeDisplayName` | contact-parser.js:195 | ws-collapse only, NO lowercase, NO honorific — display purpose |
 | 13 | inline `normalizedName` | save-candidates-service.js:963 | lowercase+honorific(3, =#4's set)+strip-non-alpha+ws |
-| 14 | `IntegrityMatchingService.normalizeName` | integrity-matching-service.js:200 | +NFD diacritic +Last,First reorder +honorific(8, mid-word) |
+| 14 | `IntegrityMatchingService.normalizeName` | integrity-matching-service.js:200 | +NFD diacritic +Last,First reorder +honorific(8, mid-word); Integrity branch adds suffix handling (source-built, not deployed, 2026-11-02) |
 | — | composite `normalizeName` | reviewer-work-author-resolver.js:34 | #6 then #5 — **duplicated inline** at reviewer-identity-lookup.js:44-45 |
 
 **14 definitions found** (matches the memo's count exactly), of which:

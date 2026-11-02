@@ -225,10 +225,11 @@ the live request roster and source coverage version 1 with all sources searched
 and no errors. A recorded approval means the integrity review is complete; it
 does not authorize funding or gate later workflow progression. **[LIVE since 2026-09-30: PR #366 merged as `fdaec0b1f` and deployed; migration 057 applied and schema-verified (S552)]**
 
+**[SOURCE-BUILT, NOT DEPLOYED — 2026-11-02]** On `codex/integrity-screening-discussion`, new runs/approvals use coverage version 2 with validated PubPeer source results and explicit unverified name evidence. New approval requires current policy; historical version-1 approval status uses its original completeness rules and unchanged roster/latest-decision precedence. No saved JSON or staff decisions are rewritten, and no schema/migration is needed for this JSON-only accuracy increment. The preceding Production description is the dated deployed baseline. Managed monthly refresh is now source-built but unscheduled; migration 092 is applied with unchanged corpus, and code promotion/manual dry-run are authorized; see the retraction metadata page below.
+
 ### `retractions` (68,248 rows)
-**Source of truth:** Postgres (manually refreshed via script — no live cron).
-**Read paths (verified 2026-05-07):** `lib/services/integrity-service.js` — searches `retractions.authors_normalized` for overlap with screened applicants, falls back to text match.
-**Write paths:** `scripts/import-retraction-watch.js` — DELETE all + INSERT bulk from Retraction Watch CSV. **No `/api/cron/refresh-retractions` route exists** (Atlas v1 mis-cited this).
+**Source of truth:** Postgres; the displayed count is an historical production snapshot, not a fresh probe. No managed cron has been activated by this work.
+**Read paths:** `lib/services/integrity-service.js` searches authors and records managed generation metadata where available. **[SOURCE-BUILT, NOT DEPLOYED — 2026-11-02]** `retraction-refresh-service.js` and the disabled `/api/cron/refresh-retractions` worker validate/stage/atomically merge the official corpus and `retraction_dataset` metadata. The legacy importer upserts a local CSV and optionally clears first; it now refuses managed schema. Migration 092 is applied with unchanged corpus; no production refresh publication was run. See [managed dataset metadata](postgres-retraction-dataset.md) for provenance, guards, tests and remaining release prerequisites.
 
 ## Virtual Review Panel (legacy, retired 2026-10-04)
 

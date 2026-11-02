@@ -121,13 +121,13 @@ async function main() {
         const { IntegrityService } = require('../lib/services/integrity-service');
         const matches = await IntegrityService.searchRetractionWatch(testName, null);
 
-        console.log(`  After confidence filtering: ${matches.length} matches`);
+        console.log(`  After name-candidate filtering: ${matches.length} matches`);
 
         if (matches.length > 0) {
           console.log('\n  Top matches:');
           matches.slice(0, 3).forEach((m, i) => {
             console.log(`    ${i + 1}. ${m.title?.substring(0, 50)}...`);
-            console.log(`       Matched: "${m.matchedAuthor}" (${m.confidence}% confidence)`);
+            console.log(`       Matched: "${m.matchedAuthor}" (${m.matchType}; identity unverified; heuristic score ${m.confidence})`);
           });
         }
       }

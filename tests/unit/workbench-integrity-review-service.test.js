@@ -11,11 +11,12 @@ const PERSON = { contactId: CONTACT_ID, name: 'Ada Example', institution: 'North
 const RESULT = {
   name: PERSON.name,
   institution: PERSON.institution,
-  sourceCoverageVersion: 1,
+  sourceCoverageVersion: 2,
+  matchingVersion: 2,
   matchCount: 0,
   sources: {
-    retraction_watch: { searched: true, matches: [], error: null },
-    pubpeer: { searched: true, summary: 'No results', error: null },
+    retraction_watch: { searched: true, matches: [], error: null, dataset: { status: 'unrecorded', state: 'unmanaged' } },
+    pubpeer: { searched: true, sourceValidationVersion: 2, resultCount: 0, summary: 'No results', error: null },
     news: { searched: true, summary: 'No results', error: null },
   },
 };
@@ -334,4 +335,45 @@ test('migration 057 and fresh-install setup preserve append-only review rows and
     expect(source).toContain('idx_integrity_screening_reviews_screening_created');
   }
   expect(migration).not.toContain('ON DELETE CASCADE');
+});
+
+test.each([
+  { ...RESULT, sourceCoverageVersion: 1, matchingVersion: undefined },
+  { ...RESULT, sources: { ...RESULT.sources, retraction_watch: { ...RESULT.sources.retraction_watch, dataset: undefined } } },
+])('legacy approval survives but cannot grant a new approval under current rules', async (legacyResult) => {
+  const oldRun = { ...RUN, results: [legacyResult] };
+  const approval = { id: 700, screening_id: RUN.id, decision: 'approved', created_at: RUN.created_at };
+  const deps = dependenciesFor(dataverseDependencies(), { runs: [oldRun], reviews: [approval] });
+  const context = await getWorkbenchIntegrityContext({ requestId: REQUEST_ID, profileId: 42, actingUserSystemId: SYSTEM_ID }, deps);
+  expect(context.review).toMatchObject({ status: 'approved', canApprove: false });
+  expect(context.review.reason).toContain('earlier rules');
+  const unapproved = dependenciesFor(dataverseDependencies(), { runs: [oldRun] });
+  const pending = await getWorkbenchIntegrityContext({ requestId: REQUEST_ID, profileId: 42, actingUserSystemId: SYSTEM_ID }, unapproved);
+  expect(pending.review).toMatchObject({ status: 'needs_review', canApprove: false });
+  expect(pending.review.reason).toContain('earlier rules');
+  await expect(recordWorkbenchIntegrityReview(reviewArgs(), unapproved)).rejects.toMatchObject({ body: { code: 'integrity_screen_incomplete' } });
+  expect(unapproved.state.inserts).toHaveLength(0);
+});
+
+test('a newer legacy hold wins over an earlier approval', async () => {
+  const oldRun = { ...RUN, results: [{ ...RESULT, sourceCoverageVersion: 1 }] };
+  const deps = dependenciesFor(dataverseDependencies(), { runs: [oldRun], reviews: [
+    { id: 702, screening_id: RUN.id, decision: 'hold', notes: 'Recheck' },
+    { id: 701, screening_id: RUN.id, decision: 'approved' },
+  ] });
+  const context = await getWorkbenchIntegrityContext({ requestId: REQUEST_ID, profileId: 42, actingUserSystemId: SYSTEM_ID }, deps);
+  expect(context.review).toMatchObject({ status: 'hold', canApprove: false });
+});
+
+test.each([
+  { ...RESULT, sources: { ...RESULT.sources, retraction_watch: { ...RESULT.sources.retraction_watch, dataset: { status: 'unverified' } } } },
+  { ...RESULT, sourceCoverageVersion: 99 },
+  { ...RESULT, sources: { ...RESULT.sources, retraction_watch: { ...RESULT.sources.retraction_watch, dataset: undefined } } },
+  { ...RESULT, matchingVersion: undefined },
+  { ...RESULT, sources: { ...RESULT.sources, pubpeer: { ...RESULT.sources.pubpeer, sourceValidationVersion: undefined } } },
+  { ...RESULT, sources: { ...RESULT.sources, retraction_watch: { searched: true, matches: [{ matchingVersion: 2, identityStatus: 'verified', nameEvidence: 'exact_name' }], error: null } } },
+])('unknown or malformed current evidence fails closed for new approvals', async (badResult) => {
+  const deps = dependenciesFor(dataverseDependencies(), { runs: [{ ...RUN, results: [badResult] }] });
+  await expect(recordWorkbenchIntegrityReview(reviewArgs(), deps)).rejects.toMatchObject({ body: { code: 'integrity_screen_incomplete' } });
+  expect(deps.state.inserts).toHaveLength(0);
 });
