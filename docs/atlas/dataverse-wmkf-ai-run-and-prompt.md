@@ -108,7 +108,7 @@ versions and the sandbox were not backfilled.
 - **Display:** `resolveAdminPromptDescription` in
   `shared/config/adminPromptCatalog.js` prefers stored values field by field
   and falls back to the code catalog. Group/section and usage are validated.
-- **Edit [BUILT on branch, 2026-11-02; not yet deployed]:**
+- **Edit [VERIFIED deployed 2026-11-02, PR #608 `d108f21a1`]:**
   `PATCH /api/admin/prompts/[name]` (superuser) edits the six columns in place
   on the loaded current row (or the highest-version row when none is current).
   It creates no new version.
@@ -407,8 +407,8 @@ These are independent. Don't conflate them.
 
 **Write path:** `pages/api/admin/prompts/[name].js` (superuser) — the versioned-publish route. Prompt content is not stored here (it lives on the `wmkf_ai_prompt` row); only hashes and audit metadata.
 
-**Catalog-details edits [BUILT on branch, 2026-11-02; requires migration 093
-applied before deploy]:**
+**Catalog-details edits [VERIFIED deployed 2026-11-02, PR #608 `d108f21a1`;
+migration 093 applied to Production Postgres first and its constraint read back]:**
 
 - **Writer:** `PATCH /api/admin/prompts/[name]` via
   `lib/services/admin/prompts-catalog-service.js`.

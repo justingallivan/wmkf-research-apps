@@ -61,6 +61,25 @@ None required for this Integrity task. Do not start new work during closeout.
 The first future monthly execution remains unobserved; inspect its maintenance
 receipt if the owner asks about it, rather than claiming scheduled execution passed.
 
+### Action item — next session (owner request, 2026-11-02, Claude)
+
+**First publish for a brand-new prompt name in Admin.**
+[VERIFIED via `lib/services/admin/prompts-publish-service.js`] Admin publish
+refuses any name with no current row (`404 no_current_row`, "seed it before
+versioned publish"). Connor's new prompts, once added to `wmkf_ai_prompt`,
+cannot go live from Admin until this is fixed.
+
+- Scope: extend the existing publish flow; do not build a new one.
+- Keep `If-Match`, single-current verification, the pending/final audit and
+  payload idempotency.
+- Decide with Justin how the first version is created: v1 from the draft row,
+  or flip the draft row to current.
+- Resume from `docs/plans/SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md`.
+
+Also: close PR #553 (superseded plug-in design). It must not merge; its
+Pre-Site output-schema change would break generation. Ask Justin or Codex
+before closing another agent's PR.
+
 ### Parked — requires a new owner request
 
 - ORCID/publication/coauthor-grounded identity matching for common names.
@@ -87,7 +106,7 @@ worklist or transferable production-write authorization.
 
 | Owner / stream | Current routing and preservation boundary |
 | --- | --- |
-| Claude / shared prompts | PR #606 is merged; 997d395a4 records the subsequent 40-row catalog backfill. Owning record: docs/plans/SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md. Recheck source/live state with its owner; do not revive superseded plug-in/Windows-registration directions or treat the old PR #553 branch as current authority. |
+| Claude / shared prompts | PR #606 is merged; 997d395a4 records the subsequent 40-row catalog backfill. PR #608 (Admin "Edit details" for the six catalog fields, audited in `prompt_publish_audit`) is merged and deployed as `d108f21a1`; migration 093 was applied to Production Postgres first (owner-run) and its constraint was verified. Next: first publish for new prompt names (see the action item above). Owning record: docs/plans/SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md. Recheck source/live state with its owner; do not revive superseded plug-in/Windows-registration directions or treat the old PR #553 branch as current authority. |
 | Claude / reviewer outcomes and invitations | Existing owning plans: docs/plans/INVITED_REVIEWER_OUTCOMES_PLAN_2026-10-31.md and docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md. Current open/closed items were not re-audited here. Coordinate before edits or sends. |
 | Codex / terminology | Merged slices and bounded verifier; preceding handoff and docs/audits/terminology-completion-audit-2026-11-01.md retain acceptance limits. Local colleague-brief output is not Git-backed; leave it untouched. |
 | Other streams | Preserve their worktrees, owning plans and queue decisions. No reprioritization or cleanup authority for another agent's artifacts. |

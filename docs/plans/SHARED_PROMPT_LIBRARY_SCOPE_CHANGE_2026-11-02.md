@@ -158,8 +158,8 @@ Justin's same-day approval (`DATAVERSE_PROD_WRITE_ACK`). Steps as run:
    records, per row, the name, row ID, ETags, before and after values,
    PATCH status and readback. It is needed because this write did not go
    through the Postgres `prompt_publish_audit`.
-7. **Editing in Admin** [OWNER DECISION 2026-11-02; BUILT on branch, not
-   deployed]
+7. **Editing in Admin** [OWNER DECISION 2026-11-02; VERIFIED deployed in PR
+   #608 `d108f21a1`, after migration 093 was applied]
    - Admin → AI → Prompts → **Edit details** saves the six fields in place,
      with no new version.
    - Group, section and usage are chosen from the existing lists.
