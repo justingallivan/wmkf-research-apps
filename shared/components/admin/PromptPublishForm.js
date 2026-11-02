@@ -92,13 +92,13 @@ export default function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome
   const modelCeiling = modelOutputCeiling(model, modelCatalog);
   const maxTokensValidation = validateMaxTokensInput(maxTokensText, modelCeiling);
   const validation = validatePromptForSave(prompt.name, body);
-  // A draft (no current version) can be published as-is: that IS the change.
-  const unchanged = prompt.hasCurrent
-    && maxTokensText.trim() === initialMaxTokens
+  const edited = !(maxTokensText.trim() === initialMaxTokens
     && body === (prompt.body || '')
     && systemPrompt === (prompt.systemPrompt || '')
     && outputSchema === (prompt.outputSchema || '')
-    && model === (prompt.model || '');
+    && model === (prompt.model || ''));
+  // A draft (no current version) can be published as-is: that IS the change.
+  const unchanged = prompt.hasCurrent && !edited;
 
   const submit = async () => {
     setSubmitting(true);
@@ -256,7 +256,7 @@ export default function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome
             setModel(prompt.model || '');
             setMaxTokensText(initialMaxTokens);
           }}
-          disabled={unchanged}
+          disabled={!edited}
           className="text-xs text-gray-600 hover:text-gray-900 disabled:opacity-40"
         >
           Reset

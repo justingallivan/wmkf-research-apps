@@ -62,6 +62,15 @@ test('keeps application use, stored reference and live publication state separat
   expect(within(draft).getByRole('button', { name: 'Review & publish' })).toBeEnabled();
 });
 
+test('a draft with no version number offers Publish v1', async () => {
+  serve([{ ...prompt('connor.budget-check', false), version: null, model: null, maxTokens: null }]);
+  await renderOpenWorkflows();
+  const card = await screen.findByRole('article', { name: 'Description not cataloged' });
+  fireEvent.click(within(card).getByRole('button', { name: 'Review & publish' }));
+  expect(within(card).getByRole('button', { name: 'Publish v1' })).toBeEnabled();
+  expect(within(card).getByRole('button', { name: 'Reset' })).toBeDisabled();
+});
+
 test('a draft-only prompt can be published unchanged as its first version', async () => {
   serve([prompt('phase-i.checkin', false)]);
   await renderOpenWorkflows();

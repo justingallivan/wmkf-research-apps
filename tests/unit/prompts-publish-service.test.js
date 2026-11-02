@@ -529,7 +529,7 @@ describe('publishPrompt — first publish of a draft-only name', () => {
   const draftRow = (over = {}) => ({
     ...currentRow({ version: 1, id: 'draft-id', model: 'sonnet', ...over }),
     wmkf_ai_iscurrent: false,
-    wmkf_ai_promptstatus: 682090000,
+    wmkf_ai_promptstatus: null,
     wmkf_ai_displaytitle: 'Draft title',
   });
   const args = (over = {}) => ({ name: NAME, body: VALID_BODY, profileId: 7, ...over });
@@ -601,5 +601,29 @@ describe('publishPrompt — first publish of a draft-only name', () => {
     const r = await publishPrompt(args({ requestId: 'retry', expectedVersion: 1 }));
     expect(r).toMatchObject({ status: 'completed', resumed: true, newPromptId: 'new-row', targetVersion: 2 });
     expect(aiPrompt.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('publishPrompt — first publish of a bare uncataloged draft', () => {
+  it('publishes v1 for an unknown name with no version, model, variables or schema', async () => {
+    const bare = {
+      wmkf_ai_promptid: 'connor-draft', wmkf_ai_promptname: 'connor.budget-check',
+      wmkf_promptversion: null, wmkf_ai_iscurrent: false,
+      wmkf_ai_promptbody: 'Check the attached budget and list any arithmetic errors.',
+      wmkf_ai_systemprompt: null, wmkf_ai_promptvariables: null, wmkf_ai_promptoutputschema: null,
+      wmkf_ai_model: null, wmkf_ai_temperature: null, wmkf_ai_maxtokens: null, wmkf_ai_promptstatus: null,
+    };
+    aiPrompt.queryCurrentRows.mockResolvedValue({ records: [] });
+    aiPrompt.listVersions.mockResolvedValue({ records: [bare] });
+    aiPrompt.queryCurrentIdVersions.mockResolvedValue({ records: [{ wmkf_ai_promptid: 'new-row' }] });
+    const r = await publishPrompt({
+      name: 'connor.budget-check', body: bare.wmkf_ai_promptbody, systemPrompt: '',
+      outputSchema: '', model: '', expectedVersion: null, profileId: 7,
+    });
+    expect(r).toMatchObject({ status: 'completed', targetVersion: 1, firstPublish: true });
+    expect(aiPrompt.create).toHaveBeenCalledWith(expect.objectContaining({
+      wmkf_ai_promptname: 'connor.budget-check', wmkf_promptversion: 1,
+      wmkf_ai_iscurrent: true, wmkf_ai_promptstatus: 682090001,
+    }));
   });
 });
