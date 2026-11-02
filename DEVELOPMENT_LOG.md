@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## November 2026 — Approved proposal-workflow terminology adopted (Session 657, Codex)
+
+**Milestone:** The apps adopt the approved names for proposal discussions, research presentations, shared packets and writeups, with bounded production verification.
+**Sessions:** Session 657; owner-directed terminology slices and preservation checks, followed by a colleague brief.
+**Ship state:**
+- Source slices through #600 are merged; #599 records signed-in Production observations and remaining acceptance boundaries.
+- #601 (`73d270b93`) updates legacy-client error wording while retaining codes/status/behavior; its exact-SHA Production deployment and nine synthetic guard cases passed the read-only verifier.
+- #602 (`80cc68003`) adds autonomous deployment/source verification; it does not make application HTTP requests or prove live error/browser display.
+- Saved names, custom wording, existing documents and frozen calendar content remain protected; separately authorized shared-field/default/prompt updates have dated receipts.
+**Why it matters:** Staff have distinct names for the Proposal discussion brief, Proposal review packet, Draft writeup and Final writeup without a broad rewrite of saved content.
+**Pointers:** `docs/NOMENCLATURE_GLOSSARY.md`; `docs/audits/terminology-completion-audit-2026-11-01.md`; `docs/audits/terminology-release-verification-2026-11-01.json`. Full 16-name acceptance is not certified by these bounded checks.
+
 ## November 2026 — Staff record how a reviewer engagement ended; invitations stop promising a release date (Session 655, Claude)
 
 **Milestone:** Program Directors can record a withdrawal, conflict of interest or other ending for accepted and not-yet-answered reviewers, and the invitation no longer promises a proposal release date now that materials go out on acceptance.
