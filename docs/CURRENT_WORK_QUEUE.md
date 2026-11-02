@@ -76,21 +76,24 @@ sequence.
 
 - **Deliberations display vocabulary — approved 2026-10-21; adoption partial.**
   PRs #577, #580, #581, #583, #590, #591 and #592 merged bounded display-copy
-  slices. PR #593 merged the terminology audit as `d73cdc96e`; PR #594 merged
-  A1-A3 as `21c937783`, PR #595 merged B1 as `6cbed404c`, and PR #596 merged
-  B2 as `73ecc8445` (source/Git only; no deployment inferred). The v8-to-v9
-  template change updates only the visible heading and renderVersion; the staff
-  token, old template, and stored documents are preserved. Recovery reuses an
-  uploaded file when possible; an unresolved saved attempt with a mismatched
-  template version returns HTTP 409 and requires a new confirmed operation.
-  A4 sentence-case copy and C1-C2 default/error copy are in progress on
-  `codex/remaining-source-terminology`; check current Git/PR and release
-  receipts before updating their status. Evidence, limits, and preservation
-  boundaries: `docs/audits/terminology-completion-audit-2026-11-01.md`.
-  Live saved values, prompts, files, and deployment state remain unknown. No data
-  migration, prompt publication, or backfill is authorized. Approved table and
-  dated history: `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`;
-  glossary: `docs/NOMENCLATURE_GLOSSARY.md`.
+  slices. PR #593 merged the audit (`d73cdc96e`); PRs #594–#597 merged A1–A4,
+  B1–B2 and C1–C2 (`21c937783`, `6cbed404c`, `73ecc8445`, `3285d2ad3`); PR
+  #598 merged scoped prompt-source terminology (`25cac4785`). Its SHA deployed
+  successfully to Production as deployment `7482300775`; Git merge status alone
+  does not prove deployment. Signed-in Production walkthrough confirmed
+  the main Request 1003222 Staff Deliberations/Final writeup headings and found
+  11 source-confirmed old-label strings across six files (two observed in the
+  walkthrough, nine source-only); disposition is pending and terminology migration is not complete. A fresh read-only
+  inventory reported 46 email fields / 4 personal records and 60 prompt
+  versions / 39 current. Only three scoped shared fields, Duncan's cleared
+  invitation override, and two prompt families published at v6/v3 with exact
+  approved content preserved and audits completed are verified changes.
+  No raw content is stored here. No broad migration/backfill is authorized;
+  existing saved names/content, historical files, identifiers and contracts
+  remain protected. Evidence, limits and exact residuals:
+  `docs/audits/terminology-completion-audit-2026-11-01.md`; approved table:
+  `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`; glossary:
+  `docs/NOMENCLATURE_GLOSSARY.md`.
 
 - **Staff Deliberations: group-review handoff from the writeup step
   (2026-10-06).** [STAGE 1 LIVE — PR #452, merge `40b70a145`, Production 2026-10-06]

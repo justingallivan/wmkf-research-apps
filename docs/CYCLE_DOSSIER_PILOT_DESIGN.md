@@ -51,7 +51,8 @@ The six Postgres tables are documented in docs/atlas/postgres-cycle-dossiers.md.
 PR #593 merged the terminology audit as `d73cdc96e`; PR #594 merged A1-A3
 reader/helper copy as `21c937783`, PR #595 merged B1 generated-document
 wording as `6cbed404c`, and PR #596 merged B2 template copy/safe recovery as
-`73ecc8445` (source/Git only; no deployment claim). B1 changes the
+`73ecc8445`, #597 merged A4/C1/C2 as `3285d2ad3`, and #598 merged the bounded
+prompt-source slice as `25cac4785` (Git status alone does not prove deployment). B1 changes the
 individual dossier title and renderer subtitle/PDF note and fallback wording
 to **Scientific dossier**; the explicit combined title `D26 Scientific
 Dossier` remains unchanged. Scientific body text, citations, prompts,
@@ -63,13 +64,16 @@ unchanged; old templates and stored documents remain intact, with the new
 version applying only to future renders. Generation first tries uploaded-file
 recovery; if an unresolved saved attempt has a different template version, the
 guard returns HTTP 409 and requires a new confirmed operation instead of
-rerendering under the new template identity. The approved A4 sentence-case
-display copy and C1-C2 future-default/error copy are in progress on
-`codex/remaining-source-terminology`; check current Git/PR and release receipts
-before reporting later status. No live prompts, settings, stored files, or
-deployment state were inspected. The
-historical implementation and rollout receipts below do not establish current
-deployment state.
+rerendering under the new template identity. PR #597 implements the bounded A4/C1/C2 source copy and PR #598 the scoped
+prompt-source terminology. Bounded operational receipts verify three shared
+editable fields, Duncan's invitation override cleared, and two scoped prompt
+families current at v6/v3 with exact approved content preserved and audits
+completed. A signed-in Production walkthrough confirmed the main Request 1003222
+Staff Deliberations/Final writeup headings but found 11 source-confirmed old-label strings across six files; two were observed
+and nine were source-only; see the [terminology closeout audit](audits/terminology-completion-audit-2026-11-01.md).
+Those residuals are open; this note does not certify the full terminology
+migration or general deployment state. Historical implementation and rollout
+receipts below retain their dated scope.
 
 **[VERIFIED 2026-09-07 via source, focused tests, and controlled setup]** The generation/document modules, guarded historical prompt support, prompt seed definitions, prompt seeder, six-table migration, setup-database fresh-install shape, API routes, worker/service/store, and UI are source-built on branch codex/cycle-dossier-pilot-build. Migration 045 is applied and verified; the private store `wmkf-cycle-dossier-private` (`store_W9WC1TLR7kpl9hty`) is connected under the custom `DOSSIER_BLOB` prefix in all environments, with the managed token authenticated in Development. Focused generation/document/Executor tests and targeted lint pass in the local checkout.
 
