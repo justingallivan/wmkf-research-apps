@@ -75,8 +75,8 @@ From the branch plan's "Outcome and boundary" section:
 
 **Gaps.**
 
-- **First publish of a brand-new prompt.** [BUILT ON BRANCH
-  `claude/prompt-first-publish`, 2026-11-02; NOT DEPLOYED] Owner decision
+- **First publish of a brand-new prompt.** [PRODUCTION-LIVE
+  2026-11-02: PR #610, merge `6648f2a18`; owner smoke pending] Owner decision
   2026-11-02 (option A): publishing a name that has no current row copies its
   latest draft row, with any edits made in Admin, into a new current row at
   max version + 1. The draft row is left unchanged, so later direct edits to it
@@ -194,7 +194,7 @@ Not backfilled:
   approves. Keep the existing `If-Match`, single-current, audit and idempotency
   behaviour.
 - **Show drafts written directly in Dataverse.** The inventory already lists
-  them. Publishing one when the name has no current row is built on a branch;
+  them. Publishing one when the name has no current row is live (PR #610);
   see Gaps above.
 - **Expect states Admin did not create.** With no guards, Admin must detect and
   clearly report rows it did not produce, rather than guess: zero or several
