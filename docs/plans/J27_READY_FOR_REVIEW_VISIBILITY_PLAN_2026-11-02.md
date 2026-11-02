@@ -1,6 +1,6 @@
 # J27 ready-for-review visibility plan
 
-Status: **PLANNED; no runtime change or live-system probe performed.**
+Status: **PLANNED; no runtime change. Bounded Production read completed 2026-11-02; flow execution unverified.**
 Owner: Codex, branch `codex/session-660-start`; written 2026-11-02 Pacific.
 Scope: PD dashboard discovery for J27 and later; preserve earlier-cycle behavior.
 
@@ -37,13 +37,23 @@ then the UI. Prior finding: current discovery is not gated on this marker.
 | Reviewer Finder My Proposals | `lib/services/reviewer-finder/my-proposals-service.js`, `listCycles`, `listProposalsInCycle`: separate filters; actionable additionally requires null Phase II Status | Gate both modes, including `status=all`; preserve reviewer eligibility separately |
 | Cycle source | `lib/dataverse/adapters/operations-grant-cycle.js`, `linkedCycleExpand`, `linkedCycleCode`, `linkedCycleFilter` | Derive era only from the Request's Grant Cycle link; no request meeting-date or created-date fallback |
 | Row-predicate regression coverage | `tests/unit/workbench-visibility-row-predicate.test.js` | Keep legacy truth table and add independent readiness / composition coverage |
-| Field schema | `docs/atlas/dataverse-akoya-request.md`, Custom Picklists: records `wmkf_readyforreview` as Picklist | Historical schema evidence only; live type, options and ready value remain UNKNOWN |
+| Field schema | `docs/atlas/dataverse-akoya-request.md`, Custom Picklists: records `wmkf_readyforreview` as Picklist | STALE/CONFLICT: live probe confirms Boolean Yes/No; ready is exact `true` |
 
 A repository search for `wmkf_readyforreview` in `lib`, `shared`, `pages`,
 `scripts` and `tests` found no runtime consumer. A contrary hit there would
 falsify the absence claim; the broader docs search found Atlas/evidence mentions.
 No claim about deployed behavior or Power Automate definitions is established by
 these source reads.
+
+[VERIFIED via `scripts/probe-j27-readiness-contract.cjs`, owner-authorized
+Production GETs, 2026-11-02] The field is Boolean: Yes/true and No/false.
+Receipt: `docs/plans/evidence/j27-readiness-production-2026-11-02.json`. Both
+1003391 and 1003384 link to J27, have readiness false, Request Status Phase I
+Pending, Phase I raw value 100000000, Phase II null, and test marker false.
+Phase I formatted labels were not returned; do not infer that label from this
+raw value alone. Neither example proves a completed automation handoff.
+The Atlas Picklist classification is STALE/CONFLICT; reconcile it with its
+other field groupings in the implementation documentation pass.
 
 ## Visibility rule
 
@@ -187,7 +197,7 @@ field was provisioned or decide its identity.
 ## Contract-reconcile / bounded sweep record
 
 Review mode; seven audit dispositions:
-whole-flow PARTIAL (external writer and live schema uninspected); partial-success
+whole-flow PARTIAL (live schema verified; external writer uninspected); partial-success
 PLANNED (all required producer steps must succeed before ready); async PLANNED
 (refresh and generation guards to inspect); helper semantics PLANNED (new
 readiness rule, existing lifecycle helper preserved); durable surfaces PLANNED
@@ -199,7 +209,7 @@ visibility prerequisite, J27 onward. Authoritative intent: this conversation;
 implementation evidence: source at `fb8afa427`. Searches covered source, tests,
 scripts, docs, memory/wiki and root instructions/session prompt for the field,
 readiness and J27 visibility. Atlas field mentions are AGREE on existence but
-UNKNOWN on current schema; old saved-view evidence is HISTORICAL; D25's
+STALE on the Picklist classification, contradicted by the live Boolean metadata; old saved-view evidence is HISTORICAL; D25's
 files-ready AI trigger is a distinct upstream milestone, not a contradictory
 completion claim. The new plan is PLANNED. No owning J27/Factory documents were
 edited while Claude works in parallel. Broader reconciliation is AUDIT
@@ -207,8 +217,8 @@ INCOMPLETE until the external contract and in-scope sibling consumers are
 verified; this is not a whole-repo readiness certification.
 
 Recommendation evidence: the policy composition is supported by the inspected
-query paths and owner intent, but query parity, live value mapping and end-to-end
-Power Automate handoff are NOT TESTED. A ready J27 Phase I row still failing the
+query paths and owner intent, but query parity, end-to-end
+Power Automate handoff are NOT TESTED; live Boolean mapping is now verified. A ready J27 Phase I row still failing the
 legacy lifecycle predicate is the explicit disconfirming case for claiming this
-gate alone delivers staff intake. Verdict: **NEEDS EXTERNAL CONTRACT VERIFICATION
+gate alone delivers staff intake. Verdict: **NEEDS PRODUCER COMPLETION/RERUN CONTRACT VERIFICATION
 BEFORE RUNTIME IMPLEMENTATION**, with scope decisions already recorded above.
