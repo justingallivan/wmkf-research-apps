@@ -1,6 +1,6 @@
 # Retraction Watch managed dataset metadata
 
-**[SOURCE-BUILT, NOT DEPLOYED — 2026-11-02]** Migration `092_retraction_dataset.sql` adds `retraction_dataset`, a singleton Postgres reference-data publication record. Production schema/rows have not been probed or changed by this work.
+**[SOURCE-BUILT, NOT DEPLOYED — 2026-11-02]** Migration `092_retraction_dataset.sql` adds `retraction_dataset`, a singleton Postgres reference-data publication record. Read-only production preflight confirmed 68,248 rows, migration 092 pending and metadata absent; no corpus/schema changes were made. See [production preflight](../audits/integrity-production-preflight-2026-11-02.md).
 
 ## Producer and persistence
 
@@ -28,4 +28,4 @@ The new `/api/cron/refresh-retractions` worker requires a strict bearer secret, 
 
 **[VERIFIED via isolated execution, 2026-11-02]** The full official CSV contained 73,519 records / 67,793,090 bytes, SHA-256 `7a729a87837985954a34326202cb98c4bff4b2b142fda8695febb613cf45a7f4`. A temporary loopback Postgres 18.6 rehearsal published it in 11.9 seconds and verified the unchanged-file path; twelve real-database tests covered publication/dry-run/rollback/locking/protected removals/audit failure/A→B→A fencing/schema. This is not a production row count or production performance claim. A separate actual service download completed in 12.5 seconds with identical byte count.
 
-Before promotion: Fable implementation review, relevant gates/build/tests, exact production target/schema and reference checks, backup/recovery confirmation, legacy-writer quiet window, owner-approved migration and controlled initial refresh. Monthly cron activation is a separate later commit and approval. Full provider-backed screening and production freshness remain unverified.
+Fable review and source gates/build passed. Production target/schema/reference checks and seven-day PITR coverage are verified in the preflight receipt; tested scoped recovery, external-writer quiet window, owner-approved migration and controlled initial refresh remain prerequisites. Monthly cron activation is a separate later commit and approval. Full provider-backed screening and production freshness remain unverified.

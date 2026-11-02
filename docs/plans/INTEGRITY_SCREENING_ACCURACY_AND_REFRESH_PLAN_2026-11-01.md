@@ -17,13 +17,13 @@ related:
 
 ## 1. Scope, authority, and status
 
-[PLANNED] Owner: Codex. Branch: `codex/integrity-screening-discussion`. Worktree: `/private/tmp/wmkf-integrity-screening`. Justin authorized implementation on this isolated branch on 2026-11-02, starting with Increment A and requiring Fable review before merge or production work. Increment A is source-built, tested, and Fable-reviewed as READY FOR OWNER REVIEW; it is not merged or deployed. Increment B is now source-built with isolated tests and a full official-CSV rehearsal; its Fable review and release checks are in progress. Migration 092 was applied only in a disposable loopback database. No production migration, import, schedule, or production probe has been performed.
+[VERIFIED via branch, reviews and authorized preflight] Owner: Codex. Branch: `codex/integrity-screening-discussion`. Worktree: `/private/tmp/wmkf-integrity-screening`. Justin authorized implementation on this isolated branch on 2026-11-02, starting with Increment A and requiring Fable review before merge or production work. Increment A is source-built, tested, and Fable-reviewed as READY FOR OWNER REVIEW; it is not merged or deployed. Increment B is source-built with isolated tests, full official-CSV rehearsal, passing release checks and Fable READY FOR OWNER REVIEW. Justin authorized read-only production preflight, which is recorded in the [preflight receipt](../audits/integrity-production-preflight-2026-11-02.md). Migration 092 was applied only in a disposable loopback database. No production migration, import, merge or schedule activation has been performed; production reads were explicitly authorized for the preflight.
 
 [VERIFIED via owner messages, 2026-11-01] Justin requested three initial fixes after inspecting request 1002852: reject conflicting names, use honest identity labels, and validate PubPeer sources. He additionally requested a Retraction Watch update and selected a **monthly** refresh. The proposed timing is **the 1st of every month at 06:00 UTC**, expression `0 6 1 * *`; only the monthly cadence was owner-selected, while the exact time is a planning default.
 
 [PLANNED] Deliver two bounded increments: A, screening accuracy and source reporting; B, safe reference-data refresh and scheduling. Complete A independently of B where possible. Full ORCID/publication/coauthor-based identity resolution, dismissal persistence, a direct PubPeer API, general news-classifier redesign, automatic applicant screening, funding gates, and unrelated Reviewer Finder work are out of scope. No new paid provider calls are needed to test the implementation offline. Live re-screening is a separate explicitly approved application operation.
 
-## 2. Evidence and uncertainty
+## 2. Historical baseline evidence and uncertainty — before implementation
 
 | Claim | Evidence inspected | Status |
 |---|---|---|
@@ -103,7 +103,7 @@ related:
 
 [PLANNED] Before live reads/writes, identify the exact application database and environment without printing credentials. Record existing schema/indexes, aggregate row count, minimum/maximum `last_updated`, and any import evidence; these timestamps are row-write times and do not prove a successful complete dataset import. Inspect external scheduler configuration if accessible. Verify recovery/backup before publishing the first refresh. Never use fresh-install setup against the populated database.
 
-[PLANNED] Add a small proposed `retraction_dataset` singleton metadata table through the next available existing-DB migration and fresh-install schema parity. Store a monotonically increasing publication generation, published source URL, SHA-256, upstream revision when obtainable, successful publication timestamp, last successful full-source check timestamp, row count, and format/policy version. Record per-attempt success/failure through existing `maintenance_runs`. Source revision is optional; a checksum is mandatory and must identify the bytes actually imported. Do not infer a revision for preexisting data: label its provenance unknown until the first successful managed refresh. The first dry run reports the actual CSV header diff and width violations per column against the live schema. Widen only columns demonstrated too narrow (to TEXT where appropriate) in the reviewed migration before publication; do not silently truncate or skip fields. Header/width assumptions remain UNKNOWN until the source file is tested.
+[PLANNED] Add a small proposed `retraction_dataset` singleton metadata table through the next available existing-DB migration and fresh-install schema parity. Store a monotonically increasing publication generation, published source URL, SHA-256, upstream revision when obtainable, successful publication timestamp, last successful full-source check timestamp, row count, and format/policy version. Record per-attempt success/failure through existing `maintenance_runs`. Source revision is optional; a checksum is mandatory and must identify the bytes actually imported. Do not infer a revision for preexisting data: label its provenance unknown until the first successful managed refresh. The first dry run reports the actual CSV header diff and width violations per column against the live schema. Widen only columns demonstrated too narrow (to TEXT where appropriate) in the reviewed migration before publication; do not silently truncate or skip fields. Header/width checks are verified for the inspected source in section 10 and the production preflight; revalidate actual downloaded bytes at execution.
 
 ### B2. Download, stage, validate, publish
 
@@ -149,7 +149,7 @@ related:
 
 [PLANNED] Confidence/evidence consumer checks include `tests/unit/workbench-integrity-tab.test.js`, `tests/e2e/workbench-integrity.spec.js`, and `scripts/test-retractions.js`, in addition to the engine, standalone exports and review-service tests. Diagnostic scripts must describe heuristic similarity truthfully as well.
 
-## 6. Contract-reconcile audit disposition
+## 6. Historical planning contract-reconcile audit disposition
 
 | Audit | Planning disposition |
 |---|---|
@@ -167,9 +167,9 @@ related:
 
 [PLANNED] B is acceptable when a full-dataset rehearsal meets resource budgets, failed imports leave corpus and metadata intact, readers either report one coherent generation or explicit incomplete coverage, unchanged files do not republish, provenance is truthful, and the initial authorized live refresh reads back correctly before cron enablement.
 
-[PLANNED] Work stays on the feature branch. Relevant red gates block the affected surface. No merge to `main` (which deploys), production migration/import, provider-credit-consuming re-screen, or cron activation is authorized by writing or reviewing this plan. Justin accepted implementation on 2026-11-02; source work is authorized, while merge and production work remain unapproved. Fable review is source-only; live state remains UNKNOWN unless separately probed.
+[PLANNED] Work stays on the feature branch. Relevant red gates block the affected surface. No merge to `main` (which deploys), production migration/import, provider-credit-consuming re-screen, or cron activation is authorized by writing or reviewing this plan. Justin accepted implementation on 2026-11-02; source work and read-only production preflight are authorized, while merge and production writes remain unapproved. Fable review is source-only; live state remains UNKNOWN unless separately probed.
 
-## 8. Independent review
+## 8. Initial independent plan review — historical
 
 [VERIFIED via owner messages and CLI receipt, 2026-11-01 Pacific] Justin requested and explicitly approved source disclosure and potential subscription usage for an ordinary Claude Fable review, **OAuth only, no API credits**. The initial automatic approval rejection was resolved by that explicit disclosure/approval; the subsequent invocation ran successfully. No alternate product, model, or authentication fallback was used.
 
@@ -205,4 +205,4 @@ related:
 
 [VERIFIED via official CSV and local rehearsal] The official source download is 67,793,090 bytes / 73,519 records, SHA-256 `7a729a87837985954a34326202cb98c4bff4b2b142fda8695febb613cf45a7f4`. Publisher and subject reach 500 and 263 characters; migration 092 widens only those demonstrated VARCHAR(255) fields. The temporary Postgres rehearsal covered dry-run, full publication, unchanged checks, rollback, stable IDs, locking, protected deletions, audit-after-commit failure and actual A→B→A screening invalidation. A full-source indexed publication took about 12 seconds, and an actual service download took about 12.5 seconds. These are local evidence, not production row counts, schema verification or hosted performance guarantees.
 
-[PLANNED] Production target/schema/backup and legacy-writer quiet-window checks, migration approval/application, initial controlled dry-run and publication/readback, and a separate monthly `0 6 1 * *` activation commit remain outstanding. The source worker additionally requires literal `RETRACTION_REFRESH_ENABLED=on`; Preview/dev and unset/invalid flags fail closed. See [operating guide](../guides/RETRACTION_WATCH_REFRESH.md) and [metadata Atlas](../atlas/postgres-retraction-dataset.md).
+[PARTIAL] Read-only production target/schema/corpus/scheduler preflight and seven-day PITR checks are complete; see the [preflight receipt](../audits/integrity-production-preflight-2026-11-02.md). Tested scoped recovery and external-writer quiet-window confirmation, migration approval/application, initial controlled dry-run and publication/readback, and a separate monthly `0 6 1 * *` activation commit remain outstanding. The source worker additionally requires literal `RETRACTION_REFRESH_ENABLED=on`; Preview/dev and unset/invalid flags fail closed. See [operating guide](../guides/RETRACTION_WATCH_REFRESH.md) and [metadata Atlas](../atlas/postgres-retraction-dataset.md).
