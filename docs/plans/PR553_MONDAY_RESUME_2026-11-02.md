@@ -2,14 +2,21 @@
 title: Parked Prompt Publication Work — Monday with Connor
 kind: handoff
 domain: ai-platform
-status: parked
-summary: Resume Monday November 2 with Connor's Windows09 offline checks; local implementation and Fable review complete, no live registration or enablement authorized.
+status: historical
+summary: Superseded 2026-11-02 — owner dropped the Dataverse plug-in and Windows track; see SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md. Windows09 checks were never run.
 canonical: false
 cataloged: 2026-10-30
 owner: product-engineering
 ---
 
 # Parked until Monday, November 2, 2026
+
+> **[HISTORICAL — superseded 2026-11-02]** Justin and Connor chose Admin
+> publishing with no Dataverse plug-in or write guards. Do not run the Windows09
+> checks or any step below. Current direction:
+> [scope change](SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md). The rest of
+> this record is kept as dated history; its hashes and paths still locate the
+> local-only artifacts.
 
 Owner: Justin with Connor. Codex owns the later evidence validation and guided
 rehearsal. Local expansion is paused until Windows results arrive or Justin gives

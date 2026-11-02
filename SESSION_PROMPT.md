@@ -66,11 +66,15 @@ creating the colleague brief alone would not require a milestone.
 - **Dependency maintenance.** GitHub showed #515, #532 and #565–#567 open at
   closeout. Recheck checks, reviews and relevance; do not merge automatically.
 
-### Parked — Connor / shared prompt library
+### Rescoped — Connor / shared prompt library (2026-11-02)
 
-- PR #553 remains open. Resume from
-  `docs/plans/PR553_MONDAY_RESUME_2026-11-02.md`: Windows09 offline checks with
-  Connor first; preserve complete output and validate source/package hashes.
+- **[OWNER DECISION 2026-11-02]** No Dataverse plug-in or write guards; Connor
+  drafts in Dataverse and publishes from Admin. Windows09 checks were not run
+  and are no longer needed. Current direction and carried-forward blockers
+  (Pre-Site schema): `docs/plans/SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md`.
+  The bullets below are the superseded pre-decision record.
+- PR #553 remains open. Former resume record (now historical):
+  `docs/plans/PR553_MONDAY_RESUME_2026-11-02.md`.
 - Recorded feature head `9d838c4c8`, worktree `/private/tmp/wmkf-pr553`, and
   15 local-only commits are historical resume pointers; recheck before use.
   Do not push/promote the feature merely to sync docs.
@@ -89,7 +93,7 @@ PR553 history without repeating them as fresh evidence here.
 | --- | --- |
 | Claude / reviewer outcomes | Materials cutoff and reporting recorded open; D26 repair requires a per-row manifest and separate authorization. `docs/plans/INVITED_REVIEWER_OUTCOMES_PLAN_2026-10-31.md`; preceding handoff at `9b1efa77d`. Coordinate before editing. |
 | Claude / reviewer materials and invitation calendar | #562/#568 and invitation/date follow-ups #586/#587/#589 recorded merged. Removed-candidate terminal history and first-link due-date gap remain owner decisions. `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`. Natural J27 delivery and D26 Board-calendar rendering were not rechecked here. |
-| Codex / shared prompts | Parked at Windows09 offline proof; archive above governs. |
+| Codex / shared prompts | Rescoped 2026-11-02 to Admin publishing without a plug-in; Codex to propose the reduced plan. See the scope-change record. |
 | Codex / terminology | Source slices and verifier merged; audit defines remaining acceptance limits. Brief is local-only. |
 | Other streams | Corpus, ranking, Board archive and other parked programs retain their owning plans/queue boundaries; no scope change tonight. |
 
