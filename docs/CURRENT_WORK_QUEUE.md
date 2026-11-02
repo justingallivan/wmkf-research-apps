@@ -6,7 +6,7 @@ status: canonical
 summary: Canonical priority queue separating current commitments, evidence windows, optional work, external dependencies, and parked programs.
 canonical: true
 cataloged: 2026-07-22
-last_verified: 2026-11-01
+last_verified: 2026-11-02
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -27,14 +27,14 @@ live probes, and current tests own what the system does. `docs/DOCS_CATALOG.md` 
 documents; an `active` catalog status means the document remains useful, not that every task in
 it is approved backlog.
 
-## Verification scope — bounded recheck 2026-10-31
+## Verification scope — bounded rechecks through 2026-11-02
 
 The bounded code/Git audit in `docs/audits/work-queue-drift-2026-10-19.md`
 corrects the named Site Visit, Workbench, J27, Cycle Dossier and personal-email
 status claims. Other entries retain their earlier evidence dates; this is not a
-whole-backlog or live-environment verification. The 2026-10-22 targeted document
+whole-backlog verification. The 2026-10-22 targeted document
 reconciliation updated selected status entries from source, Git ancestry, and dated
-receipts only; it did not re-probe Production. Priority order is unchanged. The 2026-10-31 source/Git audit corrected materials-on-acceptance, cycle-calendar and Zoom-picker status and classified the unfinished product threads below. It did not re-probe Production or recertify unrelated queue entries. Evidence and limits: `docs/audits/product-backlog-reconciliation-2026-10-31.md`.
+receipts only; it did not re-probe Production. Priority order is unchanged. The 2026-10-31 source/Git audit corrected materials-on-acceptance, cycle-calendar and Zoom-picker status and classified the unfinished product threads below. A bounded 2026-11-02 Production check confirms PR #600's deployment and three changed Workbench copy locations; it does not recertify unrelated queue entries or exercise all rare/error paths. Evidence and limits: `docs/audits/product-backlog-reconciliation-2026-10-31.md` and `docs/audits/terminology-completion-audit-2026-11-01.md`.
 
 ## Current sequence
 
@@ -83,17 +83,23 @@ sequence.
   does not prove deployment. Signed-in Production walkthrough confirmed
   the main Request 1003222 Staff Deliberations/Final writeup headings and found
   11 baseline old-label strings across six files (two observed, nine
-  source-only). Root reports corrections implemented on
-  `codex/final-terminology-copy`; PR review and Production verification remain
-  pending, so the migration is not release-complete. A fresh read-only
+  source-only). PR #600 (`78c965b18`) merged their corrections; root reports
+  the 215-test / 7-suite run, six-file text-only AST review, and CI passing.
+  Production deployment `7483066923` is successful; signed-in browser checks
+  confirmed the updated Workbench intro, “Draft writeup work” option, and rare
+  D26 deep-link explanation. Editing/history states and service-error paths were
+  not all exercised. Root has separately updated two legacy-client error
+  messages on `codex/legacy-terminology-final-check`; tests, scoped lint, AST
+  review and independent review pass, with HTTP 400 and existing codes preserved.
+  That update's PR and Production verification remain pending. A fresh read-only
   inventory reported 46 email fields / 4 personal records and 60 prompt
   versions / 39 current. Only three scoped shared fields, Duncan's cleared
   invitation override, and two prompt families published at v6/v3 with exact
   approved content preserved and audits completed are verified changes.
   No raw content is stored here. No broad migration/backfill is authorized;
   existing saved names/content, historical files, identifiers and contracts
-  remain protected. The stale-client compatibility guard is explicitly outside
-  this 11-string PR. Evidence, limits and source locations:
+  remain protected. This queue update does not authorize changing the
+  stale-client condition or code. Evidence, limits and source locations:
   `docs/audits/terminology-completion-audit-2026-11-01.md`; approved table:
   `docs/plans/review/PROPOSAL_WORKFLOW_VOCABULARY_2026-10-19.md`; glossary:
   `docs/NOMENCLATURE_GLOSSARY.md`.
