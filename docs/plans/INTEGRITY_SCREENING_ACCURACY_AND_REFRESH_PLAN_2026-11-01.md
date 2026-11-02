@@ -3,7 +3,7 @@ title: Integrity screening accuracy and monthly Retraction Watch refresh
 domain: integrity-screener
 kind: plan
 status: active
-summary: "Reject conflicting author names, replace identity-confidence claims, validate PubPeer evidence, and safely refresh Retraction Watch monthly. Screening and controlled refresh code deployed through PR #604 after Fable review. Migration and production dry-run verified; first publication verified; monthly activation owner-approved, source-configured pending deployment."
+summary: "Reject conflicting author names, replace identity-confidence claims, validate PubPeer evidence, and safely refresh Retraction Watch monthly. Screening and controlled refresh code deployed through PR #604 after Fable review. Migration and production dry-run verified; first publication verified; monthly activation owner-approved, deployed and verified in Production."
 canonical: false
 cataloged: 2026-11-01
 owner: product-engineering
@@ -225,4 +225,4 @@ related:
 
 ## 14. Current monthly activation checkpoint
 
-[VERIFIED via owner instruction and source] Monthly activation is explicitly authorized after verified first publication. Separate schedule change adds 0 6 1 * *; deployment verification is pending. The [activation receipt](../audits/integrity-monthly-activation-2026-11-02.md) owns current scheduling status; prior schedule-off checkpoints are historical.
+[VERIFIED via owner instruction and source] Monthly activation is explicitly authorized after verified first publication. Separate schedule change adds 0 6 1 * *; deployment verification passed on 2026-11-02. The [activation receipt](../audits/integrity-monthly-activation-2026-11-02.md) owns current scheduling status; prior schedule-off checkpoints are historical.

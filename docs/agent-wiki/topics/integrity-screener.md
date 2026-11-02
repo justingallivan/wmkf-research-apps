@@ -54,7 +54,7 @@ consume a `sources.pubpeer` shape (`hasConcerns`, `summary`, `resultCount`, `sea
 
 ## Checked-out source and production boundary
 
-[VERIFIED via PR #604, Ready production deployment and authenticated dry-run, 2026-11-02] Accuracy fixes and the controlled refresh/retention implementation are deployed. Migration 092 is applied. Production worker is enabled with strict bearer auth. Monthly scheduling at 06:00 UTC on the 1st is owner-approved and source-configured, pending deployment verification. Production dry-run proposes 73,519 upstream + 2 retained records, 5,286 additions, 1,846 updates and 13 removals. The approved first publication is verified: 73,521 records and generation 1, with both retained records and a completed audit. Current evidence: `docs/audits/integrity-production-release-2026-11-02.md`.
+[VERIFIED via PR #604, Ready production deployment and authenticated dry-run, 2026-11-02] Accuracy fixes and the controlled refresh/retention implementation are deployed. Migration 092 is applied. Production worker is enabled with strict bearer auth. Monthly scheduling at 06:00 UTC on the 1st is owner-approved and deployed and verified in the Production cron registry. Production dry-run proposes 73,519 upstream + 2 retained records, 5,286 additions, 1,846 updates and 13 removals. The approved first publication is verified: 73,521 records and generation 1, with both retained records and a completed audit. Current evidence: `docs/audits/integrity-production-release-2026-11-02.md`.
 
 ## Current UI boundaries
 
@@ -78,7 +78,7 @@ consume a `sources.pubpeer` shape (`hasConcerns`, `summary`, `resultCount`, `sea
 
 ## Corpus provenance (deployed; first publication verified)
 
-Screens fence all people’s corpus queries with a monotonic publication generation and save recorded metadata under each `sources.retraction_watch.dataset`. Changed/unverified metadata makes final corpus evidence incomplete; old runs remain version-not-recorded. The worker requires strict bearer auth, production environment and literal enablement; its owner-approved monthly schedule is source-configured pending deployment verification. Migration 092 and the owner-approved first publication are verified; generation 1 has 73,521 records. The legacy importer refuses the managed schema, and cutover must also confirm no old/external writer is already running.
+Screens fence all people’s corpus queries with a monotonic publication generation and save recorded metadata under each `sources.retraction_watch.dataset`. Changed/unverified metadata makes final corpus evidence incomplete; old runs remain version-not-recorded. The worker requires strict bearer auth, production environment and literal enablement; its owner-approved monthly schedule is deployed and verified in the Production cron registry. Migration 092 and the owner-approved first publication are verified; generation 1 has 73,521 records. The legacy importer refuses the managed schema, and cutover must also confirm no old/external writer is already running.
 
 ## Durable Memory
 
