@@ -20,7 +20,7 @@ Absent schema or an unpublished singleton is explicit unrecorded provenance, not
 
 ## Operational boundary
 
-The new `/api/cron/refresh-retractions` worker requires a strict bearer secret, `VERCEL_ENV=production`, and literal `RETRACTION_REFRESH_ENABLED=on`. There is no development bypass. Production manual worker is enabled with the existing bearer secret; it remains disabled by default elsewhere. **Monthly activation is owner-approved and source-configured, pending production verification:** `0 6 1 * *`, the 1st at 06:00 UTC. Initial publication/readback are complete. `vercel.json` sets the worker's duration ceiling only, not a schedule.
+The new `/api/cron/refresh-retractions` worker requires a strict bearer secret, `VERCEL_ENV=production`, and literal `RETRACTION_REFRESH_ENABLED=on`. There is no development bypass. Production manual worker is enabled with the existing bearer secret; it remains disabled by default elsewhere. **Monthly activation is owner-approved and source-configured, pending production verification:** `0 6 1 * *`, the 1st at 06:00 UTC. Initial publication/readback are complete. `vercel.json` now contains both the 300-second duration ceiling and the owner-approved monthly entry.
 
 `scripts/rehearse-retraction-refresh.cjs` defaults to dry-run and requires an explicit loopback-only scratch connection; it never loads app credentials. The legacy `scripts/import-retraction-watch.js` refuses once the managed metadata schema exists. Initial cutover must also prove no previously started legacy import or external scheduler remains active. Out-of-protocol raw SQL writers cannot be covered by the generation guarantee.
 

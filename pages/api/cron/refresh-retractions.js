@@ -1,5 +1,5 @@
-/** Monthly reference refresh worker; no schedule is registered until the first
- * approved production refresh succeeds. Fail closed in Preview/dev and while
+/** Monthly reference refresh worker; schedule activated separately after the
+ * approved first production publication/readback. Fail closed in Preview/dev and while
  * RETRACTION_REFRESH_ENABLED is unset. Never accepts source/database URLs.
  */
 import { constantTimeEqual } from '../../../lib/utils/cron-auth';
