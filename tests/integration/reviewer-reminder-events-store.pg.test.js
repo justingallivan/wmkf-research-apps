@@ -15,6 +15,9 @@ jest.mock('@neondatabase/serverless', () => ({
 const store = require('../../lib/services/reviewer-engagement/reminder-events-store');
 
 const URL = process.env.TEST_REQUEST_LEDGER_TEST_URL;
+if (!URL && process.env.TEST_REQUEST_LEDGER_REQUIRE === '1') {
+  throw new Error('TEST_REQUEST_LEDGER_REQUIRE=1 but TEST_REQUEST_LEDGER_TEST_URL is unset.');
+}
 const suite = URL ? describe : describe.skip;
 const SUG = '11111111-1111-4111-8111-111111111111';
 const SUG2 = '33333333-3333-4333-8333-333333333333';

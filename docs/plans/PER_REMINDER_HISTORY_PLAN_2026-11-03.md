@@ -419,7 +419,9 @@ client on `POSTGRES_URL` for per-query cancellation.
 - Tests: new `reminder-events-store.test.js` (15),
   `reminder-events-store-neon-abort.test.js` (real driver: the abort reaches
   its fetch), `tests/integration/reviewer-reminder-events-store.pg.test.js`
-  (real Postgres; skipped locally, runs in CI), plus history cases in the
+  (real Postgres; skipped locally; added to the explicit file list of the CI
+  "Postgres integration" job in `.github/workflows/test.yml` after Codex
+  implementation review 1 found the first push did not run it), plus history cases in the
   sweep, follow-up bookkeeping, reviewer list, history and drawer tests. A
   revert of the drawer key change fails the drawer test.
 - Verification: every `check:*` gate and self-test green; full unit suite
