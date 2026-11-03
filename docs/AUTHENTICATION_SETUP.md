@@ -138,7 +138,7 @@ openssl rand -base64 32
 
 **Notes:**
 - Production must set a valid `NEXTAUTH_URL`; state-changing staff API requests fail closed when it is missing or invalid.
-- Preview normally omits `NEXTAUTH_URL`. In a production-mode Preview runtime, the Origin/Referer allowlist is derived from Vercel's deployment hostname (`VERCEL_URL`) and still fails closed if neither value is usable. For a bounded smoke through the registered stable alias, use the exact branch-scoped override in Step 2.4; never set the Production host or a project-wide Preview value.
+- Preview normally omits `NEXTAUTH_URL`. In a production-mode Preview runtime, the Origin/Referer allowlist is the deployment's own hostname (`VERCEL_URL`, or a branch-scoped `NEXTAUTH_URL` if one is set) plus the registered stable alias `https://wmkfresearchapps-preview.vercel.app` (a tracked constant in `lib/utils/auth.js`). It still fails closed if neither primary value is usable, and Production never accepts the alias. No `NEXTAUTH_URL` override is needed for a signed-in POST through the alias (Step 2.4); never set the Production host or a project-wide Preview value.
 - For local development, set `NEXTAUTH_URL=http://localhost:3000` in `.env.local`
 
 ### 2.3 Redeploy
@@ -150,49 +150,41 @@ After adding environment variables:
 
 ### 2.4 Authenticated smoke through the stable Preview alias
 
-Use this only when a signed-in browser test needs a state-changing staff API
-request through `https://wmkfresearchapps-preview.vercel.app`. With the normal
-Preview configuration, `validateOrigin` allows the immutable deployment host
-from `VERCEL_URL`; an alias-hosted GET can pass while a cookie-bearing POST
-from the alias returns 403 `Forbidden` because its Origin differs.
+Use this when a signed-in browser test needs the registered stable alias
+`https://wmkfresearchapps-preview.vercel.app`, the only Preview host with an
+Entra callback. On Preview, `validateOrigin` accepts the deployment's own
+origin and this alias, so a cookie-bearing POST from the alias passes the
+CSRF-origin check without any `NEXTAUTH_URL` override.
 
 1. Record the exact Git branch, commit, immutable Preview deployment ID and URL,
    deployment class, current stable-alias target, and registered Entra callback
    before changing anything. Confirm that
    `https://wmkfresearchapps-preview.vercel.app/api/auth/callback/azure-ad`
-   is registered. Confirm the alias currently points where expected.
-2. In Vercel Project Settings → Environment Variables, add `NEXTAUTH_URL` for
-   **Preview scoped to that one Git branch**, with the exact value
-   `https://wmkfresearchapps-preview.vercel.app` (origin only; no path or
-   trailing slash). Check that the scope is the intended branch, not all
-   Preview deployments or Production. Vercel's
-   [branch-specific Preview variables](https://vercel.com/docs/environment-variables)
-   override the general Preview value. The CLI's
-   [`vercel env add` syntax](https://vercel.com/docs/cli/env) also accepts a
-   Git branch argument; inspect the resulting scope in the dashboard.
-3. Deploy that branch again: [environment variable changes apply to new
-   deployments](https://vercel.com/docs/environment-variables/managing-environment-variables).
-   Attest the **new** immutable deployment ID, commit, and Preview class; move
-   the stable alias to it and verify the alias target. An older deployment does
-   not acquire the new setting. While the override is active, use the alias
-   for staff-auth browser traffic; the immutable host will have a different
-   Origin for state-changing requests.
-4. Complete the signed-in smoke on the alias. Verify a protected GET, then use
+   is registered. Confirm the alias currently points where expected (it may be
+   unassigned).
+2. Move the stable alias to the attested deployment and verify the alias target.
+3. Complete the signed-in smoke on the alias. Verify a protected GET, then use
    an approved validation-only POST whose expected response cannot commit a
    write. Record its actual response and confirm it is not the CSRF-origin 403;
    a sign-in or GET alone does not prove the POST path. Do not use a mutating
-   endpoint as a generic CSRF probe.
-5. Restore the alias to its recorded prior target and verify it. Remove only
-   the `NEXTAUTH_URL` record scoped to that Git branch in the Vercel dashboard,
-   leaving Production and general Preview settings untouched. If the branch
-   stays active, deploy it again so future deployments use normal
-   `VERCEL_URL` derivation; existing deployments retain the environment they
-   were built with. Remove any temporary exact Entra callback added for this
-   smoke after confirming no other test uses it. Record the rollback evidence.
+   endpoint as a generic CSRF probe. A known validation-only POST: Dynamics
+   Explorer chat with `{"messages": []}` returns an SSE `error` event ("At least
+   one message is required") after the auth check and before any model call or
+   Dataverse access.
+4. Restore the alias to its recorded prior target (or unassign it) and verify
+   it. Remove any temporary exact Entra callback added for this smoke after
+   confirming no other test uses it. Record the rollback evidence.
 
-This override is a temporary smoke procedure, not a runtime CSRF allowlist
-expansion. See `.claude-memory/project-vercel-cli-deploy-preview-auth.md` for
-the alias attestation and restoration checklist.
+**Older branches.** A deployment built from code that predates the alias
+allowlist (`docs/plans/PREVIEW_ALIAS_CSRF_ORIGIN_PLAN_2026-11-03.md`) still
+rejects alias POSTs. Rebase the branch onto `main`, or as a last resort set
+`NEXTAUTH_URL` to the exact alias origin for **Preview scoped to that one Git
+branch**, deploy again, and remove that branch-scoped record afterwards.
+
+The alias is a tracked constant in `lib/utils/auth.js`; changing it is a
+reviewed commit, not an environment edit. See
+`.claude-memory/project-vercel-cli-deploy-preview-auth.md` for the alias
+attestation and restoration checklist.
 
 ---
 
@@ -290,13 +282,14 @@ This allows you to develop without setting up Azure credentials locally.
 
 ### Preview alias signs in, but a staff POST returns 403
 
-**Cause:** The signed-in browser uses the stable alias, while the Preview
-deployment derives its CSRF allowed origin from its immutable `VERCEL_URL`.
+**Cause:** Current Preview code accepts the stable alias, so this means one of:
+the deployment was built from code that predates the alias allowlist; the
+browser is on a host other than the registered alias; or the deployment is not
+running as Preview (`VERCEL_ENV` is not `preview`).
 
-**Fix:** Follow Step 2.4 for a bounded, branch-scoped `NEXTAUTH_URL` override,
-new deployment, alias verification, validation-only POST, and full rollback.
-Do not copy the Production host into Preview or derive the allowed origin from
-request headers.
+**Fix:** Check the host and the deployment's commit. For an older branch, follow
+the "Older branches" note in Step 2.4. Do not copy the Production host into
+Preview or derive the allowed origin from request headers.
 
 ### Users Can't Access After Login
 

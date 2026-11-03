@@ -513,6 +513,140 @@ describe('validateOrigin — Referer fallback + config edge cases', () => {
     expect(result).toBeNull();
     expect(res.status).toHaveBeenCalledWith(403);
   });
+
+  // -------------------------------------------------------------------------
+  // Registered stable Preview alias (docs/plans/PREVIEW_ALIAS_CSRF_ORIGIN_PLAN_2026-11-03.md)
+  // -------------------------------------------------------------------------
+  const ALIAS = 'https://wmkfresearchapps-preview.vercel.app';
+
+  function usePreview({ nextAuthUrl, vercelUrl = 'wmkf-preview-abc.vercel.app' } = {}) {
+    process.env.NODE_ENV = 'production';
+    process.env.VERCEL_ENV = 'preview';
+    if (nextAuthUrl === undefined) delete process.env.NEXTAUTH_URL;
+    else process.env.NEXTAUTH_URL = nextAuthUrl;
+    if (vercelUrl === null) delete process.env.VERCEL_URL;
+    else process.env.VERCEL_URL = vercelUrl;
+  }
+
+  async function postWith(headers, guard = requireAuth) {
+    const req = createMockReq({ method: 'POST', headers });
+    const res = createMockRes();
+    const result = guard === requireAuth
+      ? await requireAuth(req, res)
+      : await requireAppAccess(req, res, 'dynamics-explorer');
+    return { result, res };
+  }
+
+  it('accepts the stable alias Origin on Preview via requireAuth', async () => {
+    mockAuthenticatedUser(1, []);
+    usePreview();
+
+    const { result, res } = await postWith({ origin: ALIAS });
+
+    expect(result).toBeTruthy();
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it('accepts the stable alias Origin on Preview via requireAppAccess', async () => {
+    mockAuthenticatedUser(1, ['dynamics-explorer']);
+    usePreview();
+
+    const { result, res } = await postWith({ origin: ALIAS }, requireAppAccess);
+
+    expect(result).toBeTruthy();
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it('accepts a stable alias Referer when Origin is absent on Preview', async () => {
+    mockAuthenticatedUser(1, []);
+    usePreview();
+
+    const { result, res } = await postWith({ referer: `${ALIAS}/dynamics-explorer` });
+
+    expect(result).toBeTruthy();
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it('accepts the stable alias alongside a branch-scoped Preview NEXTAUTH_URL', async () => {
+    mockAuthenticatedUser(1, []);
+    usePreview({ nextAuthUrl: 'https://wmkf-branch-override.vercel.app' });
+
+    const alias = await postWith({ origin: ALIAS });
+    expect(alias.result).toBeTruthy();
+
+    const override = await postWith({ origin: 'https://wmkf-branch-override.vercel.app' });
+    expect(override.result).toBeTruthy();
+  });
+
+  it('still accepts the deployment VERCEL_URL origin on Preview', async () => {
+    mockAuthenticatedUser(1, []);
+    usePreview();
+
+    const { result } = await postWith({ origin: 'https://wmkf-preview-abc.vercel.app' });
+
+    expect(result).toBeTruthy();
+  });
+
+  it('rejects the stable alias Origin in Production', async () => {
+    mockAuthenticatedUser(1, []);
+    process.env.NODE_ENV = 'production';
+    process.env.VERCEL_ENV = 'production';
+    process.env.NEXTAUTH_URL = 'https://applications.wmkeck.org';
+
+    const viaAuth = await postWith({ origin: ALIAS });
+    expect(viaAuth.result).toBeNull();
+    expect(viaAuth.res.status).toHaveBeenCalledWith(403);
+
+    mockAuthenticatedUser(1, ['dynamics-explorer']);
+    const viaApp = await postWith({ origin: ALIAS }, requireAppAccess);
+    expect(viaApp.result).toBeNull();
+    expect(viaApp.res.status).toHaveBeenCalledWith(403);
+  });
+
+  it('fails closed for the stable alias when Preview VERCEL_URL is missing', async () => {
+    mockAuthenticatedUser(1, []);
+    usePreview({ vercelUrl: null });
+
+    const { result, res } = await postWith({ origin: ALIAS });
+
+    expect(result).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it('fails closed for the stable alias when Preview NEXTAUTH_URL is invalid', async () => {
+    mockAuthenticatedUser(1, []);
+    usePreview({ nextAuthUrl: 'not-a-url' });
+
+    const { result, res } = await postWith({ origin: ALIAS });
+
+    expect(result).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it.each([
+    'https://wmkfresearchapps-preview.vercel.app.evil.com',
+    'http://wmkfresearchapps-preview.vercel.app',
+    'https://evil-wmkfresearchapps-preview.vercel.app',
+    'https://wmkfresearchapps-preview.vercel.app:8443',
+  ])('rejects lookalike origin %s on Preview', async (origin) => {
+    mockAuthenticatedUser(1, []);
+    usePreview();
+
+    const { result, res } = await postWith({ origin });
+
+    expect(result).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it('still rejects a cookie-bearing Preview POST with neither Origin nor Referer', async () => {
+    mockAuthenticatedUser(1, []);
+    usePreview();
+
+    const { result, res } = await postWith({ cookie: 'next-auth.session-token=x' });
+
+    expect(result).toBeNull();
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
 });
 
 // ---------------------------------------------------------------------------

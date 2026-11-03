@@ -17,10 +17,10 @@ Do:
   auth-gated smoke. For this project, first inspect the already registered
   `wmkfresearchapps-preview.vercel.app` callback/alias; temporarily repoint that
   stable alias to an attested immutable Preview deployment, then restore and
-  verify its prior target after the smoke. For a signed-in alias-hosted POST,
-  follow `docs/AUTHENTICATION_SETUP.md` Step 2.4: set the exact alias origin as
-  branch-scoped Preview `NEXTAUTH_URL`, redeploy, prove a validation-only POST,
-  then remove that branch-scoped setting and restore the alias. Add an Entra
+  verify its prior target after the smoke. Preview code accepts the stable alias as a
+  CSRF origin, so a signed-in alias-hosted POST needs no `NEXTAUTH_URL`
+  override (`docs/AUTHENTICATION_SETUP.md` Step 2.4); a branch built before
+  that change needs a rebase or the Step 2.4 "Older branches" fallback. Add an Entra
   callback only when no already registered stable alias can serve the exact
   deployment.
 

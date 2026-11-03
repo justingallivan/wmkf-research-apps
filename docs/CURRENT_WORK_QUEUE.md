@@ -293,7 +293,13 @@ search limits: `docs/audits/product-backlog-reconciliation-2026-10-31.md`.
   (line 52); `workbench-briefing-link-route` and `reviewer-institution-auto-resolution-policy` already
   pass with their dates in the past. The original failure was fixed in `5ced59d3b`.
 - **Preview CSRF origin check rejects alias-hosted POSTs (2026-09-19, integration
-  smoke).** `lib/utils/auth.js validateOrigin` derives the Preview allowed origin from
+  smoke).** **[BUILT ON BRANCH `claude/preview-alias-csrf` 2026-11-03, Session
+  661; NOT MERGED; Preview proof pending.]** Owner-approved fix: on Preview only,
+  `validateOrigin` also accepts the registered stable alias (tracked constant);
+  Production unchanged; `VERCEL_BRANCH_URL` deliberately not added (no Entra
+  callback). Plan, invariants and contract review:
+  `docs/plans/PREVIEW_ALIAS_CSRF_ORIGIN_PLAN_2026-11-03.md`. Close this entry
+  with merge and Preview-proof evidence. Original report: `lib/utils/auth.js validateOrigin` derives the Preview allowed origin from
   `VERCEL_URL` (the immutable deployment host), so any state-changing request made
   through a Vercel alias such as `wmkfresearchapps-preview.vercel.app` returns 403
   `Forbidden` while GETs pass. Seen on the Explorer chat POST during the
