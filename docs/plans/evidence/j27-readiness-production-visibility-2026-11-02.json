@@ -1,0 +1,120 @@
+{
+  "observedAt": "2026-11-03T01:59:51.669Z",
+  "target": "production",
+  "dataverseMethods": [
+    "GET"
+  ],
+  "cycles": {
+    "D26": {
+      "total": 367,
+      "ready": 0,
+      "unready": 367,
+      "modes": {
+        "default": {
+          "oldEligible": 25,
+          "gatedEligible": 25,
+          "oldOrdinary": 23,
+          "gatedOrdinary": 23,
+          "removedByGate": 0,
+          "idsIdentical": true,
+          "oldIdDigest": "10c0695ec6f1d033e403eb91d81065487c33eac49bbfefc64bf10e0ff30a0bb7",
+          "gatedIdDigest": "10c0695ec6f1d033e403eb91d81065487c33eac49bbfefc64bf10e0ff30a0bb7"
+        },
+        "includeSetAside": {
+          "oldEligible": 208,
+          "gatedEligible": 208,
+          "oldOrdinary": 199,
+          "gatedOrdinary": 199,
+          "removedByGate": 0,
+          "idsIdentical": true,
+          "oldIdDigest": "0188bcb37dc38dc3d38732c67a1feef7e508a5356cb5e1b22971b19a9e4bfe2c",
+          "gatedIdDigest": "0188bcb37dc38dc3d38732c67a1feef7e508a5356cb5e1b22971b19a9e4bfe2c"
+        }
+      }
+    },
+    "J27": {
+      "total": 6,
+      "ready": 0,
+      "unready": 6,
+      "modes": {
+        "default": {
+          "oldEligible": 1,
+          "gatedEligible": 0,
+          "oldOrdinary": 0,
+          "gatedOrdinary": 0,
+          "removedByGate": 1,
+          "idsIdentical": false,
+          "oldIdDigest": "c02cf88dac0a8571df653a070e46271506d3e0d104e1bf688bea331e0e129a84",
+          "gatedIdDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        "includeSetAside": {
+          "oldEligible": 1,
+          "gatedEligible": 0,
+          "oldOrdinary": 0,
+          "gatedOrdinary": 0,
+          "removedByGate": 1,
+          "idsIdentical": false,
+          "oldIdDigest": "c02cf88dac0a8571df653a070e46271506d3e0d104e1bf688bea331e0e129a84",
+          "gatedIdDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "requestNumber": "1003391",
+      "cycle": "J27",
+      "ready": false,
+      "oldEligible": false,
+      "gatedEligible": false
+    },
+    {
+      "requestNumber": "1003384",
+      "cycle": "J27",
+      "ready": false,
+      "oldEligible": false,
+      "gatedEligible": false
+    }
+  ],
+  "deployment": {
+    "id": "dpl_AVPRpii82wjn6MYhSAWSqZmen7Ed",
+    "commit": "46b4cd2cfaa859a3d5aa13f7481da283167985e2",
+    "target": "production",
+    "state": "Ready",
+    "productionAlias": "https://applications.wmkeck.org"
+  },
+  "authenticatedDashboardReads": {
+    "scope": "all",
+    "program": "Research",
+    "D26": {
+      "default": {
+        "rows": 25,
+        "ordinary": 23,
+        "requestNumberFingerprint": "4c039c7e"
+      },
+      "includeSetAside": {
+        "rows": 208,
+        "ordinary": 199,
+        "requestNumberFingerprint": "79115895"
+      },
+      "bothFingerprintsMatchProbe": true
+    },
+    "J27": {
+      "default": {
+        "rows": 0,
+        "ordinary": 0
+      },
+      "includeSetAside": {
+        "rows": 0,
+        "ordinary": 0
+      }
+    }
+  },
+  "bounds": [
+    "Read-only Production Dataverse GET and authenticated dashboard GET; no business-record writes or flow execution.",
+    "D26 comparison uses current records with the old lifecycle predicate versus new predicate, not a preserved historical before-deploy snapshot.",
+    "J27 live negative case exists: one unready request meets old lifecycle visibility and is excluded after readiness.",
+    "No ready J27 positive exists in this Research cohort; positive case remains locally tested.",
+    "Other dashboards and programs were not live-smoked in this bounded check."
+  ]
+}

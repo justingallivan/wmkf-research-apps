@@ -1,6 +1,6 @@
 # J27 ready-for-review visibility gate
 
-Status: **IMPLEMENTED ON FEATURE BRANCH; local verification passed, not deployed.**
+Status: **DEPLOYED via PR #611; bounded Production Workbench visibility verification passed 2026-11-02.**
 Owner: Codex, `codex/session-660-start`, 2026-11-02 Pacific.
 Scope: PD dashboard discovery for J27 and later; preserve earlier-cycle eligibility.
 
@@ -106,10 +106,12 @@ remain outside the dashboard discovery gate.
 [VERIFIED via existing source] An untriaged Phase I Pending row still fails the
 Workbench lifecycle predicate, even when ready. The J27 staff-intake-list work
 must add submitted-stage/staff-state eligibility separately. Reviewer Finder's
-actionable filter still requires null Phase II Status; Connor's advanced J27
-contract specifies Phase II Pending Committee Review. That compatibility change
-also remains separate. This gate does not promise those rows become visible
-where existing lifecycle rules exclude them.
+actionable filter historically required null Phase II Status; Connor's advanced
+J27 contract specifies Phase II Pending Committee Review. The separate feature
+branch `codex/j27-actionable-reviewers` adds that option for J27+ actionable reads,
+retaining readiness and earlier-cycle rules (not deployed). The Phase I dashboard
+and broader workflow remain owner-deferred. This readiness gate alone does not
+promise visibility where existing lifecycle rules exclude a row.
 
 `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md` D25 describes an upstream files-ready
 trigger for AI. This downstream assembly-and-AI completion marker does not prove
@@ -129,10 +131,10 @@ state protocol to implement.
 
 Run scoped tests and relevant gates, each gate/self-test sequentially: types,
 Atlas, DAL, OData, request-meeting-date reads, status parity, documentation and
-secret checks. Review the final diff independently before completion. Runtime
-work stays on the feature branch; promotion to main/Production is a deliberate
-release. Actual Power Automate completion visibility remains an operational
-observation, not a prerequisite to this owner-authorized implementation.
+secret checks. Review the final diff independently before completion. Runtime work merged via PR #611 (`46b4cd2cf`). Vercel deployment
+`dpl_AVPRpii82wjn6MYhSAWSqZmen7Ed` is Production Ready with the
+`applications.wmkeck.org` alias. Actual Power Automate completion visibility
+remains an operational observation, not a prerequisite to implementation.
 
 ## Contract reconciliation and bounded sweep
 
@@ -157,8 +159,22 @@ the initially omitted Final Writeups index path, then reported no further
 material findings. `git diff --check` passed. No additional live Production
 read, write, flow run or deploy was performed for implementation.
 
-Bounded verdict: source implementation and local regressions VERIFIED; deployment
-and natural handoff observation remain unperformed. The operational rerun risk
+[VERIFIED via owner-authorized read-only Production check, 2026-11-02]
+Deployment inspected Ready. Authenticated Research Workbench GETs returned D26
+25 rows / 23 ordinary by default and 208 rows / 199 ordinary including set-aside;
+request-number fingerprints match the independent live Dataverse query. Applying
+the new predicate to the same live D26 cohort preserves the exact old eligible
+ID sets in both modes. J27 has six unready rows; one meets old lifecycle
+eligibility, but the deployed dashboard returns zero rows in both modes. Named
+examples 1003391 and 1003384 remain unready and absent (also excluded by old
+lifecycle rules). No ready J27 positive exists to observe, and no write was used
+to manufacture one. No historical before-deploy snapshot is claimed. Scope is
+Research Workbench, all-PD mode, not every application/program. Probe:
+`scripts/probe-j27-readiness-visibility.cjs`; minimal evidence:
+`docs/plans/evidence/j27-readiness-production-visibility-2026-11-02.json`.
+
+Bounded verdict: source implementation, local regressions, deployment and this
+live negative/legacy check VERIFIED; natural positive handoff remains unobserved. The operational rerun risk
 is accepted, not unresolved. Restatement classification within this scope:
 Atlas Boolean/input contract AGREE after correction; old initial plan blocker
 STALE and replaced; saved-view snapshots HISTORICAL; upstream D25 UNRELATED to
