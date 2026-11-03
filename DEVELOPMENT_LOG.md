@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## November 2026 — Staff author the shared prompt library entirely in Admin (Session 660, Claude)
+
+**Milestone:** Admin can publish Dataverse drafts, create new prompts, edit and drag-reorder groups, and retire prompts, so nobody edits Dataverse to manage prompts.
+**Sessions:** Session 660; five owner-approved PRs, CI green, each deployed to Production. Owner skipped Production smokes (they would only create junk rows).
+**Ship state:**
+- PR #610 (`6648f2a18`): first publish copies a draft into a new current version; the draft is untouched.
+- PR #612 (`2eb0058cc`): Add prompt publishes a new name as v1; placeholders are declared automatically, also on Edit & publish.
+- PR #613 (`acab577bc`) and PR #614 (`f3afb5199`): editable groups in setting `promptLibrary.groups`, reordered by drag (Proposal Ranking pattern).
+- PR #616 (`e77e80aba`): Retire stamps status Retired, is blocked for Application caller prompts, and lists retired prompts separately.
+**Why it matters:** Connor and Justin can add, organize and retire shared prompts without code changes or Dataverse edits, with every write audited.
+**Pointers:** `docs/plans/SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md`; `docs/plans/ADMIN_ADD_PROMPT_PLAN_2026-11-02.md`; `docs/plans/ADMIN_PROMPT_GROUPS_PLAN_2026-11-02.md`.
+
 ## November 2026 — Shared prompt library catalog lives in Dataverse and is editable in Admin (Session 659, Claude)
 
 **Milestone:** Owner rescoped the shared prompt library away from a Dataverse plug-in. Prompt catalog metadata now lives on the prompt rows and is editable in Admin.

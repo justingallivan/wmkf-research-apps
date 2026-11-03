@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: production-smoke-hygiene
-  last_verified: 2026-08-28 (S467) — Request 1002379 cleanup
+  last_verified: 2026-11-02 (S660) — owner declined junk-producing prompt smokes; 2026-08-28 (S467) Request 1002379 cleanup
 ---
 
 ## Recall Rule
@@ -30,3 +30,12 @@ rows and pointers; do not request delete privileges the runtime doesn't need
 (the app principal has no Activity DeleteAccess by design). Precedent:
 `docs/audits/request-1002379-test-mutation-inventory-2026-08-28.md`. See
 [[feedback-list-and-confirm-before-bulk-deletes]].
+
+**2026-11-02 (Session 660): smoke tests that only create permanent junk.** The
+owner declined Production smoke tests of the Admin prompt features (first
+publish, Add prompt, groups) because each would leave a permanent row nobody
+uses ("it will just create junk"). He also would not edit Connor's draft row or
+go into Dataverse for a test. **How to apply:** when a feature is low-risk and
+fully unit/CI-tested, offer a read-only check or a create-then-retire path
+instead of a junk-producing smoke, and record skipped smokes as "skipped by
+owner choice", never as passed.
