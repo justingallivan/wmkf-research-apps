@@ -293,13 +293,11 @@ search limits: `docs/audits/product-backlog-reconciliation-2026-10-31.md`.
   (line 52); `workbench-briefing-link-route` and `reviewer-institution-auto-resolution-policy` already
   pass with their dates in the past. The original failure was fixed in `5ced59d3b`.
 - **Preview CSRF origin check rejects alias-hosted POSTs (2026-09-19, integration
-  smoke).** **[BUILT ON BRANCH `claude/preview-alias-csrf` 2026-11-03, Session
-  661; NOT MERGED; Preview proof pending.]** Owner-approved fix: on Preview only,
+  smoke).** **[CLOSED 2026-11-03, Session 661.]** PR #620 merged `1f854345e` (test-clock fix PR #619 `1b499663e`); Production deploy of the merge commit succeeded. Preview proof 2026-11-03 (Claude, owner-authorized): alias moved from `dpl_cgM9vNTVdC1DAUMR55ZQSBdt9Nt2` to PR deployment `dpl_Dkz6h6CN7TfcgwKxWYwyPqQYxr6w` (commit `7e59fdde2`), signed in through the alias, `POST /api/dynamics-explorer/chat` with `{"messages": []}` returned HTTP 200 SSE `error` "At least one message is required" (not the CSRF 403); alias restored to `dpl_cgM9vNTVdC1DAUMR55ZQSBdt9Nt2` and verified. Owner-approved fix: on Preview only,
   `validateOrigin` also accepts the registered stable alias (tracked constant);
   Production unchanged; `VERCEL_BRANCH_URL` deliberately not added (no Entra
   callback). Plan, invariants and contract review:
-  `docs/plans/PREVIEW_ALIAS_CSRF_ORIGIN_PLAN_2026-11-03.md`. Close this entry
-  with merge and Preview-proof evidence. Original report: `lib/utils/auth.js validateOrigin` derives the Preview allowed origin from
+  `docs/plans/PREVIEW_ALIAS_CSRF_ORIGIN_PLAN_2026-11-03.md`. Original report: `lib/utils/auth.js validateOrigin` derives the Preview allowed origin from
   `VERCEL_URL` (the immutable deployment host), so any state-changing request made
   through a Vercel alias such as `wmkfresearchapps-preview.vercel.app` returns 403
   `Forbidden` while GETs pass. Seen on the Explorer chat POST during the
