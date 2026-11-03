@@ -14,6 +14,11 @@ jest.mock('../../lib/dataverse/adapters/ai-prompt', () => ({
   setIsCurrent: jest.fn(),
 }));
 jest.mock('@vercel/postgres', () => ({ sql: jest.fn(async () => ({ rows: [] })) }));
+jest.mock('../../lib/services/admin/prompt-groups-service', () => {
+  const { buildEffectivePromptGroups, defaultEditablePromptGroups } = jest.requireActual('../../shared/config/adminPromptCatalog');
+  const editable = [...defaultEditablePromptGroups(), { id: 'grant-reporting', label: 'Grant reporting' }];
+  return { getPromptGroups: jest.fn(async () => ({ groups: buildEffectivePromptGroups(editable), editable, revision: null, storageWarning: null })) };
+});
 jest.mock('../../lib/services/executor-budget-service', () => ({
   assertExecutorBudgetForPromptModel: jest.fn(async () => null),
 }));
@@ -173,5 +178,12 @@ describe('publishPrompt declares placeholders added in an edit', () => {
     expect(r).toMatchObject({ status: 'completed', targetVersion: 2 });
     const vars = JSON.parse(aiPrompt.create.mock.calls[0][0].wmkf_ai_promptvariables).variables;
     expect(vars.map((v) => v.name)).toEqual(['budget_text', 'cap']);
+  });
+});
+
+describe('createPrompt with a group added in Admin', () => {
+  it('accepts a group from the stored list', async () => {
+    await createPrompt(args({ catalog: { title: 'Budget check', group: 'grant-reporting' } }));
+    expect(aiPrompt.create.mock.calls[0][0]).toMatchObject({ wmkf_ai_groupkey: 'grant-reporting' });
   });
 });

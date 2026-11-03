@@ -327,3 +327,54 @@ test('Add prompt: a native structured-output schema requires a compatible concre
   expect(within(form).getByText(/choose a compatible concrete model/)).toBeInTheDocument();
   expect(within(form).getByRole('button', { name: 'Create and publish v1' })).toBeDisabled();
 });
+
+describe('Manage groups', () => {
+  const { defaultEditablePromptGroups, buildEffectivePromptGroups } = jest.requireActual('../../shared/config/adminPromptCatalog');
+  const editable = defaultEditablePromptGroups();
+  function serveWithGroups(putResponse) {
+    serve([prompt('phase-i.summary')]);
+    const base = global.fetch;
+    global.fetch = jest.fn(async (url, init = {}) => {
+      if (url === '/api/admin/prompts' && (init.method || 'GET') === 'GET') {
+        return response({ prompts: [prompt('phase-i.summary')], groups: buildEffectivePromptGroups(editable), groupsEditable: editable, groupsRevision: 'W/"3"', groupsWarning: null });
+      }
+      if (url === '/api/admin/prompt-groups') return putResponse;
+      return base(url, init);
+    });
+  }
+
+  test('adds a group after a chosen group, reorders, and saves the whole list', async () => {
+    serveWithGroups(response({ status: 'groups_saved' }));
+    await renderOpenWorkflows();
+    fireEvent.click(screen.getByRole('button', { name: 'Manage groups' }));
+    const panel = screen.getByRole('region', { name: 'Manage groups' });
+    const save = within(panel).getByRole('button', { name: 'Save groups' });
+    expect(save).toBeDisabled();
+    fireEvent.change(within(panel).getByLabelText('New group'), { target: { value: 'Grant reporting' } });
+    fireEvent.change(within(panel).getByLabelText('Place after'), { target: { value: 'preflight' } });
+    fireEvent.click(within(panel).getByRole('button', { name: 'Add' }));
+    fireEvent.click(within(panel).getByRole('button', { name: 'Move Grant reporting down' }));
+    expect(save).toBeEnabled();
+    fireEvent.click(save);
+    await screen.findByText('Groups saved.');
+    const put = global.fetch.mock.calls.find(([url]) => url === '/api/admin/prompt-groups');
+    const sent = JSON.parse(put[1].body);
+    expect(put[1].method).toBe('PUT');
+    expect(sent.expectedRevision).toBe('W/"3"');
+    expect(sent.groups.map((g) => g.id).slice(0, 3)).toEqual(['preflight', 'reviewers', 'grant-reporting']);
+    expect(sent.groups).toHaveLength(editable.length + 1);
+  });
+
+  test('blocks a duplicate name and shows a conflict from the server', async () => {
+    serveWithGroups({ ok: false, status: 409, json: async () => ({ status: 'groups_conflict', error: 'Groups changed since you opened them. Reload and re-apply your changes.' }) });
+    await renderOpenWorkflows();
+    fireEvent.click(screen.getByRole('button', { name: 'Manage groups' }));
+    const panel = screen.getByRole('region', { name: 'Manage groups' });
+    fireEvent.change(within(panel).getByLabelText('New group'), { target: { value: 'pre-flight' } });
+    expect(within(panel).getByText('A group with that name already exists.')).toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: 'Add' })).toBeDisabled();
+    fireEvent.change(within(panel).getByLabelText('Name of group 1'), { target: { value: 'Pre-flight checks' } });
+    fireEvent.click(within(panel).getByRole('button', { name: 'Save groups' }));
+    expect(await within(panel).findByRole('alert')).toHaveTextContent('Groups changed since you opened them');
+  });
+});

@@ -2,7 +2,7 @@
 title: Admin prompt groups — plan
 kind: plan
 domain: ai-platform
-status: proposed
+status: active
 summary: Move the Admin prompt group list from code into a Dataverse setting so superusers can add, rename and reorder groups in Admin. No sections for new groups and no deletion.
 canonical: false
 cataloged: 2026-11-02
@@ -14,7 +14,8 @@ related:
 
 # Admin prompt groups
 
-[PLANNED — not built. Awaiting Justin's review.]
+[OWNER APPROVED 2026-11-02: settings-row history is enough; pinned groups stay
+fixed. BUILT ON BRANCH `claude/admin-prompt-groups`; NOT DEPLOYED.]
 
 ## Why
 
@@ -92,7 +93,7 @@ The new group then appears in the Group dropdown in **Add prompt** and
   constant.
 - **Audit:** the settings row records who saved it last and when. No separate
   audit table, because this is display metadata only and changes no prompt.
-  [OPEN — see below]
+  [OWNER APPROVED 2026-11-02]
 
 ## Out of scope
 
@@ -111,7 +112,7 @@ The new group then appears in the Group dropdown in **Add prompt** and
 
 ## Open questions for Justin
 
-1. **Audit.** Is "last saved by / when" on the settings row enough, or do you
+1. **Audit.** [OWNER APPROVED: the settings row is enough] Is "last saved by / when" on the settings row enough, or do you
    want a history of every group change?
-2. **Pinned groups.** Is it fine that "Uncataloged" and "Legacy" stay fixed at
+2. **Pinned groups.** [OWNER APPROVED: yes] Is it fine that "Uncataloged" and "Legacy" stay fixed at
    the bottom and can't be renamed?

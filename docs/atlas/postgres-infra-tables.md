@@ -97,6 +97,13 @@ See `docs/plans/PERSONAL_EMAIL_REVIEWER_THANKYOU_DEFAULTS_PLAN_2026-10-26.md`.
 former Postgres branch is removed and `WAVE1_BACKEND_SETTINGS=postgres` fails
 loud at module load.
 **Schema:** generic key-value (model overrides, feature flags, etc.).
+Key `promptLibrary.groups` [BUILT ON BRANCH `claude/admin-prompt-groups` 2026-11-02; NOT DEPLOYED]: the editable Admin prompt group list,
+`{ version: 1, groups: [{ id, label }] }` in display order. Writer: `PUT
+/api/admin/prompt-groups` (`lib/services/admin/prompt-groups-service.js`,
+`setSettingIfUnchanged` under the row revision). Readers: `GET
+/api/admin/prompts` and the prompt catalog validation in Edit details and Add
+prompt. No row means the code default list (`ADMIN_PROMPT_GROUPS`). The row's
+updated-by and modified-on are the only history (owner decision 2026-11-02).
 
 ## Dynamics Explorer state
 
