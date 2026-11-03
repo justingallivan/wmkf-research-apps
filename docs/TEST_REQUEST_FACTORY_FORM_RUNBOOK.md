@@ -172,6 +172,18 @@ readiness flag cannot be reset or its unexpected effects approved this way. Loca
 
 [VERIFIED 2026-11-03 bounded CLI test] Prepared Request **1003456** (run `c2da75d4-a737-4d81-8db1-96aca62e12a6`) is retained unready at `verify` / `needs_attention`. All seven copies passed, but the Foundation protected projection changed; read-only recheck confirms it and audit access returned 403. No phase advancement or readiness stamp ran. Do not bypass or replace the baseline. See the [live receipt](plans/evidence/test-request-factory/j27-prepared-live-proof-2026-11-03.md).
 
+For an audited replacement of an existing generated GOverify PDF, branch-built
+owner CLI assistance is `--previous-goverify-pdf-file=<absolute private file>`
+on production `--advance`, `--run-recheck`, `--finalize-readiness` or
+`--recover-readiness`. Put only the prior URL in that small local file; do not
+commit it or paste it into a command argument. The prior URL must have the
+tracked generated shape and predate baseline capture. Substituting only that
+field must reproduce the original whole-projection digest; the current PDF and
+trigger must pass their existing timing checks. No baseline reset, URL fetch,
+ledger schema change or form bypass is added. Use the same private evidence for
+later CLI rechecks/finalization/recovery. The form supplies no evidence and may
+still refuse a replaced-PDF run. All other isolation checks remain unchanged.
+
 Use the finalization preview to inspect readiness journal status; ordinary
 `--run-inspect` still shows the existing run/resource history, not readiness
 attempts. A Phase status change closed by `--status-abandon` remains unknown

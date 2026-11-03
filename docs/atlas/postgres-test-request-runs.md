@@ -152,14 +152,17 @@ the B4 plan forbids pointing that runner at them (cast plan, *Order* 6, §6).
   read-only CLI mode `--target=production --run-recheck=<runId>` re-reads the
   account and evaluates it against the same baseline (no ledger write).
   The protected projection digest remains unchanged and stores no account
-  values. A narrowly bounded GoVerify PDF transition is accepted only when
-  the original baseline explicitly contained `akoya_goverifypdfurl: null`,
-  replacing that one current value with `null` reproduces the stored digest,
-  and the current URL has the tracked Akoya GoVerify host/site/path shape with
-  a valid `GOverifyUpdate_YYYYMMDDHHmmssfff.pdf` timestamp inside the run
-  window. The observed GoVerify trigger must also satisfy the existing moved
-  stamp checks. This does not exempt the field from the projection or accept
-  a non-null baseline; every other protected account change still fails.
+  values. A narrowly bounded GoVerify PDF transition requires substituting
+  only that field to reproduce the original whole-projection digest. By default
+  the substituted value is null. Branch-built 2026-11-03 owner CLI assistance
+  (`--previous-goverify-pdf-file=<absolute private file>`) can instead supply
+  the exact prior generated URL, whose valid filename timestamp must predate
+  capture. The current generated URL must match the tracked host/site/path and
+  have a valid timestamp inside the run window; the GoVerify trigger must move
+  within its existing window. No fallback to null follows a wrong supplied value.
+  The baseline is never changed and neither URL enters the ledger. All other
+  account, contact, result and rollup checks remain mandatory. The admin form
+  supplies no such evidence, so its recheck may still refuse these replacements.
 
 ## Second writer: the deployed admin form (2026-10-02)
 

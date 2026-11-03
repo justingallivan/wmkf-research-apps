@@ -217,6 +217,7 @@ export function parseArgs(argv) {
     steps: 1,
     runInspect: null,
     runRecheck: null,
+    previousGoVerifyPdfFile: null,
     finalizeReadiness: null,
     recoverReadiness: null,
     confirmReadinessRequest: null,
@@ -262,6 +263,7 @@ export function parseArgs(argv) {
     else if (arg.startsWith('--manifest=')) parsed.manifest = arg.slice('--manifest='.length);
     else if (arg.startsWith('--steps=')) parsed.steps = Number(arg.slice('--steps='.length));
     else if (arg.startsWith('--run-inspect=')) parsed.runInspect = arg.slice('--run-inspect='.length);
+    else if (arg.startsWith('--previous-goverify-pdf-file=')) parsed.previousGoVerifyPdfFile = arg.slice('--previous-goverify-pdf-file='.length);
     else if (arg === '--ledger-check') parsed.ledgerCheck = true;
     else if (arg.startsWith('--run-recheck=')) parsed.runRecheck = arg.slice('--run-recheck='.length);
     else if (arg.startsWith('--recover-readiness=')) parsed.recoverReadiness = arg.slice('--recover-readiness='.length);
@@ -332,6 +334,11 @@ export function parseArgs(argv) {
   }
   if (!parsed.setStatus && (parsed.statusField || parsed.statusOption || parsed.rerun)) {
     throw new Error('--field, --option and --rerun are valid only with --set-status.');
+  }
+  if (parsed.previousGoVerifyPdfFile !== null && (parsed.target !== 'production'
+      || !(parsed.advance || parsed.runRecheck || parsed.finalizeReadiness || parsed.recoverReadiness)
+      || !path.isAbsolute(parsed.previousGoVerifyPdfFile))) {
+    throw new Error('--previous-goverify-pdf-file requires an absolute private file and a production advance, recheck or readiness operation.');
   }
   if (parsed.runRecheck && parsed.target !== 'production') {
     throw new Error('--run-recheck is valid only with --target=production.');
@@ -464,6 +471,7 @@ function printHelp() {
   console.log('  --idempotency-key: 1-200 printable ASCII characters, no spaces; the ledger stores only its SHA-256.');
   console.log('  --actor: admin:<guid> or user:<guid>, or an OS username; a username (default: the current OS user) is stored only as cli:<16 hex digest>.');
   console.log('Advance a reserved run by bounded steps: ... --advance=<runId> --manifest=/absolute/manifest.json --bundle=/absolute/source-bundle.json [--steps=N] [--bypass-goverify]');
+  console.log('Optional production verification evidence: --previous-goverify-pdf-file=<absolute private file>. Must restore the original protected digest; never rewrites a baseline.');
   console.log('Inspect a ledger run (read-only, no Dataverse): ... --run-inspect=<runId>');
   console.log('Recover an unready readiness attempt (ledger only; establish all dispatchers stopped first): ... --target=production --recover-readiness=<runId> --manifest=/absolute/manifest.json [--confirm-readiness-request=<exact Request GUID>]');
   console.log('Preview prepared J27+ staff readiness (needs DATAVERSE_ALLOW_PROD_READS=yes); add --confirm (needs DATAVERSE_PROD_WRITE_ACK) for the one-shot true stamp after phase advancement: ... --target=production --finalize-readiness=<runId> --manifest=/absolute/manifest.json [--confirm]');
@@ -1065,6 +1073,18 @@ export async function runReserve(client, args, ledgerUrl) {
   }
 }
 
+/** Private owner evidence only; never echo its URL or put it in the ledger. */
+export function readPreviousGoVerifyPdf(file) {
+  if (file == null) return null;
+  const stat = path.isAbsolute(file) ? fs.statSync(file) : null;
+  if (!stat?.isFile() || stat.size > 2048) {
+    throw new Error('Previous GoVerify PDF evidence must be a small private local file.');
+  }
+  const value = fs.readFileSync(file, 'utf8').trim();
+  if (!value || value.length > 2048) throw new Error('Previous GoVerify PDF evidence is empty or too large.');
+  return value;
+}
+
 export async function runAdvance(client, args, ledgerUrl) {
   // Every Initial Assessment step's sandbox dependency
   // (lib/services/test-requests/ia-sandbox-deps.js) calls
@@ -1078,6 +1098,7 @@ export async function runAdvance(client, args, ledgerUrl) {
   // dependency, never carry it.
   const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
   enterDynamicsBypassForScript('rehearse-test-request-sandbox:advance');
+  const previousGoVerifyPdf = readPreviousGoVerifyPdf(args.previousGoVerifyPdfFile);
   const manifest = readJson(args.manifest);
   if (targetEnvironmentOf(manifest) !== (args.target ?? 'sandbox')) {
     throw new Error(`Manifest target is ${targetEnvironmentOf(manifest)}; pass --target=${targetEnvironmentOf(manifest)} to advance it.`);
@@ -1115,7 +1136,7 @@ export async function runAdvance(client, args, ledgerUrl) {
         // Opus review, P1-b: `reviews` is cumulative on `initial_assessment`
         // and needs the same 900 s). No renewal mechanism; reconsidered only
         // if a live run shows longer phases.
-        options: { bypassGoverify: args.bypassGoverify, leaseSeconds: recipeLeaseSeconds(manifest.recipe ?? 'basic') },
+        options: { bypassGoverify: args.bypassGoverify, leaseSeconds: recipeLeaseSeconds(manifest.recipe ?? 'basic'), previousGoVerifyPdf },
       });
       // The ledger never stores message text (only a lowercase code); the
       // full error, if any, is surfaced here and in a private sidecar file
@@ -1355,7 +1376,7 @@ export async function runCastMode(client, args, ledgerUrl) {
  * against its journaled pre-create baseline (foundation-transition.js). No
  * ledger or Dataverse write. Prints outcome and failure text only.
  */
-export async function runRecheck(client, runId, ledgerUrl) {
+export async function runRecheck(client, runId, ledgerUrl, previousGoVerifyPdf = null) {
   const db = pgLedgerDb(ledgerUrl);
   try {
     const ledger = createRunLedger(db);
@@ -1364,7 +1385,7 @@ export async function runRecheck(client, runId, ledgerUrl) {
     if (run.destinationEnvironment !== 'production') throw new Error(`Run ${runId} is not a production run.`);
     const resources = await ledger.listRunResources(runId);
     // The Liaison allowance comes only from this run's own journaled baseline.
-    const { failures, outcome } = await recheckFoundationTransition({ client, organizationId: run.expectedOrganizationId, resources });
+    const { failures, outcome } = await recheckFoundationTransition({ client, organizationId: run.expectedOrganizationId, resources, previousGoVerifyPdf });
     console.log(JSON.stringify({
       mode: 'READ_ONLY_FOUNDATION_RECHECK', runId, status: run.status, ok: failures.length === 0, outcome, failures,
     }, null, 2));
@@ -1406,7 +1427,7 @@ async function main() {
     try {
       const readinessClient = createClient({ resourceUrl: targetUrl, token: await getAccessToken(targetUrl) });
       const { graph } = await buildGraphContext();
-      const input = { client: readinessClient, ledger: createRunLedger(db), journal: createReadinessJournal(db), graph, manifest: readJson(args.manifest), runId: args.finalizeReadiness || args.recoverReadiness };
+      const input = { client: readinessClient, ledger: createRunLedger(db), journal: createReadinessJournal(db), graph, manifest: readJson(args.manifest), runId: args.finalizeReadiness || args.recoverReadiness, previousGoVerifyPdf: readPreviousGoVerifyPdf(args.previousGoVerifyPdfFile) };
       if (args.recoverReadiness) console.log('Before confirming recovery: disable form dispatch; establish every form invocation has ended; stop/account for every CLI, including paused senders. A timer or unchanged readiness does not prove no sender remains. Exact Request confirmation affirms this checklist. Recovery writes the ledger only.');
       const result = args.recoverReadiness
         ? await recoverReadiness({ ...input, confirmRequestId: args.confirmReadinessRequest })
@@ -1439,7 +1460,7 @@ async function main() {
     const ledgerUrl = requireLedgerUrl(args.target);
     await ledgerSchemaCheck(ledgerUrl, { mode: 'run-recheck' });
     const readClient = createClient({ resourceUrl: targetUrl, token: await getAccessToken(targetUrl) });
-    await runRecheck(readClient, args.runRecheck, ledgerUrl);
+    await runRecheck(readClient, args.runRecheck, ledgerUrl, readPreviousGoVerifyPdf(args.previousGoVerifyPdfFile));
     return;
   }
   if (args.target === 'sandbox' && process.env.DYNAMICS_SANDBOX_URL !== SANDBOX_URL) {

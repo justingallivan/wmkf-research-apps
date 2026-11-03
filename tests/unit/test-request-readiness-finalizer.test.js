@@ -155,3 +155,22 @@ test.each([['needs_attention',true,'readiness_unexpected_effects'],['needs_atten
   expect(f.journal.plan).not.toHaveBeenCalled();expect(f.client.patchWithOptions).not.toHaveBeenCalled();
   if(status==='needs_attention')await expect(finalizeReadiness({...f,confirm:true})).rejects.toThrow('owner inspection');
 });
+
+
+test('readiness preview passes explicit prior-PDF evidence to the Foundation check and refuses its failure', async () => {
+  const { recheckFoundationTransition } = require('../../lib/services/test-requests/foundation-transition.js');
+  const f = fixture();
+  await finalizeReadiness({ ...f, previousGoVerifyPdf: 'synthetic-prior-evidence' });
+  expect(recheckFoundationTransition).toHaveBeenLastCalledWith(expect.objectContaining({ previousGoVerifyPdf: 'synthetic-prior-evidence' }));
+  recheckFoundationTransition.mockResolvedValueOnce({ failures: ['protected drift'] });
+  await expect(finalizeReadiness({ ...f, previousGoVerifyPdf: 'synthetic-prior-evidence', confirm: true })).rejects.toThrow('Foundation isolation');
+  expect(f.client.patchWithOptions).not.toHaveBeenCalled();
+});
+
+test('readiness recovery also passes the same prior-PDF evidence to its prerequisite check', async () => {
+  const { recheckFoundationTransition } = require('../../lib/services/test-requests/foundation-transition.js');
+  const f = fixture({ entry: { status: 'needs_attention', attempt: 1 } });
+  await recoverReadiness({ ...f, previousGoVerifyPdf: 'synthetic-prior-evidence' });
+  expect(recheckFoundationTransition).toHaveBeenLastCalledWith(expect.objectContaining({ previousGoVerifyPdf: 'synthetic-prior-evidence' }));
+  expect(f.client.patchWithOptions).not.toHaveBeenCalled();
+});
