@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## November 2026 — Prepared J27 Factory completes a reviewer rehearsal (Session 661, Codex)
+
+**Milestone:** A prepared, marked J27 clone supports a bounded invitation-to-submitted-review rehearsal without rerunning intake assembly or AI.
+**Sessions:** Codex J27 work concurrent with Session 660, completed in Session 661; owner-authorized live scope and Fable plan/code reviews.
+**Ship state:**
+- PR #617 (`d3016b5da`): guarded prepared clone, separate phase changes, journaled owner readiness and exact prior-GoVerify-PDF proof; migration 094 verified on both managed ledgers.
+- PR #618 (`7054043ed`): immutable Factory reviewer promotion; PR #623 (`a66e09091`): expected archive misses no longer misclassified as materials outages.
+- Request 1003456, run `c2da75d4-a737-4d81-8db1-96aca62e12a6`, managed-ledger/ledger_prod: canonical PDF hash verified, one test review received with nine answers, two sent emails and zero observed request payments; honorarium declined.
+- PR #626 records closeout/operating steps; all checks passed, but GitHub still showed OPEN at stop despite owner-reported Production completion. No merge performed by this stop.
+**Why it matters:** Staff can rehearse reviewer mechanics using a complete copied package; owner CLI finalization and manual isolated materials release remain accepted limits. Broader PD workflow and earlier intake testing are deferred.
+**Pointers:** `docs/TEST_REQUEST_FACTORY_FORM_RUNBOOK.md`; `docs/plans/evidence/test-request-factory/j27-reviewer-rehearsal-proof-2026-11-03.md`; `docs/plans/J27_TEST_REQUEST_FACTORY_FINISH_PLAN_2026-11-02.md`.
+
 ## November 2026 — Staff author the shared prompt library entirely in Admin (Session 660, Claude)
 
 **Milestone:** Admin can publish Dataverse drafts, create new prompts, edit and drag-reorder groups, and retire prompts, so nobody edits Dataverse to manage prompts.

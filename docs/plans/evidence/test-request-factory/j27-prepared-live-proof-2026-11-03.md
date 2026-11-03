@@ -1,5 +1,7 @@
 # Prepared J27 Factory: managed migration and bounded live test
 
+Historical provisioning checkpoint, captured before release and reviewer rehearsal. The release hold and unexercised reviewer scopes below describe that checkpoint only. Current outcome: [completed reviewer rehearsal](j27-reviewer-rehearsal-proof-2026-11-03.md); current procedure: [Factory runbook](../../../TEST_REQUEST_FACTORY_FORM_RUNBOOK.md#repeatable-prepared-fixture-rehearsal).
+
 Date: 2026-11-03 UTC. Initial runtime: `adedab12d6fe9b1202b7b1398cd94051e4fd9dc1`;
 reviewed PDF correction and successful resumption: `c9e7800e9`.
 Owner authorized migration, one bounded Production fixture, the narrow PDF

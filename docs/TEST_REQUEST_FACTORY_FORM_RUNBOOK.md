@@ -6,7 +6,7 @@ status: active
 summary: "Operating the admin Test Request form in Production: what it needs, what each stop means, what a retry does, and how to turn it off."
 canonical: false
 cataloged: 2026-10-02
-last_verified: 2026-10-03
+last_verified: 2026-11-03
 owner: product-engineering
 related:
   - docs/plans/TEST_REQUEST_FACTORY_ADMIN_FORM_PLAN_2026-10-01.md
@@ -44,7 +44,7 @@ A variable change takes effect only in a new deployment. Details and rotation: `
    Pending Committee Review and owner readiness finalization are required.
    Earlier-cycle clone behavior is unchanged.
 
-The bundle is valid for 6 hours from the lookup (`BUNDLE_MAX_AGE_MS`, `bundle-file-copy.js`). A run not finished by then cannot be finished.
+The bundle is valid for file copying for 6 hours from lookup (`BUNDLE_MAX_AGE_MS`, `bundle-file-copy.js`). Finish the copy steps within that window. Completed verified copies do not expire for later status/readiness finalization because of that TTL or subsequent edits to the real source.
 
 Reference run **[RUN]**: `a5161f47-7b02-5ad3-8f20-3f645ec3c254`, source 1002988, test Request 1003310, seven documents, under three minutes from Confirm to ready.
 
@@ -116,7 +116,7 @@ Only a `ready` production run. One change may be open per run. The form confirms
 
 The recheck's `ok` means this pass found no newly unrecorded effects and no open or failed jobs. It does not establish that the change had no effects, that an email was delivered, or that a sender has stopped. A change still marked `dispatched` remains unresolved. No new web closure, rerun or recovery action is authorized by rechecking.
 
-[BRANCH IMPLEMENTATION, not deployed] The status-outcome explanation displays the returned change number and recorded status beside per-pass counts, keeps unresolved results visually distinct from complete results, and discards results when a later journal read identifies a different change or status. Starting another status action clears the old recheck result. The existing actor/superuser checks and operation semantics remain unchanged.
+[VERIFIED via merged PR #427 and `TestRequestStatusControl.js`; included in the later verified Production release] The status-outcome explanation displays the returned change number and recorded status beside per-pass counts, keeps unresolved results visually distinct from complete results, and discards results when a later journal read identifies a different change or status. Starting another status action clears the old recheck result. The existing actor/superuser checks and operation semantics remain unchanged.
 
 ## The command-line tool
 
@@ -128,12 +128,14 @@ The recheck's `ok` means this pass found no newly unrecorded effects and no open
 | `--run-recheck=<runId>` | Read-only: the Foundation account against the run's baseline. |
 | `--advance=<runId> --manifest=<file> --bundle=<file>` | Uses the same backend runner. The form may withhold Advance when diagnosis is uncertain; an owner CLI retry remains subject to runner checks and separate operational authorization. Needs the run's manifest and bundle as local files. |
 | `--set-status`, `--status-recheck`, `--status-abandon` | The status setter, its recheck, and closing a change stuck `dispatched`. |
-| `--finalize-readiness=<runId> --manifest=<file>` | Branch-built owner-only prepared J27+ readiness preview; add `--confirm` for the single journaled true stamp after all checks. Requires migration 094 on the operational ledger. No web finalization action. |
+| `--finalize-readiness=<runId> --manifest=<file>` | Deployed owner-only prepared J27+ readiness preview; add `--confirm` for the single journaled true stamp after all checks. Requires migration 094 on the operational ledger. No web finalization action. |
+| `--recover-readiness=<runId> --manifest=<file>` | Read-only recovery preview; exact-destination confirmation can abandon only an unready attempt after all senders stop (procedure below). |
+| `--bind-reviewer=<runId>`, `--bind-reviewer-slot=<runId>` | Owner cast suggestion binding and separate read-only slot preview; only exact Request confirmation enables the slot operation. |
 | `--ledger-check` | Ledger schema against the tracked fingerprint. |
 
 To get a form run's manifest and bundle: the run panel's artifacts download, or `scripts/factory-artifacts-download.mjs` (owner-run, reads `FACTORY_BLOB_RW_TOKEN` locally).
 
-## Prepared J27 reviewer fixtures — branch implementation, not deployed
+## Prepared J27 reviewer fixtures
 
 The Basic recipe remains unchanged. Newly reserved Production J27+ manifests
 explicitly select `j27-reviewer-fixture/v1`, start with readiness false, and omit
@@ -146,8 +148,7 @@ Download the manifest and bundle **before the final clone step**, since the dail
 sweep may delete them once the run is internally ready. Complete the clone, use
 the existing status setter for Phase I `Invited` and then Phase II `Phase II
 Pending Committee Review`, and inspect each result. Invited may create a draft
-email and GoApply tracking row; this prepared-fixture transition remains to be
-characterized. The derived Request Status must read `Phase II Pending`.
+email and GoApply tracking row. The bounded 2026-11-03 fixture had no unexpected provisioning effects; future runs still require observation. The derived Request Status must read `Phase II Pending`.
 
 Preview `--finalize-readiness=<runId> --manifest=<local manifest>` read-only.
 Only an owner-authorized invocation with `--confirm` can stamp readiness true.
@@ -168,11 +169,11 @@ The next finalization verifies the package first and only then plans a fresh
 attempt with the current ETag. An already-true
 readiness flag cannot be reset or its unexpected effects approved this way. Local code/tests do not authorize Production fixture writes or emails.
 
-[VERIFIED 2026-11-03 via `apply-ledger-migrations.js` and `check:factory-ledger`] Migration 094 is applied to BOTH managed operational ledgers; each matches the branch 054+058+094 fingerprint. Justin accepted interruption of the currently deployed Factory create/advance/status actions while merge/deployment remain held. The old deployment rejects the extra schema until compatible code is promoted. Do not bypass the guard. Future ledger migrations use `ledger:apply`, never the app database runner.
+[VERIFIED 2026-11-03 via `apply-ledger-migrations.js`, `check:factory-ledger` and Production deployment] Migration 094 is applied to BOTH managed operational ledgers; each matches the 054+058+094 fingerprint. Compatible Factory code shipped in PR #617, closing the accepted temporary interruption between migration and promotion. Future ledger migrations use `ledger:apply`, never the app database runner.
 
-[VERIFIED 2026-11-03 bounded CLI test] Prepared Request **1003456** (run `c2da75d4-a737-4d81-8db1-96aca62e12a6`) completed clone verification, both phase changes and readiness finalization after the reviewed prior-PDF proof correction. Readiness is true, Phase I Invited, Phase II Pending Committee Review and derived status Phase II Pending. Seven copied files passed; both phase changes and readiness showed no unexpected effects; read-only Foundation recheck passes. The original baseline is unchanged. Authenticated app UI and subsequent reviewer workflow are not claimed by this bounded test. See the [live receipt](plans/evidence/test-request-factory/j27-prepared-live-proof-2026-11-03.md).
+[VERIFIED 2026-11-03 bounded CLI test] Prepared Request **1003456** (run `c2da75d4-a737-4d81-8db1-96aca62e12a6`) completed clone verification, both phase changes and readiness finalization after the reviewed prior-PDF proof correction. Readiness is true, Phase I Invited, Phase II Pending Committee Review and derived status Phase II Pending. Seven copied files passed; both phase changes and readiness showed no unexpected effects; read-only Foundation recheck passes. The original baseline is unchanged. That provisioning receipt predates the separately authorized reviewer rehearsal below. See the [live receipt](plans/evidence/test-request-factory/j27-prepared-live-proof-2026-11-03.md).
 
-For an audited replacement of an existing generated GOverify PDF, branch-built
+For an audited replacement of an existing generated GOverify PDF, deployed
 owner CLI assistance is `--previous-goverify-pdf-file=<absolute private file>`
 on production `--advance`, `--run-recheck`, `--finalize-readiness` or
 `--recover-readiness`. Put only the prior URL in that small local file; do not
@@ -191,9 +192,34 @@ history and blocks finalization. Only an exact definitive no-write 412 status
 refusal can be ignored alongside a later complete corroborating transition;
 other needs_attention status history requires owner inspection.
 
+## Repeatable prepared-fixture rehearsal
+
+[VERIFIED via the CLI parser/guards, deployed UI and the bounded 2026-11-03 rehearsal] The supported MVP is Admin cloning followed by owner phase/readiness operations. A web readiness button is not required for this increment. These steps describe the procedure; each new Production write, communication or metered analysis needs its own authorized scope.
+
+1. Choose a completed source with its applicant abstract and canonical reviewer PDF. Copying a D26 package into J27 tests reviewer mechanics, not new J27 intake assembly or AI output. Confirm the destination cycle and test marker in the preview.
+2. If the Foundation already has a generated GOverify PDF, retain the authorized pre-run URL in a private local file before cloning. Use mode 0600; never commit it or put the URL in shell arguments. The optional prior-PDF proof must reproduce the original baseline digest exactly. If that proof is unavailable or fails, stop for inspection rather than resetting the baseline.
+3. Reserve through Admin and download the manifest and bundle before the final clone step. Finish copying within the six-hour bundle window. Inspect any refusal; owner CLI assistance uses the same runner and isolation checks. Retain the local artifacts privately after internal run `ready`.
+4. Use the guarded status setter separately for Phase I `Invited`, then Phase II `Phase II Pending Committee Review`. Inspect each result and its jobs/effects before proceeding. Never set `akoya_requeststatus` directly; read back derived `Phase II Pending`.
+5. Preview readiness with the local manifest; inspect package, Foundation, phase/status and journal checks. Only then run the separately authorized confirmation. Read back readiness true and the completed journal. CLI modes below use `--target=production`; reads require `DATAVERSE_ALLOW_PROD_READS=yes`, writes require `DATAVERSE_PROD_WRITE_ACK="<purpose> YYYY-MM-DD"` and configured interlocks. Use the current UTC date required by the guard.
+
+```text
+node --import ./scripts/lib/use-extensionless.mjs scripts/rehearse-test-request-sandbox.mjs --target=production --set-status=<runId> --field=phase1 --option="Invited"
+node --import ./scripts/lib/use-extensionless.mjs scripts/rehearse-test-request-sandbox.mjs --target=production --set-status=<runId> --field=phase2 --option="Phase II Pending Committee Review"
+node --import ./scripts/lib/use-extensionless.mjs scripts/rehearse-test-request-sandbox.mjs --target=production --finalize-readiness=<runId> --manifest=<absolute manifest path>
+```
+
+Add `--confirm` only to the finalization command after its preview passes. Supply `--previous-goverify-pdf-file=<absolute private file>` on supported modes when the exact prior-PDF proof is needed. The status setter has no such flag. Do not reuse another run's artifacts or automation assessment.
+
+6. For the isolated applicant-recommended reviewer path, use the existing controlled cast and owner-only `--bind-reviewer=<runId>`. The separate `--bind-reviewer-slot=<runId>` is a read-only preview; before authorizing a write, the owner must complete a fresh automation preflight and assess its dispositions. This is an operator procedure, not a check enforced by the CLI. The CLI separately requires `--confirm-slot-request=<exact destination GUID>`, the same-UTC-day write acknowledgment and its ownership/occupancy/journal fences. See the historical [cast/slot assessment contract](plans/TEST_REQUEST_FACTORY_CAST_AND_STATUS_PLAN_2026-09-28.md); a previous rehearsal's assessment is not authorization for a new slot write.
+7. In Find, use the explicit **Add Factory reviewer to Invite** action. Keep the synthetic identity unchanged and use only an approved controlled test inbox. Any automatic application analysis is separately metered and needs authorization. Send a clearly labeled test invitation with no payment promise; complete policy acknowledgments only with the reviewer's action-time consent and select honorarium opt-out for this no-payment rehearsal.
+8. Test isolation skips ordinary automatic acceptance follow-up. Manually release materials through staff controls, using the exact subject prefix `TEST ONLY — Review materials:` if the link-recovery helper will be needed. That prefix is an operator convention required by this diagnostic, not an automatic send-template rule. Open the latest materials email link: release rotates the token, so the invitation URL becomes stale. If needed, `scripts/read-test-materials-email-link.mjs` can recover exactly one existing marked-test materials link to a new private file, without minting or sending. It does not prove inbox delivery or cryptographically validate the token; the portal performs token validation.
+9. Check the canonical PDF and submit one clearly labeled test review with test placeholders. Verify staff Track/Reviews and all nine answers. `scripts/probe-factory-reviewer-rehearsal.mjs` provides a read-only paired-request census, including email/payment counts. Do not infer ordinary honorarium, automatic follow-up or synthesis coverage from this isolated test. Remove temporary local proposal copies after inspection; retain sanitized receipts, not bearer links or proposal bodies, in the repository.
+
+[VERIFIED 2026-11-03 via Production browser flow and read-only census] Request 1003456 completed this bounded rehearsal after PRs #617, #618 and #623 deployed. The copied 24-page PDF matched the saved source hash; one test review reached staff with nine answers, honorarium declined and no linked honorarium request. The final census found two sent emails and zero request-payment rows. Materials inbox delivery was not independently verified. [Full receipt](plans/evidence/test-request-factory/j27-reviewer-rehearsal-proof-2026-11-03.md). Broader PD workflow and earlier intake-stage testing remain deferred.
+
 ## Artifacts and the daily sweep
 
-The daily maintenance cron deletes Factory Blob objects (`sweepFactoryArtifacts`, `factory-artifact-store.js`) **[SOURCE; aggregate Production execution observed 2026-10-03]**: saved lookups older than 6 hours; a run's bundle and manifest once the run is `ready`; objects with no ledger row once older than 24 hours. It keeps everything for a run that is `prepared`, `creating` or `needs_attention`. Download a finished run's artifacts the same day if they will be wanted.
+The daily maintenance cron deletes Factory Blob objects (`sweepFactoryArtifacts`, `factory-artifact-store.js`) **[SOURCE; aggregate Production execution observed 2026-10-03]**: saved lookups older than 6 hours; a run's bundle and manifest once the run is `ready`; objects with no ledger row once older than 24 hours. It keeps everything for a run that is `prepared`, `creating` or `needs_attention`. Download the manifest and bundle before the final clone step if they will be needed for owner finalization or later inspection.
 
 [VERIFIED via read-only `maintenance_runs` record] The 2026-10-03 03:00 UTC daily pass completed with Factory totals of 4 deleted, 2 kept, 0 errors, and neither scan nor deletion truncated. These aggregate counts do not establish which exact objects were deleted or retained. See [follow-up evidence](audits/OPEN_ITEMS_FOLLOWUP_2026-10-03.md).
 

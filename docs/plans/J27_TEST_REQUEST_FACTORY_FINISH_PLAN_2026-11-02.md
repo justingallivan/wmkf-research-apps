@@ -1,6 +1,6 @@
 # Finish the J27 Test Request Factory
 
-Status: **IMPLEMENTED ON REVIEW BRANCH; local checks and Fable reviews passed. Migration 094 is applied to both managed ledgers; bounded prepared-fixture test passed on Request 1003456 after the Fable-reviewed PDF correction. Merge/deployment remain held; authenticated app UI and reviewer-workflow proof remain separate.**
+Status: **COMPLETE for the prepared reviewer-test MVP. [VERIFIED 2026-11-03 via Production deployment and bounded reviewer rehearsal] PRs #617, #618 and #623 are merged and deployed. Request 1003456 passed provisioning, readiness finalization, invitation, acceptance, PDF inspection and test-review submission. Owner CLI phase advancement/readiness and optional private prior-PDF proof are accepted operating requirements.**
 Owner: Codex. Date: 2026-11-02 Pacific.
 Boundary: finish the Factory for reviewer testing; broader PD workflow stays deferred.
 
@@ -64,7 +64,7 @@ unready and not test-marked. They do not establish a complete golden package
 and must not be modified as Factory destinations. The later source/metadata inventory below is read-only; neither example is a
 Factory destination.
 
-## Implementation contract and remaining live proof
+## Implemented operating contract
 
 1. **Define the minimum reviewer-test package from actual consumers.** Inventory
    a suitable completed source when read access is authorized. Identify the
@@ -93,9 +93,7 @@ Factory destination.
    before deploying this fingerprint; it affects every Factory mode, not only
    finalization. [VERIFIED 2026-11-03 via the ledger runner and fingerprint check]
    Justin authorized and completed migration 094 on both managed ledgers, accepting
-   interruption of the old deployed Factory. Merge/deployment remain held by
-   owner instruction; the old code rejects the extra schema until compatible
-   code is promoted. Do not bypass the guard.
+   interruption of the old deployed Factory before promotion. Compatible code subsequently shipped in PR #617; that temporary interruption is closed. Do not bypass the schema guard.
    Validate readiness update-ability from live metadata. Refuse already-true
    readiness unless a dispatched/applied/completed journal proves this operation.
    Observe jobs and census effects after readiness, rather than assuming no reaction.
@@ -120,7 +118,7 @@ Factory destination.
 
 ## Acceptance, release and deferred scope
 
-[VERIFIED locally for code/tests; operational release and live criteria remain open]
+[VERIFIED via local checks, Fable reviews, merged releases and the bounded Production receipts linked below]
 - Success requires the intended statuses, required artifacts and final readiness
   readback; no true stamp on an ordinary record, another run's fixture or an
   incomplete package. Test false/null/true and stale/missing required artifacts.
@@ -149,14 +147,12 @@ readiness editing. The Power Automate entry trigger is no longer a blocker to
 this increment. A suitable source and bounded required-package checklist remain
 necessary. The plan alone does not authorize Production writes or reviewer communications.
 Justin separately authorized the 2026-11-03 bounded fixture test recorded below;
-reviewer sends remain outside that scope.
+reviewer sends were subsequently authorized separately for the bounded rehearsal; this plan does not authorize future sends.
 
 Planning review: Claude Fable returned READY WITH NAMED CHANGES; this revision
 incorporates its sequence, journal, compatibility, metadata and UI corrections.
 [Review receipt](evidence/test-request-factory/j27-prepared-fable-plan-review-2026-11-02.md).
-Phase I Invited is the first uncharacterized live producing transition; existing
-guards allow its draft email and tracking effects. A bounded live test must
-explicitly account for them and characterize readiness reactions.
+The bounded provisioning test characterized Phase I Invited and readiness on this fixture without unexpected email, tracking or payment effects. Existing guards still allow characterized draft/tracking effects; one successful fixture is not a guarantee that all future automation is inert.
 
 [VERIFIED 2026-11-02 via read-only source inventory](evidence/test-request-factory/j27-prepared-source-inventory-2026-11-02.json):
 all six Research J27 requests were unready; six sampled invited D26 sources had
@@ -173,4 +169,10 @@ preview diagnostics are implemented. Fable reviewed the plan and code; every
 blocking finding and the bounded recovery/inspection corrections are closed.
 [Final Fable receipt](evidence/test-request-factory/j27-prepared-fable-final-review-2026-11-02.md).
 [Whole-flow evidence](evidence/test-request-factory/j27-prepared-implementation-2026-11-02.md).
-[VERIFIED 2026-11-03 via the ledger migration runner and `check:factory-ledger`] Migration 094 is applied to both managed ledgers, and both match the 054+058+094 fingerprint. Request 1003456 passed clone verification, both guarded phase transitions and journaled readiness finalization after the narrow Fable-reviewed GOverify PDF replacement correction. Final state: J27, Phase I Invited, Phase II Pending Committee Review, derived Phase II Pending, readiness true; no observed email/tracking/payment effects. Read-only Foundation recheck passes. Authenticated app UI and reviewer invitation/acceptance/submission remain unexercised; marked-test isolation is unchanged. [Live receipt](evidence/test-request-factory/j27-prepared-live-proof-2026-11-03.md).
+[VERIFIED 2026-11-03 via the ledger migration runner and `check:factory-ledger`] Migration 094 is applied to both managed ledgers, and both match the 054+058+094 fingerprint. Request 1003456 passed clone verification, both guarded phase transitions and journaled readiness finalization after the narrow Fable-reviewed GOverify PDF replacement correction. Final state: J27, Phase I Invited, Phase II Pending Committee Review, derived Phase II Pending, readiness true; no observed email/tracking/payment effects during provisioning. Read-only Foundation recheck passes. This is the provisioning checkpoint; the later rehearsal deliberately sent two emails. Marked-test isolation is unchanged. [Live receipt](evidence/test-request-factory/j27-prepared-live-proof-2026-11-03.md).
+
+## Completed reviewer proof and closeout
+
+[VERIFIED 2026-11-03 via Production browser flow and read-only Dataverse census] The isolated reviewer was promoted through the explicit Factory action, invited, accepted with policy acknowledgments and honorarium opt-out, and received a manual materials release. The current reviewer link served the copied 24-page canonical PDF with a byte hash matching the saved source bundle. One clearly labeled test review was submitted; staff Track and Reviews showed receipt and all nine answers. The final census found two sent email activities and zero request-payment rows, with no linked honorarium request. Inbox delivery of the materials email was not independently verified.
+
+[Reviewer rehearsal receipt](evidence/test-request-factory/j27-reviewer-rehearsal-proof-2026-11-03.md). [Repeatable operating steps](../TEST_REQUEST_FACTORY_FORM_RUNBOOK.md#repeatable-prepared-fixture-rehearsal). The dated implementation/review receipts above describe their original checkpoints; their earlier release holds are historical. No additional Factory feature is required for this MVP. No ordinary follow-up/payment path, synthesis, cleanup or broader PD workflow is claimed.
