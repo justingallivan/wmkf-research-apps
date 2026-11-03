@@ -18,6 +18,7 @@ import { TONE, fmtTs, fmtInt, ROW_DEFAULT_MAX_TOKENS } from './prompt-editor-uti
 import PublishForm from './PromptPublishForm';
 import PromptCatalogForm from './PromptCatalogForm';
 import AddPromptForm from './AddPromptForm';
+import ManagePromptGroupsPanel from './ManagePromptGroupsPanel';
 import { ADMIN_PROMPT_GROUPS, getAdminPromptDescription, resolveAdminPromptDescription } from '../../config/adminPromptCatalog';
 
 export { ExecutorBudgetEditor };
@@ -50,6 +51,7 @@ const STATUS_COPY = {
   catalog_superseded:    { tone: 'amber', text: 'Details saved, but a new version was published at the same time and does not have them. Reopen the details and save again.' },
   invalid_catalog:       { tone: 'red',   text: 'Those details could not be saved.' },
   created:               { tone: 'green', text: 'Prompt created and published as v1.' },
+  groups_saved:          { tone: 'green', text: 'Groups saved.' },
   name_exists:           { tone: 'red',   text: 'A prompt with that name already exists. Use Edit & publish to change it.' },
   invalid_name:          { tone: 'red',   text: 'That name is not allowed.' },
   invalid_input:         { tone: 'red',   text: 'The prompt could not be created.' },
@@ -65,6 +67,8 @@ export default function PromptTemplatesSection() {
   const [expandedGroups, setExpandedGroups] = useState({});
   const [adding, setAdding] = useState(false);
   const [addOutcome, setAddOutcome] = useState(null);
+  const [groupState, setGroupState] = useState({ groups: ADMIN_PROMPT_GROUPS, editable: null, revision: null, warning: null });
+  const [managingGroups, setManagingGroups] = useState(false);
   const loadGeneration = useRef(0);
 
   const load = () => {
@@ -87,6 +91,12 @@ export default function PromptTemplatesSection() {
       .then(([promptData, modelData]) => {
         if (generation !== loadGeneration.current) return;
         setPrompts(promptData.prompts || []);
+        setGroupState({
+          groups: Array.isArray(promptData.groups) && promptData.groups.length ? promptData.groups : ADMIN_PROMPT_GROUPS,
+          editable: Array.isArray(promptData.groupsEditable) ? promptData.groupsEditable : null,
+          revision: promptData.groupsRevision ?? null,
+          warning: promptData.groupsWarning || null,
+        });
         setModelCatalog(modelData);
       })
       .catch((err) => {
@@ -115,13 +125,14 @@ export default function PromptTemplatesSection() {
   if (error && !prompts) return <div className="text-red-600 text-sm">{error}</div>;
   if (!prompts || prompts.length === 0) return <div className="text-gray-500 text-sm">No prompts found.</div>;
 
-  const groups = ADMIN_PROMPT_GROUPS.map(group => ({
-    ...group, prompts: prompts.filter(prompt => resolveAdminPromptDescription(prompt).group === group.id),
+  const allGroups = groupState.groups;
+  const groups = allGroups.map(group => ({
+    ...group, prompts: prompts.filter(prompt => resolveAdminPromptDescription(prompt, allGroups).group === group.id),
   })).filter(group => group.prompts.length > 0);
   const terms = search.toLowerCase().trim().split(/\s+/).filter(Boolean);
   const matchingNames = new Set(prompts.filter(prompt => {
-    const { title, description, usedBy, group: groupId, section: sectionId } = resolveAdminPromptDescription(prompt);
-    const group = ADMIN_PROMPT_GROUPS.find(candidate => candidate.id === groupId);
+    const { title, description, usedBy, group: groupId, section: sectionId } = resolveAdminPromptDescription(prompt, allGroups);
+    const group = allGroups.find(candidate => candidate.id === groupId);
     const section = group?.sections?.find(candidate => candidate.id === sectionId);
     const text = [prompt.name, title, description, usedBy, group?.label, section?.label].join(' ').toLowerCase();
     return terms.every(term => text.includes(term));
@@ -132,6 +143,7 @@ export default function PromptTemplatesSection() {
     <div key={prompt.name} hidden={!matchingNames.has(prompt.name)}>
       <PromptPanel
         prompt={prompt}
+        groups={allGroups}
         modelCatalog={modelCatalog}
         executorBudgetConfig={executorBudgetConfig}
         onPublished={load}
@@ -153,6 +165,7 @@ export default function PromptTemplatesSection() {
         <AddPromptForm
           existingNames={new Set(prompts.map((prompt) => prompt.name))}
           modelCatalog={modelCatalog}
+          groups={allGroups}
           onCreated={(data) => {
             setAddOutcome({ ...data, status: data.status === 'completed' ? 'created' : data.status });
             setAdding(false);
@@ -161,8 +174,19 @@ export default function PromptTemplatesSection() {
           onOutcome={setAddOutcome}
           onCancel={() => setAdding(false)}
         />
+      ) : managingGroups && groupState.editable ? (
+        <ManagePromptGroupsPanel
+          editable={groupState.editable}
+          revision={groupState.revision}
+          onSaved={() => {
+            setAddOutcome({ status: 'groups_saved' });
+            setManagingGroups(false);
+            load();
+          }}
+          onClose={() => setManagingGroups(false)}
+        />
       ) : (
-        <div className="mb-4">
+        <div className="mb-4 flex gap-2">
           <button
             type="button"
             onClick={() => { setAdding(true); setAddOutcome(null); }}
@@ -170,8 +194,17 @@ export default function PromptTemplatesSection() {
           >
             Add prompt
           </button>
+          <button
+            type="button"
+            onClick={() => { setManagingGroups(true); setAddOutcome(null); }}
+            disabled={!groupState.editable}
+            className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded hover:bg-gray-100 disabled:opacity-40"
+          >
+            Manage groups
+          </button>
         </div>
       )}
+      {groupState.warning && <p className="mb-4 text-xs text-amber-800">{groupState.warning}</p>}
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700" htmlFor="prompt-search">Search prompts</label>
         <div className="mt-1 flex items-center gap-3">
@@ -182,7 +215,7 @@ export default function PromptTemplatesSection() {
             onChange={event => {
               const value = event.target.value;
               setSearch(value);
-              setExpandedGroups(value.trim() ? Object.fromEntries(ADMIN_PROMPT_GROUPS.map(group => [group.id, true])) : {});
+              setExpandedGroups(value.trim() ? Object.fromEntries(allGroups.map(group => [group.id, true])) : {});
             }}
             placeholder="Search titles, descriptions, technical keys or Used by"
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500"
@@ -204,7 +237,7 @@ export default function PromptTemplatesSection() {
             <div className="space-y-6 p-4">
               {group.id === 'reference' && <p className="text-sm text-gray-600">These stored prompts are kept for reference. The current application routes use code templates instead.</p>}
               {group.sections ? group.sections.map(section => {
-                const sectionPrompts = group.prompts.filter(prompt => resolveAdminPromptDescription(prompt).section === section.id);
+                const sectionPrompts = group.prompts.filter(prompt => resolveAdminPromptDescription(prompt, allGroups).section === section.id);
                 return (
                   <section key={section.id} aria-label={section.label} hidden={matchCount(sectionPrompts) === 0} className="space-y-4">
                     <h3 className="text-sm font-semibold text-gray-700">{section.label} ({matchCount(sectionPrompts)})</h3>
@@ -231,12 +264,12 @@ export default function PromptTemplatesSection() {
   );
 }
 
-function PromptPanel({ prompt, modelCatalog, executorBudgetConfig, onPublished }) {
+function PromptPanel({ prompt, groups, modelCatalog, executorBudgetConfig, onPublished }) {
   const [expanded, setExpanded] = useState(false);
   const [editingDetails, setEditingDetails] = useState(false);
   const [outcome, setOutcome] = useState(null);
   const dataverseFields = buildPromptDataverseFields(prompt);
-  const description = resolveAdminPromptDescription(prompt);
+  const description = resolveAdminPromptDescription(prompt, groups);
   const usage = USAGE_BADGES[description.usage];
   return (
     <article aria-label={description.title} className="border rounded-lg overflow-hidden">
@@ -291,6 +324,7 @@ function PromptPanel({ prompt, modelCatalog, executorBudgetConfig, onPublished }
         <PromptCatalogForm
           prompt={prompt}
           fallback={getAdminPromptDescription(prompt.name)}
+          groups={groups}
           onSuccess={(o) => { setOutcome(o); onPublished(); setEditingDetails(false); }}
           onOutcome={setOutcome}
           onCancel={() => setEditingDetails(false)}

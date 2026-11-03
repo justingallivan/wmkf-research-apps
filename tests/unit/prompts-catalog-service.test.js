@@ -10,6 +10,11 @@ jest.mock('../../lib/dataverse/adapters/ai-prompt', () => ({
   queryCurrentIdVersions: jest.fn(),
 }));
 jest.mock('@vercel/postgres', () => ({ sql: jest.fn(async () => ({ rows: [] })) }));
+jest.mock('../../lib/services/admin/prompt-groups-service', () => {
+  const { buildEffectivePromptGroups, defaultEditablePromptGroups } = jest.requireActual('../../shared/config/adminPromptCatalog');
+  const editable = [...defaultEditablePromptGroups(), { id: 'grant-reporting', label: 'Grant reporting' }];
+  return { getPromptGroups: jest.fn(async () => ({ groups: buildEffectivePromptGroups(editable), editable, revision: null, storageWarning: null })) };
+});
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -154,4 +159,12 @@ test('migration 093 allows every status this service writes to prompt_publish_au
   for (const status of ['completed', 'partial', 'already_published', 'concurrency_conflict', 'invalid_body', 'no_current_row', 'duplicate_current_rows', 'audit_unavailable']) {
     expect(migration).toContain(`'${status}'`);
   }
+});
+
+describe('groups added in Admin', () => {
+  it('Edit details accepts a group from the stored list', async () => {
+    const r = await updatePromptCatalog(args({ catalog: { ...LOADED, group: 'grant-reporting' } }));
+    expect(r.status).toBe('catalog_updated');
+    expect(aiPrompt.updateCatalog).toHaveBeenCalledWith(ID, expect.objectContaining({ wmkf_ai_groupkey: 'grant-reporting' }), expect.anything());
+  });
 });

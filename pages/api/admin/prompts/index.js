@@ -12,6 +12,11 @@
  *     body, systemPrompt?, outputSchema?, model?, maxTokens?, requestId? }
  * See createPrompt in lib/services/admin/prompts-publish-service.js.
  *
+ * GET also returns the effective prompt group list (`groups`, pinned groups
+ * included), the editable part, its settings revision and any storage warning
+ * (lib/services/admin/prompt-groups-service.js). Groups are saved through
+ * PUT /api/admin/prompt-groups.
+ *
  * Thin route shell (Route→Service Consolidation Plan, Stage 5): method
  * dispatch → superuser gate → withDalContext → one service call →
  * result/error→HTTP mapping. Business logic lives in
@@ -21,6 +26,7 @@ import { requireSuperuser } from '../../../../lib/utils/auth';
 import { withDalContext } from '../../../../lib/dataverse/core/context';
 import { listPrompts } from '../../../../lib/services/admin/prompts-list-service';
 import { createPrompt } from '../../../../lib/services/admin/prompts-publish-service';
+import { getPromptGroups } from '../../../../lib/services/admin/prompt-groups-service';
 import { ServiceHttpError } from '../../../../lib/services/service-http-error';
 
 export default async function handler(req, res) {
@@ -53,8 +59,14 @@ export default async function handler(req, res) {
 
   try {
     return await withDalContext('admin-prompts-list', async () => {
-      const result = await listPrompts();
-      return res.json(result);
+      const [result, groups] = await Promise.all([listPrompts(), getPromptGroups()]);
+      return res.json({
+        ...result,
+        groups: groups.groups,
+        groupsEditable: groups.editable,
+        groupsRevision: groups.revision,
+        groupsWarning: groups.storageWarning,
+      });
     });
   } catch (err) {
     console.error('[admin/prompts] list error:', err);

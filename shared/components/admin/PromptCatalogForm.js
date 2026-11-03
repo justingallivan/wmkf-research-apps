@@ -24,27 +24,27 @@ function initialValues(prompt) {
   return Object.fromEntries(FIELDS.map((key) => [key, stored[key] || '']));
 }
 
-function validate(values) {
+function validate(values, groups) {
   const issues = [];
   for (const [key, max] of Object.entries(LIMITS)) {
     if (values[key].trim().length > max) issues.push(`${key === 'usedBy' ? 'Used by' : key[0].toUpperCase() + key.slice(1)} must be at most ${max} characters.`);
   }
-  const group = ADMIN_PROMPT_GROUPS.find((candidate) => candidate.id === values.group);
+  const group = groups.find((candidate) => candidate.id === values.group);
   if (group?.sections && !group.sections.some((section) => section.id === values.section)) {
     issues.push(`Choose a section for ${group.label}.`);
   }
   return issues;
 }
 
-export default function PromptCatalogForm({ prompt, fallback, onSuccess, onOutcome, onCancel }) {
+export default function PromptCatalogForm({ prompt, fallback, groups = ADMIN_PROMPT_GROUPS, onSuccess, onOutcome, onCancel }) {
   const [values, setValues] = useState(() => initialValues(prompt));
   const [submitting, setSubmitting] = useState(false);
   const set = (key) => (event) => {
     const value = event.target.value;
     setValues((current) => (key === 'group' ? { ...current, group: value, section: '' } : { ...current, [key]: value }));
   };
-  const group = ADMIN_PROMPT_GROUPS.find((candidate) => candidate.id === values.group);
-  const issues = validate(values);
+  const group = groups.find((candidate) => candidate.id === values.group);
+  const issues = validate(values, groups);
   const unchanged = FIELDS.every((key) => values[key].trim() === (prompt.catalog?.[key] || ''));
 
   const submit = async () => {
@@ -85,8 +85,8 @@ export default function PromptCatalogForm({ prompt, fallback, onSuccess, onOutco
         <label className="block text-xs text-gray-700">
           Group
           <select value={values.group} onChange={set('group')} className={input}>
-            <option value="">Built-in ({ADMIN_PROMPT_GROUPS.find((candidate) => candidate.id === fallback.group)?.label || 'none'})</option>
-            {ADMIN_PROMPT_GROUPS.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.label}</option>)}
+            <option value="">Built-in ({groups.find((candidate) => candidate.id === fallback.group)?.label || 'none'})</option>
+            {groups.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.label}</option>)}
           </select>
         </label>
         {group?.sections && (

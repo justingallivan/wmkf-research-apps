@@ -90,13 +90,20 @@ checks before DOCX/If-Match claim; unknown shared tokens keep legacy behavior.
 No new schema or transport/claim semantics; no live preference operation performed.
 See `docs/plans/PERSONAL_EMAIL_REVIEWER_THANKYOU_DEFAULTS_PLAN_2026-10-26.md`.
 
-### `system_settings` — RETIRED 2026-05-12 (was Postgres / now Dataverse-only)
+### `system_settings` → Dataverse `wmkf_appsystemsettings` (Postgres table retired 2026-05-12)
 **Source of truth:** **Dataverse `wmkf_appsystemsettings`**. Postgres table dropped via migration `007_drop_wave1_tables.sql` on 2026-05-12. Final reconciliation on 2026-05-11 synced 10 tier-keyed `model_override:*` rows from S145 dev writes (PG→DV); counts matched (45/45) before the drop.
 **Live adapter:** `lib/services/dataverse-settings-service.js`.
 `lib/services/settings-service.js` routes unconditionally to Dataverse; the
 former Postgres branch is removed and `WAVE1_BACKEND_SETTINGS=postgres` fails
 loud at module load.
 **Schema:** generic key-value (model overrides, feature flags, etc.).
+Key `promptLibrary.groups` [BUILT ON BRANCH `claude/admin-prompt-groups` 2026-11-02; NOT DEPLOYED]: the editable Admin prompt group list,
+`{ version: 1, groups: [{ id, label }] }` in display order. Writer: `PUT
+/api/admin/prompt-groups` (`lib/services/admin/prompt-groups-service.js`,
+`setSettingIfUnchanged` under the row revision). Readers: `GET
+/api/admin/prompts` and the prompt catalog validation in Edit details and Add
+prompt. No row means the code default list (`ADMIN_PROMPT_GROUPS`). The row's
+updated-by and modified-on are the only history (owner decision 2026-11-02).
 
 ## Dynamics Explorer state
 

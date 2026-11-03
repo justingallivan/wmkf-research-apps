@@ -24,7 +24,7 @@ const USAGE_LABELS = {
   unconnected: 'No application caller',
 };
 
-export default function AddPromptForm({ existingNames, modelCatalog, onCreated, onOutcome, onCancel }) {
+export default function AddPromptForm({ existingNames, modelCatalog, groups = ADMIN_PROMPT_GROUPS, onCreated, onOutcome, onCancel }) {
   const [values, setValues] = useState({
     name: '', title: '', description: '', group: '', section: '', usedBy: '', usage: 'unconnected',
     systemPrompt: '', body: '', model: '', maxTokens: '', outputSchema: '',
@@ -37,7 +37,7 @@ export default function AddPromptForm({ existingNames, modelCatalog, onCreated, 
   };
 
   const name = values.name.trim();
-  const group = ADMIN_PROMPT_GROUPS.find((candidate) => candidate.id === values.group);
+  const group = groups.find((candidate) => candidate.id === values.group);
   const { nativeStructured, options: modelOptions } = buildModelOptions({ model: null, outputSchema: values.outputSchema.trim() }, modelCatalog);
   const maxTokens = validateMaxTokensInput(values.maxTokens, modelOutputCeiling(values.model, modelCatalog));
   const outputSchema = validateOutputSchemaText(values.outputSchema.trim());
@@ -122,7 +122,7 @@ export default function AddPromptForm({ existingNames, modelCatalog, onCreated, 
           Group
           <select value={values.group} onChange={set('group')} className={input}>
             <option value="">None</option>
-            {ADMIN_PROMPT_GROUPS.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.label}</option>)}
+            {groups.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.label}</option>)}
           </select>
         </label>
         {group?.sections && (

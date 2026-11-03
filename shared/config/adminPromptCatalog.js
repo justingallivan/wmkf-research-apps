@@ -317,6 +317,47 @@ export const ADMIN_PROMPT_GROUPS = [
   { id: 'reference', label: 'Legacy app prompts — stored reference' },
 ];
 
+/**
+ * Editable prompt groups (owner decision 2026-11-02,
+ * docs/plans/ADMIN_PROMPT_GROUPS_PLAN_2026-11-02.md). ADMIN_PROMPT_GROUPS above
+ * is the default list until the `promptLibrary.groups` setting is first saved.
+ * Pinned groups are never stored or edited and always render last. Sections stay
+ * in code, keyed by group id; groups added in Admin have none.
+ */
+export const PROMPT_GROUPS_SETTING_KEY = 'promptLibrary.groups';
+export const PINNED_PROMPT_GROUP_IDS = ['uncataloged', 'reference'];
+export const PROMPT_GROUP_LABEL_MAX = 80;
+
+/** The editable (non-pinned) default groups as stored entries `{ id, label }`. */
+export function defaultEditablePromptGroups() {
+  return ADMIN_PROMPT_GROUPS
+    .filter((group) => !PINNED_PROMPT_GROUP_IDS.includes(group.id))
+    .map(({ id, label }) => ({ id, label }));
+}
+
+/**
+ * The full display list for a stored editable list: stored order and labels,
+ * code sections by id, then the pinned groups. Null/invalid input → defaults.
+ */
+export function buildEffectivePromptGroups(storedGroups) {
+  const editable = Array.isArray(storedGroups) && storedGroups.length > 0
+    ? storedGroups
+    : defaultEditablePromptGroups();
+  const codeById = new Map(ADMIN_PROMPT_GROUPS.map((group) => [group.id, group]));
+  return [
+    ...editable.map(({ id, label }) => {
+      const sections = codeById.get(id)?.sections;
+      return sections ? { id, label, sections } : { id, label };
+    }),
+    ...ADMIN_PROMPT_GROUPS.filter((group) => PINNED_PROMPT_GROUP_IDS.includes(group.id)),
+  ];
+}
+
+/** A stable id for a new group label, e.g. "Grant reporting" → "grant-reporting". */
+export function promptGroupIdFromLabel(label) {
+  return String(label || '').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+}
+
 const UNCATALOGED_PROMPT = Object.freeze({
   title: 'Description not cataloged',
   description: 'This stored prompt has not yet been described in the application catalog.',
@@ -333,8 +374,8 @@ export const ADMIN_PROMPT_USAGES = ['application', 'reference', 'diagnostic', 'u
 
 const text = (value) => (typeof value === 'string' && value.trim() ? value.trim() : null);
 
-function validPlacement(groupId, sectionId) {
-  const group = ADMIN_PROMPT_GROUPS.find(candidate => candidate.id === groupId);
+function validPlacement(groupId, sectionId, groups) {
+  const group = groups.find(candidate => candidate.id === groupId);
   if (!group) return false;
   return group.sections ? group.sections.some(section => section.id === sectionId) : true;
 }
@@ -346,12 +387,14 @@ function validPlacement(groupId, sectionId) {
  * placement, and usage only when it is a known badge, so a stored typo falls
  * back instead of hiding the prompt or breaking the page.
  */
-export function resolveAdminPromptDescription(prompt) {
+export function resolveAdminPromptDescription(prompt, groups = ADMIN_PROMPT_GROUPS) {
   const fallback = getAdminPromptDescription(prompt?.name);
   const stored = prompt?.catalog || {};
   const group = text(stored.group);
   const section = text(stored.section);
-  const placement = validPlacement(group, section)
+  // The fallback placement is not re-checked against `groups`: it relies on
+  // group deletion being disallowed (lib/services/admin/prompt-groups-service.js).
+  const placement = validPlacement(group, section, groups)
     ? { group, ...(section ? { section } : {}) }
     : { group: fallback.group, ...(fallback.section ? { section: fallback.section } : {}) };
   const usage = ADMIN_PROMPT_USAGES.includes(text(stored.usage)) ? text(stored.usage) : fallback.usage;

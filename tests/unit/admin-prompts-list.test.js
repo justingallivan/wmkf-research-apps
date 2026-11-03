@@ -7,6 +7,14 @@ jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: (a, b) => (typeof a === 'function' ? a() : b()),
 }));
 jest.mock('../../lib/services/dynamics-service', () => ({ DynamicsService: { queryRecords: jest.fn() } }));
+jest.mock('../../lib/services/admin/prompt-groups-service', () => ({
+  getPromptGroups: jest.fn(async () => ({
+    groups: [{ id: 'tools', label: 'Tools' }, { id: 'uncataloged', label: 'Uncataloged prompts' }],
+    editable: [{ id: 'tools', label: 'Tools' }],
+    revision: 'W/"7"',
+    storageWarning: null,
+  })),
+}));
 
 import handler from '../../pages/api/admin/prompts/index';
 import { DynamicsService } from '../../lib/services/dynamics-service';
@@ -106,6 +114,10 @@ it('golden: single-row full envelope pinned (every mapRow field)', async () => {
         section: null, usedBy: null, usage: 'application',
       },
     }],
+    groups: [{ id: 'tools', label: 'Tools' }, { id: 'uncataloged', label: 'Uncataloged prompts' }],
+    groupsEditable: [{ id: 'tools', label: 'Tools' }],
+    groupsRevision: 'W/"7"',
+    groupsWarning: null,
   });
 });
 
