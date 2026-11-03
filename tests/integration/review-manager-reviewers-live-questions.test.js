@@ -38,6 +38,10 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => {
     RESPONSE_TYPE_BY_VALUE: Object.fromEntries(Object.entries(RESPONSE_TYPE_MAP).map(([k, v]) => [v, k])),
   };
 });
+// Per-reminder history (PER_REMINDER_HISTORY_PLAN_2026-11-03): no rows.
+jest.mock('../../lib/services/reviewer-engagement/reminder-events-store', () => ({
+  readReminderHistory: async () => new Map(),
+}));
 jest.mock('../../lib/external/review-question-fetcher', () => ({
   getActiveQuestionSet: jest.fn(),
 }));
@@ -283,6 +287,7 @@ test('GET success returns the full proposal + reviewer envelope', async () => {
         daysSinceMaterialsSent: expect.any(Number),
         reminderSentAt: '2026-06-22T00:00:00Z',
         reminderCount: 1,
+        reminderHistory: [],
         reviewDueDateOverride: null,
         reviewDueDateExtensionGrantedAt: null,
         effectiveReviewDeadline: '2026-09-09',
