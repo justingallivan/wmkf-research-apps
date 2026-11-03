@@ -146,3 +146,27 @@ test('upstream Dataverse lookup failure is also sanitized', async () => {
   expect(res.status).toHaveBeenCalledWith(200);
   expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'materials_unavailable' });
 });
+
+test('expected archive misses preserve the authenticated success envelope', async () => {
+  listReviewerMaterialsWithAvailability.mockResolvedValue({ files: [{ id: 'canonical' }], unavailable: true, unavailableSources: [] });
+  const { req, res } = get({ requestId: REQUEST_ID });
+  await handler(req, res);
+  expect(res.status).toHaveBeenCalledWith(200);
+  expect(res.json).toHaveBeenCalledWith({ ok: true, fileCount: 1 });
+});
+
+test.each(['dynamics', 'archive'])('classified %s listing failure stays sanitized despite a canonical file', async (source) => {
+  listReviewerMaterialsWithAvailability.mockResolvedValue({ files: [{ id: 'canonical' }], unavailable: true, unavailableSources: [source] });
+  const { req, res } = get({ requestId: REQUEST_ID });
+  await handler(req, res);
+  expect(res.status).toHaveBeenCalledWith(200);
+  expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'materials_unavailable' });
+});
+
+test('contradictory failure metadata cannot produce a successful route envelope', async () => {
+  listReviewerMaterialsWithAvailability.mockResolvedValue({ files: [{ id: 'canonical' }], unavailable: false, unavailableSources: ['dynamics'] });
+  const { req, res } = get({ requestId: REQUEST_ID });
+  await handler(req, res);
+  expect(res.status).toHaveBeenCalledWith(200);
+  expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'materials_unavailable' });
+});
