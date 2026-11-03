@@ -1,6 +1,6 @@
 # Finish the J27 Test Request Factory
 
-Status: **IMPLEMENTED ON REVIEW BRANCH; local checks and Fable reviews passed. Migration 094 is applied to both managed ledgers; bounded live proof stopped at the Foundation protection guard; release remains held.**
+Status: **IMPLEMENTED ON REVIEW BRANCH; local checks and Fable reviews passed. Migration 094 is applied to both managed ledgers; bounded prepared-fixture test passed on Request 1003456 after the Fable-reviewed PDF correction. Merge/deployment remain held; authenticated app UI and reviewer-workflow proof remain separate.**
 Owner: Codex. Date: 2026-11-02 Pacific.
 Boundary: finish the Factory for reviewer testing; broader PD workflow stays deferred.
 
@@ -11,7 +11,7 @@ Boundary: finish the Factory for reviewer testing; broader PD workflow stays def
 whether earlier-cycle-stage testing is useful later. This replaces the prior
 proposal to create a submitted fixture and require a real Power Automate run.
 
-[VERIFIED via branch source and local tests; live proof pending] The Factory
+[VERIFIED via branch source, local tests and bounded 2026-11-03 fixture finalization] The Factory
 can copy a completed, suitable package into a fresh marked test request.
 The Factory may set readiness true **only on that run-owned test destination,
 after its status and required copied-artifact checks pass**. This is a narrow
@@ -173,4 +173,4 @@ preview diagnostics are implemented. Fable reviewed the plan and code; every
 blocking finding and the bounded recovery/inspection corrections are closed.
 [Final Fable receipt](evidence/test-request-factory/j27-prepared-fable-final-review-2026-11-02.md).
 [Whole-flow evidence](evidence/test-request-factory/j27-prepared-implementation-2026-11-02.md).
-[VERIFIED 2026-11-03 via the ledger migration runner and `check:factory-ledger`] Migration 094 is applied to both managed ledgers, and both match the 054+058+094 fingerprint. Live fixture acceptance is blocked: test Request 1003456 copied all seven documents but stopped at final clone verification because the protected Foundation projection changed. Read-only recheck confirms the mismatch; audit read returned 403. Neither phase advancement nor readiness finalization ran. [Live receipt](evidence/test-request-factory/j27-prepared-live-proof-2026-11-03.md).
+[VERIFIED 2026-11-03 via the ledger migration runner and `check:factory-ledger`] Migration 094 is applied to both managed ledgers, and both match the 054+058+094 fingerprint. Request 1003456 passed clone verification, both guarded phase transitions and journaled readiness finalization after the narrow Fable-reviewed GOverify PDF replacement correction. Final state: J27, Phase I Invited, Phase II Pending Committee Review, derived Phase II Pending, readiness true; no observed email/tracking/payment effects. Read-only Foundation recheck passes. Authenticated app UI and reviewer invitation/acceptance/submission remain unexercised; marked-test isolation is unchanged. [Live receipt](evidence/test-request-factory/j27-prepared-live-proof-2026-11-03.md).
