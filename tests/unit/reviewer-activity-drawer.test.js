@@ -164,4 +164,30 @@ describe('ReviewerActivityDrawer', () => {
     expect(screen.getAllByRole('listitem')).toHaveLength(1);
     expect(screen.queryByText(/Release recorded/i)).not.toBeInTheDocument();
   });
+
+  it('lists each reminder from history as its own dated entry without duplicate React keys', () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      render(
+        <ReviewerActivityDrawer
+          reviewer={{
+            ...REVIEWER,
+            reminderSentAt: '2026-08-15T10:00:00Z',
+            reminderCount: 3,
+            reminderHistory: [
+              { kind: 'review_due', recordedAt: '2026-08-15T10:00:00.000Z' },
+              { kind: 'review_due', recordedAt: '2026-08-08T10:00:00.000Z' },
+              { kind: 'review_due', recordedAt: '2026-08-01T10:00:00.000Z' },
+            ],
+          }}
+          onClose={jest.fn()}
+        />,
+      );
+      expect(screen.getAllByText('Review reminder recorded')).toHaveLength(3);
+      expect(screen.queryByText(/recorded in total/)).not.toBeInTheDocument();
+      expect(errorSpy.mock.calls.flat().join(' ')).not.toMatch(/same key/);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
 });

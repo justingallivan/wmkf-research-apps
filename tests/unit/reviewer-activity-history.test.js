@@ -638,3 +638,132 @@ describe('current status for a staff-recorded ending stored as Withdrew', () => 
       .toBe('Current status: Withdrew');
   });
 });
+
+describe('per-reminder history (docs/plans/PER_REMINDER_HISTORY_PLAN_2026-11-03.md §4)', () => {
+  const reminders = (events) => events.filter((e) => e.key === 'review_reminder' || e.key === 'respond_reminder');
+
+  it('null history keeps today\'s single latest-stamp event and total-count detail exactly', () => {
+    const reviewer = { reminderSentAt: '2026-07-04T00:00:00Z', reminderCount: 3, reminderHistory: null };
+    const events = reminders(buildActivityHistory(reviewer));
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ key: 'review_reminder', id: 'review_reminder', detail: '3 reminders recorded in total' });
+  });
+
+  it('three history rows give three dated review reminders with unique ids, newest first', () => {
+    const reviewer = {
+      reminderSentAt: '2026-10-20T10:00:00Z',
+      reminderCount: 3,
+      reminderHistory: [
+        { kind: 'review_due', recordedAt: '2026-10-20T10:00:00.000Z' },
+        { kind: 'review_due', recordedAt: '2026-10-13T10:00:00.000Z' },
+        { kind: 'review_due', recordedAt: '2026-10-06T10:00:00.000Z' },
+      ],
+    };
+    const events = reminders(buildActivityHistory(reviewer));
+    expect(events.map((e) => e.at)).toEqual([
+      '2026-10-20T10:00:00.000Z', '2026-10-13T10:00:00.000Z', '2026-10-06T10:00:00.000Z',
+    ]);
+    expect(new Set(events.map((e) => e.id)).size).toBe(3);
+    expect(events.every((e) => e.deliveryProven === false && e.detail === null)).toBe(true);
+  });
+
+  it('a reviewer reminded before history began: the stamp plus one undated line, never invented dates', () => {
+    const reviewer = { reminderSentAt: '2026-09-01T10:00:00Z', reminderCount: 2, reminderHistory: [] };
+    const events = reminders(buildActivityHistory(reviewer));
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ at: '2026-09-01T10:00:00Z', detail: '1 earlier reminder recorded without a date' });
+  });
+
+  it('mixed: rows plus an older count put the undated line on the oldest dated reminder only', () => {
+    const reviewer = {
+      reminderSentAt: '2026-10-20T10:00:00.000Z',
+      reminderCount: 4,
+      reminderHistory: [
+        { kind: 'review_due', recordedAt: '2026-10-20T10:00:00.000Z' },
+        { kind: 'review_due', recordedAt: '2026-10-13T10:00:00.000Z' },
+      ],
+    };
+    const events = reminders(buildActivityHistory(reviewer));
+    expect(events.map((e) => e.detail)).toEqual([null, '2 earlier reminders recorded without a date']);
+  });
+
+  it('a stamp stored without milliseconds matches its row and is not shown twice', () => {
+    const reviewer = {
+      reminderSentAt: '2026-10-20T10:00:00Z',
+      reminderCount: 1,
+      reminderHistory: [{ kind: 'review_due', recordedAt: '2026-10-20T10:00:00.678Z' }],
+    };
+    expect(reminders(buildActivityHistory(reviewer))).toHaveLength(1);
+  });
+
+  it('a stamp with no matching row (failed history write) is shown as its own event', () => {
+    const reviewer = {
+      reminderSentAt: '2026-10-27T10:00:00Z',
+      reminderCount: 2,
+      reminderHistory: [{ kind: 'review_due', recordedAt: '2026-10-20T10:00:00.000Z' }],
+    };
+    const events = reminders(buildActivityHistory(reviewer));
+    expect(events.map((e) => e.at)).toEqual(['2026-10-27T10:00:00Z', '2026-10-20T10:00:00.000Z']);
+    expect(events.every((e) => e.detail === null)).toBe(true);
+  });
+
+  it('respond nudges: each row is dated, including ones before a re-sent invitation or after a release cleared the stamp', () => {
+    const reviewer = {
+      emailSentAt: '2026-10-15T10:00:00Z',
+      respondReminderSentAt: null,
+      reminderHistory: [
+        { kind: 'respond', recordedAt: '2026-10-10T10:00:00.000Z' },
+        { kind: 'respond', recordedAt: '2026-10-01T10:00:00.000Z' },
+      ],
+    };
+    const events = reminders(buildActivityHistory(reviewer));
+    expect(events.map((e) => [e.key, e.at])).toEqual([
+      ['respond_reminder', '2026-10-10T10:00:00.000Z'],
+      ['respond_reminder', '2026-10-01T10:00:00.000Z'],
+    ]);
+    expect(events.every((e) => e.detail === null)).toBe(true);
+  });
+
+  it('an accepted reviewer whose invitation was re-sent keeps every dated review reminder', () => {
+    const reviewer = {
+      emailSentAt: '2026-10-25T10:00:00Z',
+      reminderSentAt: '2026-10-20T10:00:00Z',
+      reminderCount: 2,
+      reminderHistory: [
+        { kind: 'review_due', recordedAt: '2026-10-20T10:00:00.000Z' },
+        { kind: 'review_due', recordedAt: '2026-10-13T10:00:00.000Z' },
+      ],
+    };
+    expect(reminders(buildActivityHistory(reviewer))).toHaveLength(2);
+  });
+
+  it('an uninvited follow-up (count but no row, no matching stamp) keeps the stamp-and-count fallback', () => {
+    const reviewer = { reminderSentAt: '2026-10-20T10:00:00Z', reminderCount: 1, reminderHistory: [] };
+    const events = reminders(buildActivityHistory(reviewer));
+    expect(events).toHaveLength(1);
+    expect(events[0].detail).toBeNull();
+  });
+
+  it('unknown kinds and unparseable times in history are ignored', () => {
+    const reviewer = {
+      reminderHistory: [
+        { kind: 'mystery', recordedAt: '2026-10-20T10:00:00.000Z' },
+        { kind: 'review_due', recordedAt: 'not-a-date' },
+      ],
+    };
+    expect(reminders(buildActivityHistory(reviewer))).toHaveLength(0);
+  });
+
+  it('Last Action reads the newest dated reminder', () => {
+    const reviewer = {
+      materialsSentAt: '2026-10-01T10:00:00Z',
+      reminderSentAt: '2026-10-13T10:00:00Z',
+      reminderCount: 2,
+      reminderHistory: [
+        { kind: 'review_due', recordedAt: '2026-10-13T10:00:00.000Z' },
+        { kind: 'review_due', recordedAt: '2026-10-06T10:00:00.000Z' },
+      ],
+    };
+    expect(latestActivitySummary(reviewer)).toMatchObject({ key: 'review_reminder', at: '2026-10-13T10:00:00.000Z' });
+  });
+});

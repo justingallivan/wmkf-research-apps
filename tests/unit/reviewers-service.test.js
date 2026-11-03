@@ -82,6 +82,10 @@ jest.mock('../../lib/services/review-synthesis-job-service', () => ({
 // A swallowed dependency error must still fail isolation checks if SQL leaks.
 const unexpectedSql = jest.fn(() => { throw new Error('Unexpected SQL in reviewers-service unit test'); });
 jest.mock('@vercel/postgres', () => ({ sql: (...a) => unexpectedSql(...a) }));
+const readReminderHistory = jest.fn(async () => new Map());
+jest.mock('../../lib/services/reviewer-engagement/reminder-events-store', () => ({
+  readReminderHistory: (...a) => readReminderHistory(...a),
+}));
 
 const synthesisNotStarted = {
   current: false, status: 'not_started', mode: null, runId: null, attempts: 0,
@@ -1028,5 +1032,59 @@ describe('getWriteupRoster', () => {
     const tabSentence = composeReviewerSentence([...out.reviewers].sort(compareReviewersByName));
     const tabSentenceText = tabSentence.runs.map((r) => r.text).join('');
     expect(referee.text).toContain(tabSentenceText);
+  });
+});
+
+describe('getReviewers — per-reminder history (PER_REMINDER_HISTORY_PLAN_2026-11-03 §4)', () => {
+  function seed() {
+    getRequestById.mockResolvedValueOnce({
+      akoya_requestid: REQ,
+      _wmkf_grantprogram_value: '11111111-1111-4111-8111-111111111111',
+      akoya_requestnum: 'R-1001',
+      akoya_title: 'T',
+      wmkf_reviewduedate: '2026-09-09',
+    });
+    findByRequest.mockResolvedValueOnce([
+      {
+        wmkf_appreviewersuggestionid: IDS[0],
+        _wmkf_request_value: REQ,
+        _wmkf_potentialreviewer_value: 'person-1',
+        wmkf_accepted: true,
+        wmkf_invited: true,
+        wmkf_emailsentat: '2026-08-01T00:00:00Z',
+        wmkf_reviewstatus: 100000001,
+      },
+      {
+        wmkf_appreviewersuggestionid: IDS[1],
+        _wmkf_request_value: REQ,
+        _wmkf_potentialreviewer_value: 'person-2',
+        wmkf_accepted: true,
+        wmkf_invited: false,
+        wmkf_emailsentat: null,
+        wmkf_reviewstatus: 100000001,
+      },
+    ]);
+    getActiveQuestionSet.mockResolvedValueOnce([]);
+  }
+  const reviewer = (out, id) => out.proposals[0].reviewers.find((r) => r.suggestionId === id);
+
+  test('one read for the invited rows only; rows attach per reviewer, [] when none', async () => {
+    seed();
+    readReminderHistory.mockResolvedValueOnce(new Map([
+      [IDS[0], [{ kind: 'review_due', recordedAt: '2026-08-20T10:00:00.000Z' }]],
+    ]));
+    const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
+    expect(readReminderHistory).toHaveBeenCalledTimes(1);
+    expect(readReminderHistory).toHaveBeenCalledWith([IDS[0]]);
+    expect(reviewer(out, IDS[0]).reminderHistory).toEqual([{ kind: 'review_due', recordedAt: '2026-08-20T10:00:00.000Z' }]);
+    expect(reviewer(out, IDS[1]).reminderHistory).toEqual([]);
+  });
+
+  test('a failed history read leaves the list loading with reminderHistory null on every row', async () => {
+    seed();
+    readReminderHistory.mockResolvedValueOnce(null);
+    const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
+    expect(out.success).toBe(true);
+    expect(out.proposals[0].reviewers.map((r) => r.reminderHistory)).toEqual([null, null]);
   });
 });

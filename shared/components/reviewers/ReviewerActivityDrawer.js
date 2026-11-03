@@ -120,7 +120,7 @@ export default function ReviewerActivityDrawer({ reviewer, onClose }) {
         ) : (
           <ol className={terminalStatus ? 'mt-4 space-y-4' : 'mt-5 space-y-4'}>
             {events.map(event => (
-              <li key={event.key} className="border-l-2 border-gray-200 pl-3">
+              <li key={event.id || event.key} className="border-l-2 border-gray-200 pl-3">
                 <p className="text-sm font-medium text-gray-900">{event.label}</p>
                 <p className="text-xs text-gray-500">{formatStamp(event.at)}</p>
                 {event.detail && <p className="mt-1 text-xs text-gray-500">{event.detail}</p>}

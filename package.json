@@ -118,6 +118,7 @@
   },
   "dependencies": {
     "@hello-pangea/dnd": "18.0.1",
+    "@neondatabase/serverless": "0.9.5",
     "@tiptap/extension-link": "^3.32.0",
     "@tiptap/extension-subscript": "^3.32.0",
     "@tiptap/extension-superscript": "^3.32.0",

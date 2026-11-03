@@ -6,7 +6,8 @@
  *
  * Mocks the EXTRACTED module (`reviewer-engagement/record-email-outcome`)
  * wholesale and drives the legacy caller (`sendEmails`) to pin: the call
- * happens with the existing five arguments, AFTER the send and BEFORE the
+ * happens with the existing five arguments (plus the batch reminder-history
+ * session), AFTER the send and BEFORE the
  * campaign-config block (materials never reaches that block at all — this
  * also confirms `updateRequestById` is not invoked), and a rejection
  * produces the existing `stage: 'updating_lifecycle'` warning event rather
@@ -188,7 +189,7 @@ const draft = (id) => ({
 });
 
 describe('send-emails-service delegates post-send bookkeeping (materials) to recordDeliveredEmail', () => {
-  test('calls recordDeliveredEmail with the existing five arguments, after the send and before the campaign-config block', async () => {
+  test('calls recordDeliveredEmail with the existing five arguments plus the batch reminder-history session, after the send and before the campaign-config block', async () => {
     const { emitted, onEvent } = await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
 
     expect(emitted.some((e) => e.event === 'error')).toBe(false);
@@ -202,6 +203,8 @@ describe('send-emails-service delegates post-send bookkeeping (materials) to rec
       templateType: 'materials',
       sentAt: expect.any(String),
       actingUserSystemId: 'u-1',
+      // Batch-scoped reminder-history breaker (per-reminder history plan §2).
+      reminderHistory: expect.objectContaining({ tripped: false }),
     });
 
     // Ordering: the send happens strictly before the bookkeeping call, which

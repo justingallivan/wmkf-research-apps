@@ -1,8 +1,10 @@
 # Per-reminder history for reviewer follow-up
 
-Status: **PLAN — NOT BUILT; OWNER DECISIONS D1–D3 TAKEN 2026-11-03; REVISED
-SAME DAY AFTER TWO CODEX ADVERSARIAL REVIEWS (D2 rule replaced, see §3 — owner
-to confirm); THIRD CODEX REVIEW APPROVED THE PLAN.** Session 662,
+Status: **SOURCE-BUILT on branch `claude/per-reminder-history` 2026-11-03;
+NOT MERGED; MIGRATION 095 NOT APPLIED.** Owner decisions D1–D3 taken
+2026-11-03; D2 rule revised after two Codex adversarial reviews and confirmed
+by the owner's "Build it"; third Codex review approved the plan. Build record:
+§ Build (end of this file). Session 662,
 Claude, 2026-11-03, plan written on `claude/per-reminder-history-plan` from
 `main` `a66e09091`. Queue entry: `docs/CURRENT_WORK_QUEUE.md` item 7
 "Per-reminder audit trail for reviewer follow-up (Activity history)" (J27 item,
@@ -388,3 +390,43 @@ client on `POSTGRES_URL` for per-query cancellation.
 - External: a Production migration apply and an owner-present test-request
   proof. No Dynamics schema change, no new route, no change to who receives
   reminders.
+
+## Build (2026-11-03, branch `claude/per-reminder-history`)
+
+[VERIFIED via the files and test runs named here]
+
+- Migration `lib/db/migrations/095_reviewer_reminder_events.sql` + manifest.
+  095 was free on every unmerged remote branch [VERIFIED via `git diff
+  --name-only` per branch].
+- Store `lib/services/reviewer-engagement/reminder-events-store.js`. Uses
+  `@neondatabase/serverless` directly (added to `package.json` as an exact
+  `0.9.5` pin, the version already installed under `@vercel/postgres` 0.10.0,
+  so no new code is downloaded) for per-query cancellation on `POSTGRES_URL`.
+- Writers: `reviewer-reminder-sweep.js` `sendOneReminder` (after the send
+  attempt; one session per sweep run; both sweep selects gained
+  `wmkf_invited`/`wmkf_emailsentat`); `record-email-outcome.js` follow-ups
+  (session per `send-emails-service.js` batch). Manual reminders get a fresh
+  session per call through `sendOneReminder`'s default.
+- Reader: `reviewers-service.js` `getReviewers` (one read for invited rows).
+  Display: `reviewer-activity-history.js` `reminderHistoryEvents`; the drawer
+  keys list items by the new unique `id`.
+- Test tool: `scripts/reset-reviewer-for-testing.js` counts rows on a dry run
+  and deletes them with `--commit` (not unit-tested; a CLI with live
+  Dataverse reads).
+- Comments at both reset guards; the existing guard tests
+  (`reviewer-suggestion-disposition.test.js`, `reviewer-adapters-writeback.test.js`)
+  are annotated as the history dependency.
+- Tests: new `reminder-events-store.test.js` (15),
+  `reminder-events-store-neon-abort.test.js` (real driver: the abort reaches
+  its fetch), `tests/integration/reviewer-reminder-events-store.pg.test.js`
+  (real Postgres; skipped locally, runs in CI), plus history cases in the
+  sweep, follow-up bookkeeping, reviewer list, history and drawer tests. A
+  revert of the drawer key change fails the drawer test.
+- Verification: every `check:*` gate and self-test green; full unit suite
+  1500/1502 suites — the reviewer-list characterization test was updated for
+  the new field; `workbench-integrity-service.test.js` failed once under
+  full-suite load and passes alone (3/3 runs), untouched by this change.
+- Not done: Dataverse timestamp precision was not probed (the one-second
+  match window covers both cases); migration apply and the owner-present
+  proof (Release and proof, steps 1–2).
+

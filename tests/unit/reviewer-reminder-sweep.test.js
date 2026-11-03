@@ -58,6 +58,15 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => {
   };
 });
 
+// Per-reminder history store (docs/plans/PER_REMINDER_HISTORY_PLAN_2026-11-03.md).
+// Its own behavior is covered in reminder-events-store.test.js.
+const recordReminderEvent = jest.fn(async () => ({ written: true }));
+let historySessionSeq = 0;
+jest.mock('../../lib/services/reviewer-engagement/reminder-events-store', () => ({
+  createReminderHistorySession: () => ({ tripped: false, skipped: 0, failure: null, seq: ++historySessionSeq }),
+  recordReminderEvent: (...a) => recordReminderEvent(...a),
+}));
+
 // Stage 1c: the per-run test-state lookup is replaced so each test chooses a
 // request's state; the lookup itself is covered in test-request-state.test.js.
 const mockRequestTestState = jest.fn(async () => ({ kind: 'ordinary', reason: 'test' }));
@@ -798,5 +807,95 @@ describe('Test Request isolation (Stage 1c)', () => {
     expect(mintAndStore).not.toHaveBeenCalled();
     expect(updateRecord).not.toHaveBeenCalled();
     expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe('per-reminder history writes', () => {
+  function reviewDueSetup() {
+    installReads({ request: requestConfig({
+      wmkf_respondreminderenabled: false,
+      wmkf_reviewduedate: ymdDaysFromNow(-1),
+      wmkf_reviewduereminderenabled: true,
+    }) });
+    return {
+      wmkf_appreviewersuggestionid: SUG,
+      _wmkf_potentialreviewer_value: PERSON,
+      _wmkf_request_value: REQ,
+      wmkf_invited: true,
+      wmkf_emailsentat: isoDaysAgo(30),
+      wmkf_remindercount: 1,
+      wmkf_externaltokenhash: 'stored-token-hash',
+      wmkf_externaltokenexpires: new Date(Date.now() + 120 * DAY).toISOString(),
+      wmkf_externaltokenrevoked: false,
+      _etag: 'W/"300"',
+    };
+  }
+
+  test('respond reminder: one row after the send, at the same time as the claimed marker', async () => {
+    queryAllRecords.mockResolvedValue({ records: [respondCandidate({ wmkf_invited: true })] });
+    installReads();
+    const r = await sweepRespondReminders();
+    expect(r.sent).toBe(1);
+    expect(recordReminderEvent).toHaveBeenCalledTimes(1);
+    const call = recordReminderEvent.mock.calls[0][0];
+    expect(call.kind).toBe('respond');
+    expect(call.recordedAt).toBe(mintAndStore.mock.calls[0][0].writeFields.wmkf_respondremindersentat);
+    expect(call.row).toMatchObject({ wmkf_appreviewersuggestionid: SUG, wmkf_invited: true, _wmkf_request_value: REQ });
+    expect(createAndSendEmail.mock.invocationCallOrder[0]).toBeLessThan(recordReminderEvent.mock.invocationCallOrder[0]);
+  });
+
+  test('review-due reminder: one review_due row at the claimed wmkf_remindersentat, after the send', async () => {
+    queryAllRecords.mockResolvedValue({ records: [reviewDueSetup()] });
+    const r = await sweepReviewDueReminders();
+    expect(r.sent).toBe(1);
+    const call = recordReminderEvent.mock.calls[0][0];
+    expect(call.kind).toBe('review_due');
+    expect(call.recordedAt).toBe(updateRecord.mock.calls[0][2].wmkf_remindersentat);
+    expect(createAndSendEmail.mock.invocationCallOrder[0]).toBeLessThan(recordReminderEvent.mock.invocationCallOrder[0]);
+  });
+
+  test('a failed claim (412) records no history', async () => {
+    queryAllRecords.mockResolvedValue({ records: [respondCandidate({ wmkf_invited: true })] });
+    installReads();
+    mintAndStore.mockRejectedValueOnce(Object.assign(new Error('precondition failed'), { status: 412 }));
+    await sweepRespondReminders();
+    expect(recordReminderEvent).not.toHaveBeenCalled();
+  });
+
+  test('a failed send after a successful claim still records the claimed reminder', async () => {
+    queryAllRecords.mockResolvedValue({ records: [reviewDueSetup()] });
+    createAndSendEmail.mockRejectedValueOnce(new Error('SMTP down'));
+    const r = await sweepReviewDueReminders();
+    expect(r.sent).toBe(0);
+    expect(recordReminderEvent).toHaveBeenCalledTimes(1);
+  });
+
+  test('a failing history write never fails the send result', async () => {
+    queryAllRecords.mockResolvedValue({ records: [reviewDueSetup()] });
+    recordReminderEvent.mockResolvedValueOnce({ written: false, reason: 'timeout' });
+    const r = await sweepReviewDueReminders();
+    expect(r).toMatchObject({ sent: 1, sendFailed: 0, sendUnconfirmed: 0, prepareFailed: 0 });
+  });
+
+  test('one request-local history session per sweep run, shared by its rows', async () => {
+    const second = '22222222-2222-4222-8222-222222222222';
+    queryAllRecords.mockResolvedValue({ records: [reviewDueSetup(), { ...reviewDueSetup(), wmkf_appreviewersuggestionid: second }] });
+    await sweepReviewDueReminders();
+    expect(recordReminderEvent).toHaveBeenCalledTimes(2);
+    const [a, b] = recordReminderEvent.mock.calls.map((c) => c[0].session);
+    expect(a).toBe(b);
+    recordReminderEvent.mockClear();
+    queryAllRecords.mockResolvedValue({ records: [reviewDueSetup()] });
+    await sweepReviewDueReminders();
+    expect(recordReminderEvent.mock.calls[0][0].session).not.toBe(a);
+  });
+
+  test('both sweep queries select the invitation fields the history write needs', async () => {
+    queryAllRecords.mockResolvedValue({ records: [] });
+    await sweepRespondReminders();
+    await sweepReviewDueReminders();
+    const [respondSelect, reviewDueSelect] = queryAllRecords.mock.calls.map((c) => c[1].select.split(','));
+    expect(respondSelect).toEqual(expect.arrayContaining(['wmkf_invited', 'wmkf_emailsentat']));
+    expect(reviewDueSelect).toEqual(expect.arrayContaining(['wmkf_invited', 'wmkf_emailsentat']));
   });
 });

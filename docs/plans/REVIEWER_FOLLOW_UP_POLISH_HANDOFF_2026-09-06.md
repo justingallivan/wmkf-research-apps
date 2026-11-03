@@ -22,7 +22,7 @@
 
 The current reviewer record stores only one `reminderSentAt` timestamp and cumulative `reminderCount`. The Activity history drawer therefore shows the latest reminder event plus “N reminders recorded in total.” Build a durable per-reminder audit trail and extend the reviewer activity API/DTO so each reminder can be shown as its own dated event.
 
-Plan (2026-11-03, not built): `docs/plans/PER_REMINDER_HISTORY_PLAN_2026-11-03.md`.
+Plan (2026-11-03; source-built on branch `claude/per-reminder-history`, not merged): `docs/plans/PER_REMINDER_HISTORY_PLAN_2026-11-03.md`.
 
 ## Verification
 

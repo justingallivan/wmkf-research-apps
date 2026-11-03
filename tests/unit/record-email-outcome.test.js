@@ -15,6 +15,12 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   updateLifecycle: (...a) => updateLifecycle(...a),
 }));
 
+const recordReminderEvent = jest.fn(async () => ({ written: true }));
+jest.mock('../../lib/services/reviewer-engagement/reminder-events-store', () => ({
+  createReminderHistorySession: () => ({ tripped: false, skipped: 0, failure: null }),
+  recordReminderEvent: (...a) => recordReminderEvent(...a),
+}));
+
 const { recordDeliveredEmail } = require('../../lib/services/reviewer-engagement/record-email-outcome');
 
 const SUGGESTION_ID = 'sug-1';
@@ -332,5 +338,57 @@ describe('recordDeliveredEmail', () => {
       actingUserSystemId: 'staff-42',
       ifMatch: 'W/"specific-etag"',
     });
+  });
+});
+
+describe('recordDeliveredEmail — per-reminder history', () => {
+  const base = () => ({
+    suggestionId: SUGGESTION_ID,
+    originalSuggestion: original(),
+    sentAt: SENT_AT,
+    actingUserSystemId: 'u-1',
+  });
+
+  it('followup: records one review_due row at this send\'s sentAt, after the stamp write, with the fresh row', async () => {
+    const session = { tripped: false };
+    findById.mockResolvedValue(fresh({ wmkf_invited: true, wmkf_emailsentat: '2026-08-01T00:00:00Z' }));
+    await recordDeliveredEmail({ ...base(), templateType: 'followup', reminderHistory: session });
+    expect(recordReminderEvent).toHaveBeenCalledTimes(1);
+    expect(recordReminderEvent).toHaveBeenCalledWith({
+      row: expect.objectContaining({ wmkf_invited: true, _wmkf_request_value: REQUEST_ID }),
+      kind: 'review_due',
+      recordedAt: SENT_AT,
+      session,
+    });
+    expect(updateLifecycle.mock.invocationCallOrder[0]).toBeLessThan(recordReminderEvent.mock.invocationCallOrder[0]);
+  });
+
+  it('followup: uses this send\'s own time even when a newer stamp is preserved', async () => {
+    findById.mockResolvedValue(fresh({ wmkf_remindersentat: '2026-09-06T00:00:00.000Z' }));
+    await recordDeliveredEmail({ ...base(), templateType: 'followup' });
+    expect(updateLifecycle.mock.calls[0][1].reminderSentAt).toBe('2026-09-06T00:00:00.000Z');
+    expect(recordReminderEvent.mock.calls[0][0].recordedAt).toBe(SENT_AT);
+  });
+
+  it.each(['materials', 'thankyou'])('%s: records no reminder history', async (templateType) => {
+    await recordDeliveredEmail({ ...base(), templateType });
+    expect(recordReminderEvent).not.toHaveBeenCalled();
+  });
+
+  it('followup on a closed row throws before any history write', async () => {
+    findById.mockResolvedValue(fresh({ wmkf_completedat: '2026-09-01T00:00:00Z' }));
+    await expect(recordDeliveredEmail({ ...base(), templateType: 'followup' })).rejects.toThrow();
+    expect(recordReminderEvent).not.toHaveBeenCalled();
+  });
+
+  it('followup: a failed stamp write (non-412) records no history', async () => {
+    updateLifecycle.mockRejectedValueOnce(Object.assign(new Error('boom'), { status: 500 }));
+    await expect(recordDeliveredEmail({ ...base(), templateType: 'followup' })).rejects.toThrow('boom');
+    expect(recordReminderEvent).not.toHaveBeenCalled();
+  });
+
+  it('followup: a failed history write does not throw', async () => {
+    recordReminderEvent.mockResolvedValueOnce({ written: false, reason: 'timeout' });
+    await expect(recordDeliveredEmail({ ...base(), templateType: 'followup' })).resolves.toBeUndefined();
   });
 });
