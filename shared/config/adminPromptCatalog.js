@@ -392,6 +392,8 @@ export function resolveAdminPromptDescription(prompt, groups = ADMIN_PROMPT_GROU
   const stored = prompt?.catalog || {};
   const group = text(stored.group);
   const section = text(stored.section);
+  // The fallback placement is not re-checked against `groups`: it relies on
+  // group deletion being disallowed (lib/services/admin/prompt-groups-service.js).
   const placement = validPlacement(group, section, groups)
     ? { group, ...(section ? { section } : {}) }
     : { group: fallback.group, ...(fallback.section ? { section: fallback.section } : {}) };

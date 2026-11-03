@@ -139,3 +139,10 @@ describe('a group added in Admin is usable', () => {
     expect(promptGroupIdFromLabel('  Café & Q&A! ')).toBe('cafe-q-a');
   });
 });
+
+it('maps a missing row revision on save to a typed 503', async () => {
+  getSettingStrict.mockResolvedValue(stored(defaults));
+  setSettingIfUnchanged.mockRejectedValue(Object.assign(new Error('no etag'), { code: 'setting_revision_unavailable' }));
+  await expect(savePromptGroups({ groups: [...defaults, { id: 'x', label: 'X' }], expectedRevision: 'W/"5"', profileId: 7 }))
+    .rejects.toMatchObject({ httpStatus: 503, body: expect.objectContaining({ status: 'groups_unavailable' }) });
+});
