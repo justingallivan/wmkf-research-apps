@@ -1,7 +1,8 @@
 # Per-reminder history for reviewer follow-up
 
 Status: **SOURCE-BUILT on branch `claude/per-reminder-history` 2026-11-03;
-NOT MERGED; MIGRATION 095 NOT APPLIED.** Owner decisions D1–D3 taken
+NOT MERGED; MIGRATION 095 APPLIED IN PRODUCTION 2026-11-03; OWNER-PRESENT
+PROOF PENDING.** Owner decisions D1–D3 taken
 2026-11-03; D2 rule revised after two Codex adversarial reviews and confirmed
 by the owner's "Build it"; third Codex review approved the plan. Build record:
 § Build (end of this file). Session 662,
@@ -428,7 +429,12 @@ client on `POSTGRES_URL` for per-query cancellation.
   1500/1502 suites — the reviewer-list characterization test was updated for
   the new field; `workbench-integrity-service.test.js` failed once under
   full-suite load and passes alone (3/3 runs), untouched by this change.
+- Migration apply (Release and proof, step 1): done 2026-11-03. The app
+  database tracker ended at 093, so the owner ran `node
+  scripts/apply-migrations.js` from this branch's worktree, applying Codex's
+  094 (ledger table, per Codex's recommendation to keep the shared-schema
+  convention) and 095. Readback: both tracker rows, 095's 6 columns, kind
+  check, unique key and index, 0 rows [VERIFIED via read-only query].
 - Not done: Dataverse timestamp precision was not probed (the one-second
-  match window covers both cases); migration apply and the owner-present
-  proof (Release and proof, steps 1–2).
+  match window covers both cases); the owner-present proof (step 2).
 
