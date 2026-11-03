@@ -162,3 +162,11 @@ test.each(['dynamics', 'archive'])('classified %s listing failure stays sanitize
   expect(res.status).toHaveBeenCalledWith(200);
   expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'materials_unavailable' });
 });
+
+test('contradictory failure metadata cannot produce a successful route envelope', async () => {
+  listReviewerMaterialsWithAvailability.mockResolvedValue({ files: [{ id: 'canonical' }], unavailable: false, unavailableSources: ['dynamics'] });
+  const { req, res } = get({ requestId: REQUEST_ID });
+  await handler(req, res);
+  expect(res.status).toHaveBeenCalledWith(200);
+  expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'materials_unavailable' });
+});

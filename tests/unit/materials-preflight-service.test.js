@@ -2,7 +2,8 @@
  * Logic-level unit tests for lib/services/review-manager/materials-preflight-service.js
  * (Route→Service Consolidation Plan, Stage 2 wave).
  *
- * Adapter + materials lister mocked; covers available (fileCount), the 404
+ * Adapter/lister boundary mocks plus real-lister cases with injected Graph I/O.
+ * Covers available (fileCount), the 404
  * not_found domain error with explicit { ok:false, reason } body, and the
  * untyped propagation of lookup/listing failures (the shell owns the
  * sanitized 200 materials_unavailable mapping).
@@ -85,12 +86,12 @@ test('a successful complete listing with no matching canonical file is verified 
 
 // Exercise the actual error classification and exact-file policy. Only Graph
 // and bucket discovery are replaced; the service consumes the real projection.
-function useRealListing({ primaryFiles, primaryError, archiveError }) {
+function useRealListing({ primaryFiles, primaryError, archiveError, includePrimary = true }) {
   const actual = jest.requireActual('../../lib/external/reviewer-materials');
   listReviewerMaterialsWithAvailability.mockImplementationOnce((requestId, requestNumber) => (
     actual.listReviewerMaterialsWithAvailability(requestId, requestNumber, {
       getRequestSharePointBuckets: async () => [
-        { library: 'primary', folder: 'fixture', source: 'dynamics' },
+        ...(includePrimary ? [{ library: 'primary', folder: 'fixture', source: 'dynamics' }] : []),
         ...[1, 2, 3].map((n) => ({ library: `archive${n}`, folder: 'fixture', source: 'archive' })),
       ],
       listFiles: async (library) => {
@@ -106,7 +107,7 @@ function useRealListing({ primaryFiles, primaryError, archiveError }) {
   getById.mockResolvedValueOnce({ akoya_requestid: REQ, akoya_requestnum: 'R-1001' });
 }
 const canonical = { name: 'Proposal_R-1001.pdf', folder: 'fixture/Reviewer Materials' };
-const absentArchive = () => Object.assign(new Error('expected missing archive'), { code: 'graph_folder_not_found', status: 404 });
+const absentArchive = () => Object.assign(new Error('expected missing archive'), { code: 'graph_folder_not_found', status: 404, dataverseCode: 'itemNotFound' });
 
 test('canonical file plus three expected missing archives is available without exposing internal/wrong-request files', async () => {
   useRealListing({ primaryFiles: [canonical,
@@ -139,5 +140,16 @@ test('missing tracked Dynamics bucket still blocks even with the canonical PDF i
 test.each([undefined, null, {}, '', 'archive'])('unavailable with missing/malformed source classification %j stays closed', async (unavailableSources) => {
   getById.mockResolvedValueOnce({ akoya_requestid: REQ, akoya_requestnum: 'R-1001' });
   listReviewerMaterialsWithAvailability.mockResolvedValueOnce({ files: [canonical], unavailable: true, unavailableSources });
+  await expect(materialsPreflight({ requestId: REQ })).resolves.toEqual({ ok: false, reason: 'materials_unavailable' });
+});
+
+test('no tracked Dynamics location and only missing archive folders is verified empty', async () => {
+  useRealListing({ includePrimary: false, archiveError: absentArchive() });
+  await expect(materialsPreflight({ requestId: REQ })).resolves.toEqual({ ok: true, fileCount: 0 });
+});
+
+test('nonempty failure sources override a contradictory false unavailable flag', async () => {
+  getById.mockResolvedValueOnce({ akoya_requestid: REQ, akoya_requestnum: 'R-1001' });
+  listReviewerMaterialsWithAvailability.mockResolvedValueOnce({ files: [canonical], unavailable: false, unavailableSources: ['archive'] });
   await expect(materialsPreflight({ requestId: REQ })).resolves.toEqual({ ok: false, reason: 'materials_unavailable' });
 });
