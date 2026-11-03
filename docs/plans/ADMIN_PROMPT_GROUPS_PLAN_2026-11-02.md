@@ -71,7 +71,8 @@ A **Manage groups** panel on the Prompts page:
 - **Reorder:** drag by the grip handle, using the same `@hello-pangea/dnd`
   pattern as the Proposal Ranking assessment list (animated reflow, keyboard
   lift/move/drop, reduced-motion drop fix, live announcements). [OWNER DECISION
-  2026-11-02: replaces the first build's ↑/↓ buttons for UI consistency]
+  2026-11-02: replaces the first build's ↑/↓ buttons for UI consistency;
+  PRODUCTION-LIVE: PR #614, merge `f3afb5199`; owner drag check pending]
 - **Save** sends the whole list. If someone else saved first, it shows "Groups
   changed since you opened them" and asks you to reload.
 
