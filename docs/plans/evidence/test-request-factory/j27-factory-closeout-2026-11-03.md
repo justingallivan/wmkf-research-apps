@@ -43,3 +43,23 @@ limits: Admin cloning plus owner phase/readiness steps; optional private proof
 for a prior generated Foundation PDF; isolated reviewer workflow with manual
 materials release. Earlier intake-stage fixtures and broader PD workflow remain
 deferred. Future live actions still require their own authorized scope.
+
+## Review and checks
+
+Claude Fable 5.1 reviewed the source/docs through the authorized host OAuth
+subscription (2026-11-03). Verdict: NEEDS CHANGES, docs only; scripts and CLI
+examples sound. Its required edits are resolved: operator automation assessment
+is distinguished from CLI enforcement, and the stale 058 hold is removed from
+the Atlas. All recommended clarifications are incorporated: current admin/host
+contract, status-history reader, exact subject convention, named write
+acknowledgment and omitted CLI modes. Source checked at
+`cast-slot-binding-runner.js` exact-GUID confirmation, CLI UTC acknowledgment,
+`runRunInspect`, and the send service's verbatim authoritative subject. Fable
+explicitly concluded the two edits make this ready to publish; no runtime fix
+was requested. Later historical-boundary pointers preserve original receipts.
+
+Local validation passed: doc currency, fact consistency, canonical pointers,
+Atlas, doc symbol references and sequential self-tests; docs catalog; memory
+drift (five existing nonblocking findings); secret scan/self-test; scoped probe
+ESLint and Node syntax checks. Hosted CI is tracked on PR #626; this receipt
+does not predeclare its final result.
