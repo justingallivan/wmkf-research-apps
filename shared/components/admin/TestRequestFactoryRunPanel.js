@@ -127,6 +127,8 @@ export default function TestRequestFactoryRunPanel({
         </span>
       </div>
 
+      {run.status === 'ready' && production ? <p className="text-sm text-gray-700">Cloning is complete. This run status does not confirm staff readiness. Prepared J27 fixtures need phase advancement and the owner’s readiness finalization before reviewer testing.</p> : null}
+
       {view.state === 'error' ? <div role="alert" className={ERROR_BAND}>{view.text}</div> : null}
 
       {run.status === 'retiring' || run.status === 'retired' ? (

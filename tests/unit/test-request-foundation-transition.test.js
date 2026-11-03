@@ -143,6 +143,44 @@ describe('evaluateFoundationTransition', () => {
       .toEqual(['Foundation account protected columns changed during the run']);
   });
 
+  test('accepts an existing generated PDF replacement only with the exact prior digest preimage', () => {
+    const prior = GOVERIFY_PDF.replace('20260928180115945', '20260927180115945');
+    const before = captureFoundationBaseline(account({ akoya_goverifypdfurl: prior }), CONTACTS, CAPTURED);
+    const after = refreshed({ akoya_goverifypdfurl: GOVERIFY_PDF });
+    const options = { verifiedAt: VERIFIED, previousGoVerifyPdf: prior };
+    expect(evaluateFoundationTransition(before, after, CONTACTS, options)).toEqual({ failures: [], outcome: 'refreshed' });
+    expect(evaluateFoundationTransition(before, after, CONTACTS, { verifiedAt: VERIFIED }).failures).toMatchObject([expect.stringMatching(/protected columns/)]);
+    for (const candidate of [GOVERIFY_PDF, prior.replace('20260927', '20260926'), 'previous-link']) {
+      expect(evaluateFoundationTransition(before, after, CONTACTS, { ...options, previousGoVerifyPdf: candidate }).failures).toContain('Foundation account protected columns changed during the run');
+    }
+    expect(evaluateFoundationTransition(before, { ...after, telephone1: 'changed' }, CONTACTS, options).failures).toContain('Foundation account protected columns changed during the run');
+    expect(evaluateFoundationTransition(before, { ...after, akoya_taxstatus: null }, CONTACTS, options).failures).toContain('Foundation Tax Status or BMF 509 differs from its pre-run value');
+    expect(evaluateFoundationTransition(before, { ...after, akoya_countofrequests: 12 }, CONTACTS, options).failures).toContain('Foundation akoya_countofrequests is neither unchanged nor +1');
+    expect(evaluateFoundationTransition(before, after, [], options).failures).toContain('Foundation contact rows changed during the run');
+    expect(evaluateFoundationTransition(before, { ...after, akoya_goverifytrigger: account().akoya_goverifytrigger }, CONTACTS, options).failures).toContain('Foundation account protected columns changed during the run');
+    expect(evaluateFoundationTransition(before, { ...after, akoya_goverifypdfurl: null }, CONTACTS, options).failures).toContain('Foundation account protected columns changed during the run');
+  });
+
+  test.each([
+    ['wrong host', GOVERIFY_PDF.replace('appriver3651007194.sharepoint.com', 'example.com')],
+    ['future', GOVERIFY_PDF],
+    ['invalid date', GOVERIFY_PDF.replace('20260928180115945', '20260932180115945')],
+    ['query', GOVERIFY_PDF.replace('20260928', '20260927') + '?download=1'],
+  ])('refuses even a matching baseline preimage when the prior PDF is %s', (_label, prior) => {
+    const before = captureFoundationBaseline(account({ akoya_goverifypdfurl: prior }), CONTACTS, CAPTURED);
+    const after = refreshed({ akoya_goverifypdfurl: GOVERIFY_PDF.replace('20260928180115945', '20260928180215945') });
+    expect(evaluateFoundationTransition(before, after, CONTACTS, { verifiedAt: VERIFIED, previousGoVerifyPdf: prior }).failures).toContain('Foundation account protected columns changed during the run');
+  });
+
+  test('supplied prior evidence never falls back to the null path and must predate capture', () => {
+    const prior = GOVERIFY_PDF.replace('20260928', '20260927');
+    const after = refreshed({ akoya_goverifypdfurl: GOVERIFY_PDF });
+    expect(evaluateFoundationTransition(baseline(), after, CONTACTS, { verifiedAt: VERIFIED, previousGoVerifyPdf: prior }).failures).toContain('Foundation account protected columns changed during the run');
+    const atCapture = GOVERIFY_PDF.replace('20260928180115945', '20260928180000000');
+    const before = captureFoundationBaseline(account({ akoya_goverifypdfurl: atCapture }), CONTACTS, CAPTURED);
+    expect(evaluateFoundationTransition(before, after, CONTACTS, { verifiedAt: VERIFIED, previousGoVerifyPdf: atCapture }).failures).toContain('Foundation account protected columns changed during the run');
+  });
+
   test('does not accept the PDF exception when it was already non-null in the baseline', () => {
     const before = captureFoundationBaseline(account({ akoya_goverifypdfurl: 'previous-link' }), CONTACTS, CAPTURED);
     expect(evaluateFoundationTransition(before, refreshed({ akoya_goverifypdfurl: GOVERIFY_PDF }), CONTACTS, { verifiedAt: VERIFIED }).failures)
@@ -404,6 +442,15 @@ describe('recheckFoundationTransition', () => {
       resources: resources(baseline()),
       verifiedAt: VERIFIED,
     })).resolves.toEqual({ failures: [], outcome: 'refreshed' });
+  });
+
+  test('read-only recheck propagates prior-PDF evidence without writing or changing the baseline', async () => {
+    const prior = GOVERIFY_PDF.replace('20260928', '20260927');
+    const original = captureFoundationBaseline(account({ akoya_goverifypdfurl: prior }), CONTACTS, CAPTURED);
+    const saved = JSON.stringify(original);
+    await expect(recheckFoundationTransition({ client: client(refreshed({ akoya_goverifypdfurl: GOVERIFY_PDF })), organizationId: ORG_ID,
+      resources: resources(original), verifiedAt: VERIFIED, previousGoVerifyPdf: prior })).resolves.toEqual({ failures: [], outcome: 'refreshed' });
+    expect(JSON.stringify(original)).toBe(saved);
   });
 
   test('fails closed with no baseline or two baselines', async () => {

@@ -3,7 +3,7 @@ title: Test Request Factory Run Ledger
 domain: test-request-factory
 kind: atlas
 status: active
-summary: "Durable test Request ledger, written by the owner-run CLI and, since 2026-10-02, by the deployed admin form in Production. Current copy: managed Neon ledger (054 + 058, operational data loaded 2026-09-30) behind a tracked host registry and schema fingerprint check. Shared Production app DB has 054 + 058 tables (empty; never the ledger); Preview unverified."
+summary: "Durable test Request ledger, written by the owner-run CLI and, since 2026-10-02, by the deployed admin form in Production. Current copy: managed Neon ledgers (054 + 058 + 094 verified 2026-11-03; operational data loaded 2026-09-30) behind a tracked host registry and schema fingerprint check. Shared Production app DB has 054 + 058 tables (empty; never the ledger); Preview unverified."
 canonical: false
 cataloged: 2026-09-23
 last_verified: 2026-10-05
@@ -20,8 +20,10 @@ related:
 
 Tables: `test_request_runs`, `test_request_run_resources`,
 `test_request_run_reviewer_assignments`, `test_request_status_changes`,
-`test_request_cast_members`, `test_request_cast_bindings`, and
-`test_request_cast_slot_bindings`.
+`test_request_cast_members`, `test_request_cast_bindings`,
+`test_request_cast_slot_bindings`, and `test_request_readiness_finalizations`.
+[VERIFIED 2026-11-03 via the ledger migration runner and fingerprint check]
+Migration 094 is applied to both managed ledgers (`ledger_prod` and `ledger`).
 
 **Where the ledger lives (2026-09-30, S553; `docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md`).** The operational ledger for production test Requests has lived only in `ledger_prod` inside the `wmkf-ledger-pg` Docker container on the owner's home Mac (sandbox counterpart `ledger`), hand-built and never dumped [VERIFIED S553: the office Mac holds no `ledger_prod`]. Owner decision D1 moved it to Neon project `wmkf-factory-ledger` (Vercel Marketplace, connected to no Vercel project, us-east-1), databases `ledger_prod` and `ledger`, with 054 + 058 applied and the local tracker `ledger_schema_migrations` recording 054; the home-Mac operational data was loaded into both on 2026-09-30 and the managed ledger is now the current copy [VERIFIED via `docs/plans/evidence/test-request-factory/ledger-snapshot-2026-09-30.md`]. Merged in PR #374: `lib/db/ledger-registry.js` is the tracked host allowlist the CLI's `requireLedgerUrl(target)` enforces (managed host requires `ledger_prod` for `--target=production`, `ledger` otherwise; the app's `POSTGRES_URL` is always refused), `lib/db/ledger-schema.js` + `lib/db/ledger-schema-fingerprint.json` are the structural schema check every ledger-driven CLI mode runs first (`check:factory-ledger` gate, `--ledger-check`), and `scripts/apply-ledger-migrations.js` is the ledger's own migration runner. Connection strings are `.env.local` variables for the CLI; since 2026-10-02 the production URL is also a hand-set Vercel Production variable for the admin form (`docs/CREDENTIALS_RUNBOOK.md`; see *Second writer: the deployed admin form*).
 
@@ -150,14 +152,17 @@ the B4 plan forbids pointing that runner at them (cast plan, *Order* 6, §6).
   read-only CLI mode `--target=production --run-recheck=<runId>` re-reads the
   account and evaluates it against the same baseline (no ledger write).
   The protected projection digest remains unchanged and stores no account
-  values. A narrowly bounded GoVerify PDF transition is accepted only when
-  the original baseline explicitly contained `akoya_goverifypdfurl: null`,
-  replacing that one current value with `null` reproduces the stored digest,
-  and the current URL has the tracked Akoya GoVerify host/site/path shape with
-  a valid `GOverifyUpdate_YYYYMMDDHHmmssfff.pdf` timestamp inside the run
-  window. The observed GoVerify trigger must also satisfy the existing moved
-  stamp checks. This does not exempt the field from the projection or accept
-  a non-null baseline; every other protected account change still fails.
+  values. A narrowly bounded GoVerify PDF transition requires substituting
+  only that field to reproduce the original whole-projection digest. By default
+  the substituted value is null. Branch-built 2026-11-03 owner CLI assistance
+  (`--previous-goverify-pdf-file=<absolute private file>`) can instead supply
+  the exact prior generated URL, whose valid filename timestamp must predate
+  capture. The current generated URL must match the tracked host/site/path and
+  have a valid timestamp inside the run window; the GoVerify trigger must move
+  within its existing window. No fallback to null follows a wrong supplied value.
+  The baseline is never changed and neither URL enters the ledger. All other
+  account, contact, result and rollup checks remain mandatory. The admin form
+  supplies no such evidence, so its recheck may still refuse these replacements.
 
 ## Second writer: the deployed admin form (2026-10-02)
 
@@ -365,3 +370,32 @@ Two tables added in place to migration 054 (and the V55 mirror) for the cast pla
   cannot store arbitrary bodies or tokens in those columns.
 - No cleanup/retention policy exists yet; row growth is unbounded until the
   design doc's stage 5 retirement/retention work lands.
+
+
+## Prepared J27 readiness journal (branch source, 2026-11-02)
+
+[VERIFIED via migration 094, local disposable PostgreSQL tests, and 2026-11-03 managed-ledger application/fingerprint checks] `test_request_readiness_finalizations` retains immutable
+intents per completed Production Basic run (`run_id` foreign key plus `attempt`
+composite primary key), with a partial unique index allowing one open attempt,
+`etag_before`, nullable-false `ready_before`, typed `ready_after`, status,
+dispatch/completion timestamps, allowlisted effect receipts, and sanitized error.
+`readiness-journal.js` is the only writer. Its planned→dispatched conditional
+UPDATE returns a row to exactly one sender; dispatched operations never resend.
+`readiness-finalizer.js`, reached only from owner CLI `--finalize-readiness`,
+reads it and corroborates the marked destination, reserved manifest/body/bundle,
+J27+ cycle, phase pair, derived status, status journal, Foundation isolation and
+copied destination files. Saved-source provenance and completed destination
+byte/OOXML-attestation hashes are used after cloning; the real source can change
+and export TTL does not expire a completed copy. A true-only ETag PATCH precedes readback and job/effect observation;
+only then does applied→complete record success. Unknown states and ambiguous
+non-landed writes stop without another PATCH. Owner-only `--recover-readiness`
+requires exact destination confirmation and all possible senders stopped; when
+readiness is still false/null it abandons the old attempt. Only the next
+finalization, after its package check and fresh state read, appends a new intent. All transitions are attempt-bound, so a stale sender cannot mutate the
+new journal attempt. Already-true unexpected effects remain needs_attention,
+with observed IDs; recovery cannot clear them. No cleanup writer is added;
+attempt history remains part of the retained audit trail.
+
+The checked-in fingerprint includes 094 and both managed ledgers match it as of 2026-11-03. Justin authorized the application and accepted the interruption of the old deployed Factory create/advance/status actions. Merge/deployment remain held; the old code rejects the extra schema until compatible code is promoted. The fresh-install bootstrap executes the
+numbered migration through the existing migration runner. No API route, recipe
+step or new readiness-editing web capability is introduced.

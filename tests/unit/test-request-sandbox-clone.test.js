@@ -270,8 +270,8 @@ describe('sandbox operator write boundary', () => {
       expect({ block: block.slice(0, 60), guardBeforeCheck: guard > -1 && guard < check, checkBeforeClient: check > -1 && check < create })
         .toEqual({ block: block.slice(0, 60), guardBeforeCheck: true, checkBeforeClient: true });
     }
-    expect(clientBlocks).toBe(3);
-    for (const mode of ['ledgerCheck', 'runInspect', 'setStatus || args.statusRecheck || args.statusAbandon', 'createCast || args.bindReviewer || args.bindReviewerSlot', 'runRecheck', 'reserve', 'advance']) {
+    expect(clientBlocks).toBe(4);
+    for (const mode of ['ledgerCheck', 'runInspect', 'finalizeReadiness || args.recoverReadiness', 'setStatus || args.statusRecheck || args.statusAbandon', 'createCast || args.bindReviewer || args.bindReviewerSlot', 'runRecheck', 'reserve', 'advance']) {
       const at = script.indexOf(`if (args.${mode}) {`);
       expect(at).toBeGreaterThan(-1);
       const nextDispatch = script.indexOf('\n  if (args.', at + 1);

@@ -197,6 +197,7 @@ export default function TestRequestFactoryIntake({
     if (label.length > LIMITS.labelMax) return `Keep the test label to ${LIMITS.labelMax} characters or fewer.`;
     if (!cycleOptions.length) return 'No Grant Cycle with a Board date is available. Add one in the cycle calendar first.';
     if (!chosenCycle) return 'Choose a Grant Cycle.';
+    if (/^[JD]\d{2}$/.test(chosenCycle.cycleCode) && Number(chosenCycle.cycleCode.slice(1)) >= 27 && draft?.preparedFixtureBlocker) return `${draft.preparedFixtureBlocker} Choose a completed source or an earlier cycle.`;
     if (summary && form.typed !== summary.requestNumber) return `Type Request number ${summary.requestNumber} exactly to confirm.`;
     return '';
   })();
@@ -376,7 +377,7 @@ export default function TestRequestFactoryIntake({
               {confirmReason ? <Reason id="factory-confirm-reason">{confirmReason}</Reason> : <span id="factory-confirm-reason" />}
             </div>
             <p className="max-w-2xl text-sm leading-6 text-gray-600">
-              Confirm reserves the run and creates nothing in Dataverse yet. You start the run, step by step, from the run panel.
+              Confirm reserves the run and creates nothing in Dataverse yet. You start the run, step by step, from the run panel. For Production J27 and later, this prepares a reviewer-workflow fixture. After cloning, an owner advances its phase statuses and finalizes staff readiness using the command-line tool. Intake automation is not rerun.
             </p>
           </form>
         </section>

@@ -647,8 +647,8 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
       return { client, manifest, run, bundle };
     }
 
-    const advance = ({ client, manifest, bundle }, ledger) => advanceRun({
-      runId: RUN_ID, ledger, manifest, bundle, deps: { client, graph: fakeGraph({ listFiles: async () => [] }), sharePointTarget: SP_TARGET },
+    const advance = ({ client, manifest, bundle }, ledger, previousGoVerifyPdf = null) => advanceRun({
+      runId: RUN_ID, ledger, manifest, bundle, deps: { client, graph: fakeGraph({ listFiles: async () => [] }), sharePointTarget: SP_TARGET }, options: { previousGoVerifyPdf },
     });
 
     // The recorder runs at the end of a production fence_source (after the
@@ -773,6 +773,21 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
       const outcomeRow = resources.find((row) => row.step === 'verify' && row.resourceKind === 'foundation_transition');
       expect(outcomeRow.readback).toEqual({ kind: 'foundation_transition', outcome: 'refreshed' });
       expect(() => assertLedgerReceipt(outcomeRow.readback)).not.toThrow();
+    });
+
+    test('verify propagates exact prior-PDF evidence and retains its baseline', async () => {
+      process.env.DYNAMICS_CLIENT_ID = APP_USER_ID.replace(/./, '0');
+      const prior = 'https://appriver3651007194.sharepoint.com/sites/akoyaGO/akoya_goverify/GOverify_847325CFE3C0F111AAAF000D3A361C1F/GOverifyUpdate_20260927180115945.pdf';
+      const at = new Date(Date.now() - 30_000).toISOString();
+      const stamp = at.replace(/[-:TZ.]/g, '');
+      const after = foundation({ akoya_goverifypdfurl: prior.replace('20260927180115945', stamp), akoya_goverifytrigger: at });
+      const setup = verifyFixture(after);
+      const { ledger, getResources } = createFakeLedger(setup.run);
+      const before = baselineFor(foundation({ akoya_goverifypdfurl: prior }));
+      await ledger.journalPlannedResource({ step: 'fence_source', resourceKind: 'foundation_transition', system: 'dataverse', plannedIdentity: before });
+      const result = await advance(setup, ledger, prior);
+      expect(result.outcome).toBe('ready');
+      expect(getResources().find(r => r.step === 'fence_source').plannedIdentity).toEqual(before);
     });
 
     test('verify fails a protected-column change the sandbox comparison would not see', async () => {
