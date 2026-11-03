@@ -136,6 +136,12 @@ the current row; when `emailSentAt` is empty, no rows are in scope.
   if that path is reachable: fence review-due rows on `responseReceivedAt`
   (also a reset stamp) instead, after confirming every acceptance path sets it.
 
+- **Limitation:** a reviewer whose invitation was recorded outside the app
+  (`wmkf_invited` true, `wmkf_emailsentat` empty) can still be reminded, but
+  their rows are never in scope, so they keep today's display (latest stamp
+  plus count). **[ASSUMED]** such rows are rare; the build counts reminded rows
+  with an empty `emailSentAt` before relying on this rule.
+
 Alternative: an explicit engagement id on the suggestion row. That needs a new
 Dataverse column and a writer at every reset site; not recommended.
 
@@ -143,8 +149,8 @@ Dataverse column and a writer at every reset site; not recommended.
 
 `getReviewers` adds `reminderHistory` to each reviewer row:
 
-- `null` when the read failed (fail-soft, like `fetchAnswersBySuggestion` at
-  `reviewers-service.js:39`): the drawer behaves exactly as today.
+- `null` when the read failed (fail-soft; the reviewer list still loads): the
+  drawer behaves exactly as today.
 - `[]` when no rows exist.
 - Otherwise `[{ kind, recordedAt }]`, already filtered by the fence (rule 3) on
   the server.
@@ -213,8 +219,9 @@ queue's parked item. It does not build toward that branch.
 
 - Migration `095_reviewer_reminder_events.sql` (the number is **[ASSUMED]**
   free; recheck open branches at build) and `npm run prebuild` for the manifest.
-- `scripts/setup-database.js`: follow the migration 091 precedent, which is not
-  in it [VERIFIED via grep].
+- `scripts/setup-database.js`: no edit. A fresh install executes the checked-in
+  migrations [VERIFIED via `scripts/setup-database.js:2110-2113`], and 091 is
+  likewise absent from the script [VERIFIED via grep].
 - Atlas: new `docs/atlas/postgres-reviewer-reminder-events.md`, a row in
   `docs/atlas/postgres-infra-tables.md` (091 has one [VERIFIED via grep]),
   `check:atlas`.
@@ -226,8 +233,11 @@ queue's parked item. It does not build toward that branch.
 
 ## Release and proof
 
-Tier 2 under `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`: a branch,
-characterization tests first, PR with CI green, owner decision to merge.
+Tier 2 under `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md:129-144`
+(reminder behavior, migrations): a branch, characterization tests first, PR with
+CI green, recorded last-known-good Production deployment, explicit owner
+decision to merge. Rollback: revert the merge commit; the table can stay (no
+reader once reverted).
 
 1. Apply the migration in Production with `node scripts/apply-migrations.js`
    before merging. If the table is missing, inserts are logged and skipped and
