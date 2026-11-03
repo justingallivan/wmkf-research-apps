@@ -146,7 +146,7 @@ Download the manifest and bundle **before the final clone step**, since the dail
 sweep may delete them once the run is internally ready. Complete the clone, use
 the existing status setter for Phase I `Invited` and then Phase II `Phase II
 Pending Committee Review`, and inspect each result. Invited may create a draft
-email and GoApply tracking row; its first live Factory transition remains to be
+email and GoApply tracking row; this prepared-fixture transition remains to be
 characterized. The derived Request Status must read `Phase II Pending`.
 
 Preview `--finalize-readiness=<runId> --manifest=<local manifest>` read-only.
@@ -168,10 +168,9 @@ The next finalization verifies the package first and only then plans a fresh
 attempt with the current ETag. An already-true
 readiness flag cannot be reset or its unexpected effects approved this way. Local code/tests do not authorize Production fixture writes or emails.
 
-The new fingerprint requires migration 094 before this branch can operate on a
-managed ledger. Apply through `ledger:apply`, never the app database runner, on BOTH operational ledgers in an owner-approved Factory maintenance window
-before merge/deployment; this fingerprint gates every Factory mode. The old
-deployment may reject new extra schema until promotion. Do not bypass the guard. No managed schema was changed in this build.
+[VERIFIED 2026-11-03 via `apply-ledger-migrations.js` and `check:factory-ledger`] Migration 094 is applied to BOTH managed operational ledgers; each matches the branch 054+058+094 fingerprint. Justin accepted interruption of the currently deployed Factory create/advance/status actions while merge/deployment remain held. The old deployment rejects the extra schema until compatible code is promoted. Do not bypass the guard. Future ledger migrations use `ledger:apply`, never the app database runner.
+
+[VERIFIED 2026-11-03 bounded CLI test] Prepared Request **1003456** (run `c2da75d4-a737-4d81-8db1-96aca62e12a6`) is retained unready at `verify` / `needs_attention`. All seven copies passed, but the Foundation protected projection changed; read-only recheck confirms it and audit access returned 403. No phase advancement or readiness stamp ran. Do not bypass or replace the baseline. See the [live receipt](plans/evidence/test-request-factory/j27-prepared-live-proof-2026-11-03.md).
 
 Use the finalization preview to inspect readiness journal status; ordinary
 `--run-inspect` still shows the existing run/resource history, not readiness

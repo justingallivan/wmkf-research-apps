@@ -1,6 +1,6 @@
 # Finish the J27 Test Request Factory
 
-Status: **IMPLEMENTED ON REVIEW BRANCH; local checks and Fable reviews passed. Managed migration and live proof remain pending.**
+Status: **IMPLEMENTED ON REVIEW BRANCH; local checks and Fable reviews passed. Migration 094 is applied to both managed ledgers; bounded live proof stopped at the Foundation protection guard; release remains held.**
 Owner: Codex. Date: 2026-11-02 Pacific.
 Boundary: finish the Factory for reviewer testing; broader PD workflow stays deferred.
 
@@ -91,10 +91,11 @@ Factory destination.
    Boolean readback and sanitized error. The operation is owner CLI only, with
    read-only preview and explicit confirmation; no new HTTP route. The managed ledger migration must be applied to BOTH operational ledgers
    before deploying this fingerprint; it affects every Factory mode, not only
-   finalization. Hold merge/deployment until the owner authorizes a coordinated
-   Factory maintenance window. Old code may reject the new extra schema until
-   promotion; do not bypass the guard. No live schema application is authorized
-   by this implementation task.
+   finalization. [VERIFIED 2026-11-03 via the ledger runner and fingerprint check]
+   Justin authorized and completed migration 094 on both managed ledgers, accepting
+   interruption of the old deployed Factory. Merge/deployment remain held by
+   owner instruction; the old code rejects the extra schema until compatible
+   code is promoted. Do not bypass the guard.
    Validate readiness update-ability from live metadata. Refuse already-true
    readiness unless a dispatched/applied/completed journal proves this operation.
    Observe jobs and census effects after readiness, rather than assuming no reaction.
@@ -146,8 +147,9 @@ Deferred: submitted-stage fixtures, triggering Power Automate and verifying its
 intake assembly/AI pipeline, broader PD dashboard/state workflow, and real-request
 readiness editing. The Power Automate entry trigger is no longer a blocker to
 this increment. A suitable source and bounded required-package checklist remain
-necessary. This plan records design authorization, not permission to execute
-Production writes or send reviewer communications.
+necessary. The plan alone does not authorize Production writes or reviewer communications.
+Justin separately authorized the 2026-11-03 bounded fixture test recorded below;
+reviewer sends remain outside that scope.
 
 Planning review: Claude Fable returned READY WITH NAMED CHANGES; this revision
 incorporates its sequence, journal, compatibility, metadata and UI corrections.
@@ -171,4 +173,4 @@ preview diagnostics are implemented. Fable reviewed the plan and code; every
 blocking finding and the bounded recovery/inspection corrections are closed.
 [Final Fable receipt](evidence/test-request-factory/j27-prepared-fable-final-review-2026-11-02.md).
 [Whole-flow evidence](evidence/test-request-factory/j27-prepared-implementation-2026-11-02.md).
-This is not a claim that migration 094 is applied or that a live fixture passed.
+[VERIFIED 2026-11-03 via the ledger migration runner and `check:factory-ledger`] Migration 094 is applied to both managed ledgers, and both match the 054+058+094 fingerprint. Live fixture acceptance is blocked: test Request 1003456 copied all seven documents but stopped at final clone verification because the protected Foundation projection changed. Read-only recheck confirms the mismatch; audit read returned 403. Neither phase advancement nor readiness finalization ran. [Live receipt](evidence/test-request-factory/j27-prepared-live-proof-2026-11-03.md).
