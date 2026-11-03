@@ -9,6 +9,13 @@ const sessions = [
 const response = (data, ok = true) => ({ ok, json: async () => data });
 const detail = (id, title) => ({ session: { sessionId: id }, slots: [{ wmkf_deliberationslotid: id, wmkf_minutes: 30, wmkf_Request: { akoya_requestnum: '123456', akoya_title: title } }] });
 
+// The default preview depends on upcoming/past ordering. Pin the clock
+// before the first session without faking the timers used by async UI assertions.
+beforeEach(() => {
+  jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-11-03T17:00:00Z'));
+});
+afterEach(() => jest.restoreAllMocks());
+
 test('same-day sessions remain distinct, status/location search is explicit, and opening retains context', async () => {
   global.fetch = jest.fn(async (url) => response(detail(url.split('/').pop(), 'Actual agenda title')));
   render(<Sessions sessions={sessions} cycleCode="D26" programId="research" />);
@@ -49,4 +56,18 @@ test('empty, loading and failed lists never treat an absent selection as loaded 
   expect(screen.getByText(/No sessions have been scheduled/)).toBeInTheDocument();
   view.rerender(<Sessions sessions={[]} error="offline" onRetry={() => {}} />);
   expect(screen.getByRole('alert')).toHaveTextContent('Sessions could not be loaded');
+});
+
+test('after both sessions pass, the latest session is previewed and the earlier session remains selectable', async () => {
+  Date.now.mockReturnValue(Date.parse('2026-11-04T00:00:00Z'));
+  global.fetch = jest.fn(async (url) => {
+    const id = url.split('/').pop();
+    return response(detail(id, `${id} agenda`));
+  });
+  render(<Sessions sessions={sessions} />);
+  expect(await screen.findByText('second agenda')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /1:00 PM PST/ })).toHaveAttribute('aria-pressed', 'true');
+  fireEvent.click(screen.getByRole('button', { name: /10:00 AM PST/ }));
+  expect(await screen.findByText('first agenda')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /10:00 AM PST/ })).toHaveAttribute('aria-pressed', 'true');
 });
