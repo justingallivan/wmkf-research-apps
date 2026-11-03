@@ -2,7 +2,7 @@
 
 Status: **PLAN — NOT BUILT; OWNER DECISIONS D1–D3 TAKEN 2026-11-03; REVISED
 SAME DAY AFTER TWO CODEX ADVERSARIAL REVIEWS (D2 rule replaced, see §3 — owner
-to confirm); third Codex review pending.** Session 662,
+to confirm); THIRD CODEX REVIEW APPROVED THE PLAN.** Session 662,
 Claude, 2026-11-03, plan written on `claude/per-reminder-history-plan` from
 `main` `a66e09091`. Queue entry: `docs/CURRENT_WORK_QUEUE.md` item 7
 "Per-reminder audit trail for reviewer follow-up (Activity history)" (J27 item,
@@ -370,6 +370,13 @@ written only for invited rows (§2), so §3's invariant no longer depends on the
 send paths. (2) Medium: `Promise.race` bounded the wait, not the query → the
 store cancels the fetch with an abort signal and a per-invocation breaker caps
 outstanding work (§2).
+
+**Codex adversarial review 3 (2026-11-03): approve, no material findings.**
+Approval is for the plan, not implementation. Build notes it gave, now part of
+the plan: (a) breaker state is request-local, created per sweep run, per
+send-emails batch, per manual reminder and per listing, and never held in
+module-level state across warm invocations; (b) the store uses a direct Neon
+client on `POSTGRES_URL` for per-query cancellation.
 
 ## Scope
 
