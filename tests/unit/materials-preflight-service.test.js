@@ -82,3 +82,62 @@ test('a successful complete listing with no matching canonical file is verified 
   listReviewerMaterialsWithAvailability.mockResolvedValueOnce({ files: [], unavailable: false });
   await expect(materialsPreflight({ requestId: REQ })).resolves.toEqual({ ok: true, fileCount: 0 });
 });
+
+// Exercise the actual error classification and exact-file policy. Only Graph
+// and bucket discovery are replaced; the service consumes the real projection.
+function useRealListing({ primaryFiles, primaryError, archiveError }) {
+  const actual = jest.requireActual('../../lib/external/reviewer-materials');
+  listReviewerMaterialsWithAvailability.mockImplementationOnce((requestId, requestNumber) => (
+    actual.listReviewerMaterialsWithAvailability(requestId, requestNumber, {
+      getRequestSharePointBuckets: async () => [
+        { library: 'primary', folder: 'fixture', source: 'dynamics' },
+        ...[1, 2, 3].map((n) => ({ library: `archive${n}`, folder: 'fixture', source: 'archive' })),
+      ],
+      listFiles: async (library) => {
+        if (library === 'primary') {
+          if (primaryError) throw primaryError;
+          return primaryFiles;
+        }
+        if (archiveError) throw archiveError;
+        return [canonical];
+      },
+    })
+  ));
+  getById.mockResolvedValueOnce({ akoya_requestid: REQ, akoya_requestnum: 'R-1001' });
+}
+const canonical = { name: 'Proposal_R-1001.pdf', folder: 'fixture/Reviewer Materials' };
+const absentArchive = () => Object.assign(new Error('expected missing archive'), { code: 'graph_folder_not_found', status: 404 });
+
+test('canonical file plus three expected missing archives is available without exposing internal/wrong-request files', async () => {
+  useRealListing({ primaryFiles: [canonical,
+    { name: 'Research Phase I Application_timestamp.pdf', folder: 'fixture/Reviewer Materials' },
+    { name: 'Proposal_R-9999.pdf', folder: 'fixture/Reviewer Materials' },
+    { ...canonical, folder: 'fixture/Phase II' },
+  ], archiveError: absentArchive() });
+  await expect(materialsPreflight({ requestId: REQ })).resolves.toEqual({ ok: true, fileCount: 1 });
+});
+
+test('expected missing archives with no canonical file remains verified empty', async () => {
+  useRealListing({ primaryFiles: [
+    { name: 'Research Phase I Application_timestamp.pdf', folder: 'fixture/Reviewer Materials' },
+  ], archiveError: absentArchive() });
+  await expect(materialsPreflight({ requestId: REQ })).resolves.toEqual({ ok: true, fileCount: 0 });
+});
+
+test.each([
+  { status: 403 }, { status: 429 }, { status: 500 }, { status: 404 },
+])('archive failure %j still blocks when a canonical PDF is present', async (props) => {
+  useRealListing({ primaryFiles: [canonical], archiveError: Object.assign(new Error('archive failure'), props) });
+  await expect(materialsPreflight({ requestId: REQ })).resolves.toEqual({ ok: false, reason: 'materials_unavailable' });
+});
+
+test('missing tracked Dynamics bucket still blocks even with the canonical PDF in an archive', async () => {
+  useRealListing({ primaryError: absentArchive() });
+  await expect(materialsPreflight({ requestId: REQ })).resolves.toEqual({ ok: false, reason: 'materials_unavailable' });
+});
+
+test.each([undefined, null, {}, '', 'archive'])('unavailable with missing/malformed source classification %j stays closed', async (unavailableSources) => {
+  getById.mockResolvedValueOnce({ akoya_requestid: REQ, akoya_requestnum: 'R-1001' });
+  listReviewerMaterialsWithAvailability.mockResolvedValueOnce({ files: [canonical], unavailable: true, unavailableSources });
+  await expect(materialsPreflight({ requestId: REQ })).resolves.toEqual({ ok: false, reason: 'materials_unavailable' });
+});
