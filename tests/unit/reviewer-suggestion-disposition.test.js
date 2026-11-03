@@ -397,6 +397,9 @@ describe('restore scope guard (Codex S285 review High)', () => {
     expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
   });
 
+  // Per-reminder history (reviewer_reminder_events) is scoped to one engagement
+  // only because invited rows are never reset; keep these cases
+  // (docs/plans/PER_REMINDER_HISTORY_PLAN_2026-11-03.md §3).
   test.each([
     ['invited, never answered (a legacy removal)', { wmkf_invited: true }],
     ['invitation sent stamp only', { wmkf_emailsentat: '2026-07-01T00:00:00Z' }],

@@ -176,6 +176,9 @@ no acting-user field. Historical findings and Phase 2/3 gates:
   `docs/plans/REVIEWER_FOLLOW_UP_POLISH_HANDOFF_2026-09-06.md`. **Open product to-do:** the
   reviewer record stores only cumulative `reminderCount` plus the latest `reminderSentAt`, so the
   drawer shows the latest reminder and "N reminders recorded in total"; a per-reminder audit trail
-  plus an activity DTO projection needs its own `/contract-reconcile` plan before build. Do not read
+  plus an activity DTO projection needs its own `/contract-reconcile` plan before build (plan
+  `docs/plans/PER_REMINDER_HISTORY_PLAN_2026-11-03.md`; source-built on branch
+  `claude/per-reminder-history` 2026-11-03, not merged; Atlas
+  `docs/atlas/postgres-reviewer-reminder-events.md`). Do not read
   `reminderCount` as evidence of individual reminder timestamps.
 <!-- end-source-lines: 2099-2119 -->

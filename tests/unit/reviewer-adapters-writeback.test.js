@@ -236,6 +236,9 @@ describe('reviewer-suggestion.ensureStaffManualCandidate — source union + excl
     for (const field of ENGAGEMENT_STAMP_RESET_FIELDS) expect(payload).not.toHaveProperty(field);
   });
 
+  // Per-reminder history (reviewer_reminder_events) is scoped to one engagement
+  // only because invited rows are never reset; keep these cases
+  // (docs/plans/PER_REMINDER_HISTORY_PLAN_2026-11-03.md §3).
   test.each([
     ['only an invitation-sent stamp', { wmkf_emailsentat: '2026-07-02T00:00:00Z' }],
     ['only a terminal review status', { wmkf_reviewstatus: 100000006 }],

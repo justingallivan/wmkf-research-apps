@@ -222,6 +222,10 @@ jest.mock('../../lib/services/program-director-resolver', () => ({
 }));
 
 const fetchAnswersBySuggestion = jest.fn(async () => ({}));
+// Per-reminder history (PER_REMINDER_HISTORY_PLAN_2026-11-03): no rows.
+jest.mock('../../lib/services/reviewer-engagement/reminder-events-store', () => ({
+  readReminderHistory: async () => new Map(),
+}));
 jest.mock('../../lib/services/review-answers', () => ({
   __esModule: true,
   fetchAnswersBySuggestion: (...a) => fetchAnswersBySuggestion(...a),
@@ -498,6 +502,7 @@ describe('getReviewers — characterization', () => {
               canRemove: false,
               respondReminderSentAt: null,
               responseReceivedAt: '2026-06-22T14:30:00Z',
+              reminderHistory: [],
               withdrawnSufficientAt: null,
               endedBy: null,
               declineReason: null,
@@ -559,6 +564,7 @@ describe('getReviewers — characterization', () => {
               canRemove: false,
               respondReminderSentAt: '2026-07-01T00:00:00Z',
               responseReceivedAt: '2026-06-23T10:00:00Z',
+              reminderHistory: [],
               withdrawnSufficientAt: null,
               endedBy: null,
               declineReason: null,
@@ -617,6 +623,7 @@ describe('getReviewers — characterization', () => {
               canRemove: false,
               respondReminderSentAt: null,
               responseReceivedAt: null,
+              reminderHistory: [],
               withdrawnSufficientAt: null,
               endedBy: null,
               declineReason: null,
@@ -736,6 +743,7 @@ describe('getReviewers — characterization', () => {
               canRemove: false,
               respondReminderSentAt: null,
               responseReceivedAt: null,
+              reminderHistory: [],
               withdrawnSufficientAt: null,
               endedBy: null,
               declineReason: null,

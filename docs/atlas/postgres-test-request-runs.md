@@ -3,7 +3,7 @@ title: Test Request Factory Run Ledger
 domain: test-request-factory
 kind: atlas
 status: active
-summary: "Durable test Request ledger, written by the owner-run CLI and, since 2026-10-02, by the deployed admin form in Production. Current copy: managed Neon ledgers (054 + 058 + 094 verified 2026-11-03; operational data loaded 2026-09-30) behind a tracked host registry and schema fingerprint check. Shared Production app DB has 054 + 058 tables (empty; never the ledger); Preview unverified."
+summary: "Durable test Request ledger, written by the owner-run CLI and, since 2026-10-02, by the deployed admin form in Production. Current copy: managed Neon ledgers (054 + 058 + 094 verified 2026-11-03; operational data loaded 2026-09-30) behind a tracked host registry and schema fingerprint check. Shared Production app DB has 054 + 058 + 094 tables (empty; never the ledger; 094 added 2026-11-03); Preview unverified."
 canonical: false
 cataloged: 2026-09-23
 last_verified: 2026-11-03
@@ -24,6 +24,16 @@ Tables: `test_request_runs`, `test_request_run_resources`,
 `test_request_cast_slot_bindings`, and `test_request_readiness_finalizations`.
 [VERIFIED 2026-11-03 via the ledger migration runner and fingerprint check]
 Migration 094 is applied to both managed ledgers (`ledger_prod` and `ledger`).
+[VERIFIED 2026-11-03 via read-only `schema_migrations` and `to_regclass` readback]
+It is also applied to the shared Production app database (owner-run
+`node scripts/apply-migrations.js`, tracker `applied_at`
+2026-11-03T23:18:49Z), keeping the existing convention that the app database
+carries the Factory ledger tables (as with 054 and 058) as empty schema, never
+as the ledger. The app runner `scripts/apply-migrations.js` applies every
+numbered migration, ledger-only ones included; the "Operational Factory
+ledger only" header in the 094 SQL describes where its data lives, not which
+databases receive the schema. The SQL file is left unchanged because the
+ledger runner checks migration-file checksums (Codex, 2026-11-03).
 
 **Where the ledger lives (2026-09-30, S553; `docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md`).** The operational ledger for production test Requests has lived only in `ledger_prod` inside the `wmkf-ledger-pg` Docker container on the owner's home Mac (sandbox counterpart `ledger`), hand-built and never dumped [VERIFIED S553: the office Mac holds no `ledger_prod`]. Owner decision D1 moved it to Neon project `wmkf-factory-ledger` (Vercel Marketplace, connected to no Vercel project, us-east-1), databases `ledger_prod` and `ledger`, with 054 + 058 applied and the local tracker `ledger_schema_migrations` recording 054; the home-Mac operational data was loaded into both on 2026-09-30 and the managed ledger is now the current copy [VERIFIED via `docs/plans/evidence/test-request-factory/ledger-snapshot-2026-09-30.md`]. Merged in PR #374: `lib/db/ledger-registry.js` is the tracked host allowlist the CLI's `requireLedgerUrl(target)` enforces (managed host requires `ledger_prod` for `--target=production`, `ledger` otherwise; the app's `POSTGRES_URL` is always refused), `lib/db/ledger-schema.js` + `lib/db/ledger-schema-fingerprint.json` are the structural schema check every ledger-driven CLI mode runs first (`check:factory-ledger` gate, `--ledger-check`), and `scripts/apply-ledger-migrations.js` is the ledger's own migration runner. Connection strings are `.env.local` variables for the CLI; since 2026-10-02 the production URL is also a hand-set Vercel Production variable for the admin form (`docs/CREDENTIALS_RUNBOOK.md`; see *Second writer: the deployed admin form*).
 

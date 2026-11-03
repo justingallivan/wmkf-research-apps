@@ -2,7 +2,9 @@
  * Reviewer activity history — Phase 1, derived from current record state.
  *
  * Every event here is computed at read time from lifecycle stamps already on the
- * reviewer suggestion. Nothing is materialized and nothing is backfilled: re-added
+ * reviewer suggestion, except dated reminders, which also come from the
+ * per-reminder history rows described at `reminderHistoryEvents` below.
+ * Nothing else is materialized and nothing is backfilled: re-added
  * reviewers have had those stamps cleared by `ENGAGEMENT_STAMP_RESET_ENTRIES`
  * (`lib/dataverse/adapters/reviewer-suggestion.js:887-908`). The request-scoped
  * meetingDate used for no-response attribution is a deliberate exception, while
@@ -45,7 +47,9 @@
  *   in the repository ever writes a value to it — `reviewer-suggestion.js:1957` only
  *   ever nulls it. An event derived from it could never fire.
  *
- * Every event timestamp used below IS in `ENGAGEMENT_STAMP_RESET_ENTRIES`. The
+ * Every event timestamp used below IS in `ENGAGEMENT_STAMP_RESET_ENTRIES`, except
+ * reminder history rows, which are engagement-scoped by a different rule (they
+ * exist only for invited rows, and invited rows are never reset). The
  * request-scoped meeting date is not an event timestamp and is used only for
  * attribution. Auxiliary fields that survive reset must never be used to strengthen
  * an event's provenance.
@@ -407,6 +411,65 @@ export function currentTerminalStatus(reviewer) {
   };
 }
 
+/**
+ * Per-reminder history (docs/plans/PER_REMINDER_HISTORY_PLAN_2026-11-03.md §4).
+ * `reviewer.reminderHistory` comes from Postgres `reviewer_reminder_events` via
+ * `getReviewers`: an array of `{ kind, recordedAt }`, or null when the read
+ * failed. Those rows survive the engagement reset, which is safe only because
+ * they are written for invited rows alone and invited rows are never reset
+ * (`reviewer-suggestion.js` `restore` / staff re-select). When the array is
+ * present each reminder gets its own dated event; when it is null the single
+ * latest-stamp event and its total-count detail are shown exactly as before.
+ */
+const REMINDER_HISTORY_KIND_BY_EVENT = Object.freeze({
+  respond_reminder: 'respond',
+  review_reminder: 'review_due',
+});
+
+// A Dataverse stamp may be stored without milliseconds; a history row within
+// this window of the current stamp is the same reminder.
+const STAMP_MATCH_WINDOW_MS = 1000;
+
+function reminderHistoryEvents(descriptor, reviewer) {
+  const kind = REMINDER_HISTORY_KIND_BY_EVENT[descriptor.key];
+  const dated = [];
+  for (const entry of reviewer.reminderHistory) {
+    if (entry?.kind !== kind) continue;
+    const timestamp = parseTime(entry.recordedAt);
+    if (timestamp === null) continue;
+    dated.push({ at: entry.recordedAt, timestamp });
+  }
+  // The current stamp is its own event only when no row matches it: a
+  // reminder sent before history was kept, or a history write that failed.
+  const stampRaw = reviewer[descriptor.field];
+  const stampTime = parseTime(stampRaw);
+  if (stampTime !== null
+      && !dated.some((entry) => Math.abs(entry.timestamp - stampTime) < STAMP_MATCH_WINDOW_MS)) {
+    dated.push({ at: stampRaw, timestamp: stampTime });
+  }
+  dated.sort((a, b) => a.timestamp - b.timestamp);
+
+  // Review-due reminders also carry a count. Reminders counted but not dated
+  // are shown as one undated line on the oldest dated reminder; no date is
+  // ever derived from the count.
+  const count = Number.isInteger(reviewer.reminderCount) ? reviewer.reminderCount : 0;
+  const undated = kind === 'review_due' ? count - dated.length : 0;
+
+  return dated.map((entry, index) => ({
+    key: descriptor.key,
+    id: `${descriptor.key}:${entry.timestamp}:${index}`,
+    label: descriptor.label,
+    at: entry.at,
+    timestamp: entry.timestamp,
+    deliveryProven: descriptor.deliveryProven,
+    unprovenNote: UNPROVEN_DELIVERY_NOTE,
+    order: descriptor.order,
+    detail: index === 0 && undated > 0
+      ? `${undated} earlier reminder${undated === 1 ? '' : 's'} recorded without a date`
+      : null,
+  }));
+}
+
 function parseTime(value) {
   if (!value) return null;
   const ms = new Date(value).getTime();
@@ -420,13 +483,19 @@ function parseTime(value) {
  * absent stamps are both dropped — a malformed date is not evidence of an event.
  *
  * @param {object} reviewer - a reviewer DTO row from `reviewers-service.js`
- * @returns {Array<{key, label, at, timestamp, deliveryProven, detail}>}
+ * @returns {Array<{key, id, label, at, timestamp, deliveryProven, detail}>}
+ *   `key` is the event type; `id` is unique per event (reminders can repeat).
  */
 export function buildActivityHistory(reviewer) {
   if (!reviewer) return [];
 
   const events = [];
+  const hasReminderHistory = Array.isArray(reviewer.reminderHistory);
   for (const descriptor of EVENT_DESCRIPTORS) {
+    if (hasReminderHistory && REMINDER_HISTORY_KIND_BY_EVENT[descriptor.key]) {
+      events.push(...reminderHistoryEvents(descriptor, reviewer));
+      continue;
+    }
     if (descriptor.key === 'review_due_extended' && !reviewer.reviewDueDateOverride) continue;
     if (descriptor.key === 'ended'
         && parseTime(reviewer[ENDED_AT_COVERED_BY[reviewer.reviewStatus]]) !== null) continue;
@@ -454,6 +523,7 @@ export function buildActivityHistory(reviewer) {
 
     events.push({
       key: descriptor.key,
+      id: descriptor.key,
       label: resolvedEvidence?.label || descriptor.label,
       at: raw,
       timestamp,

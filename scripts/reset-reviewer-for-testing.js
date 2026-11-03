@@ -10,6 +10,11 @@
  *   3. PATCH the suggestion row back to { selected:true, invited:false } with every
  *      lifecycle/response/token/review field cleared.
  *   4. PATCH the person row to clear the 3 board-identity fields (rank/dept/institution).
+ *   5. DELETE the suggestion's per-reminder history rows (Postgres
+ *      `reviewer_reminder_events`). The app never resets an invited reviewer and
+ *      relies on that to keep reminder history inside one engagement; this test
+ *      tool does reset one, so it must clear that history itself
+ *      (docs/plans/PER_REMINDER_HISTORY_PLAN_2026-11-03.md §3, W4).
  * Leaves the core person + contact identity (name/email) intact so it's reusable.
  * Clears the honorarium-request LOOKUP on the suggestion (so a live-mode test row
  * isn't treated as already-onboarded) but does NOT delete an akoya_request row.
@@ -58,6 +63,7 @@ const suggestionAdapter = await import('../lib/dataverse/adapters/reviewer-sugge
 const potentialReviewerAdapter = await import('../lib/dataverse/adapters/potential-reviewer.js');
 const draftMod = await import('../lib/services/review-draft-service.js');
 const ReviewDraftService = draftMod.default || draftMod;
+const { sql } = await import('@vercel/postgres');
 
 const SUGG_ENTITY = 'wmkf_appreviewersuggestions';
 const PERSON_ENTITY = 'wmkf_potentialreviewerses';
@@ -169,6 +175,12 @@ await bypassDynamicsRestrictions('reset-reviewer-for-testing', async () => {
   });
   console.log(`Review-answer rows to delete: ${answers.length}`);
 
+  // ── Per-reminder history rows (Postgres) ──
+  const reminderHistoryCount = Number((await sql`
+    SELECT COUNT(*)::int AS n FROM reviewer_reminder_events WHERE suggestion_id = ${suggestionId}
+  `).rows[0]?.n || 0);
+  console.log(`Reminder history rows to delete: ${reminderHistoryCount}`);
+
   // ── Optional: AI review-synthesis memo on the parent request ──
   const requestId = suggestion._wmkf_request_value;
   let synthesisBefore = null;
@@ -216,6 +228,9 @@ await bypassDynamicsRestrictions('reset-reviewer-for-testing', async () => {
     console.warn(`  draft delete non-fatal: ${e.message || e}`); return null;
   });
   console.log(`Draft deleted: ${draftDeleted ?? 'n/a'}`);
+
+  const historyDeleted = await sql`DELETE FROM reviewer_reminder_events WHERE suggestion_id = ${suggestionId}`;
+  console.log(`Deleted ${historyDeleted.rowCount ?? 0} reminder history row(s).`);
 
   if (CLEAR_SYNTHESIS) {
     await DynamicsService.updateRecord(REQUESTS_ENTITY, requestId, { wmkf_reviewsynthesisjson: null });
