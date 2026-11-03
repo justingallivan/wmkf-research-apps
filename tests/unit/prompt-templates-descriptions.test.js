@@ -1,11 +1,17 @@
 /** @jest-environment jsdom */
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import PromptTemplatesSection from '../../shared/components/admin/PromptTemplatesSection';
 import { ADMIN_PROMPT_CATALOG } from '../../shared/config/adminPromptCatalog';
 
 jest.mock('../../shared/components/admin/DataverseFieldInfoButton', () => function FieldInfo() {
   return <span data-testid="field-info" />;
 });
+let mockDndHandlers;
+jest.mock('@hello-pangea/dnd', () => ({
+  DragDropContext: ({ children, ...handlers }) => { mockDndHandlers = handlers; return children; },
+  Droppable: ({ children }) => children({ innerRef: () => {}, droppableProps: {}, placeholder: null }),
+  Draggable: ({ children, draggableId }) => children({ innerRef: () => {}, draggableProps: { 'data-drag-id': draggableId }, dragHandleProps: { tabIndex: 0, role: 'button' } }, { isDragging: false, isDropAnimating: false }),
+}));
 
 const response = data => ({ ok: true, status: 200, json: async () => data });
 const prompt = (name, hasCurrent = true) => ({
@@ -343,17 +349,21 @@ describe('Manage groups', () => {
     });
   }
 
-  test('adds a group after a chosen group, reorders, and saves the whole list', async () => {
+  test('adds a group at the end, drags it into place, and saves the whole list', async () => {
     serveWithGroups(response({ status: 'groups_saved' }));
     await renderOpenWorkflows();
     fireEvent.click(screen.getByRole('button', { name: 'Manage groups' }));
     const panel = screen.getByRole('region', { name: 'Manage groups' });
+    expect(within(panel).queryByLabelText('Place after')).toBeNull();
+    expect(within(panel).getByRole('list', { name: 'Fixed groups' })).toHaveTextContent('Uncataloged prompts');
     const save = within(panel).getByRole('button', { name: 'Save groups' });
     expect(save).toBeDisabled();
     fireEvent.change(within(panel).getByLabelText('New group'), { target: { value: 'Grant reporting' } });
-    fireEvent.change(within(panel).getByLabelText('Place after'), { target: { value: 'preflight' } });
     fireEvent.click(within(panel).getByRole('button', { name: 'Add' }));
-    fireEvent.click(within(panel).getByRole('button', { name: 'Move Grant reporting down' }));
+    const rows = within(panel).getByRole('list', { name: 'Prompt groups' }).querySelectorAll('[data-drag-id]');
+    expect(rows[rows.length - 1].getAttribute('data-drag-id')).toBe('grant-reporting');
+    expect(within(panel).getByRole('button', { name: 'Drag Grant reporting to reorder' })).toBeInTheDocument();
+    act(() => mockDndHandlers.onDragEnd({ source: { index: rows.length - 1 }, destination: { index: 2 } }));
     expect(save).toBeEnabled();
     fireEvent.click(save);
     await screen.findByText('Groups saved.');
