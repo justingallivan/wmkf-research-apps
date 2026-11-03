@@ -1,7 +1,8 @@
 # Per-reminder history for reviewer follow-up
 
-Status: **PLAN — NOT BUILT; OWNER DECISIONS D1–D3 TAKEN 2026-11-03 (all as
-recommended); Codex plan review pending.** Session 662,
+Status: **PLAN — NOT BUILT; OWNER DECISIONS D1–D3 TAKEN 2026-11-03; REVISED
+SAME DAY AFTER CODEX ADVERSARIAL REVIEW (D2 rule replaced, see §3 — owner to
+confirm); second Codex review pending.** Session 662,
 Claude, 2026-11-03, plan written on `claude/per-reminder-history-plan` from
 `main` `a66e09091`. Queue entry: `docs/CURRENT_WORK_QUEUE.md` item 7
 "Per-reminder audit trail for reviewer follow-up (Activity history)" (J27 item,
@@ -62,7 +63,7 @@ The drawer only shows events from the reviewer's **current** engagement. Every
 event timestamp is a stamp in `ENGAGEMENT_STAMP_RESET_ENTRIES`, so a
 remove-and-re-add clears it [VERIFIED via `reviewer-activity-history.js:44-48`;
 `lib/dataverse/adapters/reviewer-suggestion.js:940-965`]. Rows in a new table
-would survive that reset, so the plan needs its own fence (below).
+survive that reset, so §3 states why they cannot cross engagements.
 
 ## Proposed design
 
@@ -103,48 +104,79 @@ would rely on recipient address and editable subjects.
 
 ### 2. Write rules
 
-- **W1/W2 (`sendOneReminder`).** Insert the row **after** the Dataverse claim
-  succeeds and **before** the send. A 412 or other claim failure writes no row,
-  so no phantom entry. If the insert fails, log it and still send. The
-  reminder is the deliverable; the drawer's count line (rule 4 below) shows the
-  gap honestly for review-due. One edit covers manual and cron sends.
-- **W3 (follow-up email).** Insert the row inside `recordDeliveredEmail`'s
+- **W1/W2 (`sendOneReminder`).** Write the row only after the Dataverse claim
+  succeeds, and only **after the send attempt** (in both the success and the
+  failure branch, since the claim already happened). A 412 or other claim
+  failure writes no row, so no phantom entry. The history write is never on
+  the path to the email: a slow or failed database cannot stop a reminder that
+  has already been claimed (Codex review finding 2; the claim is never rolled
+  back, `reviewer-reminder-sweep.js:442-458`, `:503-505`). One edit covers
+  manual and cron sends.
+- **W3 (follow-up email).** Write the row inside `recordDeliveredEmail`'s
   `followup` branch, only after `updateLifecycle` succeeds, with
   `recorded_at = sentAt`. When the bookkeeping write throws (row closed, binding
   changed, three 412s), no row is written. That matches the count, which also
-  does not increment. Insert failure: log, do not throw (the email already went
-  out).
+  does not increment. The email has already gone out by then.
+- **Bounded, fail-soft.** Every history insert and the listing read run under a
+  short deadline (2 seconds, a code constant) via `Promise.race`. On timeout or
+  error the caller logs and carries on: the insert result is treated as unknown
+  (a late insert that still lands is correct, because the reminder was claimed),
+  and the read returns `null`. Nothing a reminder or the reviewer list depends
+  on waits longer than the deadline.
 - Inserts use `ON CONFLICT DO NOTHING` on the unique key.
 - A new small store module, `lib/services/reviewer-engagement/reminder-events-store.js`
   (insert + batch read), mirrors `materials-release-store.js`.
+- **W4 (test tool).** `scripts/reset-reviewer-for-testing.js` resets an invited
+  test reviewer to never-invited, clearing all three reminder fields
+  (`:70-82`). With `--commit` it must also delete that suggestion's history
+  rows, alongside the child rows it already deletes, so a reused test reviewer
+  starts with empty history.
 
 ### 3. Engagement fence (D2)
 
-**[OWNER DECISION 2026-11-03: as recommended.]** a row is in scope only when `recorded_at >= emailSentAt` of
-the current row; when `emailSentAt` is empty, no rows are in scope.
+**[REVISED 2026-11-03 after Codex review; owner to confirm.]** The first rule
+(rows count only from the current invitation date) is withdrawn. Codex showed
+Review Manager can re-send an invitation to a reviewer who already accepted
+(`allowResend` skips only the duplicate check,
+`lib/services/review-manager/send-emails-service.js:876`;
+`lib/utils/reviewer-invite.js:24-26`). The re-send moves `emailSentAt` forward
+through `recordDeliveredInvitation` (`:1360`) without clearing review-due
+reminders, so that rule would have hidden real history.
 
-- A re-added reviewer has `emailSentAt` cleared and later set by the new
-  invitation, so rows from the earlier engagement fall before it and drop out.
-- A re-sent invitation also moves `emailSentAt` forward, hiding respond
-  reminders from the earlier invitation round. That matches today: every
-  invitation already clears `respondReminderSentAt`.
-- **[ASSUMED, verify at build]** An invitation cannot be re-sent to a reviewer
-  who already accepted. The UI offers re-invite only on repair targets
-  (`shared/components/reviewers/ReviewerInvitePanel.js:797-806`). The server's
-  duplicate guard checks only `invited`, not the response
-  (`lib/utils/reviewer-invite.js:24-26`). If the server allows it, an accepted
-  reviewer's review-due rows would be hidden after such a re-send. Fallback
-  if that path is reachable: fence review-due rows on `responseReceivedAt`
-  (also a reset stamp) instead, after confirming every acceptance path sets it.
+**New rule: no date fence. A row belongs to the engagement of its reviewer
+suggestion, and that engagement never resets once the reviewer has been
+invited.**
 
-- **Limitation:** a reviewer whose invitation was recorded outside the app
-  (`wmkf_invited` true, `wmkf_emailsentat` empty) can still be reminded, but
-  their rows are never in scope, so they keep today's display (latest stamp
-  plus count). **[ASSUMED]** such rows are rare; the build counts reminded rows
-  with an empty `emailSentAt` before relying on this rule.
+- Since 2026-10-31 (commit `4b73a6f4c`, owner decision D in
+  `docs/plans/INVITED_REVIEWER_OUTCOMES_PLAN_2026-10-31.md`) both places that
+  apply `ENGAGEMENT_STAMP_RESET` refuse any row that was ever invited or has a
+  recorded outcome: `restore` [VERIFIED via `reviewer-suggestion.js:2766`] and
+  staff manual re-select [VERIFIED via `reviewer-suggestion.js:1012-1013`].
+  Those are the only two uses of the reset constant in `lib/`, `shared/` and
+  `pages/` [VERIFIED via grep].
+- Every reminder needs an earlier invitation (respond: invited and no answer;
+  review-due: accepted). So a suggestion that has any history row can never be
+  reset, and rows cannot leak into a later engagement. The table starts empty
+  at build, so no older row predates this guard.
+- The one exception is the test tool `scripts/reset-reviewer-for-testing.js`,
+  which deletes the rows itself (W4).
+- The build adds a regression test that ties history scoping to that guard:
+  both reset paths refuse an invited row, with a comment at each naming the
+  history dependency, so a future change to the guard fails loudly.
 
-Alternative: an explicit engagement id on the suggestion row. That needs a new
-Dataverse column and a writer at every reset site; not recommended.
+Consequences, all deliberate:
+
+- A re-sent invitation no longer hides anything. Respond nudges from an
+  earlier invitation round stay visible with their own dates, as do reminders
+  on a reviewer whose response was later withdrawn or released (the release
+  clears `respondReminderSentAt`, `withdraw-pending-invitation.js:26-37`, but
+  the reminder did happen).
+- A reviewer invited outside the app (no `emailSentAt`) gets full history too;
+  the earlier limitation is gone.
+
+Alternative considered: an explicit engagement id on the suggestion row. It
+needs a new Dataverse column and a writer at every reset site, and it guards
+against a reset that the 2026-10-31 rule already forbids. Not recommended.
 
 ### 4. Display rule
 
@@ -153,8 +185,7 @@ Dataverse column and a writer at every reset site; not recommended.
 - `null` when the read failed (fail-soft; the reviewer list still loads): the
   drawer behaves exactly as today.
 - `[]` when no rows exist.
-- Otherwise `[{ kind, recordedAt }]`, already filtered by the fence (rule 3) on
-  the server.
+- Otherwise `[{ kind, recordedAt }]` for that suggestion, newest first.
 
 One query per listing: `WHERE suggestion_id = ANY($1)` over the rows the
 listing already returns, so test-request visibility
@@ -163,16 +194,21 @@ inherited, not re-decided.
 
 In `reviewer-activity-history.js`, per kind:
 
-1. One "reminder recorded" event per in-scope row, each with its own date and
+1. One "reminder recorded" event per row, each with its own date and
    the existing "Recorded; send not confirmed" note.
-2. The current Dataverse stamp is also shown as an event when no row matches it
-   (a reminder sent before this change, or an insert that failed). Match at
-   whole-second precision. **[ASSUMED]** Dataverse may drop milliseconds from
-   stored times; the build confirms with one readback.
+2. The current Dataverse stamp is also shown as an event when no row of the
+   same kind lies within one second of it (a reminder sent before this change,
+   or an insert that failed). One second absorbs a stamp stored without
+   milliseconds. **[ASSUMED]** Dataverse may drop milliseconds; the build
+   confirms with one readback and tightens the window to exact match if it
+   does not. W3 can keep a newer stamp written by another send
+   (`record-email-outcome.js:65-67`); that stamp is itself that send's row, so
+   it matches and is not shown twice.
 3. Review-due only: let C be `reminderCount` and E the number of review-due
    events from steps 1–2. If C > E, add one undated line: "N earlier reminders
    recorded without a date". No date is ever invented from the count. If
-   E ≥ C, no line.
+   E ≥ C, no line. Two reminders in the same second are two rows (the unique
+   key keeps milliseconds) and two events.
 4. Respond reminders have no count, so steps 1–2 only.
 
 **D3 — load with the list vs. fetch on open. [OWNER DECISION 2026-11-03: load
@@ -205,17 +241,25 @@ queue's parked item. It does not build toward that branch.
 
 ## Tests
 
-- **Store:** insert, `ON CONFLICT DO NOTHING`, batch read, fence filter.
+- **Store:** insert, `ON CONFLICT DO NOTHING`, batch read; a stalled insert or
+  read resolves at the deadline (fake timers) as unknown / `null`.
 - **W1/W2:** a successful claim writes exactly one row with the claim's
-  timestamp; a 412 writes none; an insert failure still sends.
+  timestamp, after the send, on both send success and send failure; a 412
+  writes none; a stalled or failing insert never delays or prevents the send
+  (the send mock is called before the insert mock).
 - **W3:** a recorded follow-up writes one row with `sentAt`; a closed row or
   binding change writes none; an insert failure does not throw.
-- **DTO:** `reminderHistory` is `null` on read failure, `[]` on no rows; rows
-  before `emailSentAt` are excluded.
-- **Drawer:** three rows give three dated events; a pre-change reviewer with
+- **W4:** the test reset script deletes the suggestion's rows with `--commit`
+  and not on a dry run.
+- **Engagement guard:** `restore` and staff re-select refuse an invited row
+  (pins the scoping rule in §3).
+- **DTO:** `reminderHistory` is `null` on read failure or timeout, `[]` on no
+  rows; rows dated before a re-sent invitation are still returned.
+- **Drawer:** three rows give three dated events; an accepted reviewer whose
+  invitation was re-sent keeps every dated reminder; a pre-change reviewer with
   count 2 and one stamp gives one dated event plus "1 earlier reminder recorded
   without a date"; `null` history matches today's output exactly; a stamp
-  matching a row is not shown twice.
+  matching a row is not shown twice, including a stamp without milliseconds.
 
 ## Durable surfaces
 
@@ -228,8 +272,10 @@ queue's parked item. It does not build toward that branch.
   `docs/atlas/postgres-infra-tables.md` (091 has one [VERIFIED via grep]),
   `check:atlas`.
 - `docs/SERVICE_AND_UTILITY_CATALOG.md` entry and source header for the store.
-- Header comments in `reviewer-activity-history.js` (the engagement fence now
-  has an exception) and `ReviewerActivityDrawer.js`.
+- Header comments in `reviewer-activity-history.js` (reminder events now come
+  from history rows scoped by the no-reset rule, not only from reset stamps)
+  and `ReviewerActivityDrawer.js`; comments at both reset guards.
+- `scripts/reset-reviewer-for-testing.js` header (W4).
 - Agent wiki `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`.
 - No new API route: `docs/API_ROUTE_SECURITY_MATRIX.md` unchanged.
 
@@ -259,23 +305,31 @@ DTO → drawer.
 
 | Audit | Result |
 | --- | --- |
-| 1 Whole-flow | All three writers (W1–W3) and the one reader (`getReviewers` → drawer) traced above. `my-candidates-service.js:304` also projects `respondReminderSentAt` but does not feed the drawer [VERIFIED via grep: the drawer is imported only by `ReviewerManagePanel.js:33`]. |
-| 2 Partial success | Unit of success is one reminder. Rows are written only after the Dataverse write succeeds; insert failure never blocks or fails a send; the count line absorbs a missed review-due row. |
-| 3 Async / stale state | N/A for the drawer: it is unmounted on any row mutation (`ReviewerActivityDrawer.js:12-14`). Server writes are sequential within one send. |
+| 1 Whole-flow | All writers (W1–W3, test tool W4) and the one reader (`getReviewers` → drawer) traced above. `my-candidates-service.js:304` also projects `respondReminderSentAt` but does not feed the drawer [VERIFIED via grep: the drawer is imported only by `ReviewerManagePanel.js:33`]. |
+| 2 Partial success | Unit of success is one reminder. Rows are written only after the Dataverse write succeeds and after the send attempt; insert failure or delay never blocks or fails a send (bounded by the deadline); the count line absorbs a missed review-due row. |
+| 3 Async / stale state | N/A for the drawer: it is unmounted on any row mutation (`ReviewerActivityDrawer.js:12-14`). Server: the insert follows the send; a timed-out insert may land later, which is still a true record of a claimed reminder. |
 | 4 Helper extraction | The store only inserts and reads; it must not decide eligibility or replace the Dataverse claim, which stays the at-most-once guard. |
 | 5 Durable surfaces | Listed above. No route, so `check:api-routes` and route counts are unaffected. |
 | 6 Doc reconcile | Queue item 7, the 2026-09-06 handoff note, the drawer header, Atlas, wiki: at build. |
 | 7 Symbol fan-out | New `kind` values `respond` / `review_due` are read only by the drawer's per-kind rule; an unknown kind is ignored (allowlist). Reviewer merge cannot move rows: merges are blocked when the losing record has any reminder stamp (`lib/services/reviewer-merge.js:35-38`). |
 
-**Verdict: READY WITH NAMED CHANGES**; D1–D3 decided 2026-11-03. Named checks for
-the build: confirm whether an accepted reviewer can be re-invited (fence, rule
-3); confirm Dataverse timestamp precision (display rule 2); recheck the free
-migration number.
+**Verdict: READY WITH NAMED CHANGES**; D1–D3 decided 2026-11-03, D2 revised
+after Codex review (owner to confirm). Named checks for the build: confirm
+Dataverse timestamp precision (display rule 2); recheck the free migration
+number.
+
+**Codex adversarial review 1 (2026-11-03): needs-attention, two findings, both
+addressed.** (1) High: invitation re-send moved `emailSentAt` past review-due
+reminders, breaking the D2 fence → the fence is removed; scoping rests on the
+2026-10-31 no-reset-after-invite guard (§3). (2) Medium: an unbounded insert
+before the irreversible send → the insert moves after the send and every
+history database call is bounded (§2).
 
 ## Scope
 
 - Code: one migration, one small store module, two insert sites, one batch read
-  in `getReviewers`, and the drawer's reminder rule.
+  in `getReviewers`, the drawer's reminder rule, a delete in one test script,
+  and comments at two reset guards.
 - Tests: about five files, mostly extending existing ones.
 - Docs: Atlas page, catalog entry, two component headers, wiki, queue.
 - External: a Production migration apply and an owner-present test-request
