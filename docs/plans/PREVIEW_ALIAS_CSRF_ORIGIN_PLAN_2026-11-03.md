@@ -1,7 +1,6 @@
 # Preview alias CSRF origin fix
 
-Status: **BUILT ON BRANCH `claude/preview-alias-csrf`, NOT MERGED; Preview proof
-pending.** Owner approved D1 (tracked constant) and D2 (Dynamics Explorer chat
+Status: **PRODUCTION-MERGED AND PREVIEW-PROVED 2026-11-03.** PR #620 merged `1f854345e` (test-clock fix PR #619 `1b499663e`); Production deploy of the merge commit succeeded. Preview proof 2026-11-03 (Claude, owner-authorized): alias moved from `dpl_cgM9vNTVdC1DAUMR55ZQSBdt9Nt2` to PR deployment `dpl_Dkz6h6CN7TfcgwKxWYwyPqQYxr6w` (commit `7e59fdde2`), signed in through the alias, `POST /api/dynamics-explorer/chat` with `{"messages": []}` returned HTTP 200 SSE `error` "At least one message is required" (not the CSRF 403); alias restored to `dpl_cgM9vNTVdC1DAUMR55ZQSBdt9Nt2` and verified. Owner approved D1 (tracked constant) and D2 (Dynamics Explorer chat
 empty-message POST) on 2026-11-03. Session 661, Claude, 2026-11-03. Queue entry: `docs/CURRENT_WORK_QUEUE.md` → "Preview CSRF origin
 check rejects alias-hosted POSTs".
 
