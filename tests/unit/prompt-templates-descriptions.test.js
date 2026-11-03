@@ -281,3 +281,36 @@ test('a new search reopens matching workflow sections after a manual collapse', 
   expect(screen.getByText('Pre-flight (1)', { selector: 'summary' }).closest('details')).toHaveAttribute('open');
   expect(screen.getByRole('article', { name: 'Initial Assessment narrative draft' })).toBeVisible();
 });
+
+test('Add prompt: lists placeholders, blocks an existing name, and posts a new prompt', async () => {
+  serve([prompt('phase-i.summary')]);
+  const listFetch = global.fetch;
+  global.fetch = jest.fn(async (url, init = {}) => {
+    if (url === '/api/admin/prompts' && init.method === 'POST') {
+      return response({ status: 'completed', kind: 'create', targetVersion: 1, newPromptId: 'n' });
+    }
+    return listFetch(url, init);
+  });
+  await renderOpenWorkflows();
+  fireEvent.click(screen.getByRole('button', { name: 'Add prompt' }));
+  const form = screen.getByRole('region', { name: 'Add prompt' });
+  const create = within(form).getByRole('button', { name: 'Create and publish v1' });
+  expect(create).toBeDisabled();
+
+  fireEvent.change(within(form).getByLabelText(/^Name/), { target: { value: 'phase-i.summary' } });
+  fireEvent.change(within(form).getByLabelText(/^Title/), { target: { value: 'Budget check' } });
+  fireEvent.change(within(form).getByLabelText(/^Prompt body/), { target: { value: 'Check {{budget_text}} for {{program}}.' } });
+  expect(within(form).getByText(/already exists/)).toBeInTheDocument();
+  expect(create).toBeDisabled();
+  expect(within(form).getByText('budget_text')).toBeInTheDocument();
+  expect(within(form).getByText('program')).toBeInTheDocument();
+
+  fireEvent.change(within(form).getByLabelText(/^Name/), { target: { value: 'grants.budget-check' } });
+  expect(create).toBeEnabled();
+  fireEvent.click(create);
+  await screen.findByText('Prompt created and published as v1.');
+  const post = global.fetch.mock.calls.find(([url, init]) => url === '/api/admin/prompts' && init?.method === 'POST');
+  const sent = JSON.parse(post[1].body);
+  expect(sent).toMatchObject({ name: 'grants.budget-check', catalog: { title: 'Budget check', usage: 'unconnected' }, body: 'Check {{budget_text}} for {{program}}.' });
+  expect(sent.requestId).toEqual(expect.any(String));
+});

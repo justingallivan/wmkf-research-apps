@@ -17,6 +17,7 @@ import { ExecutorBudgetEditor } from './ExecutorBudgetEditor';
 import { TONE, fmtTs, fmtInt, ROW_DEFAULT_MAX_TOKENS } from './prompt-editor-utils';
 import PublishForm from './PromptPublishForm';
 import PromptCatalogForm from './PromptCatalogForm';
+import AddPromptForm from './AddPromptForm';
 import { ADMIN_PROMPT_GROUPS, getAdminPromptDescription, resolveAdminPromptDescription } from '../../config/adminPromptCatalog';
 
 export { ExecutorBudgetEditor };
@@ -48,6 +49,10 @@ const STATUS_COPY = {
   catalog_conflict:      { tone: 'amber', text: 'These details changed since you opened them. Reload and re-apply your edits.' },
   catalog_superseded:    { tone: 'amber', text: 'Details saved, but a new version was published at the same time and does not have them. Reopen the details and save again.' },
   invalid_catalog:       { tone: 'red',   text: 'Those details could not be saved.' },
+  created:               { tone: 'green', text: 'Prompt created and published as v1.' },
+  name_exists:           { tone: 'red',   text: 'A prompt with that name already exists. Use Edit & publish to change it.' },
+  invalid_name:          { tone: 'red',   text: 'That name is not allowed.' },
+  invalid_input:         { tone: 'red',   text: 'The prompt could not be created.' },
 };
 export default function PromptTemplatesSection() {
   const [prompts, setPrompts] = useState(null);
@@ -58,6 +63,8 @@ export default function PromptTemplatesSection() {
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [expandedGroups, setExpandedGroups] = useState({});
+  const [adding, setAdding] = useState(false);
+  const [addOutcome, setAddOutcome] = useState(null);
   const loadGeneration = useRef(0);
 
   const load = () => {
@@ -137,6 +144,34 @@ export default function PromptTemplatesSection() {
       <p className="text-xs text-gray-500 mb-4">
         Edit and publish a new version of a stored prompt. Publishing creates a new immutable version and makes it current. Reviewer-finder prompts are validated against their output parse contract before save.
       </p>
+      {addOutcome && (
+        <div className="mb-4 border rounded-lg overflow-hidden">
+          <OutcomeBanner outcome={addOutcome} onDismiss={() => setAddOutcome(null)} />
+        </div>
+      )}
+      {adding ? (
+        <AddPromptForm
+          existingNames={new Set(prompts.map((prompt) => prompt.name))}
+          modelCatalog={modelCatalog}
+          onCreated={(data) => {
+            setAddOutcome({ ...data, status: data.status === 'completed' ? 'created' : data.status });
+            setAdding(false);
+            load();
+          }}
+          onOutcome={setAddOutcome}
+          onCancel={() => setAdding(false)}
+        />
+      ) : (
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={() => { setAdding(true); setAddOutcome(null); }}
+            className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded hover:bg-gray-800"
+          >
+            Add prompt
+          </button>
+        </div>
+      )}
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700" htmlFor="prompt-search">Search prompts</label>
         <div className="mt-1 flex items-center gap-3">

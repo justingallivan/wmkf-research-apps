@@ -86,6 +86,11 @@ From the branch plan's "Outcome and boundary" section:
   with `invariant_violation_current_count_2` (accepted: superuser-only).
   `404 no_current_row` now means no rows exist for the name. Before this, such a
   publish returned `404 no_current_row` ("seed it before versioned publish").
+- **Add prompt in Admin.** [BUILT ON BRANCH `claude/admin-add-prompt`,
+  2026-11-02; NOT DEPLOYED] Owner request 2026-11-02: create a new prompt from
+  a form in Admin and publish it as v1, with no Dataverse editing. Publish and
+  create also declare new `{{placeholders}}` automatically. Plan:
+  [ADMIN_ADD_PROMPT_PLAN_2026-11-02.md](ADMIN_ADD_PROMPT_PLAN_2026-11-02.md).
 - **Organizing fields.** [DONE 2026-11-02] Admin shows, carries forward and
   edits the six catalog columns; see [Catalog columns](#catalog-columns).
 - **Connor's superuser access:** [OWNER REPORTED 2026-11-02] Connor has it.

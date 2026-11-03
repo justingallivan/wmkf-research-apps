@@ -41,12 +41,12 @@ it('rejects non-superusers (handled by requireSuperuser gate)', async () => {
   expect(DynamicsService.queryRecords).not.toHaveBeenCalled();
 });
 
-it('405 on non-GET, no auth check performed', async () => {
+it('405 on methods other than GET and POST, no auth check performed', async () => {
   const { requireSuperuser } = require('../../lib/utils/auth');
   requireSuperuser.mockClear();
   DynamicsService.queryRecords.mockClear();
   const r = res();
-  await handler({ method: 'POST' }, r);
+  await handler({ method: 'DELETE' }, r);
   expect(r.statusCode).toBe(405);
   expect(r.body).toEqual({ error: 'Method not allowed' });
   expect(requireSuperuser).not.toHaveBeenCalled();
