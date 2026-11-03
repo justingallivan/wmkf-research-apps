@@ -1,8 +1,8 @@
 # Per-reminder history for reviewer follow-up
 
 Status: **PLAN — NOT BUILT; OWNER DECISIONS D1–D3 TAKEN 2026-11-03; REVISED
-SAME DAY AFTER CODEX ADVERSARIAL REVIEW (D2 rule replaced, see §3 — owner to
-confirm); second Codex review pending.** Session 662,
+SAME DAY AFTER TWO CODEX ADVERSARIAL REVIEWS (D2 rule replaced, see §3 — owner
+to confirm); third Codex review pending.** Session 662,
 Claude, 2026-11-03, plan written on `claude/per-reminder-history-plan` from
 `main` `a66e09091`. Queue entry: `docs/CURRENT_WORK_QUEUE.md` item 7
 "Per-reminder audit trail for reviewer follow-up (Activity history)" (J27 item,
@@ -117,12 +117,42 @@ would rely on recipient address and editable subjects.
   `recorded_at = sentAt`. When the bookkeeping write throws (row closed, binding
   changed, three 412s), no row is written. That matches the count, which also
   does not increment. The email has already gone out by then.
-- **Bounded, fail-soft.** Every history insert and the listing read run under a
-  short deadline (2 seconds, a code constant) via `Promise.race`. On timeout or
-  error the caller logs and carries on: the insert result is treated as unknown
-  (a late insert that still lands is correct, because the reminder was claimed),
-  and the read returns `null`. Nothing a reminder or the reviewer list depends
-  on waits longer than the deadline.
+- **Invited rows only.** The store's insert takes the suggestion row the
+  writer already holds and writes nothing unless `isInvitedRow(row)` is true
+  (`shared/utils/reviewer-engagement-policy.js:119-122`: invited flag or an
+  invitation date). This one gate covers every writer, including a follow-up
+  email sent to a never-invited candidate, which the send path allows today
+  (Codex review 2, finding 1: the accepted-only guard at
+  `send-emails-service.js:749` covers materials, not follow-ups, and
+  `record-email-outcome.js:26-28` accepts an empty status). Such a send still
+  increments the count as today; it just leaves no dated row, so §3's
+  invariant holds. The row passed must carry `wmkf_invited` and
+  `wmkf_emailsentat`: `recordDeliveredEmail`'s `fresh` row does (registry
+  select, `lib/dataverse/core/entity-registry.js:143-146`); the manual reminder
+  select does (`reviewer-manual-reminder.js:58-76`); the two sweep selects
+  (`reviewer-reminder-sweep.js:154`, `:254`) gain the missing fields.
+  `isInvitedRow` throws on a row missing those fields, which the build treats
+  as a test failure, not a skip.
+- **Bounded, fail-soft, cancelled.** Every history insert and the listing read
+  are bounded at 2 seconds (a code constant), and the bound cancels the work
+  rather than just abandoning the wait (Codex review 2, finding 2):
+  - The store issues its queries through the Neon HTTP driver the app already
+    ships (`@neondatabase/serverless` 0.9.5 under `@vercel/postgres` 0.10.0)
+    with a per-query `fetchOptions.signal` of `AbortSignal.timeout(2000)`.
+    **[ASSUMED, verify at build]** per-query `fetchOptions` are honored
+    (`node_modules/@neondatabase/serverless/index.mjs:1536-1540` merges them;
+    the build proves an aborted query rejects and its fetch is torn down). If
+    not, the build stops and reports rather than shipping a wait-only bound.
+  - A per-invocation circuit breaker: after the first history timeout or error,
+    the rest of that invocation (a sweep batch, a listing) skips history calls
+    and logs one summary line. At most one cancelled call per invocation, so a
+    database outage cannot pile up requests.
+  - Database-side: the insert is a single-row `INSERT … ON CONFLICT DO NOTHING`
+    and the read a single indexed `SELECT`; neither takes long-held locks. A
+    cancelled insert may still commit on the server; that is a true record of a
+    claimed reminder, so the outcome stays "unknown, fine either way".
+  - On timeout or error the insert caller logs and carries on, and the read
+    returns `null`.
 - Inserts use `ON CONFLICT DO NOTHING` on the unique key.
 - A new small store module, `lib/services/reviewer-engagement/reminder-events-store.js`
   (insert + batch read), mirrors `materials-release-store.js`.
@@ -154,15 +184,18 @@ invited.**
   staff manual re-select [VERIFIED via `reviewer-suggestion.js:1012-1013`].
   Those are the only two uses of the reset constant in `lib/`, `shared/` and
   `pages/` [VERIFIED via grep].
-- Every reminder needs an earlier invitation (respond: invited and no answer;
-  review-due: accepted). So a suggestion that has any history row can never be
-  reset, and rows cannot leak into a later engagement. The table starts empty
-  at build, so no older row predates this guard.
+- History rows are written only for invited rows (§2, "Invited rows only"),
+  and an invited row can never be reset. So a suggestion that has any history
+  row can never start a new engagement, and rows cannot leak into one. The
+  table starts empty at build, so no older row predates this guard. This does
+  not rely on every send path requiring an invitation: Codex review 2 showed
+  the follow-up email does not.
 - The one exception is the test tool `scripts/reset-reviewer-for-testing.js`,
   which deletes the rows itself (W4).
-- The build adds a regression test that ties history scoping to that guard:
-  both reset paths refuse an invited row, with a comment at each naming the
-  history dependency, so a future change to the guard fails loudly.
+- The build adds regression tests that tie history scoping to both halves:
+  the store writes nothing for a never-invited row (the follow-up → Remove →
+  Restore case Codex named), and both reset paths refuse an invited row, with
+  a comment at each guard naming the history dependency.
 
 Consequences, all deliberate:
 
@@ -241,14 +274,19 @@ queue's parked item. It does not build toward that branch.
 
 ## Tests
 
-- **Store:** insert, `ON CONFLICT DO NOTHING`, batch read; a stalled insert or
-  read resolves at the deadline (fake timers) as unknown / `null`.
+- **Store:** insert, `ON CONFLICT DO NOTHING`, batch read; no insert for a
+  never-invited row; a stalled insert or read is aborted at the deadline (the
+  fetch receives an aborted signal, not just an abandoned promise) and
+  resolves as unknown / `null`; after one failure the breaker skips further
+  calls in that invocation; deadline timers are cleared when the call settles.
 - **W1/W2:** a successful claim writes exactly one row with the claim's
   timestamp, after the send, on both send success and send failure; a 412
   writes none; a stalled or failing insert never delays or prevents the send
   (the send mock is called before the insert mock).
 - **W3:** a recorded follow-up writes one row with `sentAt`; a closed row or
-  binding change writes none; an insert failure does not throw.
+  binding change writes none; an insert failure does not throw; a follow-up to
+  a never-invited candidate increments the count but writes no row, and after
+  Remove → Restore the drawer shows no reminder.
 - **W4:** the test reset script deletes the suggestion's rows with `--commit`
   and not on a dry run.
 - **Engagement guard:** `restore` and staff re-select refuse an invited row
@@ -315,8 +353,8 @@ DTO → drawer.
 
 **Verdict: READY WITH NAMED CHANGES**; D1–D3 decided 2026-11-03, D2 revised
 after Codex review (owner to confirm). Named checks for the build: confirm
-Dataverse timestamp precision (display rule 2); recheck the free migration
-number.
+Dataverse timestamp precision (display rule 2); prove per-query abort works on
+the installed Neon driver (§2); recheck the free migration number.
 
 **Codex adversarial review 1 (2026-11-03): needs-attention, two findings, both
 addressed.** (1) High: invitation re-send moved `emailSentAt` past review-due
@@ -324,6 +362,14 @@ reminders, breaking the D2 fence → the fence is removed; scoping rests on the
 2026-10-31 no-reset-after-invite guard (§3). (2) Medium: an unbounded insert
 before the irreversible send → the insert moves after the send and every
 history database call is bounded (§2).
+
+**Codex adversarial review 2 (2026-11-03): needs-attention, two findings, both
+addressed.** (1) High: the follow-up email can record a reminder on a
+never-invited candidate, who can then be removed and restored → history is
+written only for invited rows (§2), so §3's invariant no longer depends on the
+send paths. (2) Medium: `Promise.race` bounded the wait, not the query → the
+store cancels the fetch with an abort signal and a per-invocation breaker caps
+outstanding work (§2).
 
 ## Scope
 
