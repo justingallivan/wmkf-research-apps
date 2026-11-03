@@ -1,7 +1,8 @@
 /**
  * Ownership: operation hook: owns promotion/save commands; controller owns state and view modules render.
  */
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
+import { reviewerEngagementProjection } from '../../../utils/reviewer-engagement';
 import { readSseStream } from '../sse';
 import {
   correlateSaveResultsToRosterCandidates,
@@ -21,6 +22,9 @@ import {
 export default function useReviewerPromotion({
   requestId,
   onSaved,
+  recommended,
+  canManage,
+  phase,
   selected,
   analysis,
   displayCandidates,
@@ -42,6 +46,51 @@ export default function useReviewerPromotion({
   setRosterNote,
   setSelected,
 }) {
+  const [factoryOutcome, setFactoryOutcome] = useState(null);
+  const factoryPromotion = factoryOutcome?.requestId === requestId
+    && factoryOutcome.generation === genRef.current ? factoryOutcome : null;
+  const promoteFactoryReviewer = useCallback(async (suggestionId) => {
+    const row = recommended.find((item) => item.suggestionId === suggestionId);
+    const myGen = genRef.current;
+    if (!canManage || !requestId || !row || reviewerEngagementProjection(row).handled
+      || row.factoryTestReviewer !== true
+      || savingRef.current === myGen) return;
+    const isCurrent = () => genRef.current === myGen;
+    const outcome = { requestId, generation: myGen, suggestionId };
+    savingRef.current = myGen;
+    setFactoryOutcome({ ...outcome, pending: true });
+    setSavingCount(1);
+    setPhase('saving');
+    try {
+      const { ok, data } = await requestEnvelope('/api/workbench/promote-applicant-reviewer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, suggestionId }),
+        tolerantBody: true,
+      });
+      if (!isCurrent()) return;
+      if (!ok || data?.success !== true || data.suggestionId !== suggestionId) {
+        throw new Error(data?.error || 'Factory reviewer promotion could not be confirmed. Reload before retrying.');
+      }
+      setFactoryOutcome({ ...outcome, saved: true, warning: data.partialSuccess
+        ? 'Added to Invite; Find could not finish updating. Reload this request.' : null });
+      setRosterSavedKeys((prev) => Array.from(new Set([...prev, data.candidateKey || candKey({ suggestionId })].filter(Boolean))));
+      // The selection has committed even if this supporting read fails.
+      try { await reloadRoster(myGen); } catch { /* keep the confirmed outcome */ }
+      try { if (isCurrent() && onSaved) await onSaved(); } catch {
+        if (isCurrent()) setFactoryOutcome({ ...outcome, saved: true,
+          warning: 'Added to Invite; reload this request to refresh the reviewer list.' });
+      }
+    } catch (error) {
+      if (isCurrent()) {
+        setFactoryOutcome({ ...outcome, error: error.message });
+      }
+    } finally {
+      if (savingRef.current === myGen) savingRef.current = null;
+      if (isCurrent()) { setSavingCount(0); setPhase(phase); }
+    }
+  }, [requestId, recommended, canManage, phase, genRef, savingRef, onSaved, reloadRoster, setSavingCount, setPhase, setRosterSavedKeys]);
+
   const refreshExpiredVerification = useCallback(async (staleCandidates, expectedGeneration) => {
     if (!requestId || !Array.isArray(staleCandidates) || staleCandidates.length === 0) {
       return { refreshed: [], failures: [], stale: false };
@@ -622,5 +671,5 @@ export default function useReviewerPromotion({
     setSelected,
   ]);
 
-  return { refreshExpiredVerification, saveSelected };
+  return { refreshExpiredVerification, saveSelected, promoteFactoryReviewer, factoryPromotion };
 }

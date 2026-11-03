@@ -392,9 +392,12 @@ export default function useReviewerSearchController({
     setUnverified,
   });
 
-  const { refreshExpiredVerification, saveSelected } = useReviewerPromotion({
+  const { refreshExpiredVerification, saveSelected, promoteFactoryReviewer, factoryPromotion } = useReviewerPromotion({
     requestId,
     onSaved,
+    recommended,
+    canManage,
+    phase,
     selected,
     analysis,
     displayCandidates,
@@ -436,6 +439,9 @@ export default function useReviewerSearchController({
 
 
   return {
+    promoteFactoryReviewer,
+    factoryPromotion,
+    terminalApplicantKeys,
     phase,
     busy,
     savingCount,
