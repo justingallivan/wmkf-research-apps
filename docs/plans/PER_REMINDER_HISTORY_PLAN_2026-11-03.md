@@ -1,6 +1,7 @@
 # Per-reminder history for reviewer follow-up
 
-Status: **PLAN — NOT BUILT; OWNER DECISIONS D1–D3 OPEN.** Session 662,
+Status: **PLAN — NOT BUILT; OWNER DECISIONS D1–D3 TAKEN 2026-11-03 (all as
+recommended); Codex plan review pending.** Session 662,
 Claude, 2026-11-03, plan written on `claude/per-reminder-history-plan` from
 `main` `a66e09091`. Queue entry: `docs/CURRENT_WORK_QUEUE.md` item 7
 "Per-reminder audit trail for reviewer follow-up (Activity history)" (J27 item,
@@ -92,7 +93,7 @@ CREATE INDEX IF NOT EXISTS reviewer_reminder_events_suggestion
   keyed by `suggestion_id` for the same reviewer engagement
   [VERIFIED via `lib/db/migrations/091_reviewer_materials_releases.sql:1-27`].
 
-**D1 — where the rows live (recommendation: Postgres table above).** Alternative
+**D1 — where the rows live. [OWNER DECISION 2026-11-03: Postgres table above.]** Alternative
 A: a new Dataverse child entity of the reviewer suggestion. That needs a
 Dynamics schema change through Connor, a new adapter and DAL registration, and a
 per-reviewer query in the list. Alternative B: read the Dynamics email
@@ -119,7 +120,7 @@ would rely on recipient address and editable subjects.
 
 ### 3. Engagement fence (D2)
 
-**Recommendation:** a row is in scope only when `recorded_at >= emailSentAt` of
+**[OWNER DECISION 2026-11-03: as recommended.]** a row is in scope only when `recorded_at >= emailSentAt` of
 the current row; when `emailSentAt` is empty, no rows are in scope.
 
 - A re-added reviewer has `emailSentAt` cleared and later set by the new
@@ -174,7 +175,8 @@ In `reviewer-activity-history.js`, per kind:
    E ≥ C, no line.
 4. Respond reminders have no count, so steps 1–2 only.
 
-**D3 — load with the list (recommendation) vs. fetch on open.** Loading the rows
+**D3 — load with the list vs. fetch on open. [OWNER DECISION 2026-11-03: load
+with the list.]** Loading the rows
 with the reviewer list keeps the recorded "no fetch, no loading state" drawer
 decision and avoids a new API route (security matrix, `check:api-routes`,
 canonical route counts). Alternative: fetch when the drawer opens. That reverses
@@ -265,7 +267,7 @@ DTO → drawer.
 | 6 Doc reconcile | Queue item 7, the 2026-09-06 handoff note, the drawer header, Atlas, wiki: at build. |
 | 7 Symbol fan-out | New `kind` values `respond` / `review_due` are read only by the drawer's per-kind rule; an unknown kind is ignored (allowlist). Reviewer merge cannot move rows: merges are blocked when the losing record has any reminder stamp (`lib/services/reviewer-merge.js:35-38`). |
 
-**Verdict: READY WITH NAMED CHANGES** once D1–D3 are decided. Named checks for
+**Verdict: READY WITH NAMED CHANGES**; D1–D3 decided 2026-11-03. Named checks for
 the build: confirm whether an accepted reviewer can be re-invited (fence, rule
 3); confirm Dataverse timestamp precision (display rule 2); recheck the free
 migration number.
