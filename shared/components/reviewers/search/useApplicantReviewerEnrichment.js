@@ -94,7 +94,8 @@ export default function useApplicantReviewerEnrichment({
     [rosterExcluded, rosterSavedKeys],
   );
   const actionableRecommended = useMemo(
-    () => recommended.filter((row) => !reviewerEngagementProjection(row).handled),
+    () => recommended.filter((row) => !reviewerEngagementProjection(row).handled
+      && row.factoryTestReviewer !== true),
     [recommended],
   );
   const haveValidCache = hasValidApplicantEnrichmentCache(

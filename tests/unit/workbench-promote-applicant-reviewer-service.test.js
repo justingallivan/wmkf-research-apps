@@ -925,3 +925,139 @@ test('safe-field write failure blocks promotion with a retryable error', async (
   expect(err.body.contactError).toMatchObject({ code: 'contact_write_failed' });
   expect(updateLifecycle).not.toHaveBeenCalled();
 });
+
+// Factory identities are fictional. Their exact server binding replaces the
+// scholarly identity gate, never the immutable-person or unique-email guards.
+function factoryBinding(over = {}) {
+  return { kind: 'synthetic', person: {
+    wmkf_potentialreviewersid: PERSON, wmkf_name: 'TEST Factory Reviewer',
+    wmkf_emailaddress: 'existing@example.edu', ...over,
+  } };
+}
+
+test.each([null, {
+  candidateKey: `suggestion:${SUG}`, suggestionId: SUG, rosterStatus: 'active',
+  needsIdentification: true, identityStatus: 'unresolved',
+  applicantContactMismatch: true, email: 'fictional-ai-claim@example.edu',
+}])('bound Factory reviewer promotes without scholarly confirmation or person mutation (%j)', async (candidate) => {
+  resolveReviewerBindCapability.mockResolvedValue(factoryBinding());
+  findCandidateBySuggestion.mockResolvedValue(candidate);
+  reviewerInstitutionPhase2Enabled.mockReturnValue(true);
+  const result = await promoteApplicantReviewer(args());
+  expect(result).toMatchObject({ success: true, suggestionId: SUG, savedFields: [], partialSuccess: false });
+  expect(selectIfUnengaged).toHaveBeenCalledWith(SUG, { actingUserSystemId: 'u-1' });
+  expect(finalizeCandidatePromotion).toHaveBeenCalledWith(REQ, expect.objectContaining({
+    candidateKey: `suggestion:${SUG}`,
+  }), expect.objectContaining({ suggestionId: SUG, potentialReviewerId: PERSON }));
+  expect(update).not.toHaveBeenCalled();
+  expect(updateById).not.toHaveBeenCalled();
+  expect(findAddressTrustReceipt).not.toHaveBeenCalled();
+  expect(loadCoiContext).not.toHaveBeenCalled();
+});
+
+test.each(['excluded', 'blocked', 'coi_dropped', 'ineligible'])('Factory promotion holds protected roster status %s', async (rosterStatus) => {
+  resolveReviewerBindCapability.mockResolvedValue(factoryBinding());
+  findCandidateBySuggestion.mockResolvedValue({ candidateKey: `suggestion:${SUG}`, rosterStatus });
+  await expect(promoteApplicantReviewer(args())).rejects.toMatchObject({ body: { code: 'candidate_not_active' } });
+  expect(selectIfUnengaged).not.toHaveBeenCalled();
+});
+
+test('Factory promotion still holds an active deceased-evidence row', async () => {
+  resolveReviewerBindCapability.mockResolvedValue(factoryBinding());
+  findCandidateBySuggestion.mockResolvedValue({ candidateKey: `suggestion:${SUG}`, rosterStatus: 'active', eligibilityStatus: 'deceased' });
+  await expect(promoteApplicantReviewer(args())).rejects.toMatchObject({ body: { code: 'candidate_ineligible' } });
+  expect(selectIfUnengaged).not.toHaveBeenCalled();
+});
+
+test.each(['reviewer_isolation_not_ready', 'test_request_isolation_not_ready', 'synthetic_reviewer_pair_unverified', 'reviewer_person_inactive'])('unverified capability %s cannot use the Factory exception', async (code) => {
+  resolveReviewerBindCapability.mockRejectedValue(Object.assign(new Error('held'), { code }));
+  await expect(promoteApplicantReviewer(args())).rejects.toBeInstanceOf(ServiceHttpError);
+  expect(selectIfUnengaged).not.toHaveBeenCalled();
+});
+
+test.each(['email_conflict', 'unavailable', 'inactive'])('Factory canonical contact status %s holds selection', async (status) => {
+  resolveReviewerBindCapability.mockResolvedValue(factoryBinding());
+  loadApplicantKnownReviewerContext.mockResolvedValue({ applicantKnownReviewer: { status } });
+  await expect(promoteApplicantReviewer(args())).rejects.toBeInstanceOf(ServiceHttpError);
+  expect(selectIfUnengaged).not.toHaveBeenCalled();
+  expect(update).not.toHaveBeenCalled();
+});
+
+test.each([null, 'name [at] example.edu'])('Factory missing/obfuscated canonical email %s holds selection', async (email) => {
+  resolveReviewerBindCapability.mockResolvedValue(factoryBinding({ wmkf_emailaddress: email }));
+  loadApplicantKnownReviewerContext.mockResolvedValue({ applicantKnownReviewer: { status: 'known', email } });
+  await expect(promoteApplicantReviewer(args())).rejects.toBeInstanceOf(ServiceHttpError);
+  expect(selectIfUnengaged).not.toHaveBeenCalled();
+});
+
+test('Factory email change on final capability read holds selection', async () => {
+  resolveReviewerBindCapability.mockResolvedValueOnce(factoryBinding())
+    .mockResolvedValueOnce(factoryBinding({ wmkf_emailaddress: 'changed@example.edu' }));
+  await expect(promoteApplicantReviewer(args())).rejects.toMatchObject({ body: { code: 'synthetic_reviewer_changed' } });
+  expect(selectIfUnengaged).not.toHaveBeenCalled();
+});
+
+test('ordinary candidate cannot obtain Factory exception by a browser/roster hint', async () => {
+  findCandidateBySuggestion.mockResolvedValue({ candidateKey: `suggestion:${SUG}`, needsIdentification: true,
+    factoryTestReviewer: true, applicantKnownReviewer: { factoryTestReviewer: true } });
+  await expect(promoteApplicantReviewer(args({ factoryTestReviewer: true })))
+    .rejects.toMatchObject({ body: { code: 'identity_confirmation_required' } });
+  expect(selectIfUnengaged).not.toHaveBeenCalled();
+});
+
+test('Factory committed selection reports roster partial success without identity mutation', async () => {
+  resolveReviewerBindCapability.mockResolvedValue(factoryBinding());
+  finalizeCandidatePromotion.mockRejectedValueOnce(new Error('store unavailable'));
+  const result = await promoteApplicantReviewer(args());
+  expect(result).toMatchObject({ success: true, suggestionId: SUG, partialSuccess: true, rosterFinalized: false });
+  expect(selectIfUnengaged).toHaveBeenCalledTimes(1);
+  expect(update).not.toHaveBeenCalled();
+});
+
+test('Factory roster read failure cannot become the missing-row fallback', async () => {
+  resolveReviewerBindCapability.mockResolvedValue(factoryBinding());
+  findCandidateBySuggestion.mockRejectedValueOnce(new Error('database unavailable'));
+  await expect(promoteApplicantReviewer(args())).rejects.toMatchObject({ body: { code: 'eligibility_unavailable' } });
+  expect(selectIfUnengaged).not.toHaveBeenCalled();
+});
+
+test('Factory engagement race remains a guarded conflict', async () => {
+  resolveReviewerBindCapability.mockResolvedValue(factoryBinding());
+  selectIfUnengaged.mockRejectedValueOnce(Object.assign(new Error('already invited'), { code: 'reviewer_engagement_changed' }));
+  await expect(promoteApplicantReviewer(args())).rejects.toMatchObject({ body: { code: 'reviewer_engagement_changed' } });
+  expect(finalizeCandidatePromotion).not.toHaveBeenCalled();
+});
+
+test('Factory final capability denial is a typed conflict, never a route 500', async () => {
+  resolveReviewerBindCapability.mockResolvedValueOnce(factoryBinding())
+    .mockRejectedValueOnce(Object.assign(new Error('pair changed'), { code: 'synthetic_reviewer_pair_unverified' }));
+  await expect(promoteApplicantReviewer(args())).rejects.toMatchObject({ httpStatus: 409, body: { code: 'reviewer_binding_unavailable' } });
+  expect(selectIfUnengaged).not.toHaveBeenCalled();
+});
+
+test('ordinary-to-Factory marker drift cannot select after ordinary checks', async () => {
+  resolveReviewerBindCapability.mockResolvedValueOnce({ kind: 'ordinary' }).mockResolvedValueOnce(factoryBinding());
+  await expect(promoteApplicantReviewer(args())).rejects.toMatchObject({ httpStatus: 409, body: { code: 'synthetic_reviewer_changed' } });
+  expect(selectIfUnengaged).not.toHaveBeenCalled();
+});
+
+test('ordinary binding error preserves the earlier missing-roster refusal', async () => {
+  resolveReviewerBindCapability.mockRejectedValueOnce(new Error('unavailable'));
+  findCandidateBySuggestion.mockResolvedValueOnce(null);
+  await expect(promoteApplicantReviewer(args())).rejects.toMatchObject({ body: { code: 'identity_verification_required' } });
+});
+
+test('synthetic nonempty contact is immutable even when the attempted email is munged', async () => {
+  resolveReviewerBindCapability.mockResolvedValue(factoryBinding());
+  await expect(promoteApplicantReviewer(args({ contact: { email: 'remove-me@example.edu' } })))
+    .rejects.toMatchObject({ body: { code: 'synthetic_reviewer_identity_immutable' } });
+  expect(update).not.toHaveBeenCalled();
+});
+
+test('unengaged saved Factory suggestion retains the incumbent server re-promotion path', async () => {
+  resolveReviewerBindCapability.mockResolvedValue(factoryBinding());
+  findCandidateBySuggestion.mockResolvedValue({ candidateKey: `suggestion:${SUG}`, rosterStatus: 'saved', needsIdentification: true });
+  expect((await promoteApplicantReviewer(args())).success).toBe(true);
+  expect(selectIfUnengaged).toHaveBeenCalledTimes(1);
+  expect(recordInstitutionMeasurement).not.toHaveBeenCalled();
+});

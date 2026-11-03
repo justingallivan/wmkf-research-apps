@@ -34,8 +34,9 @@ jest.mock('../../lib/services/reviewer-exclusion-parser', () => ({
 }));
 
 const loadApplicantKnownReviewer = jest.fn();
+const loadApplicantKnownReviewerContext = jest.fn();
 jest.mock('../../lib/services/workbench/applicant-known-reviewer-service', () => ({
-  loadApplicantKnownReviewer: (...a) => loadApplicantKnownReviewer(...a),
+  loadApplicantKnownReviewerContext: (...a) => loadApplicantKnownReviewerContext(...a),
 }));
 
 const resolveReviewerBindCapability = jest.fn();
@@ -66,6 +67,7 @@ const baseRequest = (over = {}) => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  loadApplicantKnownReviewerContext.mockImplementation(async (...a) => ({ applicantKnownReviewer: await loadApplicantKnownReviewer(...a) }));
   getById.mockResolvedValue(baseRequest());
   ensureApplicantRecommended.mockResolvedValue({ id: 'sug-1', created: true, skippedExcluded: false });
   extractExcludedReviewers.mockResolvedValue({ names: [], substantive: false, parseFailed: false });
@@ -250,4 +252,15 @@ test('a June meeting date without a Grant Cycle link stamps no cycle', async () 
   // The response carries no cycle code; no screen reads one (§3.6).
   expect(body).not.toHaveProperty('cycleCode');
   expect(ensureApplicantRecommended.mock.calls[0][0].grantCycleCode).toBeNull();
+});
+
+test('Factory display hint is emitted on the recommendation only after scoped hydration verifies it', async () => {
+  getById.mockResolvedValue(baseRequest({ _wmkf_potentialreviewer1_value: P1 }));
+  loadApplicantKnownReviewerContext.mockResolvedValueOnce({
+    applicantKnownReviewer: { status: 'known', potentialReviewerId: P1 }, factoryTestReviewer: true,
+  });
+  const result = await ingestApplicantReviewers(args);
+  expect(result.recommended[0]).toMatchObject({ factoryTestReviewer: true });
+  expect(loadApplicantKnownReviewerContext).toHaveBeenCalledWith(P1, REQ);
+  expect(result.recommended[0].applicantKnownReviewer.factoryTestReviewer).toBeUndefined();
 });

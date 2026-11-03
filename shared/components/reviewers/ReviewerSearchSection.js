@@ -79,6 +79,9 @@ export default function ReviewerSearchSection({
   repairCandidateKey = null,
 }) {
   const {
+    promoteFactoryReviewer,
+    factoryPromotion,
+    terminalApplicantKeys,
     phase,
     busy,
     savingCount,
@@ -288,6 +291,12 @@ export default function ReviewerSearchSection({
       <HandledReviewers handledReviewers={handledReviewers} onNavigate={onNavigate} />
 
       <ApplicantReviewerStatus
+        unavailableFactoryReviewers={[...rosterBlocked, ...rosterIneligible]}
+        terminalApplicantKeys={terminalApplicantKeys}
+        canManage={canManage}
+        busy={busy}
+        factoryPromotion={factoryPromotion}
+        promoteFactoryReviewer={promoteFactoryReviewer}
         ingestLoading={ingestLoading}
         recPhase={recPhase}
         ingestError={ingestError}

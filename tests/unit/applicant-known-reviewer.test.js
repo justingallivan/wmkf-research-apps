@@ -22,6 +22,7 @@ import {
 } from '../../lib/utils/applicant-known-reviewer';
 import {
   loadApplicantKnownReviewer,
+  loadApplicantKnownReviewerContext,
 } from '../../lib/services/workbench/applicant-known-reviewer-service';
 import {
   createConflictPendingState,
@@ -61,7 +62,9 @@ test('scoped cast hydration uses the exact bound person and includes its hidden 
   resolveReviewerBindCapability.mockResolvedValueOnce({ kind: 'synthetic', person: cast });
   findAllByExactEmail.mockResolvedValueOnce([cast]);
 
-  const known = await loadApplicantKnownReviewer(PERSON, requestId);
+  const context = await loadApplicantKnownReviewerContext(PERSON, requestId);
+  const known = context.applicantKnownReviewer;
+  expect(context.factoryTestReviewer).toBe(true);
 
   expect(known).toMatchObject({ status: 'known', potentialReviewerId: PERSON });
   expect(resolveReviewerBindCapability).toHaveBeenCalledWith({ personId: PERSON, requestId });
@@ -284,4 +287,10 @@ test('anti-scrape stored address remains missing instead of becoming selectable'
     code: 'anti_scrape_email',
     reusable: false,
   });
+});
+
+ test('unscoped hydration cannot offer the Factory action even for a marked person', async () => {
+  getById.mockResolvedValue(person({ wmkf_issyntheticreviewer: true }));
+  const known = await loadApplicantKnownReviewer(PERSON);
+  expect(known.factoryTestReviewer).not.toBe(true);
 });

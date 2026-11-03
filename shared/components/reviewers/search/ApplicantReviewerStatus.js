@@ -3,8 +3,16 @@
  */
 import { Card } from '../../Layout';
 import { Spinner } from './SearchPrimitives';
+import { reviewerSuggestionCandidateKey } from '../../../../lib/utils/reviewer-candidate-key';
+import { reviewerEngagementProjection } from '../../../utils/reviewer-engagement';
 
 export default function ApplicantReviewerStatus({
+  canManage,
+  terminalApplicantKeys,
+  unavailableFactoryReviewers = [],
+  busy,
+  factoryPromotion,
+  promoteFactoryReviewer,
   ingestLoading,
   recPhase,
   ingestError,
@@ -66,9 +74,27 @@ export default function ApplicantReviewerStatus({
             <ul className="space-y-2">
               {recommended.map((row) => {
                 const known = row.applicantKnownReviewer;
+                const factory = row.factoryTestReviewer === true;
+                const key = reviewerSuggestionCandidateKey(row.suggestionId);
+                const terminal = terminalApplicantKeys?.has(key)
+                  || unavailableFactoryReviewers.some((candidate) => candidate.candidateKey === key);
+                const outcome = factoryPromotion?.suggestionId === row.suggestionId ? factoryPromotion : null;
+                const handled = reviewerEngagementProjection(row).handled || outcome?.saved;
                 return (
                   <li key={row.suggestionId || row.potentialReviewerId} className="p-2 border border-gray-200 rounded text-xs text-gray-700">
                     <div className="font-medium">{known?.name || row.name || 'Applicant-recommended reviewer'}</div>
+                    {factory && <div className="font-medium">Factory test reviewer · immutable test identity</div>}
+                    {factory && handled && <div>Already added to Invite</div>}
+                    {factory && terminal && !handled && <div>Unavailable in Find; check the current reviewer list.</div>}
+                    {factory && !handled && !terminal && canManage && (
+                      <button type="button" disabled={busy || known?.status !== 'known' || !known.email}
+                        onClick={() => promoteFactoryReviewer(row.suggestionId)}
+                        className="mt-2 px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40">
+                        {outcome?.pending ? 'Adding…' : 'Add Factory reviewer to Invite'}
+                      </button>
+                    )}
+                    {outcome?.error && <div role="alert" className="text-amber-700">{outcome.error}</div>}
+                    {outcome?.warning && <div role="status" className="text-amber-700">{outcome.warning}</div>}
                     {known?.status === 'known' ? (
                       <>
                         <div className="text-emerald-700">✓ Existing linked reviewer record</div>
