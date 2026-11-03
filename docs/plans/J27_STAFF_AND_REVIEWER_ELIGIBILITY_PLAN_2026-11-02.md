@@ -225,8 +225,10 @@ null, old/new cycles, readiness negatives and the formatted-label response.
 
 Owner scope decision: defer the Phase I presentation and broader workflow; the
 above staff design is a draft, not a confirmed brief or build authorization.
-Only the independent Reviewer Finder compatibility fix is authorized tonight.
-No Factory status writes or dashboard/UI changes are included.
+Only the independent Reviewer Finder compatibility fix was implemented in this
+workstream. The separate Factory plan now starts with prepared reviewer-workflow
+fixtures (`docs/plans/J27_TEST_REQUEST_FACTORY_FINISH_PLAN_2026-11-02.md`); no
+Factory runtime writes or dashboard/UI changes are included here.
 
 ## Historical planning-pass verification (before the Reviewer Finder build)
 
@@ -241,5 +243,5 @@ live calls or rollout actions were performed.
 passed. Scoped ESLint passed. Independent read-only source review reported no
 material findings. No live calls, business-record writes, merge or deployment
 were performed for this compatibility change. All 18 scoped gate/self-test commands (including the J27 register pair),
-type check and production build passed. Phase I dashboard and Factory work
-remain deferred.
+type check and production build passed. Phase I dashboard work remains deferred. Factory work has a separate
+prepared-fixture plan; it is not implemented by this Reviewer Finder change.

@@ -13,6 +13,11 @@ for staff work. PD dashboards must hide J27-and-later requests until ready.
 Earlier cycles keep their existing eligibility. The apps read the marker and
 never set it or start the flows as part of visibility filtering.
 
+Separate owner decision, 2026-11-02: the planned Factory may finalize readiness
+on verified, run-owned marked reviewer fixtures. This does not change ordinary
+intake ownership or add a write to dashboard filtering. See
+`docs/plans/J27_TEST_REQUEST_FACTORY_FINISH_PLAN_2026-11-02.md`.
+
 **Accepted operational risk (Justin, 2026-11-02):** PDs generally wait for Connor's
 release notice before logging in. Post-release reruns are expected to be rare
 and quick. Whether a rerun clears readiness, or a failure leaves a prior true
