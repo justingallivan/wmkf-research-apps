@@ -70,9 +70,12 @@ const PLAN = {
     await createRunLedger(db).reserveRun({actorId:'cli:'+'b'.repeat(16),idempotencyKey:'readiness-recovery',plan});
     await client.query("UPDATE test_request_runs SET status='ready',destination_request_number='900002',completed_at=NOW() WHERE run_id=$1",[plan.runId]);
     const store=createReadinessJournal(db);await store.plan(plan.runId,'W/"10"',false);await store.dispatch(plan.runId,1);await store.attention(plan.runId,'readiness_etag_conflict',1);
-    const previous=await store.get(plan.runId);const next=await store.recover(plan.runId,previous,'W/"11"',false);
+    const previous=await store.get(plan.runId);const abandoned=await store.recover(plan.runId,previous);
+    expect(abandoned).toMatchObject({attempt:1,status:'abandoned',error:'readiness_etag_conflict'});
+    expect((await client.query('SELECT count(*)::int AS count FROM test_request_readiness_finalizations WHERE run_id=$1',[plan.runId])).rows[0].count).toBe(1);
+    const next=await store.plan(plan.runId,'W/"11"',false);
     expect(next).toMatchObject({attempt:2,status:'planned',etag_before:'W/"11"'});
-    expect(await store.recover(plan.runId,previous,'W/"12"',false)).toBeNull();
+    expect(await store.recover(plan.runId,previous)).toBeNull();
     expect(await store.applied(plan.runId,1)).toBeNull();expect(await store.dispatch(plan.runId,1)).toBeNull();
     const history=(await client.query('SELECT attempt,status,etag_before FROM test_request_readiness_finalizations WHERE run_id=$1 ORDER BY attempt',[plan.runId])).rows;
     expect(history).toEqual([{attempt:1,status:'abandoned',etag_before:'W/"10"'},{attempt:2,status:'planned',etag_before:'W/"11"'}]);

@@ -388,8 +388,8 @@ and export TTL does not expire a completed copy. A true-only ETag PATCH precedes
 only then does applied→complete record success. Unknown states and ambiguous
 non-landed writes stop without another PATCH. Owner-only `--recover-readiness`
 requires exact destination confirmation and all possible senders stopped; when
-readiness is still false/null it abandons the old attempt and appends a fresh
-intent. All transitions are attempt-bound, so a stale sender cannot mutate the
+readiness is still false/null it abandons the old attempt. Only the next
+finalization, after its package check and fresh state read, appends a new intent. All transitions are attempt-bound, so a stale sender cannot mutate the
 new journal attempt. Already-true unexpected effects remain needs_attention,
 with observed IDs; recovery cannot clear them. No cleanup writer is added;
 attempt history remains part of the retained audit trail.

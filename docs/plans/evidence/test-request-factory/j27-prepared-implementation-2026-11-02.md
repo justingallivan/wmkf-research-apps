@@ -1,8 +1,9 @@
 # Prepared J27 Factory — implementation evidence
 
-Status: branch source and local checks; independent Fable code review pending.
+Status: branch source and local checks verified; independent Fable plan/code
+reviews and bounded correction closures passed. Managed application/live proof pending.
 No managed schema application, Production fixture writes, AI runs, email sends,
-push, merge or deployment performed for this implementation.
+merge or Production deployment performed for this implementation.
 
 ## Contract and invariants
 
@@ -35,7 +36,8 @@ Async: no new browser state/request flow; existing UI generation guards remain.
 The owner CLI has no process lease; unique open-attempt identity and attempt-bound compare-and-set
 select the sender, and every ambiguous dispatch resumes through readback only.
 Confirmed owner recovery requires all possible senders stopped and live readiness
-false/null; it retains the abandoned attempt and appends a fresh intent. Recovery
+false/null; it retains the abandoned attempt and its original error. The next
+finalization verifies the package before capturing its fresh ETag/new intent. Recovery
 cannot clear unexpected already-true effects. The existing status setter's integer/options/effects/replay contract is unchanged.
 Only its ready-run gate, interlock preflight and quiet-job observer are exported.
 
@@ -54,8 +56,9 @@ no client-supplied readiness bypass or bulk operation.
 ## Verification and limits
 
 - Canonical production build passed; type check and scoped lint passed.
-- 2,202 Factory/readiness/Reviewer Finder unit tests passed, followed by 31 focused
-  minimum-package/finalizer tests after narrowing the package requirement.
+- 2,225 Factory/readiness/Reviewer Finder unit tests passed after the recovery
+  ordering correction, followed by all 32 focused finalizer tests for the final
+  read-only diagnostic change.
 - Disposable local PostgreSQL: 23 journal/fingerprint/migration tests passed.
 - Sixteen runtime gate/self-test commands passed sequentially (migration manifest,
   Atlas, types, DAL, OData, context and route/service boundaries, status parity,
@@ -75,3 +78,13 @@ reflect the separate real-intake/fixture writer contracts. Existing readiness
 filtering is unchanged; only its writer-ownership comment is clarified. Historical
 Factory evidence remains historical. Broader J27 workflow, existing unrelated
 Atlas history and other worktrees are outside this implementation audit.
+
+
+Final independent verdict: [READY FOR OWNER REVIEW](j27-prepared-fable-final-review-2026-11-02.md).
+All original P1/P2 findings and the final preview-note mismatch are closed. The
+remaining operational limits are explicit: no automatic acceptance/clearing of
+unexpected stamped effects, unknown status-abandon history blocks finalization,
+and migration/live testing need separate owner authorization. Preview diagnostics
+remain read-only for needs_attention and abandoned attempts, while confirmation
+still refuses unresolved attention. CI explicitly includes the new PostgreSQL
+attempt-journal suite.

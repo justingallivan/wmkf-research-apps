@@ -163,13 +163,22 @@ For an unready failed/ambiguous attempt, `--recover-readiness=<runId>
 establish all form invocations have ended, and stop/account for every CLI,
 including paused senders. A timer or unchanged readiness is not proof. Only
 `--confirm-readiness-request=<exact destination GUID>` affirms that checklist
-and appends a fresh intent, retaining the abandoned attempt. An already-true
+and abandons the old attempt, retaining its original error/ETag/timestamps.
+The next finalization verifies the package first and only then plans a fresh
+attempt with the current ETag. An already-true
 readiness flag cannot be reset or its unexpected effects approved this way. Local code/tests do not authorize Production fixture writes or emails.
 
 The new fingerprint requires migration 094 before this branch can operate on a
 managed ledger. Apply through `ledger:apply`, never the app database runner, on BOTH operational ledgers in an owner-approved Factory maintenance window
 before merge/deployment; this fingerprint gates every Factory mode. The old
 deployment may reject new extra schema until promotion. Do not bypass the guard. No managed schema was changed in this build.
+
+Use the finalization preview to inspect readiness journal status; ordinary
+`--run-inspect` still shows the existing run/resource history, not readiness
+attempts. A Phase status change closed by `--status-abandon` remains unknown
+history and blocks finalization. Only an exact definitive no-write 412 status
+refusal can be ignored alongside a later complete corroborating transition;
+other needs_attention status history requires owner inspection.
 
 ## Artifacts and the daily sweep
 

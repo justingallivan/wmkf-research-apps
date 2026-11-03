@@ -1,6 +1,6 @@
 # Finish the J27 Test Request Factory
 
-Status: **BRANCH IMPLEMENTATION; Fable correction review and release/live proof remain pending.**
+Status: **IMPLEMENTED ON REVIEW BRANCH; local checks and Fable reviews passed. Managed migration and live proof remain pending.**
 Owner: Codex. Date: 2026-11-02 Pacific.
 Boundary: finish the Factory for reviewer testing; broader PD workflow stays deferred.
 
@@ -11,7 +11,8 @@ Boundary: finish the Factory for reviewer testing; broader PD workflow stays def
 whether earlier-cycle-stage testing is useful later. This replaces the prior
 proposal to create a submitted fixture and require a real Power Automate run.
 
-[PLANNED] Copy a completed, suitable package into a fresh marked test request.
+[VERIFIED via branch source and local tests; live proof pending] The Factory
+can copy a completed, suitable package into a fresh marked test request.
 The Factory may set readiness true **only on that run-owned test destination,
 after its status and required copied-artifact checks pass**. This is a narrow
 fixture-finalization operation, not permission to mark ordinary requests ready.
@@ -37,11 +38,12 @@ bundle the phase updates into an unguarded patch.
 
 ## Current evidence and invariants
 
-[VERIFIED via inspected source]
-`policy.js` `addProductionFields` and `basic-clone-steps.js` `compileBody` currently
-supply Phase II Pending directly as Request Status. `verifyClone` rejects a
-non-null Phase II Status. New J27+ runs need the derived-status and final-pair
-contract above; existing pre-J27 behavior is outside this bounded correction.
+[VERIFIED via branch source and regression tests] The legacy compiler path still
+supplies Phase II Pending directly as Request Status. New prepared Production
+J27+ manifests explicitly omit it and start readiness false. `verifyClone`
+retains its non-null Phase II refusal because clone verification precedes phase
+advancement. The separate finalizer checks the final pair and derived status.
+Existing pre-J27 behavior is outside this bounded correction.
 Old reserved manifests, payload hashes and resumed runs must retain their
 original meaning and must not gain a readiness write on resume.
 
@@ -62,7 +64,7 @@ unready and not test-marked. They do not establish a complete golden package
 and must not be modified as Factory destinations. The later source/metadata inventory below is read-only; neither example is a
 Factory destination.
 
-## Implementation steps
+## Implementation contract and remaining live proof
 
 1. **Define the minimum reviewer-test package from actual consumers.** Inventory
    a suitable completed source when read access is authorized. Identify the
@@ -102,8 +104,8 @@ Factory destination.
    and exact verified destination byte/OOXML-attestation hashes, not from the
    original source revision or export TTL. Recheck request state/ETag after the
    single heavy package pass. A separate exact-destination owner recovery can
-   abandon an unready attempt and append a fresh intent only after all possible
-   senders are stopped; prior attempts remain durable and every mutation is
+   abandon an unready attempt only after all possible senders are stopped; the
+   next finalization verifies the package and then plans with a fresh ETag; prior attempts remain durable and every mutation is
    attempt-bound. Already-true unexpected effects remain an inspection stop,
    with observed IDs retained; recovery cannot approve or clear them. Read back true before declaring
    the fixture ready. Do not expose a client-supplied bypass for these checks.
@@ -117,7 +119,7 @@ Factory destination.
 
 ## Acceptance, release and deferred scope
 
-[PLANNED]
+[VERIFIED locally for code/tests; operational release and live criteria remain open]
 - Success requires the intended statuses, required artifacts and final readiness
   readback; no true stamp on an ordinary record, another run's fixture or an
   incomplete package. Test false/null/true and stale/missing required artifacts.
@@ -159,3 +161,14 @@ all six Research J27 requests were unready; six sampled invited D26 sources had
 all seven recognized documents. This metadata establishes candidates, not byte
 integrity or authorization to create a fixture. The source probe downloaded no
 document bodies and made no Production writes.
+
+
+## Implementation verification
+
+[VERIFIED locally, 2026-11-02] The prepared compiler, destination-only package
+verification, typed attempt journal, owner finalization/recovery commands and
+preview diagnostics are implemented. Fable reviewed the plan and code; every
+blocking finding and the bounded recovery/inspection corrections are closed.
+[Final Fable receipt](evidence/test-request-factory/j27-prepared-fable-final-review-2026-11-02.md).
+[Whole-flow evidence](evidence/test-request-factory/j27-prepared-implementation-2026-11-02.md).
+This is not a claim that migration 094 is applied or that a live fixture passed.

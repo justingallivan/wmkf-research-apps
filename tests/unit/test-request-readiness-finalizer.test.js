@@ -41,11 +41,11 @@ function fixture({ ready = false, entry = null } = {}) {
   const move = (from, to, more = {}) => { if (journalRow?.status !== from) return null; journalRow = { ...journalRow, status: to, ...more }; return { ...journalRow }; };
   const journal = {
     get: jest.fn(async () => journalRow),
-    plan: jest.fn(async (_runId, etag, before) => (journalRow ||= { status: 'planned', attempt: 1, updated_at: '2026-11-02T00:00:00Z', etag_before: etag, ready_before: before })),
+    plan: jest.fn(async (_runId, etag, before) => { if (!journalRow || journalRow.status === 'abandoned') journalRow = { status: 'planned', attempt: (journalRow?.attempt ?? 0) + 1, updated_at: '2026-11-02T00:00:00Z', etag_before: etag, ready_before: before }; return journalRow; }),
     dispatch: jest.fn(async () => move('planned','dispatched',{ dispatched_at: '2026-11-02T00:00:00Z' })),
     applied: jest.fn(async () => move('dispatched','applied')), complete: jest.fn(async () => move('applied','complete')),
     attention: jest.fn(async () => (journalRow.status = 'needs_attention')),
-    recover: jest.fn(async (_runId, previous, etag, before) => (journalRow = { status: 'planned', attempt: previous.attempt + 1, etag_before: etag, ready_before: before })),
+    recover: jest.fn(async (_runId, previous) => (journalRow = { ...previous, status: 'abandoned' })),
   };
   const client = { get: jest.fn(async path => ({ ok: true, body: path.includes('EntityDefinitions') ? { ...metadata } : { ...row } })),
     patchWithOptions: jest.fn(async () => { row.wmkf_readyforreview = true; row['@odata.etag'] = 'W/"101"'; return { ok: true }; }) };
@@ -98,12 +98,12 @@ test('changed synthetic contact refuses finalization', async () => {
 
 test('completed fixture uses saved source without export freshness/live revision dependency', async () => { const f=fixture();await finalizeReadiness(f);expect(bundleSourceOf).toHaveBeenCalledWith(f.manifest,{allowStale:true});expect(f.graph.downloadFile.mock.calls.every(([drive])=>drive==='drive')).toBe(true); });
 
-test('owner recovery previews read-only, then appends a fresh unready intent without a PATCH', async () => {
+test('owner recovery previews read-only, abandons without pre-planning or a PATCH', async () => {
   const f=fixture({entry:{status:'dispatched',attempt:1,etag_before:'W/"99"',ready_before:false}});
   expect(await recoverReadiness(f)).toMatchObject({mode:'READ_ONLY_READINESS_RECOVERY_PLAN',attempt:1});
   expect(f.journal.recover).not.toHaveBeenCalled();
   await expect(recoverReadiness({...f,confirmRequestId:CYCLE})).rejects.toThrow('exact destination');
-  expect(await recoverReadiness({...f,confirmRequestId:DEST})).toMatchObject({status:'planned',attempt:2,dataverseWritten:false});
+  expect(await recoverReadiness({...f,confirmRequestId:DEST})).toMatchObject({status:'abandoned',attempt:1,dataverseWritten:false});
   expect(f.client.patchWithOptions).not.toHaveBeenCalled();
 });
 test('readiness already true cannot be reset even with exact owner confirmation', async () => {
@@ -130,4 +130,28 @@ test('fresh ETag is read after the heavy copied-file checks', async () => {
   expect(f.journal.plan).toHaveBeenCalledWith(RUN,'W/"200"',false);
   expect(f.client.patchWithOptions).toHaveBeenCalledWith(`/akoya_requests(${DEST})`,{wmkf_readyforreview:true},{'If-Match':'W/"200"'});
   expect(f.graph.downloadFile).toHaveBeenCalledTimes(3);
+});
+
+test.each(['planned','dispatched'])('owner recovery from %s allows a fresh plan after changed ETag and package checks', async status => {
+  const f=fixture({entry:{status,attempt:1,etag_before:'W/"99"',ready_before:false}});
+  await recoverReadiness({...f,confirmRequestId:DEST});
+  f.row['@odata.etag']='W/"300"';
+  await expect(finalizeReadiness({...f,confirm:true})).resolves.toMatchObject({status:'complete'});
+  expect(f.client.patchWithOptions).toHaveBeenCalledTimes(1);
+  expect(f.client.patchWithOptions.mock.calls[0][2]).toEqual({'If-Match':'W/"300"'});
+  expect(f.journal.dispatch).toHaveBeenCalledWith(RUN,2);
+});
+test('a 412 then explicit owner recovery finalizes successfully with a new attempt', async () => {
+  const f=fixture(); f.client.patchWithOptions.mockResolvedValueOnce({ok:false,status:412});
+  await expect(finalizeReadiness({...f,confirm:true})).rejects.toThrow('refused');
+  await recoverReadiness({...f,confirmRequestId:DEST});f.row['@odata.etag']='W/"400"';
+  await finalizeReadiness({...f,confirm:true});expect(f.client.patchWithOptions).toHaveBeenCalledTimes(2);
+  expect(f.journal.dispatch.mock.calls.map(call=>call[1])).toEqual([1,2]);
+});
+
+test.each([['needs_attention',true,'readiness_unexpected_effects'],['needs_attention',false,'readiness_etag_conflict'],['abandoned',false,'readiness_patch_refused']])('inspection preserves %s diagnostics without authorizing a write', async (status,ready,error) => {
+  const f=fixture({ready,entry:{status,attempt:1,error,effects:{kind:'readiness_finalization'}}});
+  expect(await finalizeReadiness(f)).toMatchObject({written:false,ready,journalStatus:status,attempt:1,error,effects:{kind:'readiness_finalization'}});
+  expect(f.journal.plan).not.toHaveBeenCalled();expect(f.client.patchWithOptions).not.toHaveBeenCalled();
+  if(status==='needs_attention')await expect(finalizeReadiness({...f,confirm:true})).rejects.toThrow('owner inspection');
 });
