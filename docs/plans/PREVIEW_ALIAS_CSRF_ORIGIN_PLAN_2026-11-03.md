@@ -7,6 +7,9 @@ check rejects alias-hosted POSTs".
 
 ## Problem
 
+Line references to `lib/utils/auth.js` in this plan are pre-change
+positions (commit `d3016b5da`).
+
 `validateOrigin` in `lib/utils/auth.js:61-119` guards every state-changing staff
 API request (POST/PUT/PATCH/DELETE) through `requireAuth` (`:160`) and
 `requireAppAccess` (`:318`). It compares the request's Origin (or Referer)
@@ -125,6 +128,9 @@ Extend the Preview block in `tests/unit/utils/auth.test.js` (around `:420-480`):
   row today. The guard is shared by every `requireAuth`/`requireAppAccess` route,
   not per-route, so no per-route row changes; add one sentence describing the
   Preview origin set only if the matrix has a shared-guard section to hold it.
+  [VERIFIED via grep at build] It has none (the App guard row at `:91` names
+  `requireAppAccess` without describing Origin checks), so the matrix is
+  unchanged. The agent wiki `topics/security-auth.md` was updated instead.
 
 ## Release and verification
 

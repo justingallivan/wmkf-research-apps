@@ -65,7 +65,10 @@ not a current authority.
 - The Origin/Referer check fails closed on missing or invalid allowed-origin
   configuration whenever `NODE_ENV=production`. Preview deliberately omits the
   fixed Production `NEXTAUTH_URL` and derives its allowed origin from
-  `VERCEL_URL`; request headers never supply the allowlist. Cookie-free,
+  `VERCEL_URL`, plus the registered stable alias
+  `wmkfresearchapps-preview.vercel.app` (tracked constant, Preview only, added
+  only after a valid primary origin); request headers never supply the
+  allowlist. Cookie-free,
   headerless server-to-server calls retain their existing exemption.
 - Cron bearer-secret checks share `lib/utils/cron-auth.js` `constantTimeEqual`.
   The shared `verifyCronSecret` keeps its local-development bypass, while
@@ -165,8 +168,9 @@ Entra redirect registration before any domain change.
   var.
 - Preview env should NOT carry a fixed `NEXTAUTH_URL` or preview-deployment
   sign-in/writes break. In production-mode Preview, `lib/utils/auth.js` derives
-  the allowed Origin/Referer value from `VERCEL_URL` and fails closed if neither
-  is usable; see `project-branded-domains.md`.
+  the allowed Origin/Referer value from `VERCEL_URL` (also accepting the stable
+  alias) and fails closed if neither primary value is usable; see
+  `project-branded-domains.md` and `docs/AUTHENTICATION_SETUP.md` Step 2.4.
 
 ## Trust-Boundary GUID Validation
 
