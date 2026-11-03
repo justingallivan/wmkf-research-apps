@@ -96,6 +96,7 @@ it('golden: single-row full envelope pinned (every mapRow field)', async () => {
       version: 3,
       isCurrent: true,
       hasCurrent: true,
+      isRetired: false,
       status: 'Published',
       systemPrompt: 'sys',
       body: 'body-text',
