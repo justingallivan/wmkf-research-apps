@@ -6,6 +6,14 @@ const sessions = [
   { sessionId: 'first', scheduledStartIso: '2026-11-03T18:00:00Z', ianaTimeZone: 'America/Los_Angeles', location: 'Virtual meeting', status: 100000000 },
   { sessionId: 'second', scheduledStartIso: '2026-11-03T21:00:00Z', ianaTimeZone: 'America/Los_Angeles', location: 'Conference room', status: 100000001 },
 ];
+// Freeze only Date before the fixture sessions so "upcoming" does not expire; timers stay real.
+beforeEach(() => {
+  jest.useFakeTimers({
+    now: new Date('2026-11-01T12:00:00Z'),
+    doNotFake: ['hrtime', 'nextTick', 'performance', 'queueMicrotask', 'requestAnimationFrame', 'cancelAnimationFrame', 'requestIdleCallback', 'cancelIdleCallback', 'setImmediate', 'clearImmediate', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'],
+  });
+});
+afterEach(() => jest.useRealTimers());
 const response = (data, ok = true) => ({ ok, json: async () => data });
 const detail = (id, title) => ({ session: { sessionId: id }, slots: [{ wmkf_deliberationslotid: id, wmkf_minutes: 30, wmkf_Request: { akoya_requestnum: '123456', akoya_title: title } }] });
 
