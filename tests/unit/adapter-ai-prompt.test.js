@@ -259,3 +259,18 @@ describe('aiPrompt.updateCatalog', () => {
     u.mockRestore();
   });
 });
+
+describe('aiPrompt.retire', () => {
+  test('clears iscurrent and stamps Retired in one If-Match write', async () => {
+    const u = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue({});
+    await aiPrompt.retire(GUID_A, { ifMatch: 'W/"2"' });
+    expect(u).toHaveBeenCalledWith('wmkf_ai_prompts', GUID_A, { wmkf_ai_iscurrent: false, wmkf_ai_promptstatus: 682090002 }, { ifMatch: 'W/"2"' });
+    u.mockRestore();
+  });
+  test('refuses a missing If-Match', () => {
+    const u = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue({});
+    expect(() => aiPrompt.retire(GUID_A)).toThrow(/If-Match/);
+    expect(u).not.toHaveBeenCalled();
+    u.mockRestore();
+  });
+});

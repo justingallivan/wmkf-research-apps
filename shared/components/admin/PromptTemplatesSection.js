@@ -14,7 +14,7 @@ import { useEffect, useRef, useState } from 'react';
 import DataverseFieldInfoButton from './DataverseFieldInfoButton';
 import { requestEnvelope } from '../../utils/api-request';
 import { ExecutorBudgetEditor } from './ExecutorBudgetEditor';
-import { TONE, fmtTs, fmtInt, ROW_DEFAULT_MAX_TOKENS } from './prompt-editor-utils';
+import { TONE, fmtTs, fmtInt, ROW_DEFAULT_MAX_TOKENS, newRequestId } from './prompt-editor-utils';
 import PublishForm from './PromptPublishForm';
 import PromptCatalogForm from './PromptCatalogForm';
 import AddPromptForm from './AddPromptForm';
@@ -52,6 +52,8 @@ const STATUS_COPY = {
   invalid_catalog:       { tone: 'red',   text: 'Those details could not be saved.' },
   created:               { tone: 'green', text: 'Prompt created and published as v1.' },
   groups_saved:          { tone: 'green', text: 'Groups saved.' },
+  retired:               { tone: 'green', text: 'Prompt retired. Apps can no longer use it. It is listed under Retired prompts; use Review & publish there to bring it back.' },
+  retire_blocked_application: { tone: 'red', text: 'This prompt is marked Application caller, so it can’t be retired here.' },
   name_exists:           { tone: 'red',   text: 'A prompt with that name already exists. Use Edit & publish to change it.' },
   invalid_name:          { tone: 'red',   text: 'That name is not allowed.' },
   invalid_input:         { tone: 'red',   text: 'The prompt could not be created.' },
@@ -126,8 +128,10 @@ export default function PromptTemplatesSection() {
   if (!prompts || prompts.length === 0) return <div className="text-gray-500 text-sm">No prompts found.</div>;
 
   const allGroups = groupState.groups;
+  const activePrompts = prompts.filter(prompt => !prompt.isRetired);
+  const retiredPrompts = prompts.filter(prompt => prompt.isRetired);
   const groups = allGroups.map(group => ({
-    ...group, prompts: prompts.filter(prompt => resolveAdminPromptDescription(prompt, allGroups).group === group.id),
+    ...group, prompts: activePrompts.filter(prompt => resolveAdminPromptDescription(prompt, allGroups).group === group.id),
   })).filter(group => group.prompts.length > 0);
   const terms = search.toLowerCase().trim().split(/\s+/).filter(Boolean);
   const matchingNames = new Set(prompts.filter(prompt => {
@@ -215,7 +219,7 @@ export default function PromptTemplatesSection() {
             onChange={event => {
               const value = event.target.value;
               setSearch(value);
-              setExpandedGroups(value.trim() ? Object.fromEntries(allGroups.map(group => [group.id, true])) : {});
+              setExpandedGroups(value.trim() ? { ...Object.fromEntries(allGroups.map(group => [group.id, true])), __retired: true } : {});
             }}
             placeholder="Search titles, descriptions, technical keys or Used by"
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500"
@@ -248,6 +252,20 @@ export default function PromptTemplatesSection() {
             </div>
           </details>
         ))}
+        {retiredPrompts.length > 0 && (
+          <details hidden={matchCount(retiredPrompts) === 0} open={expandedGroups.__retired || undefined} className="rounded-lg border border-dashed border-gray-300">
+            <summary onClick={event => {
+              event.preventDefault();
+              setExpandedGroups(current => ({ ...current, __retired: !current.__retired }));
+            }} className="cursor-pointer rounded-lg bg-gray-50 p-4 text-sm font-semibold text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500">
+              Retired prompts ({matchCount(retiredPrompts)})
+            </summary>
+            <div className="space-y-6 p-4">
+              <p className="text-sm text-gray-600">Apps can’t use these. Use Review &amp; publish on one to bring it back as a new version.</p>
+              {retiredPrompts.map(renderPrompt)}
+            </div>
+          </details>
+        )}
         {executorBudgetError && (
           <div className={`text-xs px-3 py-2 rounded border ${TONE.red}`}>
             {executorBudgetError}. Prompt editing remains available.
@@ -268,9 +286,36 @@ function PromptPanel({ prompt, groups, modelCatalog, executorBudgetConfig, onPub
   const [expanded, setExpanded] = useState(false);
   const [editingDetails, setEditingDetails] = useState(false);
   const [outcome, setOutcome] = useState(null);
+  const [confirmingRetire, setConfirmingRetire] = useState(false);
+  const [retiring, setRetiring] = useState(false);
+  const retireRequest = useRef(null);
   const dataverseFields = buildPromptDataverseFields(prompt);
   const description = resolveAdminPromptDescription(prompt, groups);
   const usage = USAGE_BADGES[description.usage];
+  const retireBlocked = description.usage === 'application';
+  const retire = async () => {
+    setRetiring(true);
+    // One request id per confirmation, so a retried click replays instead of repeating.
+    if (!retireRequest.current) retireRequest.current = newRequestId();
+    try {
+      const envelope = await requestEnvelope(`/api/admin/prompts/${encodeURIComponent(prompt.name)}`, {
+        method: 'POST',
+        body: { action: 'retire', expectedVersion: prompt.version, requestId: retireRequest.current },
+      });
+      const { data } = envelope;
+      if (data.status === 'completed' || data.status === 'already_published') {
+        setOutcome({ status: 'retired' });
+        setConfirmingRetire(false);
+        retireRequest.current = null;
+        onPublished();
+      } else if (!envelope.ok && !data.status) setOutcome({ status: 'failed', warnings: [envelope.error.message] });
+      else setOutcome(data);
+    } catch (err) {
+      setOutcome({ status: 'failed', warnings: [err.message] });
+    } finally {
+      setRetiring(false);
+    }
+  };
   return (
     <article aria-label={description.title} className="border rounded-lg overflow-hidden">
       <div className="p-4 bg-gray-50 border-b flex flex-wrap items-start justify-between gap-3">
@@ -280,7 +325,11 @@ function PromptPanel({ prompt, groups, modelCatalog, executorBudgetConfig, onPub
             <span className={`px-2 py-0.5 rounded border text-xs ${TONE[usage.tone]}`}>
               {usage.label}
             </span>
-            {!prompt.hasCurrent && (
+            {prompt.isRetired ? (
+              <span className="px-2 py-0.5 rounded border bg-gray-100 text-gray-600 border-gray-300 text-xs">
+                retired
+              </span>
+            ) : !prompt.hasCurrent && (
               <span className="px-2 py-0.5 rounded border bg-amber-50 text-amber-800 border-amber-200 text-xs">
                 draft — no published version
               </span>
@@ -317,8 +366,30 @@ function PromptPanel({ prompt, groups, modelCatalog, executorBudgetConfig, onPub
           >
             {expanded ? 'Cancel' : (prompt.hasCurrent ? 'Edit & publish' : 'Review & publish')}
           </button>
+          {prompt.hasCurrent && (
+            <button
+              type="button"
+              onClick={() => { setConfirmingRetire(true); setExpanded(false); setEditingDetails(false); }}
+              disabled={retireBlocked}
+              title={retireBlocked ? 'Marked Application caller: an app may depend on this prompt, so it can’t be retired here.' : undefined}
+              className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Retire
+            </button>
+          )}
         </div>
       </div>
+      {confirmingRetire && (
+        <div role="group" aria-label="Confirm retire" className={`p-4 border-b text-sm ${TONE.amber}`}>
+          <p>Retire this prompt? Apps can no longer use it. Nothing is deleted: it moves to Retired prompts, and Review &amp; publish brings it back as a new version.</p>
+          <div className="mt-2 flex justify-end gap-3">
+            <button type="button" onClick={() => setConfirmingRetire(false)} className="text-xs text-gray-700 hover:text-gray-900">Cancel</button>
+            <button type="button" onClick={retire} disabled={retiring} className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded hover:bg-gray-800 disabled:opacity-40">
+              {retiring ? 'Retiring…' : 'Retire prompt'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {editingDetails && (
         <PromptCatalogForm

@@ -388,3 +388,34 @@ describe('Manage groups', () => {
     expect(await within(panel).findByRole('alert')).toHaveTextContent('Groups changed since you opened them');
   });
 });
+
+describe('Retire', () => {
+  test('a published unconnected prompt can be retired after confirming', async () => {
+    serve([{ ...prompt('phase-i.checkin'), hasCurrent: true }]);
+    await renderOpenWorkflows();
+    const card = await screen.findByRole('article', { name: 'Phase I application and budget checks' });
+    fireEvent.click(within(card).getByRole('button', { name: 'Retire' }));
+    const confirm = within(card).getByRole('group', { name: 'Confirm retire' });
+    expect(confirm).toHaveTextContent('Nothing is deleted');
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Retire prompt' }));
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/admin/prompts/phase-i.checkin', expect.objectContaining({ method: 'POST' })));
+    const post = global.fetch.mock.calls.find(([url, init]) => url === '/api/admin/prompts/phase-i.checkin' && init?.method === 'POST');
+    expect(JSON.parse(post[1].body)).toMatchObject({ action: 'retire', expectedVersion: 1, requestId: expect.any(String) });
+  });
+
+  test('Retire is disabled for an Application caller prompt', async () => {
+    serve([prompt('review-synthesis.generate')]);
+    await renderOpenWorkflows();
+    const card = await screen.findByRole('article', { name: 'Synthesize submitted human peer reviews' });
+    expect(within(card).getByRole('button', { name: 'Retire' })).toBeDisabled();
+  });
+
+  test('retired prompts are listed in their own collapsed section', async () => {
+    serve([prompt('phase-i.summary'), { ...prompt('phase-i.checkin', false), isRetired: true }]);
+    await renderOpenWorkflows();
+    const retired = screen.getByText(/^Retired prompts \(1\)/).closest('details');
+    expect(within(retired).getByRole('article', { name: 'Phase I application and budget checks' })).toBeInTheDocument();
+    expect(within(retired).getByText('retired')).toBeInTheDocument();
+    expect(within(retired).getByRole('button', { name: 'Review & publish' })).toBeInTheDocument();
+  });
+});

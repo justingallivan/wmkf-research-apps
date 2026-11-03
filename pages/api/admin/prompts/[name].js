@@ -10,6 +10,9 @@
  * PUT  — publish a new version (or, for a draft-only name, the first version,
  *        copied from the latest draft row). Body:
  *        { body, systemPrompt?, variables?, outputSchema?, model?, maxTokens?, expectedVersion?, requestId? }.
+ * POST  — { action: 'retire', expectedVersion?, requestId? }: retire the prompt
+ *         (clear the current row, stamp Retired; refused for application usage).
+ *         See retirePrompt in lib/services/admin/prompts-publish-service.js.
  * PATCH — edit catalog details in place (no new version). Body:
  *        { rowId, expected, catalog } — see lib/services/admin/prompts-catalog-service.js.
  *
@@ -23,12 +26,12 @@
 import { requireSuperuser } from '../../../../lib/utils/auth';
 import { withDalContext } from '../../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../../lib/services/service-http-error';
-import { getPrompt, publishPrompt } from '../../../../lib/services/admin/prompts-publish-service';
+import { getPrompt, publishPrompt, retirePrompt } from '../../../../lib/services/admin/prompts-publish-service';
 import { updatePromptCatalog } from '../../../../lib/services/admin/prompts-catalog-service';
 import { isGuid } from '../../../../lib/utils/guid';
 
 export default async function handler(req, res) {
-  if (req.method !== 'GET' && req.method !== 'PUT' && req.method !== 'PATCH') {
+  if (req.method !== 'GET' && req.method !== 'PUT' && req.method !== 'PATCH' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
   const gate = await requireSuperuser(req, res);
@@ -42,6 +45,20 @@ export default async function handler(req, res) {
       if (req.method === 'GET') {
         try {
           return res.json(await getPrompt(name));
+        } catch (err) {
+          if (err instanceof ServiceHttpError) {
+            return res.status(err.httpStatus).json(err.body ?? { error: err.message });
+          }
+          throw err;
+        }
+      }
+      if (req.method === 'POST') {
+        const { action, expectedVersion, requestId } = req.body || {};
+        if (action !== 'retire') return res.status(400).json({ status: 'invalid_action', error: 'Unknown action.' });
+        try {
+          return res.status(200).json(await retirePrompt({
+            name, expectedVersion, requestId: requestId || undefined, profileId: gate.profileId,
+          }));
         } catch (err) {
           if (err instanceof ServiceHttpError) {
             return res.status(err.httpStatus).json(err.body ?? { error: err.message });

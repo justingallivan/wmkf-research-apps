@@ -242,7 +242,9 @@ export default function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome
 
       {!prompt.hasCurrent && (
         <div className="text-xs px-3 py-2 rounded border bg-amber-50 text-amber-800 border-amber-200">
-          This prompt has no published version yet. Publishing copies the draft (with any edits above) into a new version v{(prompt.version ?? 0) + 1} and makes it live. The draft row in Dataverse is left unchanged.
+          {prompt.isRetired
+            ? <>This prompt is retired. Publishing copies its last version (with any edits above) into a new version v{(prompt.version ?? 0) + 1} and makes it live again.</>
+            : <>This prompt has no published version yet. Publishing copies the draft (with any edits above) into a new version v{(prompt.version ?? 0) + 1} and makes it live. The draft row in Dataverse is left unchanged.</>}
         </div>
       )}
 
