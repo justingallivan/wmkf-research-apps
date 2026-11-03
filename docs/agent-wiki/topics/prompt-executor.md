@@ -214,8 +214,8 @@ audit 2026-09-18: 8 current prompts, e.g. `cycle-dossier.research-plan` on Opus 
   (PR #612, merge `2eb0058cc`; owner smoke pending). Editable prompt groups
   (**Manage groups**, setting `promptLibrary.groups`) are production-live
   (PR #613, merge `acab577bc`; owner smoke pending).
-  Admin **Retire** (status Retired, blocked for Application caller) is built on
-  branch `claude/prompt-retire`, not deployed. See
+  Admin **Retire** (status Retired, blocked for Application caller) is production-live
+  (PR #616, merge `e77e80aba`). See
   `docs/plans/SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md`.
 
 ## Standard Probe

@@ -94,7 +94,7 @@ From the branch plan's "Outcome and boundary" section:
   a form in Admin and publish it as v1, with no Dataverse editing. Publish and
   create also declare new `{{placeholders}}` automatically. Plan:
   [ADMIN_ADD_PROMPT_PLAN_2026-11-02.md](ADMIN_ADD_PROMPT_PLAN_2026-11-02.md).
-- **Retire a prompt.** [BUILT ON BRANCH `claude/prompt-retire` 2026-11-02; NOT DEPLOYED] Owner decisions 2026-11-02: retire, not
+- **Retire a prompt.** [PRODUCTION-LIVE 2026-11-02: PR #616, merge `e77e80aba`] Owner decisions 2026-11-02: retire, not
   delete; blocked for prompts marked Application caller; retired prompts are
   listed in their own collapsed section. Retire clears the live version and
   stamps status Retired; Review & publish brings it back as a new version.
