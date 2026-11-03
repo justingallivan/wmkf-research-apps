@@ -437,4 +437,13 @@ client on `POSTGRES_URL` for per-query cancellation.
   check, unique key and index, 0 rows [VERIFIED via read-only query].
 - Not done: Dataverse timestamp precision was not probed (the one-second
   match window covers both cases); the owner-present proof (step 2).
+- Preview proof attempt 2026-11-03 (owner-authorized Chrome use): the stable
+  alias was moved to PR deployment `dpl_DLWE5GaFurfY8uYFUA6E72FgBBF5` and
+  sign-in worked, but every `GET /api/review-manager/reviewers` returned 500.
+  [VERIFIED via Vercel function logs] Preview's Dataverse calls target
+  Production and the target interlock denies them ("prod read denied —
+  DATAVERSE_ALLOW_PROD_READS not set to yes"), so neither the list nor a
+  reminder send can run on Preview; unrelated to this change. Alias restored
+  to `dpl_cgM9vNTVdC1DAUMR55ZQSBdt9Nt2` and verified. The proof (step 2) can
+  only run in Production, on a Factory test request, after merge.
 
