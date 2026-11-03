@@ -165,3 +165,25 @@ test('failure path: no active Dynamics systemuser for the PD email → 404', asy
 
   expect(res.status).toHaveBeenCalledWith(404);
 });
+
+test.each([true, false])('J27 pending-committee route preserves DTO/counts and readiness=%s', async (ready) => {
+  resolveByEmail.mockResolvedValue(PD);
+  DynamicsService.queryAllRecords.mockImplementation(async (entity, options) => {
+    if (entity === 'akoya_requests') {
+      expect(options.filter).toBe("_wmkf_programdirector_value eq pd-1 and wmkf_GrantCycle/wmkf_cyclecode eq 'J27' and akoya_requeststatus eq 'Phase II Pending' and (wmkf_phaseiistatus eq null or wmkf_phaseiistatus eq 100000002)");
+      return { records: [{
+        akoya_requestid: 'r-j27', akoya_requestnum: 'J27-example',
+        wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, wmkf_readyforreview: ready,
+        akoya_requeststatus: 'Phase II Pending', wmkf_phaseiistatus: 100000002,
+        wmkf_phaseiistatus_formatted: 'Phase II Pending Committee Review',
+      }] };
+    }
+    return { records: [{ _wmkf_request_value: 'r-j27', wmkf_invited: true }] };
+  });
+  const res = createMockRes();
+  await handler(createMockReq({ method: 'GET', query: { cycleCode: 'J27' } }), res);
+  expect(res.status).toHaveBeenCalledWith(200);
+  expect(res._data.proposals).toHaveLength(ready ? 1 : 0);
+  if (ready) expect(res._data.proposals[0]).toMatchObject({ requestId: 'r-j27', phaseIIStatus: 'Phase II Pending Committee Review', reviewerInvited: 1 });
+  else expect(DynamicsService.queryAllRecords).toHaveBeenCalledTimes(1);
+});

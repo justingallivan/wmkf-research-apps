@@ -1,6 +1,7 @@
 # J27 staff dashboard and actionable reviewer eligibility
 
-Status: **PLANNED; no runtime changes.** Owner: Codex, 2026-11-02 Pacific.
+Status: **PARTIAL: Reviewer Finder compatibility implemented on a feature branch;
+Phase I dashboard/workflow deferred by owner. Not deployed.** Owner: Codex, 2026-11-02 Pacific.
 Scope: two additive J27-and-later eligibility changes. D26 and earlier behavior
 and the deployed readiness gate remain intact.
 
@@ -26,7 +27,7 @@ The existing Atlas records Phase II Pending Committee Review as raw option
 constant, not labels or an unexplained repeated number. This plan performed no
 new Production reads or status writes.
 
-## Verified gaps and source trace
+## Baseline gaps and source trace (before this fix)
 
 [VERIFIED via branch source at `5349a3542`, plus local read-only evidence commit
 `74c37f6a5`; not a claim that the proposed feature is built]
@@ -76,7 +77,7 @@ scope=all, includeSetAside or status=all is selected; no test/superuser bypass.
 
 ## Staff list presentation
 
-[PROPOSED; explicit preference question sent to Justin]
+[DEFERRED BY OWNER 2026-11-02; requires broader workflow review, not approval to build]
 Use the existing list layout and controls, with a minimal Phase I variant:
 
 - Identify a Phase I row as **Staff review** and link to the Proposal tab.
@@ -216,11 +217,29 @@ Meeting Tracker's default path also calls `loadDashboard`, and an unchanged
 both are accounted for here. No runtime prototype, new live schema query or
 Phase-I-ready Production positive was tested by this planning pass.
 
-Verdict: **READY FOR IMPLEMENTATION REVIEW**, with Phase I presentation proposed
-for owner confirmation. Eligibility decisions are explicit; future J27 staff-state
-fields and rerun mechanics are not prerequisites for this limited increment.
+Current bounded implementation: `lib/services/reviewer-finder/my-proposals-service.js`
+now adds the 100000002 alternative only in J27+ actionable queries. Pre-J27,
+status=all, readiness, PD/cycle constraints, projections and suggestion hydration
+are retained. Service/route tests exercise all eight Phase II options plus unknown,
+null, old/new cycles, readiness negatives and the formatted-label response.
+
+Owner scope decision: defer the Phase I presentation and broader workflow; the
+above staff design is a draft, not a confirmed brief or build authorization.
+Only the independent Reviewer Finder compatibility fix is authorized tonight.
+No Factory status writes or dashboard/UI changes are included.
+
+## Historical planning-pass verification (before the Reviewer Finder build)
 
 Planning checks: all 11 scoped documentation gate/self-test commands passed;
 `git diff --check` passed. Independent read-only review checked service routing,
 legacy presentation and the explicit null DTO contract. No runtime edits,
 live calls or rollout actions were performed.
+
+## Reviewer Finder build verification
+
+[VERIFIED locally, 2026-11-02] All 54 targeted service/route/readiness tests
+passed. Scoped ESLint passed. Independent read-only source review reported no
+material findings. No live calls, business-record writes, merge or deployment
+were performed for this compatibility change. All 18 scoped gate/self-test commands (including the J27 register pair),
+type check and production build passed. Phase I dashboard and Factory work
+remain deferred.

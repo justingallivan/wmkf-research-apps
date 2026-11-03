@@ -208,3 +208,61 @@ test.each([undefined, 'J27'])('refuses incomplete %s discovery rather than retur
   queryAllRequests.mockResolvedValue({ records: [], capped: true });
   await expect(getMyProposals({ azureEmail: EMAIL, cycleCode })).rejects.toMatchObject({ httpStatus: 503 });
 });
+
+// Interpret the two emitted phase predicates against real-shaped rows. The
+// expected set below is independent of the service's cutover calculation.
+function phaseQueryRecords(records, filter) {
+  const expanded = filter.includes('(wmkf_phaseiistatus eq null or wmkf_phaseiistatus eq 100000002)');
+  const nullOnly = filter.includes('and wmkf_phaseiistatus eq null');
+  return records.filter((r) => r.akoya_requeststatus === 'Phase II Pending'
+    && (!expanded && !nullOnly || r.wmkf_phaseiistatus == null || expanded && r.wmkf_phaseiistatus === 100000002));
+}
+
+const PHASE_II_OPTIONS = [100000000, 100000001, 100000002, 100000003, 100000004, 100000005, 707510001, 707510002, 999999999];
+
+test.each([
+  ['J25', ['null']], ['D26', ['null']],
+  ['j27', ['null', '100000002']], ['D27', ['null', '100000002']], ['J28', ['null', '100000002']],
+])('%s actionable admits only its allowed Phase II states', async (cycleCode, expected) => {
+  const records = [null, ...PHASE_II_OPTIONS].map((value) => ({
+    akoya_requestid: String(value), akoya_requestnum: String(value),
+    akoya_requeststatus: 'Phase II Pending', wmkf_phaseiistatus: value,
+    wmkf_phaseiistatus_formatted: value === 100000002 ? 'Phase II Pending Committee Review' : null,
+    wmkf_GrantCycle: { wmkf_cyclecode: cycleCode.toUpperCase() }, wmkf_readyforreview: true,
+  }));
+  // The new option is also present on a Phase I / declined / concept request:
+  // none may leak through the parenthesized OR branch.
+  for (const status of ['Phase I Pending', 'Phase I Declined', 'Concept Pending']) {
+    records.push({ ...records[3], akoya_requestid: status, akoya_requeststatus: status });
+  }
+  queryAllRequests.mockImplementation(async ({ filter }) => ({ records: phaseQueryRecords(records, filter) }));
+  const result = await getMyProposals({ azureEmail: EMAIL, cycleCode });
+  expect(result.proposals.map((r) => r.requestId)).toEqual(expected);
+  const { filter } = queryAllRequests.mock.calls[0][0];
+  const expectedPhase = expected.length === 2
+    ? '(wmkf_phaseiistatus eq null or wmkf_phaseiistatus eq 100000002)'
+    : 'wmkf_phaseiistatus eq null';
+  expect(filter).toBe(`_wmkf_programdirector_value eq pd-1 and wmkf_GrantCycle/wmkf_cyclecode eq '${cycleCode.toUpperCase()}' and akoya_requeststatus eq 'Phase II Pending' and ${expectedPhase}`);
+  if (expected.length === 2) expect(result.proposals[1].phaseIIStatus).toBe('Phase II Pending Committee Review');
+});
+
+test.each([false, null, undefined, 1, 'true'])('explicit J27 pending-committee status does not bypass readiness %s', async (ready) => {
+  queryAllRequests.mockResolvedValue({ records: [{
+    akoya_requestid: 'unready', akoya_requestnum: 'unready',
+    akoya_requeststatus: 'Phase II Pending', wmkf_phaseiistatus: 100000002,
+    wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, wmkf_readyforreview: ready,
+  }] });
+  expect((await getMyProposals({ azureEmail: EMAIL, cycleCode: 'J27' })).proposals).toEqual([]);
+  expect(queryAllSuggestions).not.toHaveBeenCalled();
+});
+
+test.each(['D26', 'J27'])('%s status=all retains its prior phase-unrestricted query', async (cycleCode) => {
+  const records = [null, ...PHASE_II_OPTIONS].map((value) => ({
+    akoya_requestid: String(value), akoya_requestnum: String(value),
+    akoya_requeststatus: 'Phase II Pending', wmkf_phaseiistatus: value,
+    wmkf_GrantCycle: { wmkf_cyclecode: cycleCode }, wmkf_readyforreview: true,
+  }));
+  queryAllRequests.mockImplementation(async ({ filter }) => ({ records: phaseQueryRecords(records, filter) }));
+  expect((await getMyProposals({ azureEmail: EMAIL, cycleCode, status: 'all' })).proposals).toHaveLength(records.length);
+  expect(queryAllRequests.mock.calls[0][0].filter).toBe(`_wmkf_programdirector_value eq pd-1 and wmkf_GrantCycle/wmkf_cyclecode eq '${cycleCode}' and akoya_requeststatus eq 'Phase II Pending'`);
+});

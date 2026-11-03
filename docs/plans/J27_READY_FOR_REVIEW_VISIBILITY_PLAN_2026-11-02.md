@@ -106,10 +106,12 @@ remain outside the dashboard discovery gate.
 [VERIFIED via existing source] An untriaged Phase I Pending row still fails the
 Workbench lifecycle predicate, even when ready. The J27 staff-intake-list work
 must add submitted-stage/staff-state eligibility separately. Reviewer Finder's
-actionable filter still requires null Phase II Status; Connor's advanced J27
-contract specifies Phase II Pending Committee Review. That compatibility change
-also remains separate. This gate does not promise those rows become visible
-where existing lifecycle rules exclude them.
+actionable filter historically required null Phase II Status; Connor's advanced
+J27 contract specifies Phase II Pending Committee Review. The separate feature
+branch `codex/j27-actionable-reviewers` adds that option for J27+ actionable reads,
+retaining readiness and earlier-cycle rules (not deployed). The Phase I dashboard
+and broader workflow remain owner-deferred. This readiness gate alone does not
+promise visibility where existing lifecycle rules exclude a row.
 
 `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md` D25 describes an upstream files-ready
 trigger for AI. This downstream assembly-and-AI completion marker does not prove
