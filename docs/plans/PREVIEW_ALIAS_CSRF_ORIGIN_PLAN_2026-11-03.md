@@ -1,7 +1,8 @@
 # Preview alias CSRF origin fix
 
-Status: **PLAN — not built. Owner decisions D1–D2 open.** Session 661, Claude,
-2026-11-03. Queue entry: `docs/CURRENT_WORK_QUEUE.md` → "Preview CSRF origin
+Status: **BUILT ON BRANCH `claude/preview-alias-csrf`, NOT MERGED; Preview proof
+pending.** Owner approved D1 (tracked constant) and D2 (Dynamics Explorer chat
+empty-message POST) on 2026-11-03. Session 661, Claude, 2026-11-03. Queue entry: `docs/CURRENT_WORK_QUEUE.md` → "Preview CSRF origin
 check rejects alias-hosted POSTs".
 
 ## Problem
@@ -80,8 +81,8 @@ scope without review.
 
 A browser sends `Origin: https://wmkfresearchapps-preview.vercel.app` only from
 a page served on that alias, which is always a deployment of this project's own
-code. [ASSUMED — verify against publicsuffix.org before build] `vercel.app` is
-on the Public Suffix List, so other people's `vercel.app`
+code. [VERIFIED via `public_suffix_list.dat` line 16327, fetched 2026-11-03]
+`vercel.app` is on the Public Suffix List, so other people's `vercel.app`
 sites are separate sites and cannot use our origin. Accepting the alias therefore
 admits our own Preview code, possibly from a different branch than the receiving
 deployment, not third parties. Non-browser callers can forge Origin, but they
@@ -167,8 +168,8 @@ relative `fetch` (Origin = alias) → `requireAuth`/`requireAppAccess` →
 `validateOrigin` → route. Durable surfaces: no route added, so
 `check:api-routes` and `CANONICAL_COUNTS` are unaffected. Named changes applied:
 the invariant table above, the inherited-caller list, and the limiter
-resolution. Verdict: **READY WITH NAMED CHANGES (applied)**, pending owner
-decisions D1–D2 and the Public Suffix List check.
+resolution. Verdict: **READY WITH NAMED CHANGES (applied)**, owner decisions
+D1–D2 since approved and the Public Suffix List check since verified.
 
 ## Scope
 
