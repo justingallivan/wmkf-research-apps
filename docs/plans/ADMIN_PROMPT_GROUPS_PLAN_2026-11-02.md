@@ -15,7 +15,7 @@ related:
 # Admin prompt groups
 
 [OWNER APPROVED 2026-11-02: settings-row history is enough; pinned groups stay
-fixed. BUILT ON BRANCH `claude/admin-prompt-groups`; NOT DEPLOYED.]
+fixed. PRODUCTION-LIVE 2026-11-02: PR #613, merge `acab577bc`; owner smoke pending.]
 
 ## Why
 

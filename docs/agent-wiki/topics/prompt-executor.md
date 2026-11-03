@@ -212,8 +212,8 @@ audit 2026-09-18: 8 current prompts, e.g. `cycle-dossier.research-plan` on Opus 
   owner smoke pending). An Admin **Add prompt** form (new name → v1, placeholders
   declared automatically, also on Edit & publish) is production-live
   (PR #612, merge `2eb0058cc`; owner smoke pending). Editable prompt groups
-  (**Manage groups**, setting `promptLibrary.groups`) are built on branch
-  `claude/admin-prompt-groups`, not deployed. See
+  (**Manage groups**, setting `promptLibrary.groups`) are production-live
+  (PR #613, merge `acab577bc`; owner smoke pending). See
   `docs/plans/SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md`.
 
 ## Standard Probe

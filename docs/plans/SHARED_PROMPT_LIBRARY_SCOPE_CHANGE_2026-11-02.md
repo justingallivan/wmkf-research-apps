@@ -94,7 +94,7 @@ From the branch plan's "Outcome and boundary" section:
   a form in Admin and publish it as v1, with no Dataverse editing. Publish and
   create also declare new `{{placeholders}}` automatically. Plan:
   [ADMIN_ADD_PROMPT_PLAN_2026-11-02.md](ADMIN_ADD_PROMPT_PLAN_2026-11-02.md).
-- **Editable groups.** [BUILT ON BRANCH `claude/admin-prompt-groups` 2026-11-02; NOT DEPLOYED] Superusers add, rename and reorder prompt
+- **Editable groups.** [PRODUCTION-LIVE 2026-11-02: PR #613, merge `acab577bc`; owner smoke pending] Superusers add, rename and reorder prompt
   groups in Admin (**Manage groups**); no sections for new groups and no
   deletion. Plan: [ADMIN_PROMPT_GROUPS_PLAN_2026-11-02.md](ADMIN_PROMPT_GROUPS_PLAN_2026-11-02.md).
 - **Organizing fields.** [DONE 2026-11-02] Admin shows, carries forward and
