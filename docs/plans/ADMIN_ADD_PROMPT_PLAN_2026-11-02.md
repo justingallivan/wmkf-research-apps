@@ -14,8 +14,8 @@ related:
 # Admin "Add prompt" form
 
 [OWNER APPROVED 2026-11-02: name format yes; Edit & publish also declares new
-placeholders, yes; superuser-only, yes. BUILT ON BRANCH
-`claude/admin-add-prompt`; NOT DEPLOYED.]
+placeholders, yes; superuser-only, yes. PRODUCTION-LIVE: PR #612,
+merge `2eb0058cc`; owner smoke pending.]
 
 ## Why
 
