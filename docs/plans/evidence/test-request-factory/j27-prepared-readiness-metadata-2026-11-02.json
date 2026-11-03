@@ -1,0 +1,10 @@
+{
+  "checkedAt": "2026-11-03T04:41:28.095Z",
+  "readOnly": true,
+  "field": {
+    "logicalName": "wmkf_readyforreview",
+    "type": "Boolean",
+    "createable": true,
+    "updateable": true
+  }
+}

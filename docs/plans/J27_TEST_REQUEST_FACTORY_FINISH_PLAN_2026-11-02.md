@@ -1,6 +1,6 @@
 # Finish the J27 Test Request Factory
 
-Status: **PLANNED; prepared reviewer-workflow fixtures are the owner-selected starting point.**
+Status: **BRANCH IMPLEMENTATION; Fable correction review and release/live proof remain pending.**
 Owner: Codex. Date: 2026-11-02 Pacific.
 Boundary: finish the Factory for reviewer testing; broader PD workflow stays deferred.
 
@@ -29,10 +29,11 @@ copy a source's readiness value or claim it reran assembly/AI processing.
 Before finalization readiness must be false/unset; a partial fixture must not
 become visible prematurely. Factory provisioning success and staff-readiness
 are separate facts; do not report a reviewer-ready outcome until the final
-readiness write and readback succeed. Keep status changes in the existing
-guarded order (Phase I then Phase II), with readback/observation. Determine the
-smallest compatible create/status sequence from the existing immutable run
-contract; do not bundle both phase updates into an unguarded patch.
+readiness write and readback succeed. Keep the existing clone recipe unchanged: complete the Factory run first, then
+use its guarded status setter for Phase I followed by Phase II, then finalize
+readiness through a named owner CLI operation. Internal run `ready` means clone
+provisioning is complete; staff readiness remains a separate Boolean. Never
+bundle the phase updates into an unguarded patch.
 
 ## Current evidence and invariants
 
@@ -58,34 +59,53 @@ owner-authorized live test; this does not require running the intake pipeline.
 
 [VERIFIED via earlier read-only evidence] Examples 1003391 and 1003384 were
 unready and not test-marked. They do not establish a complete golden package
-and must not be modified as Factory destinations. No new live read occurred
-for this plan revision.
+and must not be modified as Factory destinations. The later source/metadata inventory below is read-only; neither example is a
+Factory destination.
 
 ## Implementation steps
 
 1. **Define the minimum reviewer-test package from actual consumers.** Inventory
    a suitable completed source when read access is authorized. Identify the
-   document(s), metadata and any recipe-required saved AI outputs used by reviewer
+   documents and metadata used by reviewer
    discovery, invitations/material release, acceptance and review submission.
-   Require only what the chosen test/recipe uses; recreating all intake AI output
-   is not a prerequisite. A complete D26 source may be usable if it satisfies the
+   Production supports the Basic recipe only. Require its canonical reviewer
+   proposal plus applicant abstract; copy the other
+   recognized bundle documents under existing rules. Saved AI outputs and
+   completed reviews are not part of this increment. A complete D26 source may be usable if it satisfies the
    destination consumers and its known test limitations are accepted; do not
    insist on a ready J27 source when none is available. Connor's proposed J27
    staff-PDF root/name is not proof of a file. Verify actual source/destination
    naming and preserve provenance, copy/rename rules and byte-integrity checks.
 2. **Correct new J27 fixture statuses and verification.** Omit direct Request
    Status writes, resolve the phase options from metadata and verify the final
-   pair plus derived status. Adapt the verifier to that pair without weakening
-   unrelated checks. Keep readiness unset until finalization. Update preview and
+   pair plus derived status. Keep clone verification before advancement, including the null Phase II
+   check. Check the final phase pair in the separate finalizer. Keep readiness unset until finalization. Update preview and
    confirmation copy to say prepared reviewer-workflow fixture, not intake test.
 3. **Finalize readiness with a guarded, recoverable operation.** Re-read the
    destination test marker/run identity and the verified package/status inputs.
    Use a concrete ETag and a true-only readiness patch on the exact run-owned
-   destination. Record intent/dispatch/outcome durably through the existing run
-   journal or a deliberately reviewed extension; an in-memory flag is insufficient.
+   destination. Add a small typed journal table with immutable `(run_id, attempt)` identity, one open attempt per run, and
+   planned/dispatched/applied/complete/needs_attention/abandoned states, before ETag,
+   Boolean readback and sanitized error. The operation is owner CLI only, with
+   read-only preview and explicit confirmation; no new HTTP route. The managed ledger migration must be applied to BOTH operational ledgers
+   before deploying this fingerprint; it affects every Factory mode, not only
+   finalization. Hold merge/deployment until the owner authorizes a coordinated
+   Factory maintenance window. Old code may reject the new extra schema until
+   promotion; do not bypass the guard. No live schema application is authorized
+   by this implementation task.
+   Validate readiness update-ability from live metadata. Refuse already-true
+   readiness unless a dispatched/applied/completed journal proves this operation.
+   Observe jobs and census effects after readiness, rather than assuming no reaction.
    If the result is ambiguous, reconcile by reading before retrying. A repeated
-   request must not blindly issue another patch. Stale/missing artifacts or
-   ownership/status mismatches block finalization. Read back true before declaring
+   request must not blindly issue another patch. Stale/missing destination artifacts or ownership/status mismatches block
+   finalization. After cloning, provenance comes from the hash-bound saved bundle
+   and exact verified destination byte/OOXML-attestation hashes, not from the
+   original source revision or export TTL. Recheck request state/ETag after the
+   single heavy package pass. A separate exact-destination owner recovery can
+   abandon an unready attempt and append a fresh intent only after all possible
+   senders are stopped; prior attempts remain durable and every mutation is
+   attempt-bound. Already-true unexpected effects remain an inspection stop,
+   with observed IDs retained; recovery cannot approve or clear them. Read back true before declaring
    the fixture ready. Do not expose a client-supplied bypass for these checks.
 4. **Prove one prepared reviewer fixture.** Local tests, then owner-authorized
    bounded Production creation/copy/status/readiness writes on a fresh destination.
@@ -104,9 +124,11 @@ for this plan revision.
 - Tests include ambiguous writes, ETag conflicts, ownership mismatch, repeated
   finalization, resumed old manifests and forbidden effects with real negative
   inputs present. Prove no status/readiness write is added to historical runs.
-- Preserve earlier-cycle behavior and existing recipes; identify manifest/version
-  compatibility changes before editing persisted contracts. No new table, route,
-  recipe or background worker is prescribed by this plan.
+- Preserve earlier-cycle behavior and existing recipes. An explicit new manifest
+  value selects prepared fixtures and a distinct create body (readiness false,
+  omitted Request Status), pinned by the reserved body hash. Old manifests
+  recompile byte-identically and cannot finalize readiness. One typed journal
+  table is required; no new route, recipe or background worker.
 - Run compiler/runner/status/file/route/UI tests and relevant gates/self-tests
   sequentially (types, Atlas, DAL/OData, route security/boundaries, status parity,
   docs; migrations only if a reviewed durable extension needs one). Independent
@@ -125,6 +147,15 @@ this increment. A suitable source and bounded required-package checklist remain
 necessary. This plan records design authorization, not permission to execute
 Production writes or send reviewer communications.
 
-Planning verification: independent read-only review found no material issues in
-this revised prepared-fixture scope. All nine scoped documentation gate/self-test
-commands and diff checks passed. No runtime or Production changes were made.
+Planning review: Claude Fable returned READY WITH NAMED CHANGES; this revision
+incorporates its sequence, journal, compatibility, metadata and UI corrections.
+[Review receipt](evidence/test-request-factory/j27-prepared-fable-plan-review-2026-11-02.md).
+Phase I Invited is the first uncharacterized live producing transition; existing
+guards allow its draft email and tracking effects. A bounded live test must
+explicitly account for them and characterize readiness reactions.
+
+[VERIFIED 2026-11-02 via read-only source inventory](evidence/test-request-factory/j27-prepared-source-inventory-2026-11-02.json):
+all six Research J27 requests were unready; six sampled invited D26 sources had
+all seven recognized documents. This metadata establishes candidates, not byte
+integrity or authorization to create a fixture. The source probe downloaded no
+document bodies and made no Production writes.

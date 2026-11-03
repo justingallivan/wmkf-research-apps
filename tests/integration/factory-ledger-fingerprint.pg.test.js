@@ -315,6 +315,12 @@ describeIf('factory ledger schema fingerprint (live Postgres)', () => {
 
     (TEST_URL ? test : test.skip)('054 tracked, 058 live-but-untracked, approvedAhead empty -> verifyTrackedPrefix ok, then decideFileAction adopts 058', async () => {
       if (!gitAvailable) return;
+      // This scenario is specifically the historical 054→058 prefix, not
+      // later migrations already present in the suite's main schema.
+      await client.query(`DROP SCHEMA ${schema} CASCADE`);
+      await client.query(`CREATE SCHEMA ${schema}`);
+      await client.query(`SET search_path TO ${schema}`);
+      await client.query(fs.readFileSync(path.join(tempMigrationsDir, FILE_054), 'utf8'));
       // Simulate a ledger where 058 was hand-applied ahead of its tracker row.
       await client.query(file058Sql);
 

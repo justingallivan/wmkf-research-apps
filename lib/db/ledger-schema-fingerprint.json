@@ -1,7 +1,8 @@
 {
   "generatedFrom": [
     "054_test_request_runs.sql",
-    "058_test_request_cast_slot_bindings.sql"
+    "058_test_request_cast_slot_bindings.sql",
+    "094_test_request_readiness_finalizations.sql"
   ],
   "fingerprint": {
     "tables": {
@@ -550,6 +551,156 @@
             "unique": true,
             "primary": true,
             "definition": "CREATE UNIQUE INDEX test_request_cast_slot_bindings_pkey ON test_request_cast_slot_bindings USING btree (run_id, member_id)"
+          }
+        ],
+        "triggers": [],
+        "policies": []
+      },
+      "test_request_readiness_finalizations": {
+        "relkind": "r",
+        "relpersistence": "p",
+        "rowSecurity": {
+          "enabled": false,
+          "forced": false
+        },
+        "columns": [
+          {
+            "name": "run_id",
+            "type": "uuid",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "attempt",
+            "type": "integer",
+            "nullable": false,
+            "default": "1"
+          },
+          {
+            "name": "status",
+            "type": "text",
+            "nullable": false,
+            "default": "'planned'::text"
+          },
+          {
+            "name": "etag_before",
+            "type": "text",
+            "nullable": false,
+            "default": null
+          },
+          {
+            "name": "ready_before",
+            "type": "boolean",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "ready_after",
+            "type": "boolean",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "dispatched_at",
+            "type": "timestamp with time zone",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "completed_at",
+            "type": "timestamp with time zone",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "effects",
+            "type": "jsonb",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "error",
+            "type": "text",
+            "nullable": true,
+            "default": null
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp with time zone",
+            "nullable": false,
+            "default": "now()"
+          },
+          {
+            "name": "updated_at",
+            "type": "timestamp with time zone",
+            "nullable": false,
+            "default": "now()"
+          }
+        ],
+        "constraints": [
+          {
+            "name": "test_request_readiness_complete_coherence",
+            "type": "c",
+            "definition": "CHECK ((((status = 'complete'::text) AND (ready_after IS TRUE) AND (completed_at IS NOT NULL)) OR ((status <> 'complete'::text) AND (completed_at IS NULL))))"
+          },
+          {
+            "name": "test_request_readiness_dispatch_coherence",
+            "type": "c",
+            "definition": "CHECK ((((status = 'planned'::text) AND (dispatched_at IS NULL)) OR (status = 'abandoned'::text) OR ((status <> ALL (ARRAY['planned'::text, 'abandoned'::text])) AND (dispatched_at IS NOT NULL))))"
+          },
+          {
+            "name": "test_request_readiness_finalizations_attempt_check",
+            "type": "c",
+            "definition": "CHECK ((attempt > 0))"
+          },
+          {
+            "name": "test_request_readiness_finalizations_effects_check",
+            "type": "c",
+            "definition": "CHECK (test_request_receipt_ok(effects))"
+          },
+          {
+            "name": "test_request_readiness_finalizations_error_check",
+            "type": "c",
+            "definition": "CHECK ((length(error) <= 500))"
+          },
+          {
+            "name": "test_request_readiness_finalizations_etag_before_check",
+            "type": "c",
+            "definition": "CHECK ((etag_before ~ '^W/\"[0-9]{1,20}\"$'::text))"
+          },
+          {
+            "name": "test_request_readiness_finalizations_pkey",
+            "type": "p",
+            "definition": "PRIMARY KEY (run_id, attempt)"
+          },
+          {
+            "name": "test_request_readiness_finalizations_ready_before_check",
+            "type": "c",
+            "definition": "CHECK ((ready_before IS DISTINCT FROM true))"
+          },
+          {
+            "name": "test_request_readiness_finalizations_run_id_fkey",
+            "type": "f",
+            "definition": "FOREIGN KEY (run_id) REFERENCES test_request_runs(run_id)"
+          },
+          {
+            "name": "test_request_readiness_finalizations_status_check",
+            "type": "c",
+            "definition": "CHECK ((status = ANY (ARRAY['planned'::text, 'dispatched'::text, 'applied'::text, 'complete'::text, 'needs_attention'::text, 'abandoned'::text])))"
+          }
+        ],
+        "indexes": [
+          {
+            "name": "test_request_readiness_finalizations_pkey",
+            "unique": true,
+            "primary": true,
+            "definition": "CREATE UNIQUE INDEX test_request_readiness_finalizations_pkey ON test_request_readiness_finalizations USING btree (run_id, attempt)"
+          },
+          {
+            "name": "test_request_readiness_one_open",
+            "unique": true,
+            "primary": false,
+            "definition": "CREATE UNIQUE INDEX test_request_readiness_one_open ON test_request_readiness_finalizations USING btree (run_id) WHERE (status = ANY (ARRAY['planned'::text, 'dispatched'::text, 'applied'::text]))"
           }
         ],
         "triggers": [],

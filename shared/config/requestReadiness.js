@@ -1,6 +1,7 @@
 /**
  * PD discovery prerequisite, independent of lifecycle/action eligibility.
- * Power Automate owns wmkf_readyforreview (logical name below). Only an
+ * Power Automate owns real-intake wmkf_readyforreview; the prepared Factory
+ * has a separate guarded test-fixture finalizer. This predicate only reads. Only an
  * explicitly linked pre-J27 cycle is exempt. No request-date fallback.
  * Callers must fetch the complete roster before filtering/counting, select
  * wmkf_readyforreview, and expand wmkf_GrantCycle($select=wmkf_cyclecode).

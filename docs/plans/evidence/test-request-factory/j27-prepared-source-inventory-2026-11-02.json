@@ -1,0 +1,37 @@
+{
+  "checkedAt": "2026-11-03T04:44:07.568Z",
+  "readOnly": true,
+  "scope": "Research D26/J27; up to 12 J27 and six invited D26 sources",
+  "field": {
+    "logicalName": "wmkf_readyforreview",
+    "type": "Boolean",
+    "createable": true,
+    "updateable": true
+  },
+  "totalByCycle": {
+    "D26": 367,
+    "J27": 6
+  },
+  "j27": {
+    "sampled": 6,
+    "unready": 6,
+    "namedExamples": [
+      {
+        "requestNumber": "1003391",
+        "ready": false,
+        "recognizedDocuments": 0
+      },
+      {
+        "requestNumber": "1003384",
+        "ready": false,
+        "recognizedDocuments": 0
+      }
+    ]
+  },
+  "d26Candidates": {
+    "sampledInvited": 6,
+    "withSevenRecognizedDocuments": 6,
+    "withNonNullApplicantAbstract": 6
+  },
+  "limits": "Metadata-only candidates, no downloaded bytes or completed fixture proof. Detailed source dispositions and file inventories are retained locally, not published."
+}

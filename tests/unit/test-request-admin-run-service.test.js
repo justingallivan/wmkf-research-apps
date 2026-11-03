@@ -1674,3 +1674,11 @@ describe('S1: source display read', () => {
     expect(result.source.cycleCode).toBeNull();
   });
 });
+
+test('prepared-package refusal is a preview blocker and typed 409, with no run reserved', async () => {
+  const h=harness({deployment:'production',deps:{resolveGrantCycle:async()=>cloneCycleFromCalendarRow({grantCycleId:GRANT_CYCLE_ID,cycleCode:'J27',boardDate:'2027-06-03'})}});
+  const draft=await h.service.exportSource({profileId:PROFILE,sourceRequestNumber:'9000001'});
+  expect(draft.preparedFixtureBlocker).toMatch(/canonical reviewer proposal/);
+  await expect(h.service.confirmRun(h.confirmArgs(draft.draftId,{cycleCode:'J27'}))).rejects.toMatchObject({httpStatus:409,code:'factory_prepared_package_incomplete'});
+  expect(h.ledger.rows.size).toBe(0);
+});

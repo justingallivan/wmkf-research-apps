@@ -398,3 +398,23 @@ describe('fenceCastBindingClient (slice B)', () => {
     expect(() => fenceCastBindingClient(client, bindingFence)[name]('/x', {})).toThrow(/not allowed in a cast binding/);
   });
 });
+
+describe('prepared readiness fence', () => {
+  test('admits only exact-destination true with one concrete If-Match', async () => {
+    const { fenceReadinessClient } = await import('../../lib/services/test-requests/production-write-fence.js');
+    const raw = { patchWithOptions: jest.fn(async () => ({ ok: true })) };
+    const destinationRequestId = '11111111-1111-4111-8111-111111111111';
+    const sourceRequestId = '22222222-2222-4222-8222-222222222222';
+    const fenced = fenceReadinessClient(raw, { destinationRequestId, sourceRequestId });
+    const path = `/akoya_requests(${destinationRequestId})`;
+    for (const [target, body, headers] of [
+      [path, { wmkf_readyforreview: false }, { 'If-Match': 'W/"1"' }],
+      [path, { wmkf_readyforreview: true, akoya_requeststatus: 'Phase II Pending' }, { 'If-Match': 'W/"1"' }],
+      [path, { wmkf_readyforreview: true }, { 'If-Match': '*' }],
+      [`/akoya_requests(${sourceRequestId})`, { wmkf_readyforreview: true }, { 'If-Match': 'W/"1"' }],
+    ]) expect(() => fenced.patchWithOptions(target, body, headers)).toThrow();
+    expect(raw.patchWithOptions).not.toHaveBeenCalled();
+    await fenced.patchWithOptions(path, { wmkf_readyforreview: true }, { 'If-Match': 'W/"1"' });
+    expect(raw.patchWithOptions).toHaveBeenCalledTimes(1);
+  });
+});

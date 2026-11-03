@@ -39,7 +39,10 @@ A variable change takes effect only in a new deployment. Details and rotation: `
 1. **Look up** the source Request number. The form reads the Request and its documents from production and saves a bundle. Limits (`TEST_REQUEST_PREVIEW_READ_LIMITS`, `admin-preview-service.js`): at most 7 documents, 25 MB each, 50 MB in total; PDF and XLSX only.
 2. **Confirm and reserve run.** Writes the bundle and manifest to the Blob store and one row to the ledger. Nothing exists in Dynamics yet.
 3. **Start production run.** One request per step; the form keeps going until the run is ready or a step stops. `copy_file` runs once per document. `observe` waits about a minute.
-4. **Status** (optional): available once the run is `ready`.
+4. **Status:** available once the run is `ready` (clone provisioning complete).
+   For prepared J27+ reviewer fixtures, Phase I Invited followed by Phase II
+   Pending Committee Review and owner readiness finalization are required.
+   Earlier-cycle clone behavior is unchanged.
 
 The bundle is valid for 6 hours from the lookup (`BUNDLE_MAX_AGE_MS`, `bundle-file-copy.js`). A run not finished by then cannot be finished.
 
@@ -125,9 +128,48 @@ The recheck's `ok` means this pass found no newly unrecorded effects and no open
 | `--run-recheck=<runId>` | Read-only: the Foundation account against the run's baseline. |
 | `--advance=<runId> --manifest=<file> --bundle=<file>` | Uses the same backend runner. The form may withhold Advance when diagnosis is uncertain; an owner CLI retry remains subject to runner checks and separate operational authorization. Needs the run's manifest and bundle as local files. |
 | `--set-status`, `--status-recheck`, `--status-abandon` | The status setter, its recheck, and closing a change stuck `dispatched`. |
+| `--finalize-readiness=<runId> --manifest=<file>` | Branch-built owner-only prepared J27+ readiness preview; add `--confirm` for the single journaled true stamp after all checks. Requires migration 094 on the operational ledger. No web finalization action. |
 | `--ledger-check` | Ledger schema against the tracked fingerprint. |
 
 To get a form run's manifest and bundle: the run panel's artifacts download, or `scripts/factory-artifacts-download.mjs` (owner-run, reads `FACTORY_BLOB_RW_TOKEN` locally).
+
+## Prepared J27 reviewer fixtures — branch implementation, not deployed
+
+The Basic recipe remains unchanged. Newly reserved Production J27+ manifests
+explicitly select `j27-reviewer-fixture/v1`, start with readiness false, and omit
+a direct Request Status write. A source must supply its applicant abstract and
+canonical reviewer proposal; other recognized Basic
+files are copied normally. This is a prepared reviewer package, not proof that
+intake assembly or AI processing ran. Production does not seed later recipes.
+
+Download the manifest and bundle **before the final clone step**, since the daily
+sweep may delete them once the run is internally ready. Complete the clone, use
+the existing status setter for Phase I `Invited` and then Phase II `Phase II
+Pending Committee Review`, and inspect each result. Invited may create a draft
+email and GoApply tracking row; its first live Factory transition remains to be
+characterized. The derived Request Status must read `Phase II Pending`.
+
+Preview `--finalize-readiness=<runId> --manifest=<local manifest>` read-only.
+Only an owner-authorized invocation with `--confirm` can stamp readiness true.
+It rechecks the run-owned test identity, cycle, phase/status journal, metadata,
+saved source, Foundation isolation and copied destination files. Completed copies
+are not expired by the original export TTL or later edits to the real source. A dispatched result is reconciled
+by reading; it is never resent. Already-true readiness without this operation's
+journal is refused. Unexpected post-stamp effects stop for owner inspection,
+even if readiness already reads true. No rollback or ordinary-request editor is provided.
+
+For an unready failed/ambiguous attempt, `--recover-readiness=<runId>
+--manifest=<file>` previews a ledger-only recovery. Stop/disable form dispatch,
+establish all form invocations have ended, and stop/account for every CLI,
+including paused senders. A timer or unchanged readiness is not proof. Only
+`--confirm-readiness-request=<exact destination GUID>` affirms that checklist
+and appends a fresh intent, retaining the abandoned attempt. An already-true
+readiness flag cannot be reset or its unexpected effects approved this way. Local code/tests do not authorize Production fixture writes or emails.
+
+The new fingerprint requires migration 094 before this branch can operate on a
+managed ledger. Apply through `ledger:apply`, never the app database runner, on BOTH operational ledgers in an owner-approved Factory maintenance window
+before merge/deployment; this fingerprint gates every Factory mode. The old
+deployment may reject new extra schema until promotion. Do not bypass the guard. No managed schema was changed in this build.
 
 ## Artifacts and the daily sweep
 

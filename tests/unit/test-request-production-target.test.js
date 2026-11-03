@@ -15,6 +15,8 @@ import {
   buildCloneManifest,
   clientTargetEnvironment,
   computeRunPlanDigest,
+  getRequest,
+  compileBody,
   correctMeetingDate,
   createRequestWithGoverifyBypass,
   validateCloneManifest,
@@ -494,4 +496,58 @@ describe('verifyClone on a production target', () => {
     const sandbox = verifyClone(manifest({ targetEnvironment: 'sandbox' }), preflightBefore, observation([]), [], { accountid: 'a', versionnumber: 2 }, []);
     expect(sandbox.failures).toContain('Foundation account changed during rehearsal');
   });
+});
+
+
+describe('prepared J27 create contract', () => {
+  const readyMetadata = () => metadata({ overrides: { wmkf_readyforreview: { createable: true, requiredLevel: 'None', type: 'Boolean' } } });
+  const prepared = { ...production, requestStatus: undefined, preparedFixture: 'j27-reviewer-fixture/v1' };
+  test('explicit prepared create is unready and omits direct Request Status', () => {
+    const result = compileTestRequestDraft(draftInput({ production: prepared, metadata: readyMetadata() }));
+    expect(result.blockers).toEqual([]);
+    expect(result.createBody.wmkf_readyforreview).toBe(false);
+    expect(result.createBody).not.toHaveProperty('akoya_requeststatus');
+  });
+  test('legacy production input retains its original body and no readiness field', () => {
+    const result = compileTestRequestDraft(draftInput({ production, metadata: readyMetadata() }));
+    expect(result.blockers).toEqual([]);
+    expect(result.createBody.akoya_requeststatus).toBe('Phase II Pending');
+    expect(result.createBody).not.toHaveProperty('wmkf_readyforreview');
+  });
+  test.each(['wrong', null])('unknown prepared discriminator refuses (%s)', preparedFixture => {
+    expect(compileTestRequestDraft(draftInput({ production: { ...prepared, preparedFixture }, metadata: readyMetadata() })).createBody).toBeNull();
+  });
+  test('missing Boolean metadata blocks prepared create', () => {
+    expect(compileTestRequestDraft(draftInput({ production: prepared })).createBody).toBeNull();
+  });
+  test('CLI finalization defaults to read-only and requires production/manifest', () => {
+    expect(parseArgs(['node', 'fixture', `--target=production`, `--finalize-readiness=${RUN_ID}`, '--manifest=/tmp/fixture.json']).confirm).toBe(false);
+    expect(() => parseArgs(['node', 'fixture', `--finalize-readiness=${RUN_ID}`, '--manifest=/tmp/fixture.json'])).toThrow();
+    expect(() => parseArgs(['node', 'fixture', `--target=production`, `--finalize-readiness=${RUN_ID}`])).toThrow();
+  });
+});
+
+
+test('old J27 values recompile unchanged; only explicit prepared values change the reserved body', () => {
+  const md = metadata({ overrides: { wmkf_readyforreview: { createable: true, requiredLevel: 'None', type: 'Boolean' } } });
+  const preflight = { metadata: md, foundation: { accountid: ORG_ID }, grantOption: { value: 100000000 } };
+  const values = { requestId: REQUEST_ID, runId: RUN_ID, testLabel: 'Fixture', fiscalYear: 'June 2027', meetingDate: '2027-06-01', grantCycleId: GRANT_CYCLE_ID, cycleCode: 'J27', ...production };
+  const source = draftInput().sourceRequest;
+  const old = compileBody(preflight, values, source);
+  const prepared = compileBody(preflight, { ...values, preparedFixture: 'j27-reviewer-fixture/v1' }, source);
+  expect(old.akoya_requeststatus).toBe('Phase II Pending');
+  expect(old).not.toHaveProperty('wmkf_readyforreview');
+  expect(prepared).not.toHaveProperty('akoya_requeststatus');
+  expect(prepared.wmkf_readyforreview).toBe(false);
+  expect(compileBody(preflight, values, source)).toEqual(old);
+  expect(() => compileBody(preflight, { ...values, cycleCode: 'D26', preparedFixture: 'j27-reviewer-fixture/v1' }, source)).toThrow();
+});
+
+
+test('readiness projection is Production-only; sandbox keeps its existing fields', async () => {
+  for (const [baseUrl, expected] of [[`${PRODUCTION_URL}/api/data/v9.2`,true],[`${SANDBOX_URL}/api/data/v9.2`,false]]) {
+    const client={baseUrl,get:jest.fn(async()=>({ok:true,body:{akoya_requestid:REQUEST_ID}}))};
+    await getRequest(client,REQUEST_ID);
+    expect(client.get.mock.calls[0][0].includes('wmkf_readyforreview')).toBe(expected);
+  }
 });

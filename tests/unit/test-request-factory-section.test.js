@@ -1062,3 +1062,16 @@ describe('final refinements', () => {
     await screen.findByText('No steps recorded yet.');
   });
 });
+
+test('package preview blocks J27 Confirm while preserving the D26 selection', async () => {
+  const server=makeServer();await renderSection(server,[]);
+  await lookup(server,'1001000',{status:200,body:{draftId:DRAFT_ID,summary:SUMMARY,source:{cycleCode:'D26'},cycles:CYCLES,defaults:{cycleCode:'D26'},preparedFixtureBlocker:'Prepared fixture requires an applicant abstract and canonical reviewer proposal.'}});
+  await screen.findByLabelText('Test label');fillConfirm();
+  expect(confirmButton().disabled).toBe(false);
+  fireEvent.change(screen.getByLabelText('Grant Cycle'),{target:{value:'J27'}});
+  expect(confirmButton().disabled).toBe(true);
+  expect(screen.getByText(/Choose a completed source or an earlier cycle/)).toBeTruthy();
+  fireEvent.change(screen.getByLabelText('Grant Cycle'),{target:{value:'D26'}});
+  expect(confirmButton().disabled).toBe(false);
+  expect(server.bodies('POST',BASE)).toHaveLength(0);
+});

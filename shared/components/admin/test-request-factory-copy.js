@@ -16,6 +16,7 @@ const CONTACT = 'Contact an administrator.';
 
 // A string is the copy. A function receives the server's message (possibly empty) and returns the copy.
 export const ERROR_COPY = Object.freeze({
+  factory_prepared_package_incomplete: 'This source needs an applicant abstract and canonical reviewer proposal for a prepared J27 fixture. Choose a completed source. Nothing was created.',
   factory_form_disabled: 'Creating test Requests is switched off on this deployment, so nothing was changed.',
   factory_profile_required: "I couldn't tell which staff profile this is, so nothing was started. Sign in again and try again.",
   factory_actor_email_required: "Your staff email wasn't available to name the program director, so nothing was created. Sign in again and try again.",

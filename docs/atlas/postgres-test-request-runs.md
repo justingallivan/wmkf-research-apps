@@ -21,7 +21,9 @@ related:
 Tables: `test_request_runs`, `test_request_run_resources`,
 `test_request_run_reviewer_assignments`, `test_request_status_changes`,
 `test_request_cast_members`, `test_request_cast_bindings`, and
-`test_request_cast_slot_bindings`.
+`test_request_cast_slot_bindings`. Branch source additionally defines
+`test_request_readiness_finalizations` in migration 094; it has not been applied
+to a managed ledger.
 
 **Where the ledger lives (2026-09-30, S553; `docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md`).** The operational ledger for production test Requests has lived only in `ledger_prod` inside the `wmkf-ledger-pg` Docker container on the owner's home Mac (sandbox counterpart `ledger`), hand-built and never dumped [VERIFIED S553: the office Mac holds no `ledger_prod`]. Owner decision D1 moved it to Neon project `wmkf-factory-ledger` (Vercel Marketplace, connected to no Vercel project, us-east-1), databases `ledger_prod` and `ledger`, with 054 + 058 applied and the local tracker `ledger_schema_migrations` recording 054; the home-Mac operational data was loaded into both on 2026-09-30 and the managed ledger is now the current copy [VERIFIED via `docs/plans/evidence/test-request-factory/ledger-snapshot-2026-09-30.md`]. Merged in PR #374: `lib/db/ledger-registry.js` is the tracked host allowlist the CLI's `requireLedgerUrl(target)` enforces (managed host requires `ledger_prod` for `--target=production`, `ledger` otherwise; the app's `POSTGRES_URL` is always refused), `lib/db/ledger-schema.js` + `lib/db/ledger-schema-fingerprint.json` are the structural schema check every ledger-driven CLI mode runs first (`check:factory-ledger` gate, `--ledger-check`), and `scripts/apply-ledger-migrations.js` is the ledger's own migration runner. Connection strings are `.env.local` variables for the CLI; since 2026-10-02 the production URL is also a hand-set Vercel Production variable for the admin form (`docs/CREDENTIALS_RUNBOOK.md`; see *Second writer: the deployed admin form*).
 
@@ -365,3 +367,36 @@ Two tables added in place to migration 054 (and the V55 mirror) for the cast pla
   cannot store arbitrary bodies or tokens in those columns.
 - No cleanup/retention policy exists yet; row growth is unbounded until the
   design doc's stage 5 retirement/retention work lands.
+
+
+## Prepared J27 readiness journal (branch source, 2026-11-02)
+
+[VERIFIED via migration 094 and local disposable PostgreSQL tests; NOT applied
+in managed ledgers] `test_request_readiness_finalizations` retains immutable
+intents per completed Production Basic run (`run_id` foreign key plus `attempt`
+composite primary key), with a partial unique index allowing one open attempt,
+`etag_before`, nullable-false `ready_before`, typed `ready_after`, status,
+dispatch/completion timestamps, allowlisted effect receipts, and sanitized error.
+`readiness-journal.js` is the only writer. Its planned→dispatched conditional
+UPDATE returns a row to exactly one sender; dispatched operations never resend.
+`readiness-finalizer.js`, reached only from owner CLI `--finalize-readiness`,
+reads it and corroborates the marked destination, reserved manifest/body/bundle,
+J27+ cycle, phase pair, derived status, status journal, Foundation isolation and
+copied destination files. Saved-source provenance and completed destination
+byte/OOXML-attestation hashes are used after cloning; the real source can change
+and export TTL does not expire a completed copy. A true-only ETag PATCH precedes readback and job/effect observation;
+only then does applied→complete record success. Unknown states and ambiguous
+non-landed writes stop without another PATCH. Owner-only `--recover-readiness`
+requires exact destination confirmation and all possible senders stopped; when
+readiness is still false/null it abandons the old attempt and appends a fresh
+intent. All transitions are attempt-bound, so a stale sender cannot mutate the
+new journal attempt. Already-true unexpected effects remain needs_attention,
+with observed IDs; recovery cannot clear them. No cleanup writer is added;
+attempt history remains part of the retained audit trail.
+
+The checked-in fingerprint includes 094. Existing managed ledgers will fail its
+schema check until the owner authorizes `ledger:apply` to BOTH operational
+ledgers. Hold merge/deployment until a coordinated Factory maintenance window;
+old code may reject the new extra schema until promotion. The fresh-install bootstrap executes the
+numbered migration through the existing migration runner. No API route, recipe
+step or new readiness-editing web capability is introduced.
