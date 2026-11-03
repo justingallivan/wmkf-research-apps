@@ -2,7 +2,7 @@
 title: Admin "Add prompt" form — plan
 kind: plan
 domain: ai-platform
-status: proposed
+status: active
 summary: Create a new shared-library prompt from a form in Admin and publish it immediately as v1, with placeholders declared automatically. No Dataverse editing and no draft state.
 canonical: false
 cataloged: 2026-11-02
@@ -13,7 +13,9 @@ related:
 
 # Admin "Add prompt" form
 
-[PLANNED — not built. Awaiting Justin's review.]
+[OWNER APPROVED 2026-11-02: name format yes; Edit & publish also declares new
+placeholders, yes; superuser-only, yes. BUILT ON BRANCH
+`claude/admin-add-prompt`; NOT DEPLOYED.]
 
 ## Why
 
@@ -117,9 +119,10 @@ this is accepted.
 - The route header and service header.
 - `docs/atlas/dataverse-wmkf-ai-run-and-prompt.md` (write paths and audit
   statuses), with `check:atlas`.
-- The `prompt_publish_audit` status check, if `outcome_json.kind` or a new
-  status needs it. Check migration 093's constraint first; add a migration only
-  if a new status value is required.
+- The `prompt_publish_audit` status check: no migration needed. Create writes
+  only `pending`, `completed`, `partial` or `failed`, which migration 093
+  already allows; `name_exists` and `invalid_name` are HTTP responses, never
+  audit rows. [VERIFIED via `lib/db/migrations/093_prompt_publish_audit_catalog_status.sql:10-14`]
 - The scope-change doc and the agent wiki prompt-executor page.
 - Tests: service (create, name exists, bad name, derived variables, replay,
   audit abort, concurrent create) and UI (form validation, placeholder list,
@@ -132,14 +135,14 @@ this is accepted.
 
 ## Open questions for Justin
 
-1. **Name format.** Is `team.task` style (lowercase, dots and hyphens) right?
-   The column's maximum length is unknown [ASSUMED]; read the
-   `wmkf_ai_promptname` metadata in the sandbox before building.
-2. **Placeholders added in later edits.** **Edit & publish** keeps the earlier
+1. **Name format.** [OWNER APPROVED] `team.task` style. The column's maximum
+   length is still unread [ASSUMED]; the build caps names at 64 characters,
+   well above the longest existing name (37).
+2. **Placeholders added in later edits.** [OWNER APPROVED: yes] **Edit & publish** keeps the earlier
    version's variables. If someone adds a new `{{…}}` placeholder later,
    publish refuses it, which is today's behavior. Should **Edit & publish**
    also declare new placeholders automatically, without changing existing
    ones? For prompts an app already uses, a new required variable would fail
    that app's runs until the app supplies it.
-3. **Who can add prompts.** The plan keeps it superuser-only, like the rest of
+3. **Who can add prompts.** [OWNER APPROVED: superuser-only] The plan keeps it superuser-only, like the rest of
    Admin → Prompts. Connor already has superuser access.

@@ -12,7 +12,7 @@ function parseOutputSchema(value) {
   }
 }
 
-function validateOutputSchemaText(value) {
+export function validateOutputSchemaText(value) {
   if (value === '') return { valid: true, issue: null };
   const parsed = parseOutputSchema(value);
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -21,7 +21,7 @@ function validateOutputSchemaText(value) {
   return { valid: true, issue: null };
 }
 
-function buildModelOptions(prompt, modelCatalog) {
+export function buildModelOptions(prompt, modelCatalog) {
   const nativeStructured = parseOutputSchema(prompt.outputSchema)?.generationMode === 'native-json-schema';
   const statuses = modelCatalog?.modelStatuses || {};
   const options = [];
@@ -51,7 +51,7 @@ function buildModelOptions(prompt, modelCatalog) {
 // Mirrors prompts-publish-service.js: the reviewed output ceiling of the
 // selected model (a tier resolves to its current concrete model; a blank model
 // has no knowable ceiling, so none is enforced).
-function modelOutputCeiling(model, modelCatalog) {
+export function modelOutputCeiling(model, modelCatalog) {
   const raw = String(model || '').trim();
   if (!raw) return null;
   const tier = (modelCatalog?.tiers || []).find((t) => t.key === raw);
@@ -62,7 +62,7 @@ function modelOutputCeiling(model, modelCatalog) {
 
 // Blank is allowed (keeps the stored budget). Otherwise a positive whole number
 // no larger than the selected model's ceiling.
-function validateMaxTokensInput(text, ceiling) {
+export function validateMaxTokensInput(text, ceiling) {
   const trimmed = String(text).trim();
   if (trimmed === '') return { valid: true, value: null };
   if (!/^\d+$/.test(trimmed) || Number(trimmed) <= 0) {
