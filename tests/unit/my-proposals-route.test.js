@@ -107,6 +107,8 @@ test('golden path: cycleCode returns the proposals-in-cycle DTO with reviewer co
         records: [{
           akoya_requestid: 'r1',
           akoya_requestnum: 'REQ-1',
+          // Match the expanded Grant Cycle returned by the real request query.
+          wmkf_GrantCycle: { wmkf_cyclecode: 'J26' },
           wmkf_meetingdate: '2026-06-15',
           akoya_requeststatus: 'Phase II Pending',
           wmkf_phaseiistatus: null,

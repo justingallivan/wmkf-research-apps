@@ -192,6 +192,7 @@ function harness() {
         akoya_requestnum: row.akoya_requestnum,
         wmkf_meetingdate: row.wmkf_meetingdate,
         wmkf_GrantCycle: row.wmkf_GrantCycle,
+        wmkf_readyforreview: row.wmkf_readyforreview,
       })),
       totalCount: requests.filter((row) => row._wmkf_currentfinalwriteup_value).length,
       capped: false,
@@ -572,7 +573,7 @@ describe('cycle scoping (Slice 6A)', () => {
     expect(result.queues.open.every((row) => row.cycleCode === 'J26')).toBe(true);
     expect(scopedFilters(fixture.dependencies)).toHaveLength(1);
     expect(fixture.dependencies.queryAllRequests).toHaveBeenCalledWith({
-      select: 'akoya_requestid,akoya_requestnum',
+      select: 'akoya_requestid,akoya_requestnum,wmkf_readyforreview',
       filter: '_wmkf_currentfinalwriteup_value ne null',
       expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
       orderby: 'akoya_requestnum desc',
@@ -1042,4 +1043,22 @@ describe('test requests are excluded from every Final Writeups surface', () => {
     expect(result.counts.total).toBe(1);
     expect(result.queues.open.map((row) => row.requestId)).toEqual([REQUEST_A_ID]);
   });
+});
+
+test('J27 readiness filters Final discovery and queues while focused reads remain accessible', async () => {
+  const { requests, dependencies } = harness();
+  for (const request of requests) linkCycle(request, 'J27');
+  requests[0].wmkf_readyforreview = false;
+  requests[1].wmkf_readyforreview = true;
+  requests[2].wmkf_readyforreview = false;
+  const index = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID, cycleCode: 'J27' }, dependencies);
+  expect(index.counts.total).toBe(1);
+  expect([...index.queues.open, ...index.queues.history, ...index.queues.stewardship].map((r) => r.requestId)).toEqual([REQUEST_B_ID]);
+  for (const [ids] of dependencies.findDocumentsByIds.mock.calls) expect(ids).not.toContain(FINAL_A_ID);
+  const focused = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID, selectedRequestId: REQUEST_A_ID }, dependencies);
+  expect(focused.selected.requestId).toBe(REQUEST_A_ID);
+  for (const request of requests) request.wmkf_readyforreview = false;
+  const empty = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID }, dependencies);
+  expect(empty.cycles.available).toEqual([]);
+  expect(empty.counts.total).toBe(0);
 });

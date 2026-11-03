@@ -128,7 +128,7 @@ test('cycle-list mode: lists organization-wide eligible cycles with honest activ
   expect(body.lastDecidedCycleCode).toBe('J26');
   expect(body.programDirector).toEqual({ systemuserid: 'pd-1', fullName: 'Dr. PD One' });
   expect(queryAllRequests).toHaveBeenCalledWith({
-    select: 'akoya_requestid,akoya_requeststatus,_wmkf_grantprogram_value,_wmkf_programdirector_value,wmkf_triagestatus',
+    select: 'akoya_requestid,akoya_requeststatus,_wmkf_grantprogram_value,_wmkf_programdirector_value,wmkf_triagestatus,wmkf_readyforreview',
     expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
     filter: "_wmkf_grantcycle_value ne null and (_akoya_programid_value eq 8dcab30b-958f-ee11-8179-000d3a341e8f or _akoya_programid_value eq 94cab30b-958f-ee11-8179-000d3a341e8f) and (akoya_requeststatus eq 'Phase II Pending' or wmkf_triagestatus eq 100000000 or wmkf_triagestatus eq 100000001)",
     orderby: 'akoya_requestnum desc',
@@ -168,7 +168,7 @@ test('Stage 1d: cycle discovery keeps test requests but leaves them out of count
     wmkf_istestrequest: true, wmkf_testcreationrunid: '22222222-2222-4222-8222-222222222222',
   };
   const ordinaryRow = {
-    akoya_requestid: 'r-1', wmkf_meetingdate: '2027-06-11', wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, _wmkf_programdirector_value: 'pd-1',
+    akoya_requestid: 'r-1', wmkf_meetingdate: '2027-06-11', wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, wmkf_readyforreview: true, _wmkf_programdirector_value: 'pd-1',
     wmkf_istestrequest: null, wmkf_testcreationrunid: null,
   };
   queryAllRequests.mockResolvedValue({ records: [testRow, ordinaryRow], capped: false });
@@ -236,7 +236,7 @@ test('cycle-list mode: the default is per Grant Program — a caller whose defau
     programName: 'SoCal',
   });
   buildProgramScopeFilter.mockImplementationOnce((programId) => `_wmkf_grantprogram_value eq ${programId}`);
-  queryAllRequests.mockResolvedValue({ records: [{ wmkf_meetingdate: '2027-06-10', wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, _wmkf_programdirector_value: 'pd-9' }], capped: false });
+  queryAllRequests.mockResolvedValue({ records: [{ wmkf_meetingdate: '2027-06-10', wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, wmkf_readyforreview: true, _wmkf_programdirector_value: 'pd-9' }], capped: false });
   const body = await loadDashboard(args({ callerSystemId: 'pd-9' }));
   expect(queryAllRequests).toHaveBeenCalledWith(expect.objectContaining({
     filter: expect.stringContaining(`_wmkf_grantprogram_value eq ${otherProgram}`),
@@ -299,7 +299,7 @@ test('proposal mode: a lowercase code is normalized and a December meeting date 
   });
   const body = await loadDashboard(args({ cycleCode: 'd26', scope: 'all' }));
   expect(queryAllRequests.mock.calls[0][0].filter).toContain("(wmkf_GrantCycle/wmkf_cyclecode eq 'D26')");
-  expect(body.proposals[0]).toMatchObject({ cycleCode: null, cycleLabel: null });
+  expect(body.proposals).toEqual([]); // no linked cycle cannot establish the legacy exemption
 });
 
 test('proposal mode: non-lead non-superuser rows project canManage false', async () => {
@@ -420,4 +420,37 @@ describe('landing cycle (docs/plans/LANDING_CYCLE_PLAN_2026-10-29.md)', () => {
     getLandingCycle.mockResolvedValueOnce({ code: 'J26', reason: null });
     await expect(loadMeetingTrackerSelection(args())).resolves.toMatchObject({ defaultCycleCode: 'J26' });
   });
+});
+
+test.each([false, null, undefined, 1, 'true'])('readiness %s: hides J27/D27 before dashboard and Tracker lists, rollups and cycle counts', async (ready) => {
+  const make = (id, code, value) => ({ akoya_requestid: id, akoya_requestnum: id, wmkf_GrantCycle: { wmkf_cyclecode: code }, wmkf_readyforreview: value, akoya_requeststatus: 'Phase II Pending', wmkf_triagestatus: 100000000 });
+  const records = [make('old', 'D26', false), make('unready-june', 'J27', ready), make('unready-dec', 'D27', ready), make('ready', 'J28', true)];
+  queryAllRequests.mockResolvedValue({ records, capped: false });
+  const cycles = await loadDashboard(args());
+  expect(cycles.cycles.map((c) => [c.code, c.count])).toEqual([['J28', 1], ['D26', 1]]);
+  const proposals = await loadDashboard(args({ cycleCode: 'J27', scope: 'all', includeSetAside: true }));
+  expect(proposals.proposals.map((r) => r.requestId)).toEqual(['old', 'ready']);
+  expect(proposals.rollup.total).toBe(2);
+  expect(fetchReviewerRollup).toHaveBeenLastCalledWith(['old', 'ready']);
+  const tracker = await loadMeetingTrackerSelection(args({ cycleCode: 'J27', scope: 'all' }));
+  expect(tracker.proposals.map((r) => r.requestId)).toEqual(['old', 'ready']);
+  // This shared Tracker selection is also Discussion Sentiment's picker source.
+  for (const [query] of queryAllRequests.mock.calls) {
+    expect(query.select.split(',')).toContain('wmkf_readyforreview');
+    expect(query.expand).toBe('wmkf_GrantCycle($select=wmkf_cyclecode)');
+  }
+});
+
+test.each([{ capped: true }, { hasMore: true }, { records: null }])('incomplete request reads never return partial proposal success: %j', async (extra) => {
+  queryAllRequests.mockResolvedValue({ records: [], ...extra });
+  await expect(loadDashboard(args({ cycleCode: 'J27' }))).rejects.toMatchObject({ httpStatus: 503 });
+  await expect(loadDashboard(args())).rejects.toMatchObject({ httpStatus: 503 });
+});
+
+test('a readiness change is reflected on the next request; a selected cycle can become empty', async () => {
+  const record = { akoya_requestid: 'ready', akoya_requestnum: '1', wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, wmkf_readyforreview: true };
+  queryAllRequests.mockResolvedValue({ records: [record] });
+  expect((await loadDashboard(args({ cycleCode: 'J27' }))).proposals).toHaveLength(1);
+  queryAllRequests.mockResolvedValue({ records: [{ ...record, wmkf_readyforreview: false }] });
+  expect(await loadDashboard(args({ cycleCode: 'J27' }))).toMatchObject({ proposals: [], rollup: { total: 0 } });
 });

@@ -1,0 +1,35 @@
+{
+  "observedAt": "2026-11-02T23:37:46.682Z",
+  "target": "production",
+  "dataverseMethods": [
+    "GET"
+  ],
+  "field": {
+    "logicalName": "wmkf_readyforreview",
+    "type": "Boolean",
+    "ready": true,
+    "notReady": false,
+    "trueLabel": "Yes",
+    "falseLabel": "No"
+  },
+  "requests": [
+    {
+      "akoya_requestnum": "1003391",
+      "wmkf_readyforreview": false,
+      "akoya_requeststatus": "Phase I Pending",
+      "wmkf_phaseistatus": 100000000,
+      "wmkf_phaseiistatus": null,
+      "wmkf_istestrequest": false,
+      "cycleCode": "J27"
+    },
+    {
+      "akoya_requestnum": "1003384",
+      "wmkf_readyforreview": false,
+      "akoya_requeststatus": "Phase I Pending",
+      "wmkf_phaseistatus": 100000000,
+      "wmkf_phaseiistatus": null,
+      "wmkf_istestrequest": false,
+      "cycleCode": "J27"
+    }
+  ]
+}

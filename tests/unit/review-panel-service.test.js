@@ -63,6 +63,8 @@ const {
   getReviewPanelPage, getReviewPanelForRequest, launchReviewPanel, controlReviewPanel, downloadReviewPanel, projectReviewPanelRun, reviewPanelAction,
 } = require('../../lib/services/review-panel-service');
 
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle.js', () => ({ linkedCycleExpand: () => 'wmkf_GrantCycle($select=wmkf_cyclecode)' }));
+
 const OWNER = 7;
 const REQ_A = '11111111-1111-4111-8111-111111111111';
 const REQ_B = '22222222-2222-4222-8222-222222222222';
@@ -72,6 +74,7 @@ const ENTRY_ID = '55555555-5555-4555-8555-555555555555';
 
 function rosterRecord(requestId, requestNumber) {
   return {
+    wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
     akoya_requestid: requestId, akoya_requestnum: requestNumber, akoya_title: 'Title',
     _akoya_applicantid_value_formatted: 'Inst', _wmkf_projectleader_value_formatted: 'PI', _wmkf_programdirector_value_formatted: 'PD',
   };
@@ -598,5 +601,18 @@ describe('launchReviewPanel — active-run guard (mirrored by the tab\'s launcha
     const result = await launchReviewPanel(OWNER, { selectedRequestIds: [REQ_A], idempotencyKey: LAUNCH_KEY });
     expect(result.run.id).toBe(RUN_ID);
     expect(store.createReviewPanelRun).not.toHaveBeenCalled();
+  });
+});
+
+test('panel roster hides unready J27 and retains D26 before readiness', async () => {
+  requests.queryAllRequests.mockResolvedValue({ records: [
+    rosterRecord(REQ_A, 'old'),
+    { ...rosterRecord(REQ_B, 'hidden'), wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, wmkf_readyforreview: false },
+    { ...rosterRecord(LAUNCH_KEY, 'ready'), wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, wmkf_readyforreview: true },
+  ] });
+  const { loadReviewPanelRoster } = require('../../lib/services/review-panel-service');
+  expect((await loadReviewPanelRoster()).map((r) => r.requestNumber)).toEqual(['old', 'ready']);
+  expect(requests.queryAllRequests.mock.calls[0][0]).toMatchObject({
+    select: expect.stringContaining('wmkf_readyforreview'), expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
   });
 });

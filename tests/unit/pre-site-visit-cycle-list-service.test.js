@@ -46,6 +46,7 @@ const labels = { draft: 'AI draft ready', shared: 'Shared', visit: 'Visit', fina
 function req(id, overrides = {}) {
   return {
     akoya_requestid: id,
+    wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
     akoya_requestnum: id === R1 ? '1002959' : '1003001',
     akoya_title: 'Proposal title',
     _akoya_applicantid_value_formatted: 'University',
@@ -369,7 +370,7 @@ it('reports due as waiting only for requests active automation would scan', asyn
     // A December meeting date without a Grant Cycle link is outside the cycle allowlist.
     grantRequestAdapter.queryAllRequests.mockResolvedValue({ records: [req(R1, { ...eligible, wmkf_GrantCycle: null }), req(R2, eligible)], capped: false });
     const unlinked = await list();
-    expect(unlinked.artifacts.find((row) => row.requestNumber === '1002959').preparation).toMatchObject({ due: true, state: 'disabled' });
+    expect(unlinked.artifacts.find((row) => row.requestNumber === '1002959')).toBeUndefined(); // no linked era: excluded from discovery
   } finally {
     for (const [key, value] of Object.entries(saved)) {
       if (value === undefined) delete process.env[key];
@@ -507,4 +508,17 @@ it('joins pending reads before reporting a document rejection over a visit rejec
   expect(finished).toBe(false);
   releaseMaterial({ summaries: new Map(), availability: new Map() });
   expect(await result).toBe(documentFailure);
+});
+
+it('J27 readiness gates the request-first list before document and schedule reads', async () => {
+  grantRequestAdapter.queryAllRequests.mockResolvedValue({ records: [
+    req(R1, { wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, wmkf_readyforreview: false }),
+    req(R2, { wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, wmkf_readyforreview: true }),
+  ], capped: false });
+  const result = await list({ cycleCode: 'J27' });
+  expect(result.requestCounts.total).toBe(1);
+  expect(result.artifacts.map((r) => r.requestNumber)).toEqual(['1003001']);
+  expect(requestDocumentAdapter.findByRequests.mock.calls.every(([ids]) => !ids.includes(R1))).toBe(true);
+  expect(requestDocumentAdapter.findByRequests.mock.calls.some(([ids]) => ids.includes(R2))).toBe(true);
+  expect(grantRequestAdapter.queryAllRequests.mock.calls[0][0].select).toContain('wmkf_readyforreview');
 });

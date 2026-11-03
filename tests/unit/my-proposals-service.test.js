@@ -116,7 +116,7 @@ test('proposals-in-cycle projects slots, counts all four lifecycle buckets, and 
     records: [{
       akoya_requestid: 'r1',
       akoya_requestnum: 'REQ-1',
-      wmkf_meetingdate: '2026-06-15',
+      wmkf_GrantCycle: { wmkf_cyclecode: 'J26' }, wmkf_meetingdate: '2026-06-15',
       akoya_requeststatus: 'Phase II Pending',
       _wmkf_potentialreviewer1_value: 'p1',
       _wmkf_potentialreviewer3_value: 'p3',
@@ -148,7 +148,7 @@ test('proposals-in-cycle projects slots, counts all four lifecycle buckets, and 
 
 test('a request with no suggestion rows gets 0/0/0/0 counts', async () => {
   queryAllRequests.mockResolvedValue({
-    records: [{ akoya_requestid: 'r1', akoya_requestnum: 'REQ-1', wmkf_meetingdate: '2026-06-15' }],
+    records: [{ akoya_requestid: 'r1', akoya_requestnum: 'REQ-1', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' }, wmkf_meetingdate: '2026-06-15' }],
   });
   const out = await getMyProposals({ azureEmail: EMAIL, cycleCode: 'J26' });
   expect(out.proposals[0]).toMatchObject({
@@ -160,7 +160,7 @@ test('reviewer-count aggregation chunks the OR-chain at 25 request ids per query
   const ids = Array.from({ length: 30 }, (_, i) => `r${i}`);
   queryAllRequests.mockResolvedValue({
     records: ids.map((id) => ({
-      akoya_requestid: id, akoya_requestnum: `REQ-${id}`, wmkf_meetingdate: '2026-06-15',
+      akoya_requestid: id, akoya_requestnum: `REQ-${id}`, wmkf_GrantCycle: { wmkf_cyclecode: 'J26' }, wmkf_meetingdate: '2026-06-15',
     })),
   });
 
@@ -183,8 +183,28 @@ test('reviewer-count aggregation chunks the OR-chain at 25 request ids per query
 
 test('a suggestion-count chunk failure propagates untyped (clean 500 beats an undercount)', async () => {
   queryAllRequests.mockResolvedValue({
-    records: [{ akoya_requestid: 'r1', akoya_requestnum: 'REQ-1', wmkf_meetingdate: '2026-06-15' }],
+    records: [{ akoya_requestid: 'r1', akoya_requestnum: 'REQ-1', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' }, wmkf_meetingdate: '2026-06-15' }],
   });
   queryAllSuggestions.mockRejectedValue(new Error('Dataverse unavailable'));
   await expect(getMyProposals({ azureEmail: EMAIL, cycleCode: 'J26' })).rejects.toThrow('Dataverse unavailable');
+});
+
+test.each(['all', 'actionable'])('readiness gates %s and cycle counts before suggestion reads', async (status) => {
+  const make = (id, code, ready) => ({ akoya_requestid: id, akoya_requestnum: id, wmkf_GrantCycle: { wmkf_cyclecode: code }, wmkf_readyforreview: ready });
+  queryAllRequests.mockResolvedValue({ records: [make('legacy', 'D26', false), make('hidden', 'J27', false), make('ready', 'J27', true)] });
+  const cycles = await getMyProposals({ azureEmail: EMAIL });
+  expect(cycles.cycles.map((c) => [c.code, c.count])).toEqual([['J27', 1], ['D26', 1]]);
+  const result = await getMyProposals({ azureEmail: EMAIL, cycleCode: 'J27', status });
+  expect(result.proposals.map((r) => r.requestId)).toEqual(['legacy', 'ready']);
+  expect(queryAllSuggestions.mock.calls[0][0].filter).not.toContain('hidden');
+  expect(queryAllSuggestions.mock.calls[0][0].filter).toContain('ready');
+  for (const [query] of queryAllRequests.mock.calls) {
+    expect(query.select.split(',')).toContain('wmkf_readyforreview');
+    expect(query.expand).toBe('wmkf_GrantCycle($select=wmkf_cyclecode)');
+  }
+});
+
+test.each([undefined, 'J27'])('refuses incomplete %s discovery rather than returning partial counts', async (cycleCode) => {
+  queryAllRequests.mockResolvedValue({ records: [], capped: true });
+  await expect(getMyProposals({ azureEmail: EMAIL, cycleCode })).rejects.toMatchObject({ httpStatus: 503 });
 });
