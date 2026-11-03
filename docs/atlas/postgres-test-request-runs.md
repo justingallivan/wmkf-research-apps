@@ -6,7 +6,7 @@ status: active
 summary: "Durable test Request ledger, written by the owner-run CLI and, since 2026-10-02, by the deployed admin form in Production. Current copy: managed Neon ledgers (054 + 058 + 094 verified 2026-11-03; operational data loaded 2026-09-30) behind a tracked host registry and schema fingerprint check. Shared Production app DB has 054 + 058 tables (empty; never the ledger); Preview unverified."
 canonical: false
 cataloged: 2026-09-23
-last_verified: 2026-10-05
+last_verified: 2026-11-03
 owner: product-engineering
 related:
   - docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md
@@ -64,12 +64,9 @@ the B4 plan forbids pointing that runner at them (cast plan, *Order* 6, §6).
   `--bind-reviewer` and `--run-recheck` modes, which use the same ledger URL
   check [VERIFIED via `scripts/rehearse-test-request-sandbox.mjs:1283-1341`])
   of `scripts/rehearse-test-request-sandbox.mjs`, which connect only to
-  the operator-supplied `TEST_REQUEST_LEDGER_URL` (refused when unset, when
-  it names a neon.tech host, or when it equals any shared `POSTGRES_URL*` /
-  `DATABASE_URL` value). No API route or worker calls the ledger yet.
+  the operator-supplied `TEST_REQUEST_LEDGER_URL` (refused when unset, outside the tracked host registry, or equal to any shared `POSTGRES_URL*` / `DATABASE_URL` value). The deployed admin routes also call the ledger through `admin-run-service.js` (see Second writer below); no new worker is introduced by prepared readiness.
 - **Reader:** the same run-ledger store (`getRun`, `listRunResources`,
-  `listRuns`) and, eventually, the admin Test Requests operations panel
-  (list/status/resume/retire, design-doc stage 5, not yet built).
+  `listRuns`) and the deployed admin Test Requests panel for actor-scoped list/detail, clone advancement and status operations. Retirement remains deferred.
 - **Cleanup:** none yet. Retirement (`status = 'retiring' → 'retired'`) is a
   planned admin action (design-doc stage 5); no automatic row deletion
   exists or is planned — the ledger is a durable audit trail of clone runs,
@@ -154,7 +151,7 @@ the B4 plan forbids pointing that runner at them (cast plan, *Order* 6, §6).
   The protected projection digest remains unchanged and stores no account
   values. A narrowly bounded GoVerify PDF transition requires substituting
   only that field to reproduce the original whole-projection digest. By default
-  the substituted value is null. Branch-built 2026-11-03 owner CLI assistance
+  the substituted value is null. Deployed 2026-11-03 owner CLI assistance
   (`--previous-goverify-pdf-file=<absolute private file>`) can instead supply
   the exact prior generated URL, whose valid filename timestamp must predate
   capture. The current generated URL must match the tracked host/site/path and
@@ -173,12 +170,12 @@ the B4 plan forbids pointing that runner at them (cast plan, *Order* 6, §6).
 - **Actor:** `admin:<UUIDv5 of the staff profile>`; a run is visible only to the actor that reserved it. A CLI run reserved under a different actor (`cli:<digest>` by default, or `user:<guid>`) is not listed by the form. The CLI's `--advance` takes the manifest and bundle as local files (`--manifest`, `--bundle`), so advancing a form run from the CLI needs them downloaded first (below).
 - **Grant Cycle (meeting-date retirement step 5; PR #556, deployed 2026-10-30):** the source lookup returns the destination calendar's J/D rows (`listDestinationGrantCycles`, read through the target client) and the source's own linked code as the default; Confirm takes a `cycleCode`, resolves that row in the destination (`resolveDestinationGrantCycle`) and writes the run's `fiscal_year` ("December 2026") and `meeting_date` from the row's Board date. The row id and code are not ledger columns (no migration): they live in the manifest's `values` and the create body's `wmkf_GrantCycle@odata.bind`, which `create_body_sha256` pins. A run reserved before this change has no cycle in its manifest; its clone is unlinked, so the IA and review steps that read the clone's cycle refuse it.
 - **Switch:** `TEST_REQUEST_FACTORY_FORM=on` gates source lookup, Confirm, advance, status change and status recheck (`requireWritable`); list, detail, artifacts, Foundation recheck and status options are not gated. On in Production since 2026-10-02.
-- **Production runs through the form so far:** `20407283-c279-5e0c-b396-210ad6842482` (Request 1003308, `needs_attention`, `file_journal_unverified`, not resumable) and `a5161f47-7b02-5ad3-8f20-3f645ec3c254` (Request 1003310, `ready`, one status change).
+- **Historical 2026-10-02 form-run checkpoint (not a current census):** `20407283-c279-5e0c-b396-210ad6842482` (Request 1003308, `needs_attention`, `file_journal_unverified`, not resumable) and `a5161f47-7b02-5ad3-8f20-3f645ec3c254` (Request 1003310, `ready`, one status change).
 
 ### Factory artifact Blob store
 
 - **Store:** private Vercel Blob store `wmkf-factory-private` (`store_I7EbkXANJL0zeaby`), token `FACTORY_BLOB_RW_TOKEN` (Production only). The ledger holds no source text; the form keeps the source bundle and the run manifest here.
-- **Factory source bundle v5 (2026-10-03):** [DEPLOYED via PR #425 (`14e90a4`) to Ready Production deployment `dpl_Ac2a21TX57PXgTcMJ57FSCrTJpKF`; the new-clone live path has not yet been smoked.] The private bundle includes the source Request's applicant `wmkf_abstract` for ordinary basic clones. The compiler copies it to the new Request and source fencing/readback verify it; only bundle/body digests enter the ledger. This does not include `wmkf_abstractformatted` or `wmkf_abstractapproved`. Separately, the owner-authorized abstract-only repair of Request 1003303 returned HTTP 204 and its exact 2,476-character readback matched the pinned source; receipt: `/tmp/factory-abstract-repair-receipt.json`.
+- **Factory source bundle v5 (2026-10-03):** [DEPLOYED via PR #425 (`14e90a4`); the later prepared J27 clone and reviewer rehearsal passed on 2026-11-03, linked below.] The private bundle includes the source Request's applicant `wmkf_abstract` for ordinary basic clones. The compiler copies it to the new Request and source fencing/readback verify it; only bundle/body digests enter the ledger. This does not include `wmkf_abstractformatted` or `wmkf_abstractapproved`. Separately, the owner-authorized abstract-only repair of Request 1003303 returned HTTP 204 and its exact 2,476-character readback matched the pinned source; receipt: `/tmp/factory-abstract-repair-receipt.json`.
 - **Pathnames** (minted only by `factory-artifact-store.js`): `<target>/drafts/<actorId>/<draftId>/bundle.json` at source lookup; `<target>/runs/<runId>/{bundle,manifest}.json` at Confirm, written create-only before the ledger row is reserved.
 - **Reader:** `advance` (manifest, and the bundle checked against the run's `bundleSha256`), the artifacts route, and the owner-run `scripts/factory-artifacts-download.mjs`.
 - **Deletion:** only `sweepFactoryArtifacts`, run by the daily maintenance cron (`pages/api/cron/maintenance.js`), and only when both `TEST_REQUEST_LEDGER_URL` and `FACTORY_BLOB_RW_TOKEN` are set, which is now true in Production. It deletes drafts older than 6 hours; a run's two objects when its ledger row is `ready`; and objects with no ledger row once all are older than 24 hours. It never deletes for a `prepared`, `creating` or `needs_attention` run, so the artifacts of a parked run (today: `20407283`) stay until someone removes them by hand. Caps: 1,000 objects scanned per prefix and 200 deletions per sweep. Aggregate execution observed in the 2026-10-03 03:00 UTC daily maintenance record: 4 deleted, 2 kept, no errors or truncation. Exact object identities were not independently verified; see `docs/audits/OPEN_ITEMS_FOLLOWUP_2026-10-03.md`.
@@ -340,9 +337,9 @@ Two tables added in place to migration 054 (and the V55 mirror) for the cast pla
 
 ## `test_request_cast_slot_bindings` (B4 branch build, 2026-09-29)
 
-**[VERIFIED via branch source and disposable PostgreSQL test]** Migration 058 adds a separate typed journal for Potential Reviewer 1, one row per `(run_id, member_id)` with a composite foreign key to the verified suggestion's binding row. The row stores the expected Request/person GUIDs, a five-slot occupancy snapshot and concrete pre-PATCH ETag, dispatch and verification timestamps, constrained provenance and failure codes, and typed readback fields. A planned row can stop with `needs_attention` before a snapshot if the Request marker drifts; this is a journaled refusal, with no PATCH. Migration 058 restores the current cast tables and `test_request_receipt_ok` function when an earlier applied 054 lacks them; it repairs the earlier three-role cast-member CHECK and, on explicit replay, the stricter snapshot CHECK from the first B4 draft. It refuses conflicting table columns and required constraints. `scripts/setup-database.js` V57 mirrors the new table for fresh installs, after V56's post-presentation materials. The disposable PostgreSQL test applies current, earlier, and three-role 054→058, reruns 058 after recreating the old snapshot CHECK, verifies the pre-snapshot refusal and compares the installed receipt function with 054. Ledger state for 058: the managed Neon ledgers `ledger_prod` and `ledger` had 054 + 058 applied by hand on 2026-09-30 [VERIFIED S553, `check:factory-ledger` matches the 054 + 058 fingerprint]; the home Mac's local `ledger_prod`/`ledger` have not (`docs/plans/briefs/FACTORY_LEDGER_SNAPSHOT_BRIEF_2026-09-30.md`); the shared Production/Preview database has 054 only.
+**[VERIFIED via branch source and disposable PostgreSQL test]** Migration 058 adds a separate typed journal for Potential Reviewer 1, one row per `(run_id, member_id)` with a composite foreign key to the verified suggestion's binding row. The row stores the expected Request/person GUIDs, a five-slot occupancy snapshot and concrete pre-PATCH ETag, dispatch and verification timestamps, constrained provenance and failure codes, and typed readback fields. A planned row can stop with `needs_attention` before a snapshot if the Request marker drifts; this is a journaled refusal, with no PATCH. Migration 058 restores the current cast tables and `test_request_receipt_ok` function when an earlier applied 054 lacks them; it repairs the earlier three-role cast-member CHECK and, on explicit replay, the stricter snapshot CHECK from the first B4 draft. It refuses conflicting table columns and required constraints. `scripts/setup-database.js` V57 mirrors the new table for fresh installs, after V56's post-presentation materials. The disposable PostgreSQL test applies current, earlier, and three-role 054→058, reruns 058 after recreating the old snapshot CHECK, verifies the pre-snapshot refusal and compares the installed receipt function with 054. Ledger state for 058: the managed Neon ledgers `ledger_prod` and `ledger` had 054 + 058 applied by hand on 2026-09-30 [VERIFIED S553, `check:factory-ledger` matches the 054 + 058 fingerprint]; the home Mac's local `ledger_prod`/`ledger` have not (`docs/plans/briefs/FACTORY_LEDGER_SNAPSHOT_BRIEF_2026-09-30.md`); the shared Production app database later also received 058; see the dated shared-database evidence under Limits. Preview remains unverified.
 
-**[VERIFIED via branch source and disposable PostgreSQL test]** `createRunLedger` exposes `planCastSlotBinding`, snapshot, dispatch, verification, attention and read methods. `runCastSlotBinding` reads the ready run, verified suggestion and exact marked person; observes an already matching slot without a PATCH; otherwise records occupancy and ETag before one fenced PATCH, then reads back all five slots and the marker/run ID. A metadata read failure leaves the planned row retriable; no PATCH was dispatched. A dispatched row resumes by readback without resending. Unit and PostgreSQL tests cover the journal transitions, hand-set slot, occupancy, concrete ETag, response loss and 412 outcomes. Automatic approval review rejected silently extending the production-capable `--bind-reviewer` command with the live slot write. That command remains suggestion-only. A separate `--bind-reviewer-slot=<runId>` command previews the target and occupants read-only; only `--confirm-slot-request=<the previewed Request GUID>` calls the slot runner. This branch has not run a production slot PATCH.
+**[VERIFIED via branch source and disposable PostgreSQL test]** `createRunLedger` exposes `planCastSlotBinding`, snapshot, dispatch, verification, attention and read methods. `runCastSlotBinding` reads the ready run, verified suggestion and exact marked person; observes an already matching slot without a PATCH; otherwise records occupancy and ETag before one fenced PATCH, then reads back all five slots and the marker/run ID. A metadata read failure leaves the planned row retriable; no PATCH was dispatched. A dispatched row resumes by readback without resending. Unit and PostgreSQL tests cover the journal transitions, hand-set slot, occupancy, concrete ETag, response loss and 412 outcomes. Automatic approval review rejected silently extending the production-capable `--bind-reviewer` command with the live slot write. That command remains suggestion-only. A separate `--bind-reviewer-slot=<runId>` command previews the target and occupants read-only; only `--confirm-slot-request=<the previewed Request GUID>` calls the slot runner. [VERIFIED 2026-11-03 via the owner-authorized bounded rehearsal] The separate slot operation was exercised on the marked fixture, Request 1003456; this does not authorize future slot writes.
 
 ## Limits
 
@@ -359,11 +356,7 @@ Two tables added in place to migration 054 (and the V55 mirror) for the cast pla
   `test_request_status_changes` remain absent there; all tables are empty and
   the CLI never uses that database [VERIFIED via owner-authorized read-only
   queries, 2026-09-30/10-01]. Preview's database is unverified.
-- The owner-run `ledger_prod` and `ledger` need read-only schema preflight,
-  explicit 058 application by the owner, and a recorded receipt before the
-  slot operation can use them. `apply-migrations.js` must not target these
-  local ledgers. Shared Production/Preview Postgres migration consistency is
-  not a prerequisite for the owner-run local slot journal.
+- The current managed `ledger_prod` and `ledger` have 054+058+094 verified on 2026-11-03. Every operation still requires the tracked schema preflight; new slot writes need fresh configuration/automation assessment. Use the dedicated ledger runner for future ledger migrations, never the shared app runner. Shared Production/Preview migration consistency is not a prerequisite for the managed slot journal.
 - The JSONB resource receipts are checked by `test_request_receipt_ok` in
   PostgreSQL and by `assertLedgerReceipt` in JavaScript. They accept only
   bounded allowlisted keys and values; a writer bypassing JavaScript still
@@ -372,7 +365,7 @@ Two tables added in place to migration 054 (and the V55 mirror) for the cast pla
   design doc's stage 5 retirement/retention work lands.
 
 
-## Prepared J27 readiness journal (branch source, 2026-11-02)
+## Prepared J27 readiness journal (deployed, 2026-11-03)
 
 [VERIFIED via migration 094, local disposable PostgreSQL tests, and 2026-11-03 managed-ledger application/fingerprint checks] `test_request_readiness_finalizations` retains immutable
 intents per completed Production Basic run (`run_id` foreign key plus `attempt`
@@ -396,6 +389,6 @@ new journal attempt. Already-true unexpected effects remain needs_attention,
 with observed IDs; recovery cannot clear them. No cleanup writer is added;
 attempt history remains part of the retained audit trail.
 
-The checked-in fingerprint includes 094 and both managed ledgers match it as of 2026-11-03. Justin authorized the application and accepted the interruption of the old deployed Factory create/advance/status actions. Merge/deployment remain held; the old code rejects the extra schema until compatible code is promoted. The fresh-install bootstrap executes the
+The checked-in fingerprint includes 094 and both managed ledgers match it as of 2026-11-03. Justin authorized application before promotion and accepted the temporary interruption of the old Factory. Compatible code subsequently shipped in PR #617; that interruption is closed. Request 1003456 completed journaled readiness finalization and the later bounded reviewer rehearsal; see [receipt](../plans/evidence/test-request-factory/j27-reviewer-rehearsal-proof-2026-11-03.md). The fresh-install bootstrap executes the
 numbered migration through the existing migration runner. No API route, recipe
 step or new readiness-editing web capability is introduced.
