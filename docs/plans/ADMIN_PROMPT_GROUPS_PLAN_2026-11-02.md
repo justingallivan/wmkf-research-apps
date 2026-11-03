@@ -33,8 +33,8 @@ constant [VERIFIED], so a group that isn't in it can't be used.
 - **Store the list in Dataverse settings** (option A), not free-text groups.
 - **No sections** for new groups.
 - **No deletion.**
-- **Order follows the proposal flow, then other apps.** You choose a new
-  group's position when you add it, and you can move groups up or down later.
+- **Order follows the proposal flow, then other apps.** You drag each group,
+  including a new one, into its place.
 
 ## Storage
 
@@ -64,9 +64,14 @@ in the build). Value:
 
 A **Manage groups** panel on the Prompts page:
 
-- **Add group:** a label plus "Place after: [group]".
+- **Add group:** a label. The new group goes at the end of the list, above the
+  pinned groups; drag it into place. [OWNER DECISION 2026-11-02: "Place after"
+  removed when drag was adopted]
 - **Rename:** edit a label in place.
-- **Reorder:** ↑/↓ buttons.
+- **Reorder:** drag by the grip handle, using the same `@hello-pangea/dnd`
+  pattern as the Proposal Ranking assessment list (animated reflow, keyboard
+  lift/move/drop, reduced-motion drop fix, live announcements). [OWNER DECISION
+  2026-11-02: replaces the first build's ↑/↓ buttons for UI consistency]
 - **Save** sends the whole list. If someone else saved first, it shows "Groups
   changed since you opened them" and asks you to reload.
 
