@@ -3,7 +3,7 @@ title: Shared Prompt Library Scope Change — Admin Publishing, No Dataverse Plu
 kind: plan
 domain: ai-platform
 status: active
-summary: Owner decision 2026-11-02 — drop the Dataverse plug-in, write guards and Windows/registration track; Connor drafts in Dataverse and publishes from Admin. Supersedes the PR553 Custom API publication design.
+summary: Owner decision 2026-11-02 — drop the Dataverse plug-in, write guards and Windows/registration track; prompts are created and published in Admin (Add prompt; Dataverse drafts are a fallback). Supersedes the PR553 Custom API publication design.
 canonical: false
 cataloged: 2026-11-02
 owner: product-engineering
@@ -23,10 +23,13 @@ related:
    or unauthorized edits are not a risk this feature needs to address.
 2. **No Dataverse plug-in.** Option B was chosen: there is no Custom API and no
    .NET publisher, and nothing is registered in Dataverse.
-3. **Connor publishes from Admin.** He keeps writing drafts directly in
-   Dataverse with his own tools. Making a version live is done in Admin, by
+3. **Connor publishes from Admin.** Making a version live is done in Admin, by
    Connor or Justin. Connor cannot run the repo's Node scripts, so a
-   command-line publisher was ruled out.
+   command-line publisher was ruled out. [UPDATED 2026-11-02, owner request]
+   New prompts are written in Admin with **Add prompt**
+   ([plan](ADMIN_ADD_PROMPT_PLAN_2026-11-02.md)); nobody needs to edit
+   Dataverse. Publishing a draft already written in Dataverse (first publish,
+   PR #610) remains as a fallback.
 
 This supersedes the following on branch `codex/shared-prompt-library-plan`
 (PR #553):
@@ -97,7 +100,8 @@ From the branch plan's "Outcome and boundary" section:
 
 **Owner-reported context, 2026-11-02.** Connor has no draft prompts in
 Dataverse yet. His current prompts are free text that Power Automate reads.
-He plans to add them to this same table, and he can sign in to Admin.
+He plans to add them to this same table, and he can sign in to Admin. Later the
+same day Justin chose Admin's **Add prompt** form over drafting in Dataverse.
 Pointing his Power Automate flows at the table stays outside this work.
 
 **`phase-i.checkin` and last cycle's Check-in runs.** [VERIFIED via read-only

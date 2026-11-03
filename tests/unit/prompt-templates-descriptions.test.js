@@ -314,3 +314,16 @@ test('Add prompt: lists placeholders, blocks an existing name, and posts a new p
   expect(sent).toMatchObject({ name: 'grants.budget-check', catalog: { title: 'Budget check', usage: 'unconnected' }, body: 'Check {{budget_text}} for {{program}}.' });
   expect(sent.requestId).toEqual(expect.any(String));
 });
+
+test('Add prompt: a native structured-output schema requires a compatible concrete model', async () => {
+  serve([prompt('phase-i.summary')]);
+  await renderOpenWorkflows();
+  fireEvent.click(screen.getByRole('button', { name: 'Add prompt' }));
+  const form = screen.getByRole('region', { name: 'Add prompt' });
+  fireEvent.change(within(form).getByLabelText(/^Name/), { target: { value: 'grants.structured' } });
+  fireEvent.change(within(form).getByLabelText(/^Title/), { target: { value: 'Structured' } });
+  fireEvent.change(within(form).getByLabelText(/^Prompt body/), { target: { value: 'Summarize.' } });
+  fireEvent.change(within(form).getByLabelText(/^Output schema/), { target: { value: '{"generationMode":"native-json-schema","parseMode":"json","outputs":[{"name":"x"}],"jsonSchema":{"type":"object"}}' } });
+  expect(within(form).getByText(/choose a compatible concrete model/)).toBeInTheDocument();
+  expect(within(form).getByRole('button', { name: 'Create and publish v1' })).toBeDisabled();
+});

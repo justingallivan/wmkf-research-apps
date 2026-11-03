@@ -38,7 +38,7 @@ export default function AddPromptForm({ existingNames, modelCatalog, onCreated, 
 
   const name = values.name.trim();
   const group = ADMIN_PROMPT_GROUPS.find((candidate) => candidate.id === values.group);
-  const { options: modelOptions } = buildModelOptions({ model: null, outputSchema: values.outputSchema }, modelCatalog);
+  const { nativeStructured, options: modelOptions } = buildModelOptions({ model: null, outputSchema: values.outputSchema.trim() }, modelCatalog);
   const maxTokens = validateMaxTokensInput(values.maxTokens, modelOutputCeiling(values.model, modelCatalog));
   const outputSchema = validateOutputSchemaText(values.outputSchema.trim());
   const placeholders = [...new Set([...`${values.systemPrompt}\n${values.body}`.matchAll(PLACEHOLDER_RE)].map((m) => m[1]))];
@@ -52,6 +52,9 @@ export default function AddPromptForm({ existingNames, modelCatalog, onCreated, 
   if (values.body.trim()) issues.push(...validatePromptForSave(name, values.body).issues);
   if (!maxTokens.valid) issues.push(maxTokens.issue);
   if (!outputSchema.valid) issues.push(outputSchema.issue);
+  if (nativeStructured && !modelOptions.some((option) => option.value === values.model && !option.disabled)) {
+    issues.push('This output schema uses native structured output: choose a compatible concrete model.');
+  }
   const ready = name && values.title.trim() && values.body.trim() && issues.length === 0;
 
   const submit = async () => {
@@ -162,7 +165,8 @@ export default function AddPromptForm({ existingNames, modelCatalog, onCreated, 
         <label className="block text-xs text-gray-700">
           Model
           <select value={values.model} onChange={set('model')} className={input}>
-            <option value="">Use Executor fallback</option>
+            {!nativeStructured && <option value="">Use Executor fallback</option>}
+            {nativeStructured && <option value="">Choose a model</option>}
             {modelOptions.map((option) => <option key={option.value} value={option.value} disabled={option.disabled}>{option.label}</option>)}
           </select>
         </label>
