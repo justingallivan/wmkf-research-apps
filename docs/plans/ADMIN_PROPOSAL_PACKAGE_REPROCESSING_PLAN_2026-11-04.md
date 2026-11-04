@@ -2,8 +2,8 @@
 title: Admin proposal package reprocessing plan
 domain: workbench
 kind: plan
-status: proposed
-summary: App-only reprocessing of a changed proposal package with explicit stage selection, preserved prior work, durable progress, and bounded retries.
+status: deferred
+summary: Retained app-only package reprocessing feature, deferred until revised application flows are settled; stage membership and implementation recommendations remain provisional.
 canonical: false
 cataloged: 2026-11-04
 owner: product-engineering
@@ -15,6 +15,21 @@ related:
 ---
 
 # Admin proposal package reprocessing
+
+## Owner direction and resume condition
+
+[VERIFIED via Justin's explicit instruction, 2026-11-04] The reprocessing
+feature is still wanted and must remain on the roadmap. Defer its design and
+implementation until the revised application flows are settled. Field Primer
+and Initial Assessment are expected to be overhauled; they are not an approved
+first implementation sequence or stable integration targets for this feature.
+
+Resume when the owner has settled the new stages, inputs, outputs, dependencies,
+and staff-edit/lifecycle boundaries. Then rebuild the inventory against the new
+source and revise this plan before implementing adapters, persistence, or UI.
+The source investigation below is a dated baseline, not a constraint on the
+workflow redesign. The detailed storage, retention, and lifecycle recommendations
+are provisional and have not been accepted as product decisions.
 
 ## Outcome and scope
 
@@ -55,9 +70,9 @@ The Admin prompt destination catalog (`shared/config/adminPromptDestinations.js`
 helps find writers but is not an automation schedule or a complete dependency
 graph. Its inventory must not become the rerun list by itself.
 
-## Milestone 1: establish the stage inventory
+## Resume milestone: establish the revised workflow and stage inventory
 
-[PLANNED] Before runtime edits, trace every app-owned candidate from trigger to
+[DEFERRED until revised flows are settled] Before runtime edits, trace every app-owned candidate from trigger to
 inputs, writes, reuse checks, and consumers. Record the result here or in a
 linked inventory with source citations. Include preparation workers, jobs,
 manual generators, and upstream-owned fields merely displayed in the app.
@@ -67,12 +82,12 @@ and Request fields; prompt/model/budget configuration; output table/field/file;
 current-artifact behavior; staff-edit protection; dependency stages; active-run
 check; safe retry/reconciliation mechanism; and whether it fits this feature.
 
-Initial candidates, not a complete or activated stage list:
+Pre-redesign candidates, retained for reassessment rather than execution:
 
 | Candidate | Proposed treatment |
 |---|---|
-| Field Primer | First implementation slice |
-| Initial Assessment | Next supported stage after snapshot/lineage verification |
+| Field Primer | Expected overhaul; reassess its successor after workflow decisions |
+| Initial Assessment | Expected overhaul; reassess its successor after workflow decisions |
 | Draft writeup | Start with eligible Draft-stage generation using its general-mode contract, not the post-visit `regenerate` mode. Post-visit Review-stage replacements need a separate adapter review; group-review regeneration is excluded because it stages/sends handoff mail |
 | AI Review Panel | Optional, separately selected stage; retain owner, access, provider, rollout, and cost controls |
 | Summary, fit rationale, extracted context, integrity results, other app automations | Inventory first. Classify actual writer and input contract; add only verified app-owned stages with defined replacement semantics |
@@ -254,20 +269,26 @@ validation failure, changed preview, busy Request, partial results, and unknown
 commit outcome. Record actionable operational events with run/stage references
 and deduplication; proposal text and provider secrets stay out of those events.
 
-## Implementation sequence
+## Provisional implementation sequence after workflow decisions
 
-1. **Inventory and owner review:** complete the stage/dependency matrix, exact
+All steps are deferred. Re-select the first vertical slice from the revised
+workflow; the earlier Field Primer → Initial Assessment recommendation is not
+an approved sequence.
+
+1. **Workflow decisions, inventory and owner review:** settle the revised app
+   flows first, then complete the stage/dependency matrix, exact
    first-release selections, source authority, lifecycle blocks, and retention
    choices. No runtime behavior change.
 2. **Read-only preview:** implement server-side resolution and change detection;
    show eligibility/replacement consequences without model calls or writes to
    business data. Persist private previews only under the reviewed retention
    contract. Test role and source-binding behavior.
-3. **One-stage vertical slice:** add durable jobs, worker dispatch, snapshot and
-   prior-envelope preservation, and the Field Primer adapter. Prove failures,
-   restart recovery, persistence errors, and concurrent Workbench regeneration.
-4. **Governed documents:** add Initial Assessment, then eligible Draft writeup
-   paths. Validate preservation/pointer activation, post-handoff/final-stage
+3. **One-stage vertical slice:** choose a stable stage from the revised workflow,
+   then add durable jobs, worker dispatch, snapshot/prior-output preservation,
+   and its adapter. Prove failures, restart recovery, persistence errors, and
+   concurrent Workbench operations.
+4. **Governed documents:** add the approved document stages from the revised
+   workflow. Validate preservation/pointer activation, post-handoff/final-stage
    blocks, uncertain uploads, and same-input reuse against real domain contracts.
    Keep group-review regeneration excluded; prove that enabled notification
    configuration still creates no email intent or send on accepted paths.
@@ -319,19 +340,21 @@ does not authorize a smoke run or consuming metered review products.
 
 ## Decisions to settle before runtime implementation
 
-1. Approve the completed stage inventory and first-release selection. In
+1. Settle the revised app flows, including the planned Field Primer and Initial
+   Assessment overhauls. Then approve the rebuilt stage inventory and first-release selection. In
    particular, decide which optional analyses should run every time and which
    are explicitly selected (especially AI Review Panel).
 2. Confirm recovery-content retention and whether current-field replacement
    needs longer-lived history than the proposed 90-day recovery window.
 3. Confirm UI placement and the document lifecycle stages supported at launch.
-   The proposed first slice is one Request, superuser-only, Field Primer,
-   followed by eligible governed document stages after their adapter reviews.
+   The proposed shape remains one Request and superuser-only; the first stage
+   and supported document states must be selected from the revised workflow.
 
 ## Contract-reconcile planning verdict
 
 [VERIFIED] Product boundary and the cited existing service contracts are
-source/owner supported. [PLANNED] Stage inventory, preview/snapshot storage,
+source/owner supported as the pre-redesign baseline. [DEFERRED by owner]
+Stage inventory, preview/snapshot storage,
 job persistence, worker adapters, UI, migrations, and deployment are unbuilt.
 Unverified external flow internals and live runtime configuration remain outside
 this source-only plan; no claim of end-to-end production proof is made.
