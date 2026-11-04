@@ -47,9 +47,9 @@ beforeEach(() => {
 const sqlText = (i) => sql.mock.calls[i][0].join('?');
 
 describe('normalizeCatalog', () => {
-  test('trims, blanks to null, and accepts known placement/usage', () => {
-    expect(normalizeCatalog({ title: '  T  ', description: '   ', group: 'reviews', section: 'human', usage: 'reference' }))
-      .toEqual({ title: 'T', description: null, group: 'reviews', section: 'human', usedBy: null, usage: 'reference' });
+  test.each(['reference', 'power-automate'])('trims, blanks to null, and accepts known placement/usage %s', (usage) => {
+    expect(normalizeCatalog({ title: '  T  ', description: '   ', group: 'reviews', section: 'human', usage }))
+      .toEqual({ title: 'T', description: null, group: 'reviews', section: 'human', usedBy: null, usage });
   });
   test.each([
     [{ bogus: 'x' }, /Unknown catalog field/],

@@ -31,12 +31,14 @@ test('a prompt with no stored values starts blank, with the built-in text only a
 test('saves a PATCH with the loaded row, the loaded values and the trimmed edits', async () => {
   const { onSuccess } = setup();
   fireEvent.change(screen.getByLabelText('Title'), { target: { value: '  New title  ' } });
+  expect(screen.getByRole('option', { name: 'Power Automate flow' })).toHaveValue('power-automate');
+  fireEvent.change(screen.getByLabelText('Usage'), { target: { value: 'power-automate' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save details' }));
   await waitFor(() => expect(onSuccess).toHaveBeenCalledWith({ status: 'catalog_updated' }));
   const [url, init] = global.fetch.mock.calls[0];
   expect(url).toBe(`/api/admin/prompts/${encodeURIComponent(NAME)}`);
   expect(init.method).toBe('PATCH');
-  expect(JSON.parse(init.body)).toEqual({ rowId: ROW, expected: catalog, catalog: { ...catalog, title: 'New title' } });
+  expect(JSON.parse(init.body)).toEqual({ rowId: ROW, expected: catalog, catalog: { ...catalog, title: 'New title', usage: 'power-automate' } });
 });
 
 test('changing to a group with sections requires a section; a group without sections clears it', () => {

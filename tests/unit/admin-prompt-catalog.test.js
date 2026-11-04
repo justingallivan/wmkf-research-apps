@@ -47,9 +47,9 @@ describe('resolveAdminPromptDescription (stored catalog columns first)', () => {
   test('a new prompt with only stored values is described and placed by them', () => {
     const r = resolveAdminPromptDescription({
       name: 'connor.new-flow',
-      catalog: { title: 'New flow', description: 'Does a thing.', group: 'reviews', section: 'human', usedBy: 'Power Automate', usage: 'unconnected' },
+      catalog: { title: 'New flow', description: 'Does a thing.', group: 'reviews', section: 'human', usedBy: 'Power Automate', usage: 'power-automate' },
     });
-    expect(r).toEqual({ title: 'New flow', description: 'Does a thing.', usedBy: 'Power Automate', usage: 'unconnected', group: 'reviews', section: 'human' });
+    expect(r).toEqual({ title: 'New flow', description: 'Does a thing.', usedBy: 'Power Automate', usage: 'power-automate', group: 'reviews', section: 'human' });
   });
 
   test('unknown or incomplete placement and unknown usage fall back instead of hiding the prompt', () => {

@@ -25,6 +25,7 @@ export { ExecutorBudgetEditor };
 
 const USAGE_BADGES = {
   application: { label: 'Application caller', tone: 'green' },
+  'power-automate': { label: 'Power Automate flow', tone: 'green' },
   reference: { label: 'Stored reference', tone: 'amber' },
   diagnostic: { label: 'Developer diagnostic', tone: 'gray' },
   unconnected: { label: 'No application caller', tone: 'gray' },

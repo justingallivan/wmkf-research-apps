@@ -19,6 +19,7 @@ const MAX_NAME_LEN = 64;
 const PLACEHOLDER_RE = /\{\{\s*(\w+)\s*\}\}/g;
 const USAGE_LABELS = {
   application: 'Application caller',
+  'power-automate': 'Power Automate flow',
   reference: 'Stored reference',
   diagnostic: 'Developer diagnostic',
   unconnected: 'No application caller',
