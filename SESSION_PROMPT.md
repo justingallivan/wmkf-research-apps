@@ -78,6 +78,10 @@ with the same runtime at `wmkfresearchapps-9tt15znbc-justin-gallivans-projects.v
 
 ### Done — do not carry forward as open
 
+- `phase-i.checkin` is deprecated [VERIFIED via Justin's explicit decision,
+  2026-11-04]. The shared-prompt plan records this decision; no Connor reply is
+  needed to settle its disposition. No live Dataverse retirement or catalog
+  edit was performed when recording the decision.
 - PR #626 is merged (`626b1d681`) and PR #628 is merged (`3629a33af`), verified
   through GitHub. The previous handoff's merge discrepancies are resolved.
 - The main checkout was fast-forwarded to `origin/main`; it is no longer behind
@@ -105,7 +109,7 @@ Do not append those full handoffs here or infer fresh permissions from them.
 | Codex / J27 Factory | `docs/plans/J27_TEST_REQUEST_FACTORY_FINISH_PLAN_2026-11-02.md` and `docs/TEST_REQUEST_FACTORY_FORM_RUNBOOK.md`; completed bounded rehearsal and owner-deferred broader workflow. Full historical evidence/ledger identities remain in the prior handoff and owning receipts. |
 | Claude / Preview CSRF | PR #620 and closeout #621 merged; `docs/plans/PREVIEW_ALIAS_CSRF_ORIGIN_PLAN_2026-11-03.md`. No new test writes authorized. |
 | Claude / per-reminder history | PR #625 runtime and #628 closeout merged; `docs/plans/PER_REMINDER_HISTORY_PLAN_2026-11-03.md` and `docs/atlas/postgres-reviewer-reminder-events.md`. Staged proof owner-deferred; do not reuse or mutate preserved fixtures. |
-| Claude / shared prompts | `docs/plans/SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md`; Connor reply, smoke/name-length uncertainty and parked catalog/group work need fresh verification before becoming tasks. |
+| Claude / shared prompts | `docs/plans/SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md`; `phase-i.checkin` deprecation is resolved by owner decision 2026-11-04. Smoke/name-length uncertainty and parked catalog/group work need fresh verification before becoming tasks. |
 | Codex / Integrity | Session 658 at `git show 9db614417:SESSION_PROMPT.md`; first Dec 1 monthly refresh is future at this stop. Preserve `.integrity-backups/2026-11-02-pre-refresh/`; no restore authorized. |
 | Claude / reviewer outcomes and invitations | `docs/plans/INVITED_REVIEWER_OUTCOMES_PLAN_2026-10-31.md` and `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`; not re-audited here. |
 | Codex / terminology | `docs/audits/terminology-completion-audit-2026-11-01.md`; preserve acceptance limits and local colleague brief. |
