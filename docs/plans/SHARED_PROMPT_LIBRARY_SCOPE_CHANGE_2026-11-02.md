@@ -111,18 +111,27 @@ He plans to add them to this same table, and he can sign in to Admin. Later the
 same day Justin chose Admin's **Add prompt** form over drafting in Dataverse.
 Pointing his Power Automate flows at the table stays outside this work.
 
-**`phase-i.checkin` and last cycle's Check-in runs.** [VERIFIED via read-only
+### `phase-i.checkin` — deprecated
+
+[VERIFIED via Justin's explicit decision, 2026-11-04] `phase-i.checkin` is
+deprecated. Its disposition is resolved; do not carry forward a dependency on
+Connor's reply or plan to repair/publish this draft. This records the owner
+decision only: no live Dataverse retirement or catalog edit was performed as
+part of recording it.
+
+**Historical investigation, 2026-11-02 — last cycle's Check-in runs.** [VERIFIED via read-only
 Production count/aggregate query of `wmkf_ai_runs`, owner-run 2026-11-02]
-Task type Check-in (`682090002`) has 303 runs: 147 in April and 156 in May
+Task type Check-in (`682090002`) had 303 runs at that read: 147 in April and 156 in May
 2026, from 2026-04-23 to 2026-05-06, with none since. All were logged by Power
 Automate under one account, all completed, all used `claude-sonnet-4-5`, and
 each is linked to a request. Each output is stored on its run row in
 `wmkf_ai_rawoutput` as JSON with the top-level keys `clerical_checks`,
 `keywords`, `priority_fit` and `summary`. No run links a prompt row or prompt
 version. [OWNER REPORTED] The flow's prompt text lives in a free-text Dataverse
-field. [ASSUMED pending Connor's reply] The flow does not read the
-`phase-i.checkin` prompt row, so that row is treated as a dead prompt. Its
-draft's output schema field holds an example of the response shape, not valid
+field. The run records did not establish whether the flow read the
+`phase-i.checkin` prompt row; the owner's deprecation decision above resolves
+the prompt's disposition without making a new claim about that historical flow.
+The draft's output schema field held an example of the response shape, not valid
 JSON. That example belongs in the prompt text; Admin publish rejects it as an
 output schema.
 
