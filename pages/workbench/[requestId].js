@@ -6,8 +6,8 @@
  * applicant-reviewer ingestion + in-panel search), Proposal (documents + AI
  * content + Field Primer, S258/S260), Reviews (read-back of submitted reviews —
  * decoded Q1/Q3/Q10 ratings + file download), and — Group A, S260 — Overview
- * (per-request command center) + Status (read-only akoya_requeststatus
- * reflection), Awardee (grantee-deliverables workflow), and Initial Assessment
+ * (per-request command center, including read-only request status), Awardee
+ * (grantee-deliverables workflow), and Initial Assessment
  * (governed DOCX producer/read model), and Staff Deliberations (S466 merge of
  * the former Pre Site Visit Writeup + Site Visit tabs: durable Word producer,
  * guarded share hand-off, logistics, materials distribution, guarded reopen —
@@ -31,7 +31,6 @@ import ReviewsTab from '../../shared/components/workbench/ReviewsTab';
 import ProposalTab from '../../shared/components/workbench/ProposalTab';
 import IntegrityTab from '../../shared/components/workbench/IntegrityTab';
 import OverviewTab from '../../shared/components/workbench/OverviewTab';
-import StatusTab from '../../shared/components/workbench/StatusTab';
 import AwardeeTab from '../../shared/components/workbench/AwardeeTab';
 import InitialAssessmentTab from '../../shared/components/workbench/InitialAssessmentTab';
 import StaffDeliberationsTab from '../../shared/components/workbench/StaffDeliberationsTab';
@@ -43,7 +42,7 @@ import { classifyTarget } from '../../lib/dataverse/core/interlock';
 
 // Implemented tabs: Overview, Proposal, Initial Assessment, Reviewers, Reviews,
 // Review Panel (S511; visible only with the `review-panel` app grant — `gate`),
-// Staff Deliberations (the merged site-visit writeup workspace, S466), Status,
+// Staff Deliberations (the merged site-visit writeup workspace, S466), Awardee,
 // Final Writeup now supplies the governed group-review handoff and Word launch.
 // A tab with `gate` is hidden (and its deep link falls back to Overview) unless
 // useAppAccess().hasAccess(gate) is true — fail-closed while access loads.
@@ -57,7 +56,6 @@ const TABS = [
   { key: 'review-panel', label: 'Review Panel', gate: 'review-panel' },
   { key: 'staff-deliberations', label: 'Staff Deliberations' },
   { key: 'final-writeup', label: 'Final writeup' },
-  { key: 'status', label: 'Status' },
   { key: 'awardee', label: 'Awardee' },
 ];
 /** Tabs the current viewer may see: ungated tabs always; gated tabs only when the app grant is present. */
@@ -292,8 +290,6 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
           key={typeof requestId === 'string' ? requestId : ''}
           requestId={typeof requestId === 'string' ? requestId : ''}
         />
-      ) : activeTab === 'status' ? (
-        <StatusTab context={visibleContext} />
       ) : activeTab === 'awardee' ? (
         <AwardeeTab
           key={typeof requestId === 'string' ? requestId : ''}

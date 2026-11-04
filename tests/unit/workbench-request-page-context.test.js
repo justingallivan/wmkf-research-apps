@@ -118,7 +118,7 @@ test('clears every context consumer and canManage on B after a valid A snapshot'
   expect(screen.getByTestId('reviewers')).toHaveAttribute('data-context', 'request-a');
   expect(screen.getByTestId('reviewers')).toHaveAttribute('data-can-manage', 'true');
 
-  for (const tab of ['overview', 'proposal', 'reviewers', 'status', 'awardee']) {
+  for (const tab of ['overview', 'proposal', 'reviewers', 'awardee']) {
     routeId = 'request-b';
     tabName = tab;
     view.rerender(<WorkbenchRequest />);
