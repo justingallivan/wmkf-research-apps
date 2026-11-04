@@ -155,7 +155,7 @@ test('loads authoritative Dataverse fields and the exact Proposal Narrative', as
       requestedAmount: '$900,000',
       invitedAmount: '$1,000,000',
       totalProjectBudget: '$3,500,000',
-      institutionalFundingHistory: 'Applicant U has received 8 awards totaling $9.15 million from WMKF. The most recent grant was awarded in June 2026 to develop chemical tools to restore the function of defective proteins.',
+      institutionalFundingHistory: 'Applicant U has received 8 Research or Undergraduate Education - Science & Engineering awards totaling $9.15 million from WMKF. The most recent of these grants was awarded in June 2026 to develop chemical tools to restore the function of defective proteins.',
     },
   });
   expect(deps.getProgramGrants).toHaveBeenCalledWith('22222222-2222-4222-8222-222222222222');
@@ -445,7 +445,7 @@ test('excludes a newer unrelated program grant from count, total and recency', a
 
   // The excluded award still participates in the broad rollup cross-check.
   expect(result.context.documentFields.institutionalFundingHistory).toBe(
-    'Applicant U has received 7 awards totaling $7.95 million from WMKF. The most recent grant was awarded in June 2016 to do project 6.',
+    'Applicant U has received 7 Research or Undergraduate Education - Science & Engineering awards totaling $7.95 million from WMKF. The most recent of these grants was awarded in June 2016 to do project 6.',
   );
 });
 
@@ -476,7 +476,7 @@ test('picks the newest grant by its fiscal-year label when its decision date is 
   const result = await loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps);
 
   expect(result.context.documentFields.institutionalFundingHistory).toBe(
-    'Applicant U has received 8 awards totaling $9.15 million from WMKF. The most recent grant was awarded in June 2026 to develop chemical tools to restore the function of defective proteins.',
+    'Applicant U has received 8 Research or Undergraduate Education - Science & Engineering awards totaling $9.15 million from WMKF. The most recent of these grants was awarded in June 2026 to develop chemical tools to restore the function of defective proteins.',
   );
 });
 
@@ -490,7 +490,7 @@ test('"awarded in" uses the decision date when the newest grant has no fiscal ye
   const result = await loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps);
 
   expect(result.context.documentFields.institutionalFundingHistory).toBe(
-    'Applicant U has received 8 awards totaling $9.15 million from WMKF. The most recent grant was awarded in June 2026 to develop chemical tools to restore the function of defective proteins.',
+    'Applicant U has received 8 Research or Undergraduate Education - Science & Engineering awards totaling $9.15 million from WMKF. The most recent of these grants was awarded in June 2026 to develop chemical tools to restore the function of defective proteins.',
   );
 });
 
@@ -683,7 +683,7 @@ test('uses an Undergraduate Science & Engineering award for count, total and new
   const deps = dependencies({ getProgramGrants: jest.fn().mockResolvedValue({ records: rows, capped: false }) });
   const result = await loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps);
   expect(result.context.documentFields.institutionalFundingHistory).toBe(
-    'Applicant U has received 7 awards totaling $8.15 million from WMKF. The most recent grant was awarded in June 2026 to develop chemical tools to restore the function of defective proteins.',
+    'Applicant U has received 7 Research or Undergraduate Education - Science & Engineering awards totaling $8.15 million from WMKF. The most recent of these grants was awarded in June 2026 to develop chemical tools to restore the function of defective proteins.',
   );
   // Snapshot and document share the same text; the narrowed sentence affects the fingerprint.
   expect(buildPreSiteVisitInputSnapshot(result).request.institutionalFundingHistory)
@@ -698,5 +698,28 @@ test('still rejects broad rollup drift caused by an excluded award', async () =>
     await expect(loadPreSiteVisitInputs({ requestId: REQUEST_ID }, dependencies({
       getProgramGrants: jest.fn().mockResolvedValue({ records: rows, capped: false }),
     }))).rejects.toMatchObject({ code: 'pre_site_visit_funding_history_unavailable' });
+  } finally { warn.mockRestore(); }
+});
+
+
+test('logs exclusion counts without record identities or content while preserving qualifying totals', async () => {
+  const rows = programGrantRows();
+  rows[7] = { ...rows[7], wmkf_request_type: null, wmkf_wmkfprojectdescription: 'Private award description' };
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    const result = await loadPreSiteVisitInputs({ requestId: REQUEST_ID }, dependencies({
+      getProgramGrants: jest.fn().mockResolvedValue({ records: rows, capped: false }),
+    }));
+    expect(warn).toHaveBeenCalledWith('[pre-site-visit] funding-history exclusions', { missingRequestType: 1 });
+    expect(JSON.stringify(warn.mock.calls)).not.toMatch(/Private award description|1001997|55555557/);
+    expect(result.context.documentFields.institutionalFundingHistory).toContain('7 Research or Undergraduate Education - Science & Engineering awards totaling $7.95 million');
+  } finally { warn.mockRestore(); }
+});
+
+test('does not log an exclusion event when every award qualifies', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    await loadPreSiteVisitInputs({ requestId: REQUEST_ID }, dependencies());
+    expect(warn).not.toHaveBeenCalledWith('[pre-site-visit] funding-history exclusions', expect.anything());
   } finally { warn.mockRestore(); }
 });

@@ -6,7 +6,7 @@ status: active
 summary: "Production-live Wave 19, Site Visit handoff/correction, and Production-proved frozen distribution."
 canonical: false
 cataloged: 2026-08-17
-last_verified: 2026-09-15
+last_verified: 2026-11-03
 owner: product-engineering
 related:
   - docs/atlas/dataverse-wmkf-requestdocument.md
@@ -523,7 +523,12 @@ other target; Production also completed the durable mutation proof:
   on the existing `wmkf_sitevisit` Activity; it was not folded into Wave 19.
   Institutional Funding History needed no result field: since S467
   (2026-08-28) it is derived deterministically from Dataverse at generation
-  and stored only in the v3 input snapshot (`docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`).
+  and stored only in the input snapshot (introduced in v3; currently v4;
+  `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`). **[VERIFIED via branch source
+  and tests, 2026-11-03; not deployed.]** The narrower Research / Undergraduate
+  Education - Science & Engineering funding policy changes the snapshot text,
+  not its schema or prior frozen snapshots; both positive and zero-history
+  sentences name the scope. The lifecycle plan owns the current policy.
 
 The cross-tab lifecycle, Site Visit file paths, and Final same-item lineage transaction are
 specified in `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`.

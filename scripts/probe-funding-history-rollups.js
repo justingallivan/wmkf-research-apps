@@ -53,24 +53,28 @@ async function get(token, urlPath) {
 const esc = (s) => String(s).replace(/'/g, "''");
 
 async function resolveTargets(token, args) {
-  const targets = []; // { label, accountId }
-  const pushAccount = (label, id) => { if (id && !targets.some((t) => t.accountId === id)) targets.push({ label, accountId: id }); };
+  const targets = []; // { label, accountId, formattedApplicant }
+  let failed = 0;
+  const pushAccount = (label, id, formattedApplicant = null) => { if (id && !targets.some((t) => t.accountId === id)) targets.push({ label, accountId: id, formattedApplicant }); };
 
   async function byRequestNumber(num) {
     const r = await get(token, `/akoya_requests?$select=akoya_requestid,_akoya_applicantid_value&$filter=akoya_requestnum eq '${esc(num)}'&$top=1`);
     const row = r.value?.[0];
-    if (!row?._akoya_applicantid_value) { console.log(`  ! request ${num}: not found or no applicant`); return; }
-    pushAccount(`request ${num} → ${row['_akoya_applicantid_value@OData.Community.Display.V1.FormattedValue'] || 'applicant'}`, row._akoya_applicantid_value);
+    if (!row?._akoya_applicantid_value) { failed += 1; console.error(`  ! request ${num}: not found or no applicant`); return; }
+    pushAccount(`request ${num} → ${row['_akoya_applicantid_value@OData.Community.Display.V1.FormattedValue'] || 'applicant'}`, row._akoya_applicantid_value, row['_akoya_applicantid_value@OData.Community.Display.V1.FormattedValue']);
   }
   async function byName(name) {
     const r = await get(token, `/accounts?$select=accountid,name,akoya_aka&$filter=akoya_aka eq '${esc(name)}' or name eq '${esc(name)}'&$top=3`);
-    if (!r.value?.length) { console.log(`  ! account "${name}": not found`); return; }
+    if (!r.value?.length) { failed += 1; console.error(`  ! account "${name}": not found`); return; }
     for (const a of r.value) pushAccount(`account "${a.akoya_aka || a.name}"`, a.accountid);
   }
 
   if (args.length) {
-    for (const a of args) await (/^\d{5,}$/.test(a) ? byRequestNumber(a) : byName(a));
-    return targets;
+    for (const a of args) {
+      try { await (/^\d{5,}$/.test(a) ? byRequestNumber(a) : byName(a)); }
+      catch (error) { failed += 1; console.error(`  ! target ${a}: ${error.message}`); }
+    }
+    return { targets, failed };
   }
   await byRequestNumber('1002379');
   await byName('Emory University');
@@ -78,55 +82,67 @@ async function resolveTargets(token, args) {
   for (const a of top.value || []) pushAccount(`top-count account "${a.akoya_aka || a.name}"`, a.accountid);
   const zero = await get(token, `/accounts?$select=accountid,name,akoya_aka,akoya_countofrequests&$filter=wmkf_countofprogramgrants eq 0 and akoya_countofrequests gt 3&$orderby=akoya_countofrequests desc&$top=1`);
   for (const a of zero.value || []) pushAccount(`zero-program-grant account "${a.akoya_aka || a.name}"`, a.accountid);
-  return targets;
+  return { targets, failed };
 }
 
 (async () => {
   const {
     PROGRAM_GRANT_SELECT, programGrantFilter, reconcileProgramGrantRollups,
     qualifyingFundingHistoryGrants, selectMostRecentProgramGrant, formatInstitutionalFundingHistory,
+    fundingHistoryExclusions, fundingHistoryInstitutionName, fundingHistoryAwardedIn,
   } = await import('../lib/services/pre-site-visit/funding-history.js');
-  const { formatMeetingDate } = await import('../lib/services/pre-site-visit/proposal-core-service.js');
   const token = await getToken();
   console.log(`target host: ${new URL(process.env.DYNAMICS_URL).hostname} (READ-ONLY)`);
-  const targets = await resolveTargets(token, process.argv.slice(2));
+  const { targets, failed } = await resolveTargets(token, process.argv.slice(2));
+  const summary = { passed: 0, failed: failed || (targets.length ? 0 : 1) };
   for (const target of targets) {
-    const account = await get(token, `/accounts(${target.accountId})?$select=${ACCOUNT_SELECT}`);
-    let next = `/akoya_requests?$select=${PROGRAM_GRANT_SELECT}&$filter=${encodeURIComponent(programGrantFilter(target.accountId))}`;
-    const records = [];
-    while (next) {
-      const page = await get(token, next);
-      for (const row of page.value || []) {
-        const normalized = { ...row };
-        for (const [key, value] of Object.entries(row)) {
-          const suffix = '@OData.Community.Display.V1.FormattedValue';
-          if (key.endsWith(suffix)) normalized[`${key.slice(0, -suffix.length)}_formatted`] = value;
+    try {
+      const account = await get(token, `/accounts(${target.accountId})?$select=${ACCOUNT_SELECT}`);
+      let next = `/akoya_requests?$select=${PROGRAM_GRANT_SELECT}&$filter=${encodeURIComponent(programGrantFilter(target.accountId))}`;
+      const records = [];
+      while (next) {
+        const page = await get(token, next);
+        for (const row of page.value || []) {
+          const normalized = { ...row };
+          for (const [key, value] of Object.entries(row)) {
+            const suffix = '@OData.Community.Display.V1.FormattedValue';
+            if (key.endsWith(suffix)) normalized[`${key.slice(0, -suffix.length)}_formatted`] = value;
+          }
+          records.push(normalized);
         }
-        records.push(normalized);
+        const nextLink = page['@odata.nextLink'];
+        if (nextLink && !nextLink.startsWith(`${process.env.DYNAMICS_URL}/api/data/v9.2/`)) {
+          throw new Error('Unexpected pagination host/path');
+        }
+        next = nextLink ? nextLink.slice(`${process.env.DYNAMICS_URL}/api/data/v9.2`.length) : null;
       }
-      const nextLink = page['@odata.nextLink'];
-      if (nextLink && !nextLink.startsWith(`${process.env.DYNAMICS_URL}/api/data/v9.2/`)) {
-        throw new Error('Unexpected pagination host/path');
-      }
-      next = nextLink ? nextLink.slice(`${process.env.DYNAMICS_URL}/api/data/v9.2`.length) : null;
+      const check = reconcileProgramGrantRollups({ records, rollupCount: account.wmkf_countofprogramgrants, rollupSum: account.wmkf_sumofprogramgrants });
+      if (!check.ok) throw new Error(`Rollup mismatch: ${check.reason}`);
+      const qualifying = qualifyingFundingHistoryGrants(records);
+      const latest = selectMostRecentProgramGrant(qualifying);
+      const institution = fundingHistoryInstitutionName(account, target.formattedApplicant);
+      if (!institution) throw new Error('Applicant institution name is unavailable');
+      console.log(JSON.stringify({
+        institution,
+        exclusions: fundingHistoryExclusions(records),
+        broadCount: records.length, qualifyingCount: qualifying.length,
+        awards: qualifying.map(row => ({ requestNumber: row.akoya_requestnum, amount: row.akoya_grant, program: row._akoya_programid_value_formatted })),
+        sentence: formatInstitutionalFundingHistory({
+          institutionName: institution,
+          programGrantCount: qualifying.length,
+          programGrantSum: qualifying.reduce((sum, row) => sum + Number(row.akoya_grant), 0),
+          mostRecentGrant: latest ? {
+            awardedIn: fundingHistoryAwardedIn(latest),
+            description: latest.wmkf_wmkfprojectdescription,
+          } : null,
+        }),
+      }, null, 2));
+      summary.passed += 1;
+    } catch (error) {
+      summary.failed += 1;
+      console.error(`PROBE FAILED for ${target.label}: ${error.message}`);
     }
-    const check = reconcileProgramGrantRollups({ records, rollupCount: account.wmkf_countofprogramgrants, rollupSum: account.wmkf_sumofprogramgrants });
-    if (!check.ok) throw new Error(`Rollup mismatch: ${check.reason}`);
-    const qualifying = qualifyingFundingHistoryGrants(records);
-    const latest = selectMostRecentProgramGrant(qualifying);
-    console.log(JSON.stringify({
-      institution: account.akoya_aka || account.name,
-      broadCount: records.length, qualifyingCount: qualifying.length,
-      awards: qualifying.map(row => ({ requestNumber: row.akoya_requestnum, amount: row.akoya_grant, program: row._akoya_programid_value_formatted })),
-      sentence: formatInstitutionalFundingHistory({
-        institutionName: account.akoya_aka || account.name,
-        programGrantCount: qualifying.length,
-        programGrantSum: qualifying.reduce((sum, row) => sum + Number(row.akoya_grant), 0),
-        mostRecentGrant: latest ? {
-          awardedIn: String(latest.akoya_fiscalyear || '').trim() || formatMeetingDate(latest.akoya_decisiondate),
-          description: latest.wmkf_wmkfprojectdescription,
-        } : null,
-      }),
-    }, null, 2));
   }
+  console.log('Summary:', JSON.stringify(summary));
+  if (summary.failed) process.exitCode = 1;
 })().catch((error) => { console.error('PROBE ERROR:', error.message); process.exit(1); });

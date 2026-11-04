@@ -161,8 +161,11 @@ WMKF Request Type = Request (`wmkf_request_type = 100000001`), actual Type looku
 Undergraduate Education - Science & Engineering. Other undergraduate programs,
 including Liberal Arts, are excluded. Exact applicant and positive grant amount
 requirements remain. Recency uses decision date, else the Month YYYY fiscal-year
-label; an undated qualifying award fails closed. The zero-history sentence names
-these programs explicitly. The existing snapshot and generation-key machinery
+label; an undated qualifying award fails closed. Both positive and zero-history sentences name
+these programs explicitly; the latest sentence says "the most recent of these
+grants." Exclusions are logged once per read as counts by reason (missing/other
+Request Type, Type or Program), with no institution names, award content or IDs.
+Missing classifications remain excluded; the diagnostics do not change eligibility. The existing snapshot and generation-key machinery
 captures this text; existing Word files and retries of frozen snapshots keep their
 stored text until deliberate regeneration. This policy supersedes the former
 all-Program count/sum and Research-only most-recent sentence.
