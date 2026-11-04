@@ -1,11 +1,14 @@
 import {
   formatAwardTotal,
+  fundingHistoryExclusions,
+  fundingHistoryInstitutionName,
+  fundingHistoryAwardedIn,
   formatInstitutionalFundingHistory,
   loadProgramGrants,
   programGrantFilter,
   programGrantRecencyDate,
   reconcileProgramGrantRollups,
-  researchProgramGrants,
+  qualifyingFundingHistoryGrants,
   selectMostRecentProgramGrant,
 } from '../../lib/services/pre-site-visit/funding-history';
 
@@ -23,7 +26,7 @@ test('loadProgramGrants fetches every matching row with the rollup predicate and
   const queryAllRequests = jest.fn().mockResolvedValue({ records: rows, capped: false });
   await expect(loadProgramGrants(APPLICANT_ID, { queryAllRequests })).resolves.toEqual({ records: rows, capped: false });
   expect(queryAllRequests).toHaveBeenCalledWith({
-    select: 'akoya_requestid,akoya_requestnum,akoya_fiscalyear,akoya_decisiondate,akoya_grant,_wmkf_grantprogram_value,wmkf_wmkfprojectdescription',
+    select: 'akoya_requestid,akoya_requestnum,akoya_fiscalyear,akoya_decisiondate,akoya_grant,wmkf_request_type,_wmkf_type_value,_akoya_programid_value,_wmkf_grantprogram_value,wmkf_wmkfprojectdescription',
     filter: programGrantFilter(APPLICANT_ID),
   });
   queryAllRequests.mockResolvedValue({ records: rows, capped: true });
@@ -91,7 +94,7 @@ test.each([
   expect(formatAwardTotal(amount)).toBe(expected);
 });
 
-test('matches the Power Automate template sentence', () => {
+test('names the qualifying program scope in the positive sentence', () => {
   expect(formatInstitutionalFundingHistory({
     institutionName: 'Emory University',
     programGrantCount: 8,
@@ -101,7 +104,7 @@ test('matches the Power Automate template sentence', () => {
       description: 'To develop chemical tools to restore the function of defective proteins.',
     },
   })).toBe(
-    'Emory University has received 8 awards totaling $9.15 million from WMKF. The most recent grant was awarded in June 2026 to develop chemical tools to restore the function of defective proteins.',
+    'Emory University has received 8 Research or Undergraduate Education - Science & Engineering awards totaling $9.15 million from WMKF. The most recent of these grants was awarded in June 2026 to develop chemical tools to restore the function of defective proteins.',
   );
 });
 
@@ -111,7 +114,7 @@ test('singular award, sub-million total, and description without trailing period
     programGrantCount: '1',
     programGrantSum: '750000',
     mostRecentGrant: { awardedIn: 'December 2019', description: 'To build a telescope' },
-  })).toBe('Small College has received 1 award totaling $750,000 from WMKF. The most recent grant was awarded in December 2019 to build a telescope.');
+  })).toBe('Small College has received 1 Research or Undergraduate Education - Science & Engineering award totaling $750,000 from WMKF. The most recent of these grants was awarded in December 2019 to build a telescope.');
 });
 
 test('leaves acronym-led descriptions capitalized and omits missing parts', () => {
@@ -120,38 +123,38 @@ test('leaves acronym-led descriptions capitalized and omits missing parts', () =
     programGrantCount: 2,
     programGrantSum: 2000000,
     mostRecentGrant: { awardedIn: 'June 2021', description: 'NMR-guided design of enzymes' },
-  })).toBe('Tech U has received 2 awards totaling $2 million from WMKF. The most recent grant was awarded in June 2021 NMR-guided design of enzymes.');
+  })).toBe('Tech U has received 2 Research or Undergraduate Education - Science & Engineering awards totaling $2 million from WMKF. The most recent of these grants was awarded in June 2021 NMR-guided design of enzymes.');
   expect(formatInstitutionalFundingHistory({
     institutionName: 'Tech U',
     programGrantCount: 2,
     programGrantSum: 2000000,
     mostRecentGrant: { awardedIn: null, description: 'To build a telescope' },
-  })).toBe('Tech U has received 2 awards totaling $2 million from WMKF.');
+  })).toBe('Tech U has received 2 Research or Undergraduate Education - Science & Engineering awards totaling $2 million from WMKF.');
   expect(formatInstitutionalFundingHistory({
     institutionName: 'Tech U',
     programGrantCount: 2,
     programGrantSum: 2000000,
     mostRecentGrant: { awardedIn: 'June 2020', description: '   ' },
-  })).toBe('Tech U has received 2 awards totaling $2 million from WMKF. The most recent grant was awarded in June 2020.');
+  })).toBe('Tech U has received 2 Research or Undergraduate Education - Science & Engineering awards totaling $2 million from WMKF. The most recent of these grants was awarded in June 2020.');
   expect(formatInstitutionalFundingHistory({
     institutionName: 'Tech U',
     programGrantCount: 2,
     programGrantSum: 2000000,
     mostRecentGrant: null,
-  })).toBe('Tech U has received 2 awards totaling $2 million from WMKF.');
+  })).toBe('Tech U has received 2 Research or Undergraduate Education - Science & Engineering awards totaling $2 million from WMKF.');
   expect(formatInstitutionalFundingHistory({
     institutionName: 'Tech U',
     programGrantCount: 2,
     programGrantSum: null,
     mostRecentGrant: null,
-  })).toBe('Tech U has received 2 awards from WMKF.');
+  })).toBe('Tech U has received 2 Research or Undergraduate Education - Science & Engineering awards from WMKF.');
 });
 
 test('zero or missing count renders the no-prior-award sentence', () => {
   for (const count of [0, null, undefined, 'n/a']) {
     expect(formatInstitutionalFundingHistory({
       institutionName: 'New U', programGrantCount: count, programGrantSum: 0, mostRecentGrant: null,
-    })).toBe('New U has not previously received a program grant from WMKF.');
+    })).toBe('New U has not previously received a Research or Undergraduate Education - Science & Engineering program grant from WMKF.');
   }
 });
 
@@ -160,22 +163,55 @@ test('requires an institution name', () => {
     .toThrow(/institution name/);
 });
 
-test('researchProgramGrants keeps only Research-program rows by formatted label', () => {
-  const research = { akoya_requestnum: '1', _wmkf_grantprogram_value_formatted: 'Research' };
-  const socal = { akoya_requestnum: '2', _wmkf_grantprogram_value_formatted: 'Southern California' };
-  const unlabeled = { akoya_requestnum: '3' };
-  expect(researchProgramGrants([research, socal, unlabeled])).toEqual([research]);
-  expect(researchProgramGrants([])).toEqual([]);
+test('history includes only Request / Program records in Research or Undergraduate Science & Engineering', () => {
+  const research = { wmkf_request_type: 100000001, _wmkf_type_value_formatted: 'Program', _wmkf_grantprogram_value_formatted: 'Research' };
+  const undergraduate = { ...research, _wmkf_grantprogram_value_formatted: 'Undergraduate Education', _akoya_programid_value_formatted: 'Undergraduate Education - Science & Engineering' };
+  const excluded = [
+    { ...research, wmkf_request_type: 100000000 }, // Concept
+    { ...research, wmkf_request_type: 682090001 }, // Individual
+    { ...research, wmkf_request_type: null },
+    { ...research, _wmkf_type_value_formatted: 'Special Grants' },
+    { ...research, _wmkf_type_value_formatted: null },
+    { ...undergraduate, _akoya_programid_value_formatted: 'Undergraduate Education - Liberal Arts' },
+    { ...undergraduate, _akoya_programid_value_formatted: null },
+    { ...research, _wmkf_grantprogram_value_formatted: 'Southern California' },
+    { ...research, _wmkf_grantprogram_value_formatted: null },
+  ];
+  expect(qualifyingFundingHistoryGrants([research, undergraduate, ...excluded])).toEqual([research, undergraduate]);
+  expect(qualifyingFundingHistoryGrants([])).toEqual([]);
 });
 
-test('qualifier wording marks a research grant that is not the newest program grant overall', () => {
-  const base = { institutionName: 'UCLA', programGrantCount: 31, programGrantSum: 25764182 };
-  expect(formatInstitutionalFundingHistory({
-    ...base,
-    mostRecentGrant: { awardedIn: 'June 2022', description: 'To image the brain', qualifier: 'research' },
-  })).toBe('UCLA has received 31 awards totaling $25.76 million from WMKF. The most recent research grant was awarded in June 2022 to image the brain.');
-  expect(formatInstitutionalFundingHistory({
-    ...base,
-    mostRecentGrant: { awardedIn: 'June 2022', description: 'To image the brain', qualifier: null },
-  })).toBe('UCLA has received 31 awards totaling $25.76 million from WMKF. The most recent grant was awarded in June 2022 to image the brain.');
+
+test('exclusion counts explain every dropped row once without including content', () => {
+  const base = { wmkf_request_type: 100000001, _wmkf_type_value_formatted: 'Program', _wmkf_grantprogram_value_formatted: 'Research', institution: 'Private Institution', akoya_requestid: 'private-id', wmkf_wmkfprojectdescription: 'private content' };
+  const rows = [
+    base,
+    { ...base, wmkf_request_type: null, _wmkf_type_value_formatted: null },
+    { ...base, wmkf_request_type: 100000000 },
+    { ...base, _wmkf_type_value_formatted: null },
+    { ...base, _wmkf_type_value_formatted: 'Discretionary' },
+    { ...base, _wmkf_grantprogram_value_formatted: null },
+    { ...base, _wmkf_grantprogram_value_formatted: 'Undergraduate Education' },
+    { ...base, _wmkf_grantprogram_value_formatted: 'Undergraduate Education', _akoya_programid_value_formatted: 'Undergraduate Education - Liberal Arts' },
+  ];
+  const counts = fundingHistoryExclusions(rows);
+  expect(counts).toEqual({ missingRequestType: 1, otherRequestType: 1, missingType: 1, otherType: 1, missingProgram: 2, otherProgram: 1 });
+  expect(Object.values(counts).reduce((sum, count) => sum + count, 0))
+    .toBe(rows.length - qualifyingFundingHistoryGrants(rows).length);
+  expect(JSON.stringify(counts)).not.toMatch(/Private Institution|private-id|private content/);
+  expect(fundingHistoryExclusions([base])).toEqual({});
+});
+
+test('shared institution formatting rejects placeholders and preserves name precedence', () => {
+  expect(fundingHistoryInstitutionName({ akoya_aka: '  AKA U  ', name: 'Legal U' }, 'Request U')).toBe('AKA U');
+  expect(fundingHistoryInstitutionName({ akoya_aka: 'N/A', name: ' Legal U ' }, 'Request U')).toBe('Legal U');
+  expect(fundingHistoryInstitutionName({ akoya_aka: 'unknown', name: 'none' }, ' Request U ')).toBe('Request U');
+  expect(fundingHistoryInstitutionName({ akoya_aka: 'unknown', name: 'none' })).toBeNull();
+});
+
+test('shared award display uses fiscal year first and decision date in UTC as fallback', () => {
+  expect(fundingHistoryAwardedIn({ akoya_fiscalyear: ' June 1994 ', akoya_decisiondate: '1995-01-01' })).toBe('June 1994');
+  expect(fundingHistoryAwardedIn({ akoya_fiscalyear: ' ', akoya_decisiondate: '1994-06-15T00:00:00Z' })).toBe('June 1994');
+  expect(fundingHistoryAwardedIn({ akoya_decisiondate: '1994-06-30T20:00:00-07:00' })).toBe('July 1994');
+  expect(fundingHistoryAwardedIn({ wmkf_meetingdate: '1994-06-15' })).toBeNull();
 });

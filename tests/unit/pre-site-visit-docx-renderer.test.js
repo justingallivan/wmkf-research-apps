@@ -26,7 +26,7 @@ function documentFieldsFixture() {
     programDirector: 'Pat Director',
     invitedAmount: '$1,000,000',
     totalProjectBudget: '$3,500,000',
-    institutionalFundingHistory: 'Applicant University has received 8 awards totaling $9.15 million from WMKF. The most recent grant was awarded in June 2026 to develop chemical tools to restore the function of defective proteins.',
+    institutionalFundingHistory: 'Applicant University has received 8 Research or Undergraduate Education - Science & Engineering awards totaling $9.15 million from WMKF. The most recent of these grants was awarded in June 2026 to develop chemical tools to restore the function of defective proteins.',
   };
 }
 
@@ -98,7 +98,7 @@ test('fills split-run Dataverse and AI placeholders while retaining the template
   expect(xml).toContain('[[STAFF:GraphicalAbstractCaption]]');
   expect(xml).toContain('Research presentation:');
   expect(xml).toContain('[[STAFF:ScientificPresentation]]');
-  expect(xml).toContain('Institutional Funding History:Applicant University has received 8 awards totaling $9.15 million from WMKF.');
+  expect(xml).toContain('Institutional Funding History:Applicant University has received 8 Research or Undergraduate Education - Science & Engineering awards totaling $9.15 million from WMKF.');
 });
 
 test('refuses to render without an institutional funding history sentence', async () => {

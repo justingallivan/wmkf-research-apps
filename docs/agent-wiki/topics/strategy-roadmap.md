@@ -1,8 +1,8 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-10-31
-verification_scope: "Bounded source/Git backlog reconciliation for materials acceptance and product follow-ups; other dated history retained, no live probes"
+last_verified: 2026-11-03
+verification_scope: "Funding-history branch policy/diagnostics checked against source, tests and read-only Production samples 2026-11-03; prior backlog audit and dated release history retained"
 stale_after_days: 90
 owner: product-strategy
 source_files:
@@ -57,6 +57,17 @@ Start with `docs/CURRENT_WORK_QUEUE.md` for ordered commitments. The catalog is 
 document inventory, and individual implementation plans do not establish priority.
 
 ## Current direction and owner holds
+
+- **Institutional Funding History [VERIFIED via branch source, tests and read-only
+  Production probes, 2026-11-03; not deployed]:** the writeup's count, total and
+  latest grant use one qualifying subset: WMKF Request Type Request, actual Type
+  Program, broad Grant Program Research or internal Program Undergraduate
+  Education - Science & Engineering. Full positive Program rollup reconciliation
+  remains the prerequisite. Both positive and zero-history sentences name the
+  scope; exclusions are logged as counts by reason only. Recency uses decision
+  date, else Month YYYY fiscal-year label. Existing Word documents/frozen retries
+  keep their stored text. This supersedes the S467 policy and meeting-date
+  fallback in the historical entry below. See `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`.
 
 - **Final writeups dashboard:** cycle scoping, review views, bookmarkable PD filtering,
   and publication-version context are implemented and have dated September 2026
@@ -197,8 +208,8 @@ at `3101f067` in Ready deployment `dpl_AjT5FeDh5wkdeFSoZWJsVDM5oBqs`.
   Name search performs one bounded 51-row probe, returns at most 50, and tells
   the UI when more matches exist. Owner verified the broad `smith` warning in
   Production after merge `c5efa770`.
-- **Institutional Funding History filled from Dataverse (S467, 2026-08-28,
-  production):** `lib/services/pre-site-visit/funding-history.js` renders the
+- **Historical Institutional Funding History milestone (S467, 2026-08-28,
+  production; policy superseded by the 2026-11-03 branch change above):** `lib/services/pre-site-visit/funding-history.js` renders the
   `AI:InstitutionalFundingHistory` placeholder sentence from the account rollups
   `wmkf_countofprogramgrants`/`wmkf_sumofprogramgrants`, fail-closed against
   the live rows matching the rollups' predicate (`wmkf_typeforrollup eq
