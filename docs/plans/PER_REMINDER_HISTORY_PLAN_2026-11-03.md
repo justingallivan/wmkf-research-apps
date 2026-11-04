@@ -1,8 +1,8 @@
 # Per-reminder history for reviewer follow-up
 
-Status: **SOURCE-BUILT on branch `claude/per-reminder-history` 2026-11-03;
-NOT MERGED; MIGRATION 095 APPLIED IN PRODUCTION 2026-11-03; OWNER-PRESENT
-PROOF PENDING.** Owner decisions D1–D3 taken
+Status: **PRODUCTION-LIVE 2026-11-03 (PR #625, merge `f75465281`, deployment `dpl_HuW1y9yaeuDLQTiRTEqsAHhiS5i9`; rollback `dpl_6pBBZctFHNgpQMpWA6EiSCgTDfVU`); MIGRATION 095 APPLIED; STAGED PROOF DEFERRED
+BY THE OWNER — the first real review-due reminder in Production is the
+evidence.** See § Production release (end of this file). Owner decisions D1–D3 taken
 2026-11-03; D2 rule revised after two Codex adversarial reviews and confirmed
 by the owner's "Build it"; third Codex review approved the plan. Build record:
 § Build (end of this file). Session 662,
@@ -446,4 +446,37 @@ client on `POSTGRES_URL` for per-query cancellation.
   reminder send can run on Preview; unrelated to this change. Alias restored
   to `dpl_cgM9vNTVdC1DAUMR55ZQSBdt9Nt2` and verified. The proof (step 2) can
   only run in Production, on a Factory test request, after merge.
+
+## Production release (2026-11-03)
+
+- Merged by owner decision: PR #625, merge `f75465281`; Production
+  deployment `dpl_HuW1y9yaeuDLQTiRTEqsAHhiS5i9` Ready and serving
+  `applications.wmkeck.org` [VERIFIED via `vercel inspect`]. Last-known-good
+  before merge: `dpl_6pBBZctFHNgpQMpWA6EiSCgTDfVU`. Rollback: revert the merge.
+- [VERIFIED via signed-in Production `GET /api/review-manager/reviewers`]
+  The history read works in Production: reviewer rows return
+  `reminderHistory: []` (read succeeded, no rows), not `null`.
+- Staged proof (step 2) not achieved; deferred by the owner. Attempts, all
+  with owner authorization:
+  - 1003456 (Codex's J27 prepared reviewer fixture): not used. Its Factory
+    Reviewer has submitted (manual review-due reminders refuse,
+    `reviewer-manual-reminder.js:102`), and Codex asked that the fixture be
+    preserved.
+  - 1003430 (Codex's 2026-11-01 rehearsal request, released for this use by
+    Codex): the TEST · Factory Reviewer had already declined there, and a
+    responded reviewer is never reset. A hand-added "TEST · Reminder History
+    Reviewer" (owner's address) was refused at send by the test-request
+    email guard: only Factory synthetic reviewers can be emailed on a test
+    Request (`lib/services/test-requests/reviewer-directed-email.js:41-53`).
+    No email was sent. The never-invited candidate (suggestion
+    `6ed88fe4-e1d7-f111-a05b-70a8a59c439a`) was removed the same day
+    (`DELETE /api/reviewer-finder/my-candidates`, 200); its new person record
+    `84793be7-e1d7-f111-a05b-000d3a379333` (not synthetic) remains in
+    Dynamics.
+- Evidence still to observe: the first review-due reminder (manual, or the
+  Review Manager follow-up email) sent to an invited reviewer in Production
+  should add one `reviewer_reminder_events` row and one dated entry in that
+  reviewer's Activity history. A staged proof would need a Factory synthetic
+  reviewer bound to a test Request that has never been invited (Codex's
+  Factory tooling).
 

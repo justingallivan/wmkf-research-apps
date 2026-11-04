@@ -178,7 +178,7 @@ no acting-user field. Historical findings and Phase 2/3 gates:
   drawer shows the latest reminder and "N reminders recorded in total"; a per-reminder audit trail
   plus an activity DTO projection needs its own `/contract-reconcile` plan before build (plan
   `docs/plans/PER_REMINDER_HISTORY_PLAN_2026-11-03.md`; source-built on branch
-  `claude/per-reminder-history` 2026-11-03, not merged; Atlas
+  `claude/per-reminder-history`, Production-live 2026-11-03 via PR #625 `f75465281`; Atlas
   `docs/atlas/postgres-reviewer-reminder-events.md`). Do not read
   `reminderCount` as evidence of individual reminder timestamps.
 <!-- end-source-lines: 2099-2119 -->
