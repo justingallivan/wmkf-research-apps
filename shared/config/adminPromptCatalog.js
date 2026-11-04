@@ -370,7 +370,7 @@ export function getAdminPromptDescription(name) {
   return Object.hasOwn(ADMIN_PROMPT_CATALOG, name) ? ADMIN_PROMPT_CATALOG[name] : UNCATALOGED_PROMPT;
 }
 
-export const ADMIN_PROMPT_USAGES = ['application', 'reference', 'diagnostic', 'unconnected', 'uncataloged'];
+export const ADMIN_PROMPT_USAGES = ['application', 'power-automate', 'reference', 'diagnostic', 'unconnected', 'uncataloged'];
 
 const text = (value) => (typeof value === 'string' && value.trim() ? value.trim() : null);
 

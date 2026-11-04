@@ -12,6 +12,7 @@ import { ADMIN_PROMPT_GROUPS, ADMIN_PROMPT_USAGES } from '../../config/adminProm
 const LIMITS = { title: 200, description: 4000, usedBy: 4000 };
 const USAGE_LABELS = {
   application: 'Application caller',
+  'power-automate': 'Power Automate flow',
   reference: 'Stored reference',
   diagnostic: 'Developer diagnostic',
   unconnected: 'No application caller',
