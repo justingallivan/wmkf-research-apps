@@ -15,7 +15,7 @@ Read this when: building or planning the Request Workbench, the cycle dashboard,
 Do:
 - Build toward the per-request-holistic destination; the near-term build is the reviewer-lifecycle slice as Workbench v1 (URL `/workbench/[requestId]/...`).
 - Reviewer-tab structure: DECIDED S206 as 4-tab; built as 5 sub-tabs (Candidates added S211); now **COLLAPSED to 3 sub-tabs — Find · Invite Reviewers · Track Reviewers (S280, commit `4d45b4c8`)** — with state-aware default landing. The `candidates` tab key now backs the "Invite Reviewers" label; legacy `invite`/`completed` deep-links normalize to `track`.
-- Treat `akoya_requeststatus` (Status tab) as a read-only living taxonomy — enumerate live, never hardcode; the board decides approve/decline, staff only recommend.
+- Treat `akoya_requeststatus` (Overview status display) as a read-only living taxonomy — enumerate live, never hardcode; the board decides approve/decline, staff only recommend.
 - Verify-before-relying on the D26 allowlist: grep reviewer/invite/honorarium paths to confirm only dashboard visibility is gated on grant status.
 
 Do not:
@@ -36,7 +36,7 @@ History: dated release checkpoints (2026-07-29 → 2026-09-02), the S194–S206 
 
 ## Current source-backed state (verified 2026-08-31)
 
-- Nine top-level tabs are implemented in Production, with zero placeholders.
+- [VERIFIED via local `pages/workbench/[requestId].js`, 2026-11-04] The Workbench has [10](../docs/CANONICAL_COUNTS.md#workbench-tab-count) top-level tabs, with zero placeholders. The redundant Status tab is removed in local source; Overview retains the read-only status display. Deployment of this removal has not been verified.
   The former Pre-Site/Site
   Visit pair now presents as the unified Staff Deliberations workspace, and
   Final Writeup is a readiness-gated same-item handoff/workspace rather than a
