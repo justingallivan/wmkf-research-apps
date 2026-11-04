@@ -20,6 +20,7 @@ import PromptCatalogForm from './PromptCatalogForm';
 import AddPromptForm from './AddPromptForm';
 import ManagePromptGroupsPanel from './ManagePromptGroupsPanel';
 import { ADMIN_PROMPT_GROUPS, getAdminPromptDescription, resolveAdminPromptDescription } from '../../config/adminPromptCatalog';
+import { describePromptDestinations } from '../../config/adminPromptDestinations';
 
 export { ExecutorBudgetEditor };
 
@@ -139,7 +140,10 @@ export default function PromptTemplatesSection() {
     const { title, description, usedBy, group: groupId, section: sectionId } = resolveAdminPromptDescription(prompt, allGroups);
     const group = allGroups.find(candidate => candidate.id === groupId);
     const section = group?.sections?.find(candidate => candidate.id === sectionId);
-    const text = [prompt.name, title, description, usedBy, group?.label, section?.label].join(' ').toLowerCase();
+    const destination = describePromptDestinations(prompt);
+    const text = [prompt.name, title, description, usedBy, group?.label, section?.label,
+      destination.caller?.summary, ...(destination.caller?.fields || []),
+      ...destination.configured.flatMap(item => [item.label, item.technical])].join(' ').toLowerCase();
     return terms.every(term => text.includes(term));
   }).map(prompt => prompt.name));
   const matchCount = list => list.filter(prompt => matchingNames.has(prompt.name)).length;
@@ -222,7 +226,7 @@ export default function PromptTemplatesSection() {
               setSearch(value);
               setExpandedGroups(value.trim() ? { ...Object.fromEntries(allGroups.map(group => [group.id, true])), __retired: true } : {});
             }}
-            placeholder="Search titles, descriptions, technical keys or Used by"
+            placeholder="Search titles, descriptions, technical keys, Used by or destinations"
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500"
           />
           {search && <button type="button" onClick={() => { setSearch(''); setExpandedGroups({}); }} className="shrink-0 text-sm text-gray-600 underline">Clear search</button>}
@@ -338,6 +342,7 @@ function PromptPanel({ prompt, groups, modelCatalog, executorBudgetConfig, onPub
           </div>
           <p className="mt-2 max-w-3xl text-sm text-gray-700">{description.description}</p>
           <p className="mt-1 text-sm text-gray-600"><span className="font-medium">Used by:</span> {description.usedBy}</p>
+          <PromptDestinations prompt={prompt} />
           <p className="mt-2 mb-1 text-xs text-gray-500"><code className="break-all">{prompt.name}</code></p>
           <div className="text-xs text-gray-500">
             {prompt.hasCurrent ? 'current version' : 'latest version'} <strong>v{prompt.version ?? '?'}</strong> · {(prompt.body || '').length} chars
@@ -412,6 +417,31 @@ function PromptPanel({ prompt, groups, modelCatalog, executorBudgetConfig, onPub
       )}
       {outcome && <OutcomeBanner outcome={outcome} onDismiss={() => setOutcome(null)} />}
     </article>
+  );
+}
+
+function PromptDestinations({ prompt }) {
+  const { caller, configured, configurationIssue, fallback } = describePromptDestinations(prompt);
+  return (
+    <div className="mt-2 max-w-3xl text-sm text-gray-600" aria-label="Output destinations">
+      <p><span className="font-medium">Writes to:</span> {caller?.summary || fallback}</p>
+      {!prompt.hasCurrent && <p className="mt-1 text-xs">This version is not current; destinations describe configuration and caller behavior, not an active run.</p>}
+      {configured.map(item => (
+        <p key={item.technical} className="mt-1 text-xs">
+          {item.label} — <code className="break-all">{item.technical}</code> (configured writeback)
+        </p>
+      ))}
+      {caller?.fields.length > 0 && (
+        <details className="mt-1 text-xs">
+          <summary className="cursor-pointer">Tables and fields saved by the caller</summary>
+          <ul className="mt-1 space-y-1">
+            {caller.fields.map(field => <li key={field}><code className="break-all">{field}</code></li>)}
+          </ul>
+        </details>
+      )}
+      {configurationIssue && <p className="mt-1 text-xs text-amber-800">{configurationIssue}</p>}
+      {!configurationIssue && configured.length === 0 && <p className="mt-1 text-xs">No direct Executor field writeback is declared.</p>}
+    </div>
   );
 }
 

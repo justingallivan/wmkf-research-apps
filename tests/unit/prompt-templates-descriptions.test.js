@@ -51,6 +51,26 @@ test('shows an audited title, explanation, Used by label and technical key toget
   expect(within(card).getByText('executor.echo-parity').tagName).toBe('CODE');
 });
 
+test('shows and searches caller-saved table/field destinations without running the prompt', async () => {
+  serve([prompt('grantee-title.generate'), prompt('expense-reporter.extract-image')]);
+  await renderOpenWorkflows();
+  const card = screen.getByRole('article', { name: 'Board Summary project objective' });
+  expect(within(card).getByText('Writes to:').parentElement).toHaveTextContent('only when empty');
+  expect(within(card).getByText('akoya_request.wmkf_wmkfprojectdescription')).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Search prompts'), { target: { value: 'wmkf_wmkfprojectdescription' } });
+  expect(card).toBeVisible();
+  expect(screen.getByText('expense-reporter.extract-image').closest('article')).not.toBeVisible();
+  expect(global.fetch.mock.calls.every(([, init]) => !init?.method || init.method === 'GET')).toBe(true);
+});
+
+test('shows declared writeback for an uncataloged prompt while leaving its external caller unknown', async () => {
+  serve([{ ...prompt('external.new-flow'), outputSchema: JSON.stringify({ outputs: [{ target: { kind: 'akoya_request', field: 'wmkf_newfield' } }] }) }]);
+  await renderOpenWorkflows();
+  const card = screen.getByText('external.new-flow').closest('article');
+  expect(within(card).getByText('akoya_request.wmkf_newfield')).toBeInTheDocument();
+  expect(within(card).getByText(/Caller-managed destination is not documented/)).toBeInTheDocument();
+});
+
 test('keeps application use, stored reference and live publication state separate', async () => {
   serve([prompt('review-synthesis.generate'), prompt('phase-ii.qa'), prompt('phase-i.checkin', false)]);
   await renderOpenWorkflows();
