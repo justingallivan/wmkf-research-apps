@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## November 2026 — Each reviewer reminder gets its own dated history entry (Session 661, Claude)
+
+**Milestone:** The reviewer Activity history lists every reminder with its date instead of only the latest one plus a total.
+**Sessions:** Session 661 (Claude, concurrent with Codex); owner decisions D1–D3; three Codex plan reviews and one implementation review.
+**Ship state:**
+- PR #625 (`f75465281`), Production deployment `dpl_HuW1y9yaeuDLQTiRTEqsAHhiS5i9`: Postgres `reviewer_reminder_events` (migration 095, owner-applied with Codex's 094 to the app database); written after each send for invited reviewers only, bounded and cancelled so history never blocks a reminder.
+- History read verified in Production (`reminderHistory: []`); staged proof deferred by the owner — the first real review-due reminder is the evidence.
+- Same session: Preview alias CSRF fix, PR #620 (`1f854345e`), Preview-proved.
+**Why it matters:** Staff can see when each follow-up went out, while the Dataverse stamps and count stay authoritative for sending.
+**Pointers:** `docs/plans/PER_REMINDER_HISTORY_PLAN_2026-11-03.md`; `docs/atlas/postgres-reviewer-reminder-events.md`.
+
 ## November 2026 — Prepared J27 Factory completes a reviewer rehearsal (Session 661, Codex)
 
 **Milestone:** A prepared, marked J27 clone supports a bounded invitation-to-submitted-review rehearsal without rerunning intake assembly or AI.

@@ -83,13 +83,13 @@ alongside Codex. Its earlier standalone handoff (PR #622) is folded in here.
      removed). Its non-synthetic person record
      `84793be7-e1d7-f111-a05b-000d3a379333` (owner's iCloud address) remains in
      Dynamics.
-   - Closeout docs: PR #628 (docs only; owner merge pending at this writing).
+   - Closeout docs: PR #628 merged (`3629a33af`); this handoff section via PR #622
+     (`abd5a4a2b`). DEVELOPMENT_LOG entry added at stop.
 
 ### Claude stream — next items (verify before acting)
 
 - **Observe the first real review-due reminder in Production**: one
   `reviewer_reminder_events` row and one dated Activity history entry.
-- **PR #628** merge (docs only) if not yet merged.
 - `scripts/reset-reviewer-for-testing.js` now requires the
   `reviewer_reminder_events` table in the database it runs against.
 - The main checkout is behind `origin/main`; pulling it is the owner's call
