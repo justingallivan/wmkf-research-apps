@@ -239,6 +239,33 @@ describe('grant-request.aggregateLinkedCycles', () => {
   });
 });
 
+describe('listBoardDates completeness', () => {
+  test('reads a calendar larger than the shared 100-row page in one bounded request', async () => {
+    const rows = Array.from({ length: 112 }, (_, i) => ({ wmkf_cyclecode: `J${i}`, wmkf_meetingdate: null }));
+    fetchMock.mockImplementation(async (_url, { headers }) => {
+      const pageSize = Number(/odata.maxpagesize=(\d+)/.exec(headers.Prefer)?.[1]);
+      return {
+        ok: true, status: 200,
+        json: async () => ({ value: rows.slice(0, pageSize), ...(pageSize < rows.length ? { '@odata.nextLink': 'https://example.crm.dynamics.com/next' } : {}) }),
+      };
+    });
+    await expect(open(() => listBoardDates({ timeoutMs: 1234 }))).resolves.toEqual(rows);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(new URL(url).searchParams.get('$top')).toBe('500');
+    expect(options.headers.Authorization).toBe('Bearer test-token');
+  });
+
+  test('still refuses a partial calendar rather than filing against incomplete dates', async () => {
+    fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({
+      value: [{ wmkf_cyclecode: 'D26', wmkf_meetingdate: '2026-12-10' }],
+      '@odata.nextLink': 'https://example.crm.dynamics.com/next',
+    }) });
+    await expect(open(() => listBoardDates())).rejects.toThrow('response was paged');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('listBoardDatesOrNone', () => {
   test('returns the Board dates when the calendar reads', async () => {
     fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({ value: [{ wmkf_cyclecode: 'D26', wmkf_meetingdate: '2026-12-10' }] }) });
