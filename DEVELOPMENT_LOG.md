@@ -18,7 +18,7 @@ The chronological archive after the `Legacy chronological session log` divider c
 - PR #617 (`d3016b5da`): guarded prepared clone, separate phase changes, journaled owner readiness and exact prior-GoVerify-PDF proof; migration 094 verified on both managed ledgers.
 - PR #618 (`7054043ed`): immutable Factory reviewer promotion; PR #623 (`a66e09091`): expected archive misses no longer misclassified as materials outages.
 - Request 1003456, run `c2da75d4-a737-4d81-8db1-96aca62e12a6`, managed-ledger/ledger_prod: canonical PDF hash verified, one test review received with nine answers, two sent emails and zero observed request payments; honorarium declined.
-- PR #626 records closeout/operating steps; all checks passed, but GitHub still showed OPEN at stop despite owner-reported Production completion. No merge performed by this stop.
+- PR #626 (`626b1d681`) merged after all 13 checks passed; the owner subsequently confirmed Production deployment. It records closeout/operating steps and read-only rehearsal probes.
 **Why it matters:** Staff can rehearse reviewer mechanics using a complete copied package; owner CLI finalization and manual isolated materials release remain accepted limits. Broader PD workflow and earlier intake testing are deferred.
 **Pointers:** `docs/TEST_REQUEST_FACTORY_FORM_RUNBOOK.md`; `docs/plans/evidence/test-request-factory/j27-reviewer-rehearsal-proof-2026-11-03.md`; `docs/plans/J27_TEST_REQUEST_FACTORY_FINISH_PLAN_2026-11-02.md`.
 

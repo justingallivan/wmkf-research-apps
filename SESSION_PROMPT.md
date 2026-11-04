@@ -37,22 +37,38 @@ begin that implementation before settling the workflow. This handoff lands on
    published. Fable reviewed docs/probes; required and recommended documentation
    corrections resolved. All hosted checks on `15a427dd1` now passed.
 
-### Release-status discrepancy — verify before claiming promotion
+### Closeout release and follow-up decisions
 
-[OWNER REPORTED] Justin said the closeout was done and in Production.
-[VERIFIED via GitHub at stop] PR #626 was still OPEN, with no merge commit;
-`origin/main` remained at `a66e09091`. [VERIFIED via GitHub, Claude, later
-2026-11-03] PR #626 has since merged (`626b1d681`, 23:05 UTC). Its final checks were all successful.
-Do not silently merge or infer the Preview is Production. Recheck GitHub and the
-serving deployment next time if this distinction still matters. The previously
-released runtime/rehearsal proof is separate from this documentation closeout.
+[VERIFIED via GitHub] PR #626 merged as `626b1d681` after all 13 checks passed
+on final head `dd6dd3631`. [OWNER REPORTED] Justin confirmed Production deployment.
+The earlier open-PR discrepancy is closed; no further merge is needed.
+
+Migration clarification: 094's header was too restrictive. The app runner and
+fresh bootstrap include it, matching the 054/058 shared-schema convention. The
+managed databases remain the only operational Factory ledgers. Claude's merged
+closeout documents owner-run application of 094 and 095 to the Production app
+database with readback (Atlas pages below); Codex performed no additional DB
+writes. Leave the checksum-tracked 094 SQL unchanged. Use the dedicated ledger
+runner for managed ledgers and the ordinary app runner for the app database.
+
+Reminder-test handoff: preserve 1003456's completed review. The proposed 1003430
+setup was conditional, not proof of a suitable outstanding reviewer and not
+new send authorization. Claude's later handoff records that reviewer declined,
+a hand-added reviewer was refused by the test-email guard, and Justin deferred
+staged proof. Do not repeat that setup based on our earlier suggestion. The
+first Production reminder-history row remains unobserved per the current Atlas.
+Staff response correction exists (`reviewer-engagement/correct-response.js`),
+but it is not reviewer policy consent; the Factory CLI has no acceptance step.
+Justin controls the approved test inbox; Codex did not independently read it.
 
 ### Session branch commits
 
 - `cc1c9c801` — Record completed Factory reviewer rehearsal and read-only probes.
 - `18dc93c1d` — Close out prepared Factory MVP and document repeatable rehearsal.
 - `15a427dd1` — Resolve Fable closeout guidance findings.
-- This stop commit adds the handoff and Factory milestone entry.
+- `dd6dd3631` — Initial handoff and Factory milestone.
+- This follow-up stop commit reconciles the merge/migration/reminder decisions;
+  it stays on the already-authorized closeout branch, with no runtime changes.
 
 ## Concurrent Claude stream — same day (Claude, 2026-11-03)
 
@@ -83,13 +99,13 @@ alongside Codex. Its earlier standalone handoff (PR #622) is folded in here.
      removed). Its non-synthetic person record
      `84793be7-e1d7-f111-a05b-000d3a379333` (owner's iCloud address) remains in
      Dynamics.
-   - Closeout docs: PR #628 (docs only; owner merge pending at this writing).
+   - Closeout docs: PR #628 MERGED (`3629a33af`), verified via current main history.
 
 ### Claude stream — next items (verify before acting)
 
 - **Observe the first real review-due reminder in Production**: one
   `reviewer_reminder_events` row and one dated Activity history entry.
-- **PR #628** merge (docs only) if not yet merged.
+- **PR #628 DONE**: merged; do not carry its merge forward as open.
 - `scripts/reset-reviewer-for-testing.js` now requires the
   `reviewer_reminder_events` table in the database it runs against.
 - The main checkout is behind `origin/main`; pulling it is the owner's call
@@ -110,8 +126,7 @@ alongside Codex. Its earlier standalone handoff (PR #622) is folded in here.
 
 ### Verify Before Acting
 
-- Resolve PR #626's GitHub/owner-reported release discrepancy above; no new
-  merge authorization is supplied by this handoff.
+- PR #626 is merged and owner-reported live; no release-discrepancy task remains.
 - The older J27 eligibility/readiness plans still contain branch-era status
   labels. Verify the already-merged readiness/actionable changes against source
   and history before treating any plan item as an open task.
@@ -170,6 +185,8 @@ needed in CLAUDE.md. Claim-evidence pilot report was unavailable because local
 state could not be read; no observation row was fabricated. No router growth
 advisory was received in this stop.
 
-Milestone determination: **entry added** to DEVELOPMENT_LOG.md for the shipped
-prepared J27 Factory and completed bounded reviewer rehearsal. PR #626's
-closeout promotion is explicitly not independently verified.
+Milestone determination: the existing Factory milestone entry was corrected
+with the verified #626 merge and owner-reported deployment. No additional
+milestone entry is required for these explanatory follow-ups. No CLAUDE.md or
+memory-router edits were needed. The pilot report remains unavailable; no
+observation row was invented.
