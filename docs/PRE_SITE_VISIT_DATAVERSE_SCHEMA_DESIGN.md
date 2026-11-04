@@ -524,8 +524,8 @@ other target; Production also completed the durable mutation proof:
   Institutional Funding History needed no result field: since S467
   (2026-08-28) it is derived deterministically from Dataverse at generation
   and stored only in the input snapshot (introduced in v3; currently v4;
-  `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`). **[VERIFIED via branch source
-  and tests, 2026-11-03; not deployed.]** The narrower Research / Undergraduate
+  `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`). **[PRODUCTION-DEPLOYED 2026-11-03 via PR #629, merge `b16078551`;
+  Ready deployment `dpl_2FHnvWzgb6W3svPkr2T8MNKvA3ux`.]** The narrower Research / Undergraduate
   Education - Science & Engineering funding policy changes the snapshot text,
   not its schema or prior frozen snapshots; both positive and zero-history
   sentences name the scope. The lifecycle plan owns the current policy.

@@ -152,8 +152,9 @@ Evidence: `docs/PRE_SITE_VISIT_GENERATION_RESILIENCE_PLAN.md` §Status.
 | Slides, other applicant materials, recording, transcript, transcript summary | SharePoint bytes plus one `wmkf_requestdocument` row per file | Governed upload/registration and normal SharePoint version/recycle behavior |
 | Current document selection | Request lookup to the current Ready Word row | Service-controlled atomic transition |
 
-**[VERIFIED via branch source, focused tests and read-only Production probe,
-2026-11-03; not deployed.]** Institutional funding history first reconciles all
+**[PRODUCTION-DEPLOYED 2026-11-03 via PR #629, merge `b16078551`; Vercel
+deployment `dpl_2FHnvWzgb6W3svPkr2T8MNKvA3ux` Ready, public sign-in/session
+checks passed and bounded runtime error scan returned zero records.]** Institutional funding history first reconciles all
 positive Program grants against the account's Program count/sum rollups. The
 writeup then counts, sums and cites the newest award from one narrower subset:
 WMKF Request Type = Request (`wmkf_request_type = 100000001`), actual Type lookup
@@ -168,7 +169,10 @@ Request Type, Type or Program), with no institution names, award content or IDs.
 Missing classifications remain excluded; the diagnostics do not change eligibility. The existing snapshot and generation-key machinery
 captures this text; existing Word files and retries of frozen snapshots keep their
 stored text until deliberate regeneration. This policy supersedes the former
-all-Program count/sum and Research-only most-recent sentence.
+all-Program count/sum and Research-only most-recent sentence. PR CI passed
+27,280 tests (329 skipped) plus 183 Postgres integration tests; the skipped tests
+are not claimed as verified. No governed Word generation or regeneration was
+performed during release; document-write behavior remains test-proven.
 
 The existing `akoya_sitevisitnotes` field may contain historical content. This
 plan neither deletes it nor silently changes its meaning. Before any future

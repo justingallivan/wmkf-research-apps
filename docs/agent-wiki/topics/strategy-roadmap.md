@@ -2,7 +2,7 @@
 agent_wiki: topic
 status: active
 last_verified: 2026-11-03
-verification_scope: "Funding-history branch policy/diagnostics checked against source, tests and read-only Production samples 2026-11-03; prior backlog audit and dated release history retained"
+verification_scope: "Funding-history PR #629 production release verified via Vercel Ready deployment, CI, public endpoint checks and bounded error scan 2026-11-03; prior backlog audit and dated history retained"
 stale_after_days: 90
 owner: product-strategy
 source_files:
@@ -58,8 +58,8 @@ document inventory, and individual implementation plans do not establish priorit
 
 ## Current direction and owner holds
 
-- **Institutional Funding History [VERIFIED via branch source, tests and read-only
-  Production probes, 2026-11-03; not deployed]:** the writeup's count, total and
+- **Institutional Funding History [PRODUCTION-DEPLOYED 2026-11-03 via PR #629,
+  merge `b16078551`, Ready deployment `dpl_2FHnvWzgb6W3svPkr2T8MNKvA3ux`]:** the writeup's count, total and
   latest grant use one qualifying subset: WMKF Request Type Request, actual Type
   Program, broad Grant Program Research or internal Program Undergraduate
   Education - Science & Engineering. Full positive Program rollup reconciliation
@@ -67,7 +67,8 @@ document inventory, and individual implementation plans do not establish priorit
   scope; exclusions are logged as counts by reason only. Recency uses decision
   date, else Month YYYY fiscal-year label. Existing Word documents/frozen retries
   keep their stored text. This supersedes the S467 policy and meeting-date
-  fallback in the historical entry below. See `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`.
+  fallback in the historical entry below; CI and public endpoint checks passed,
+  the bounded release error scan returned zero records, and no Word write was invoked. See `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`.
 
 - **Final writeups dashboard:** cycle scoping, review views, bookmarkable PD filtering,
   and publication-version context are implemented and have dated September 2026
@@ -209,7 +210,7 @@ at `3101f067` in Ready deployment `dpl_AjT5FeDh5wkdeFSoZWJsVDM5oBqs`.
   the UI when more matches exist. Owner verified the broad `smith` warning in
   Production after merge `c5efa770`.
 - **Historical Institutional Funding History milestone (S467, 2026-08-28,
-  production; policy superseded by the 2026-11-03 branch change above):** `lib/services/pre-site-visit/funding-history.js` renders the
+  production; policy superseded by the 2026-11-03 release above):** `lib/services/pre-site-visit/funding-history.js` renders the
   `AI:InstitutionalFundingHistory` placeholder sentence from the account rollups
   `wmkf_countofprogramgrants`/`wmkf_sumofprogramgrants`, fail-closed against
   the live rows matching the rollups' predicate (`wmkf_typeforrollup eq
