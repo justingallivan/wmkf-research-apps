@@ -41,7 +41,8 @@ begin that implementation before settling the workflow. This handoff lands on
 
 [OWNER REPORTED] Justin said the closeout was done and in Production.
 [VERIFIED via GitHub at stop] PR #626 was still OPEN, with no merge commit;
-`origin/main` remained at `a66e09091`. Its final checks were all successful.
+`origin/main` remained at `a66e09091`. [VERIFIED via GitHub, Claude, later
+2026-11-03] PR #626 has since merged (`626b1d681`, 23:05 UTC). Its final checks were all successful.
 Do not silently merge or infer the Preview is Production. Recheck GitHub and the
 serving deployment next time if this distinction still matters. The previously
 released runtime/rehearsal proof is separate from this documentation closeout.
@@ -52,6 +53,50 @@ released runtime/rehearsal proof is separate from this documentation closeout.
 - `18dc93c1d` — Close out prepared Factory MVP and document repeatable rehearsal.
 - `15a427dd1` — Resolve Fable closeout guidance findings.
 - This stop commit adds the handoff and Factory milestone entry.
+
+## Concurrent Claude stream — same day (Claude, 2026-11-03)
+
+Claude worked in worktree `/Users/gallivan/Code/WMKF_Apps-claude-2026-11-03`
+alongside Codex. Its earlier standalone handoff (PR #622) is folded in here.
+
+1. **Preview alias CSRF fix — PRODUCTION-MERGED, PREVIEW-PROVED.** PR #620
+   (`1f854345e`): on Preview only, `lib/utils/auth.js` `validateOrigin` also
+   accepts the registered stable alias (tracked constant
+   `PREVIEW_STABLE_ALIAS_ORIGIN`). Signed-in alias POST proved not-403; alias
+   restored. Test-clock fix PR #619 (`1b499663e`); closeout PR #621
+   (`e18496cbd`). Plan: `docs/plans/PREVIEW_ALIAS_CSRF_ORIGIN_PLAN_2026-11-03.md`.
+2. **Per-reminder history (queue item 7) — PRODUCTION-LIVE.** PR #625, merge
+   `f75465281`, deployment `dpl_HuW1y9yaeuDLQTiRTEqsAHhiS5i9` (rollback
+   `dpl_6pBBZctFHNgpQMpWA6EiSCgTDfVU`). New Postgres table
+   `reviewer_reminder_events` (migration 095); each reminder gets its own dated
+   Activity history entry. Owner decisions D1–D3; three Codex plan reviews and
+   one implementation review. Plan:
+   `docs/plans/PER_REMINDER_HISTORY_PLAN_2026-11-03.md` (§ Build, § Production
+   release); Atlas `docs/atlas/postgres-reviewer-reminder-events.md`.
+   - Migrations: the owner ran `node scripts/apply-migrations.js` from the
+     Claude worktree, applying **094 and 095 to the Production app database**
+     (094 on Codex's recommendation, keeping the shared-schema convention;
+     `docs/atlas/postgres-test-request-runs.md` now says so). Readback exact.
+   - Staged proof **deferred by the owner**: 1003456 preserved at Codex's
+     request; on 1003430 the Factory reviewer had declined, and the test-request
+     email guard refused a hand-added reviewer (no email sent; candidate
+     removed). Its non-synthetic person record
+     `84793be7-e1d7-f111-a05b-000d3a379333` (owner's iCloud address) remains in
+     Dynamics.
+   - Closeout docs: PR #628 (docs only; owner merge pending at this writing).
+
+### Claude stream — next items (verify before acting)
+
+- **Observe the first real review-due reminder in Production**: one
+  `reviewer_reminder_events` row and one dated Activity history entry.
+- **PR #628** merge (docs only) if not yet merged.
+- `scripts/reset-reviewer-for-testing.js` now requires the
+  `reviewer_reminder_events` table in the database it runs against.
+- The main checkout is behind `origin/main`; pulling it is the owner's call
+  (other-owner WIP there).
+- Note for Codex/runbook: `docs/TEST_REQUEST_FACTORY_FORM_RUNBOOK.md` says future
+  ledger migrations use `ledger:apply`, "never the app database runner"; the app
+  runner nonetheless applies every numbered migration to the app database.
 
 ## Next Items
 
@@ -95,6 +140,7 @@ shared-prompt work and compact concurrent routing. No other checkout was edited.
 
 | Owner / stream | Resume boundary |
 |---|---|
+| Claude / Preview CSRF + per-reminder history | See the concurrent Claude section above; worktree `/Users/gallivan/Code/WMKF_Apps-claude-2026-11-03` (branches merged; no WIP). |
 | Claude / shared prompts | `docs/plans/SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md`; prior handoff records waiting for Connor on phase-i.checkin, skipped Production smokes, unread name-column length and parked group/catalog work. Verify before carrying these forward. |
 | Codex / Integrity | Session 658 handoff at `git show 9db614417:SESSION_PROMPT.md`; Dec 1 refresh remains future at this stop. Preserve `.integrity-backups/2026-11-02-pre-refresh/`; no restore authorized. |
 | Claude / reviewer outcomes / invitations | Owning plans `INVITED_REVIEWER_OUTCOMES_PLAN_2026-10-31.md` and `REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`; not re-audited here. |
