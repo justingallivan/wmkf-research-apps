@@ -1,7 +1,6 @@
 # Atlas: `reviewer_reminder_events` (Postgres — per-reminder history)
 
-**Status:** [SOURCE-BUILT on branch `claude/per-reminder-history`, 2026-11-03;
-not merged or deployed.] Migration 095 applied to the shared Production app
+**Status:** [PRODUCTION-LIVE 2026-11-03 (PR #625, merge `f75465281`, deployment `dpl_HuW1y9yaeuDLQTiRTEqsAHhiS5i9`; rollback `dpl_6pBBZctFHNgpQMpWA6EiSCgTDfVU`); first Production row not yet observed.] Migration 095 applied to the shared Production app
 database 2026-11-03 (owner-run `node scripts/apply-migrations.js`, tracker
 `applied_at` 2026-11-03T23:18:50Z); readback the same day: 6 columns, kind
 check, unique key, suggestion index, 0 rows [VERIFIED via read-only query]. Plan and reviews:
