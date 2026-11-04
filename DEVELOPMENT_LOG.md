@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## November 2026 — Draft writeups use a consistent institutional funding scope (Session 662, Codex)
+
+**Milestone:** Institutional Funding History count, total and latest award now describe one owner-approved award population.
+**Sessions:** Session 662; live field/value probes, Claude code review and finding closure, owner-authorized PR and release.
+**Ship state:**
+- PR #629, merge `b16078551`: exact applicant, positive amount, WMKF Request Type Request, actual Type Program, broad Research OR internal Undergraduate Education - Science & Engineering; full Program-rollup check retained before narrowing.
+- Positive/zero wording names the scope; exclusions are logged as counts only. Runtime and GET-only diagnostic share formatting; missing targets and partial failures return unsuccessful status.
+- Production deployment `dpl_2FHnvWzgb6W3svPkr2T8MNKvA3ux` Ready; CI passed 27,280 tests plus 183 Postgres integration tests. Public sign-in/session checks passed and bounded error scan returned zero records.
+- Existing Word files/frozen retries retain saved text; no Word generation or business-data write was used as the release smoke. Documentation follow-up `2cba25544` also reached Ready.
+**Why it matters:** Board-facing history no longer mixes all-Program totals with a Research-only latest grant or silently hides classification exclusions.
+**Pointers:** `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`; `lib/services/pre-site-visit/funding-history.js`; commits `3e0922583`, `ba3bd0130`, `b16078551`, `2cba25544`.
+
 ## November 2026 — Prepared J27 Factory completes a reviewer rehearsal (Session 661, Codex)
 
 **Milestone:** A prepared, marked J27 clone supports a bounded invitation-to-submitted-review rehearsal without rerunning intake assembly or AI.
