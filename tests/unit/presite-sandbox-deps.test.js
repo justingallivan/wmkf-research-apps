@@ -217,6 +217,8 @@ describe('createPresiteInputDeps + loadPreSiteVisitInputs (P1: the real program-
     wmkf_meetingdate: '2025-01-01',
     akoya_grant: 10000,
     _wmkf_grantprogram_value_formatted: 'Research',
+    wmkf_request_type: 100000001,
+    _wmkf_type_value_formatted: 'Program',
     wmkf_wmkfprojectdescription: 'A prior award.',
   };
   function applicantRow({ count, sum }) {

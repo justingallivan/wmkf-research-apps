@@ -6,7 +6,7 @@ status: active
 summary: "Pre-Site/Site Visit lifecycle, Final acknowledgement, dashboard, and persona lenses are live; leadership-review transition Production-live since 2026-09-07."
 canonical: false
 cataloged: 2026-08-17
-last_verified: 2026-09-04
+last_verified: 2026-11-03
 owner: product-engineering
 related:
   - docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md
@@ -146,11 +146,26 @@ Evidence: `docs/PRE_SITE_VISIT_GENERATION_RESILIENCE_PLAN.md` §Status.
 | Canonical normalized proposal core, content-free diagnostics, and bounded input snapshot | Pre-Site `wmkf_requestdocument` JSON snapshot fields | Write-once render/audit evidence; raw provider output remains on the governed AI run |
 | Reviewer roster and review narrative | Submitted-review roster plus current `wmkf_reviewsynthesisjson` | Deterministically rendered at the selected evidence timestamp; no duplicate Pre-Site review store initially |
 | Graphical abstract image/caption and staff recommendation | The Word document | Manually pasted or entered by the PD |
-| Institutional funding history | Dataverse, rendered deterministically at generation (S467: account `wmkf_countofprogramgrants`/`wmkf_sumofprogramgrants` rollups + newest program-grant request; `lib/services/pre-site-visit/funding-history.js`) | Stored only in the v3 input snapshot and the rendered Word bytes, like the other DV fields; no LLM and no new Dataverse column |
+| Institutional funding history | Dataverse, rendered deterministically at generation; see the scoped 2026-11-03 policy below and `lib/services/pre-site-visit/funding-history.js` | Stored only in the input snapshot (currently v4) and rendered Word bytes; no LLM and no new Dataverse column |
 | Site Visit observations and later editorial prose | The current Word document | Direct staff edits; SharePoint native versions are authoritative |
 | Site Visit logistics | Dataverse | Separate bounded schema/adapter decision; do not hide these inside the Word file |
 | Slides, other applicant materials, recording, transcript, transcript summary | SharePoint bytes plus one `wmkf_requestdocument` row per file | Governed upload/registration and normal SharePoint version/recycle behavior |
 | Current document selection | Request lookup to the current Ready Word row | Service-controlled atomic transition |
+
+**[VERIFIED via branch source, focused tests and read-only Production probe,
+2026-11-03; not deployed.]** Institutional funding history first reconciles all
+positive Program grants against the account's Program count/sum rollups. The
+writeup then counts, sums and cites the newest award from one narrower subset:
+WMKF Request Type = Request (`wmkf_request_type = 100000001`), actual Type lookup
+= Program, and either broad Grant Program = Research or internal Program =
+Undergraduate Education - Science & Engineering. Other undergraduate programs,
+including Liberal Arts, are excluded. Exact applicant and positive grant amount
+requirements remain. Recency uses decision date, else the Month YYYY fiscal-year
+label; an undated qualifying award fails closed. The zero-history sentence names
+these programs explicitly. The existing snapshot and generation-key machinery
+captures this text; existing Word files and retries of frozen snapshots keep their
+stored text until deliberate regeneration. This policy supersedes the former
+all-Program count/sum and Research-only most-recent sentence.
 
 The existing `akoya_sitevisitnotes` field may contain historical content. This
 plan neither deletes it nor silently changes its meaning. Before any future

@@ -5,7 +5,7 @@ import {
   programGrantFilter,
   programGrantRecencyDate,
   reconcileProgramGrantRollups,
-  researchProgramGrants,
+  qualifyingFundingHistoryGrants,
   selectMostRecentProgramGrant,
 } from '../../lib/services/pre-site-visit/funding-history';
 
@@ -23,7 +23,7 @@ test('loadProgramGrants fetches every matching row with the rollup predicate and
   const queryAllRequests = jest.fn().mockResolvedValue({ records: rows, capped: false });
   await expect(loadProgramGrants(APPLICANT_ID, { queryAllRequests })).resolves.toEqual({ records: rows, capped: false });
   expect(queryAllRequests).toHaveBeenCalledWith({
-    select: 'akoya_requestid,akoya_requestnum,akoya_fiscalyear,akoya_decisiondate,akoya_grant,_wmkf_grantprogram_value,wmkf_wmkfprojectdescription',
+    select: 'akoya_requestid,akoya_requestnum,akoya_fiscalyear,akoya_decisiondate,akoya_grant,wmkf_request_type,_wmkf_type_value,_akoya_programid_value,_wmkf_grantprogram_value,wmkf_wmkfprojectdescription',
     filter: programGrantFilter(APPLICANT_ID),
   });
   queryAllRequests.mockResolvedValue({ records: rows, capped: true });
@@ -151,7 +151,7 @@ test('zero or missing count renders the no-prior-award sentence', () => {
   for (const count of [0, null, undefined, 'n/a']) {
     expect(formatInstitutionalFundingHistory({
       institutionName: 'New U', programGrantCount: count, programGrantSum: 0, mostRecentGrant: null,
-    })).toBe('New U has not previously received a program grant from WMKF.');
+    })).toBe('New U has not previously received a Research or Undergraduate Education - Science & Engineering program grant from WMKF.');
   }
 });
 
@@ -160,12 +160,22 @@ test('requires an institution name', () => {
     .toThrow(/institution name/);
 });
 
-test('researchProgramGrants keeps only Research-program rows by formatted label', () => {
-  const research = { akoya_requestnum: '1', _wmkf_grantprogram_value_formatted: 'Research' };
-  const socal = { akoya_requestnum: '2', _wmkf_grantprogram_value_formatted: 'Southern California' };
-  const unlabeled = { akoya_requestnum: '3' };
-  expect(researchProgramGrants([research, socal, unlabeled])).toEqual([research]);
-  expect(researchProgramGrants([])).toEqual([]);
+test('history includes only Request / Program records in Research or Undergraduate Science & Engineering', () => {
+  const research = { wmkf_request_type: 100000001, _wmkf_type_value_formatted: 'Program', _wmkf_grantprogram_value_formatted: 'Research' };
+  const undergraduate = { ...research, _wmkf_grantprogram_value_formatted: 'Undergraduate Education', _akoya_programid_value_formatted: 'Undergraduate Education - Science & Engineering' };
+  const excluded = [
+    { ...research, wmkf_request_type: 100000000 }, // Concept
+    { ...research, wmkf_request_type: 682090001 }, // Individual
+    { ...research, wmkf_request_type: null },
+    { ...research, _wmkf_type_value_formatted: 'Special Grants' },
+    { ...research, _wmkf_type_value_formatted: null },
+    { ...undergraduate, _akoya_programid_value_formatted: 'Undergraduate Education - Liberal Arts' },
+    { ...undergraduate, _akoya_programid_value_formatted: null },
+    { ...research, _wmkf_grantprogram_value_formatted: 'Southern California' },
+    { ...research, _wmkf_grantprogram_value_formatted: null },
+  ];
+  expect(qualifyingFundingHistoryGrants([research, undergraduate, ...excluded])).toEqual([research, undergraduate]);
+  expect(qualifyingFundingHistoryGrants([])).toEqual([]);
 });
 
 test('qualifier wording marks a research grant that is not the newest program grant overall', () => {
