@@ -96,9 +96,9 @@ comments.
 | First Cut rationale | 1–3 sentences on key impact | Intake | Proposal | App job (open in D37) | Chairs, Board | Stored and app-editable; shared packet snapshot frozen (F2) |
 | Field / methods keywords | From controlled lists | Intake | Proposal | Connor's flow (D37) | Staff, packets | Stored; full lists pending |
 | Triage flag and reason | One list value plus one sentence | Intake | Proposal | AI flags; staff decide (D17/D38) | Staff only | Stored |
-| Staff notes | Free text | Any | Staff | Staff | Staff only, never Chairs or Board | Stored |
+| Staff notes | Free text | Any | Staff | Staff | Staff only, never Chairs or Board | Single editable field; no entry history (D1) |
 | Reviewer summary | Opens with the scores; agreement, concerns | After review | Reviews, synthesis, writeup | Generated draft, staff edit in app | Staff, Board | Stored and app-editable (F1) |
-| Offramp justification | One or two sentences | After review | Staff judgment | Staff (D50) | Staff, records | Stored; field open (D36) |
+| Offramp justification | One or two sentences | After review | Staff judgment | Staff (D50) | Staff, records | Single editable field; no entry history (D1); exact field open (D36) |
 | Presentation summary | Short paragraph | After presentation | Presentation material; exact draft inputs to settle | Generated draft, staff edit in app | Board | Stored and app-editable (F1) |
 | Final rationale | Impact plus rationale after review and presentation | Before ranking | Review/presentation evidence and staff judgment; exact draft inputs to settle | Generated draft, staff edit in app | Board | Stored and app-editable (F1) |
 | Rank | Ordered position | Ranking | Existing Dataverse Proposal Ranking records | Ranking meetings | Board | Read from ranking records; no request-level copy (F3) |
@@ -122,6 +122,10 @@ comments.
 - **F3 amount:** defer amount overrides and "Do not approve" as later-cycle
   edge cases. Continue existing invited-amount/requested-amount fallback;
   neither new override controls nor amount write-back is approved here.
+- **D1:** staff notes and offramp justification are single editable fields,
+  without a logged entry history. Staff notes remain internal. Exact Dataverse
+  field names/provisioning still need verification; platform audit settings
+  were not changed or decided here.
 - **I1:** use editable app fields for intake. Decide later whether an Initial
   Assessment Word document assembled from them is needed. This decision does
   not retire or remove the existing D26 document workflow.
@@ -183,11 +187,12 @@ A packet is a generated, version-pinned selection of fields for one audience.
 | Chairs outcome | Grants Manager sets `wmkf_phaseistatus` and request status (D35/D39) | Process decided; app reads |
 | Offramp after reviews | Staff decide (D50); app displays; formal status in AkoyaGO (D36) | AkoyaGO field open; justification field open |
 | Invited to presentation | Possibly `wmkf_phaseiistatus` | Open (alignment log) |
-| Staff notes | New request-level field or table | Not designed |
+| Staff notes | Single editable field associated with the request | D1 edit model decided; exact field/provisioning to verify |
 
-Short fields now have an app editing home (F1). The storage choice for
-offramp justification and staff notes remains open. Owner question D1: store them on the request, or in an
-app table with audit history.
+D1 resolved by owner, 2026-11-05: staff notes and offramp justification are
+single editable fields without a logged entry history. The exact Dataverse
+fields/provisioning remain to verify. This does not authorize changing
+platform-level auditing.
 
 ## Part 5 — Outputs
 
@@ -215,7 +220,6 @@ app table with audit history.
 
 ## Open owner questions
 
-- D1 — home for offramp justification and staff notes.
 - O1 — leadership delivery form per packet.
 - Carried from earlier discussion: rank per program; whether "about 50" is a
   target; the CSO's confirmation of the workbook source inference and of the

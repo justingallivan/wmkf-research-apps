@@ -65,8 +65,11 @@ The cycle information plan records:
    in the cycle; retain existing invited/requested amount behavior for now.
 5. **I1:** editable app fields are the intake working surface. Whether to
    assemble an Initial Assessment Word document from them is deferred.
-6. **Next owner questions:** D1 (offramp justification/staff notes storage), O1
-   (leadership delivery), then carried rank-per-program / ~50 target / CSO
+6. **D1:** staff notes and offramp justification are single editable fields
+   without a logged entry history; exact Dataverse provisioning remains to
+   verify. Platform auditing was not changed or decided.
+7. **Next owner questions:** O1 (leadership delivery), then carried
+   rank-per-program / ~50 target / CSO
    source and one-page-shape confirmations.
 
 ### Verified Open
