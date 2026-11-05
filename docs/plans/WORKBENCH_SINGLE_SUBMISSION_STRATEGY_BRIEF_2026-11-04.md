@@ -3,7 +3,7 @@ title: Workbench single-submission strategy brief
 domain: workbench
 kind: plan
 status: draft
-summary: Historical planning inventory, owner direction to design the whole staff workflow first, and the CSO review-workbook field inventory and source analysis (short fields condense the edited Word writeup).
+summary: Historical planning inventory and D26 workbook source analysis, with Nov 5 J27 direction for app-editable short fields, versioned Word reconciliation and frozen shared packets.
 canonical: false
 owner: product-engineering
 related:
@@ -74,7 +74,7 @@ not implementation. Existing release records remain checkpoint-specific.
    SharePoint body search, with explicit completeness, permission and freshness
    handling. Basic Graph search is not the complete proposed experience.
 
-## Findings from today's component review
+## Historical component review — 2026-11-04
 
 [VERIFIED via source investigation in this session]
 
@@ -122,9 +122,9 @@ list; the proposed list is for triage only; presentations follow reviews.
 Chairs and interested Board members weigh in on the ~50 in advance; staff
 narrow to ~25; the Chairs decide.
 
-Design implications, not yet decisions: the four Claude-drafted fields with
-fixed formats are a concrete candidate shape for the Initial Assessment
-overhaul; the Field Primer does not appear. The workbook omits reviewer
+The Nov 5 owner decision uses editable app fields for intake; whether to
+assemble an Initial Assessment Word output from them is deferred. The Field
+Primer does not appear in the workbook. The workbook omits reviewer
 finding, Program Coordinator work and documents, which the Workbench still
 covers. The field inventory and source analysis follow.
 
@@ -192,22 +192,27 @@ plus the applicant's lay abstract and the short title. Where the writeup had
 been edited heavily, the Dataverse section columns matched poorly
 (0.06–0.30 overlap), so they cannot stand in for final text.
 
-### Planning consequences (proposed, not decided)
+### J27 planning decisions — 2026-11-05
 
-1. Board- and Chairs-stage short fields are generated from the current Word
-   writeup at the point a packet is needed, then staff edit them. Reading the
-   Dataverse section columns would miss staff edits.
-2. J27 intake fields cannot come from a writeup, which does not exist at
-   intake. Generate them from the submitted proposal and the applicant's lay
-   abstract, in the CSO's formats; the D26 rows give 23 worked examples. This
-   overlaps D37 (Connor's on-submit flows) and the Initial Assessment overhaul.
-3. Staff writing stays in one place, the Word writeup. Only judgments not yet
-   in the writeup need a separate staff field (offramp justification, staff
-   notes).
-4. Each short field needs a stated stage, source and audience, including the
-   First Cut rationale's freeze until the final rationale replaces it.
+[VERIFIED via owner discussion; new workflow remains PLANNED.]
 
-The staged plan built on this analysis is
+1. Short fields are stored in Dataverse and edited in the app. Later Word
+   composition remains to decide. Generated documents retain their field-value
+   baseline and Word version; later Word edits are flagged for human or
+   machine-assisted reconciliation. The D26 source analysis above describes
+   the older Word-centered process, not the J27 editing contract.
+2. Intake fields use submitted materials and the CSO formats. Editable app
+   fields are the intake working surface (I1); whether an Initial Assessment
+   Word output is needed is deferred.
+3. Freeze the First Cut packet that was shared, while keeping app fields
+   editable; later packets use updated values (F2).
+4. Rank remains in existing Dataverse Proposal Ranking records; no final rank
+   is needed on each request. Recommended-amount overrides and "Do not approve"
+   are deferred to later in the cycle; use existing amount behavior for now.
+5. November 15 remains the first-slice target for staff state/bulk setting and
+   intake fields visible as they arrive (S1). Delivery feasibility is unverified.
+
+The staged plan and remaining questions are in
 `docs/plans/J27_CYCLE_INFORMATION_PLAN_2026-11-04.md` (draft).
 
 ## Next discussion

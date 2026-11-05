@@ -3,7 +3,7 @@ title: J27 cycle information plan
 domain: workbench
 kind: plan
 status: draft
-summary: Staged plan to gather, generate and deliver the information in the CSO's J27 review workbook — field contract, intake generation, packet generation, decision records and outputs — with the owner-confirmed Nov 15 first-slice target.
+summary: Staged plan to gather, generate and deliver the information in the CSO's J27 review workbook — field contract, intake generation, packet generation, decision records and outputs — with owner-confirmed app editing, versioned Word reconciliation, packet snapshots and the Nov 15 first-slice target.
 canonical: false
 owner: product-engineering
 related:
@@ -49,10 +49,12 @@ completion or verified delivery feasibility.
 
 ## Principles
 
-1. **One home for staff prose.** Staff write in the Word writeup. Short fields
-   for packets are derived from it, not maintained as a second editable copy.
-2. **Derived by default, stored by exception.** A short field is regenerated
-   from its current source unless it has no other home (owner question F1).
+1. **App editing for short fields.** Staff edit the short fields in the app,
+   backed by Dataverse. Later document composition remains to be decided.
+2. **Versioned agreement with Word.** Generated Word sections agree with the
+   saved field values used to build that version. Later Word edits may diverge;
+   flag them for human or machine-assisted reconciliation rather than let
+   edits remain silently isolated in Word (F1).
 3. **One recorded fact per decision.** Decisions live where Connor's flows and
    AkoyaGO users can see them (D41, D31, D35/D39); the app does not keep a
    shadow copy.
@@ -64,8 +66,10 @@ completion or verified delivery feasibility.
 
 ## Stage map by the J27 calendar
 
-Sources follow the calendar, not the audience. Before Feb 10 there is no
-writeup, so the First Cut and semi-finalist packets are intake-sourced.
+Inputs follow the calendar, not the audience. Intake drafts use submitted
+materials. Staff edit the resulting app fields; later summaries use the
+relevant reviews and presentation material. Document assembly is a separate
+decision, not a prerequisite for editing these fields.
 
 | When | Step | Packet (CSO sheet) | Source of its prose |
 |---|---|---|---|
@@ -73,9 +77,9 @@ writeup, so the First Cut and semi-finalist packets are intake-sourced.
 | Jan 13–14 | PD triage to ~50 | First Cut (sheet 2), to Chairs and interested Board members | Intake fields |
 | Feb 10–24 | Staff narrow to ~25; Chairs decide | Semi-finalist (sheet 3) plus one-page writeups (D21) | Intake fields; writeups for the ~25 |
 | Mar 10–25 | Reviews in; staff offramp | After review (sheet 3b) | Reviews, review synthesis, writeup |
-| Apr 19 – May 7 | Research presentations | — | Staff write the presentation section in Word |
-| May 12–13 | Ranking | Finalist (sheet 4) | Final Word writeup, Proposal Ranking |
-| May 27 | Board books | Board cover pages | Final Word writeup |
+| Apr 19 – May 7 | Research presentations | — | Presentation material and staff-edited app summary; document assembly later |
+| May 12–13 | Ranking | Finalist (sheet 4) | Saved app fields, Proposal Ranking |
+| May 27 | Board books | Board cover pages | Saved app fields; document composition to be decided |
 
 ## Part 1 — Field contract
 
@@ -89,31 +93,38 @@ comments.
 | Lay abstract | Plain-language paragraph | Intake | Applicant's lay abstract, proposal | Connor's flow (D37) | All | Stored; field not yet identified |
 | Methods | Short paragraph replacing the old page-1 Methodology bullet (CSO note; length not specified) | Intake | Proposal | App job (open in D37) | All | Stored |
 | Key personnel | Name (role), rank and department; institution only if different; short expertise; at most one closing team sentence | Intake | Proposal, personnel records | App job (open in D37) | All | Stored |
-| First Cut rationale | 1–3 sentences on key impact | Intake | Proposal | App job (open in D37) | Chairs, Board | Stored; frozen until the final rationale replaces it |
+| First Cut rationale | 1–3 sentences on key impact | Intake | Proposal | App job (open in D37) | Chairs, Board | Stored and app-editable; shared packet snapshot frozen (F2) |
 | Field / methods keywords | From controlled lists | Intake | Proposal | Connor's flow (D37) | Staff, packets | Stored; full lists pending |
 | Triage flag and reason | One list value plus one sentence | Intake | Proposal | AI flags; staff decide (D17/D38) | Staff only | Stored |
 | Staff notes | Free text | Any | Staff | Staff | Staff only, never Chairs or Board | Stored |
-| Reviewer summary | Opens with the scores; agreement, concerns | After review | Reviews, synthesis, writeup | Generated, staff edit | Staff, Board | Owner question F1 |
+| Reviewer summary | Opens with the scores; agreement, concerns | After review | Reviews, synthesis, writeup | Generated draft, staff edit in app | Staff, Board | Stored and app-editable (F1) |
 | Offramp justification | One or two sentences | After review | Staff judgment | Staff (D50) | Staff, records | Stored; field open (D36) |
-| Presentation summary | Short paragraph | After presentation | Writeup's presentation section | Derived | Board | Owner question F1 |
-| Final rationale | Impact plus rationale after review and presentation | Before ranking | Final writeup | Derived | Board | Owner question F1 |
-| Rank / Recommend for | Number; dollars or "Do not approve" | Ranking | Proposal Ranking | Ranking meetings | Board | Owner question F3 |
+| Presentation summary | Short paragraph | After presentation | Presentation material; exact draft inputs to settle | Generated draft, staff edit in app | Board | Stored and app-editable (F1) |
+| Final rationale | Impact plus rationale after review and presentation | Before ranking | Review/presentation evidence and staff judgment; exact draft inputs to settle | Generated draft, staff edit in app | Board | Stored and app-editable (F1) |
+| Rank | Ordered position | Ranking | Existing Dataverse Proposal Ranking records | Ranking meetings | Board | Read from ranking records; no request-level copy (F3) |
+| Recommend for | Existing invited/requested amount for now | Ranking | Existing ranking amount behavior | Ranking meetings | Board | Overrides and "Do not approve" deferred to later-cycle discussion (F3) |
 
-**Owner question F1 — edit model for writeup-derived fields.** Recommended:
-(a) derived views, regenerated from the current Word writeup and never edited
-directly; staff fix the writeup instead. Alternative: (b) stored and editable,
-with a freshness check against the writeup version they came from. The plan
-assumes (a) for reviewer summary, presentation summary and final rationale,
-and (b)-style stored fields only where there is no Word home (offramp
-justification, staff notes, intake fields).
+### Owner decisions — 2026-11-05
 
-**Owner question F2:** do intake fields stay editable after the First Cut, or
-freeze at the First Cut packet like the rationale?
+[VERIFIED via owner discussion; implementation remains PLANNED.]
 
-**Owner question F3:** write rank and "Recommend for" back to the request, or
-keep reading them from Proposal Ranking when a packet is built. "Recommend
-for" also needs an editable amount; ranking uses the invited amount, falling
-back to the requested amount (`lib/dataverse/adapters/proposal-ranking-source.js:196-199`).
+- **F1:** short fields are stored in Dataverse and edited in the app. Word
+  documents can be assembled from them later; document composition is not
+  settled. Retain the field-value baseline and corresponding generated Word
+  version. Detect later Word edits and flag possible divergence for human or
+  machine-assisted reconciliation. Owner expects few edits at this phase;
+  that is a workload assumption, not a correctness guarantee. Exact section
+  mapping, check timing, conflict handling and automation remain to design.
+- **F2:** freeze the shared First Cut packet, not the editable app fields.
+  Later packets use updated values; an already shared packet stays historical.
+- **F3 rank:** no final rank field on the request. Read rank from existing
+  Dataverse Proposal Ranking records (ordered request IDs within a round/list).
+- **F3 amount:** defer amount overrides and "Do not approve" as later-cycle
+  edge cases. Continue existing invited-amount/requested-amount fallback;
+  neither new override controls nor amount write-back is approved here.
+- **I1:** use editable app fields for intake. Decide later whether an Initial
+  Assessment Word document assembled from them is needed. This decision does
+  not retire or remove the existing D26 document workflow.
 
 ## Part 2 — Intake generation
 
@@ -124,8 +135,7 @@ Split by owner, per D37 and D14.
   prompt, the target field and the format. Needed from Connor: target field for
   the lay abstract (none exists), confirmation that the short-title prompt is
   `grantee-title.generate` or its edit, and the keyword lists.
-- **App jobs (pending the open D37 question and the Initial Assessment
-  overhaul):** methods, key personnel, First Cut rationale and the triage flag
+- **App jobs (pending the open D37 producer split):** methods, key personnel, First Cut rationale and the triage flag
   sentence. Proposed: one governed prompt over the AI Materials narrative plus
   request context, the same input shape as the existing Draft generator
   (`lib/services/pre-site-visit/proposal-core-service.js:188-215`), returning
@@ -135,9 +145,9 @@ Split by owner, per D37 and D14.
   They contain applicant data and stay outside this public repo. A prompt is
   accepted when staff judge its output against those rows, not by text
   similarity alone.
-- **Initial Assessment:** the CSO's four intake fields are a candidate
-  replacement for the current four-section Word assessment. Owner question I1:
-  replace it, keep both, or fold the fields into it.
+- **Initial Assessment (I1 resolved):** editable app fields are the intake
+  working surface. A Word assessment assembled from them is deferred for a
+  later decision; it is not a dependency for this intake work.
 
 ## Part 3 — Packet generation
 
@@ -156,11 +166,11 @@ A packet is a generated, version-pinned selection of fields for one audience.
   score sentence (`composeScoreSentence`,
   `shared/utils/review-writeup-paragraphs.js:588`), the AI review synthesis and
   staff edits; staff recommendation and offramp justification from Part 4.
-- **Finalist and Board (sheet 4):** presentation summary and final rationale
-  generated from the current Word writeup. Reading Word text server-side can
-  reuse the existing DOCX text path (`lib/utils/file-loader.js`, mammoth). Each
-  packet records the writeup item and revision it read. Board cover pages
-  follow the existing Board release path (D21).
+- **Finalist and Board (sheet 4):** use saved, staff-edited app summaries and
+  rationale. Exact Word composition remains to be decided. For generated Word
+  sections, retain the field baseline, section mapping and document version;
+  later edits trigger comparison/reconciliation (F1). Existing Board release
+  machinery is a foundation, not proof that this new workflow exists.
 - **Staleness:** when the source changes after a packet was built, the packet
   shows it as out of date; it is never silently regenerated after delivery.
 
@@ -175,8 +185,8 @@ A packet is a generated, version-pinned selection of fields for one audience.
 | Invited to presentation | Possibly `wmkf_phaseiistatus` | Open (alignment log) |
 | Staff notes | New request-level field or table | Not designed |
 
-The offramp justification and staff notes are the only staff prose that needs
-a home outside Word. Owner question D1: store them on the request, or in an
+Short fields now have an app editing home (F1). The storage choice for
+offramp justification and staff notes remains open. Owner question D1: store them on the request, or in an
 app table with audit history.
 
 ## Part 5 — Outputs
@@ -196,24 +206,26 @@ app table with audit history.
 | Stage | Contents | Depends on |
 |---|---|---|
 | 0 (thin D13 slice) | D41 staff-state field and bulk setting; intake fields visible in the Workbench list as they arrive | S1 resolved; Connor for field provisioning |
-| 1 | Field contract accepted; prompt formats written | F1–F3, I1 |
+| 1 | Field contract accepted; prompt formats written | F1, F2, I1 resolved; exact field/schema contracts still to verify; F3 amount deferred |
 | 2 | App intake job for methods, key personnel, First Cut rationale; Connor's flows for the rest | D37 split; test set review |
 | 3a | First Cut and semi-finalist packets with workbook export and magic-link delivery | Stages 0–2; D34 design |
 | 3b | After-review packet, offramp record | Part 4 field decisions |
-| 3c | Finalist and Board packets from Word writeups | F1; D21 path |
+| 3c | Finalist and Board packets from saved app fields; Word version tracking and reconciliation | F1 implementation design; D21 composition decision |
 | 5 | Full workbook export and cycle/proposal views | Workbench design |
 
 ## Open owner questions
 
-- F1 — derived versus stored writeup fields.
-- F2 — intake field freeze at First Cut.
-- F3 — rank and "Recommend for" write-back and amount editing.
-- I1 — Initial Assessment: replace, keep or merge.
 - D1 — home for offramp justification and staff notes.
 - O1 — leadership delivery form per packet.
 - Carried from earlier discussion: rank per program; whether "about 50" is a
   target; the CSO's confirmation of the workbook source inference and of the
   one-page writeup shape (D21).
+
+## Deferred decisions
+
+- Whether an Initial Assessment Word output is needed (I1).
+- Recommended-amount overrides and "Do not approve" handling later in the
+  cycle (F3); no request-level rank copy is required.
 
 ## Not in scope
 

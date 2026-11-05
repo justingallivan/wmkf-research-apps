@@ -50,21 +50,24 @@ All docs/config only. No runtime code, Dataverse write, prompt or flag change.
 
 ### Owner Decision Needed — primary next session
 
-Remaining questions are in `docs/plans/J27_CYCLE_INFORMATION_PLAN_2026-11-04.md`,
-"Open owner questions". S1 was resolved by the owner on 2026-11-05.
+[VERIFIED via owner discussion, 2026-11-05; product decisions, not shipped behavior.]
+The cycle information plan records:
 
-1. **S1 resolved, 2026-11-05:** owner kept November 15 for the first slice:
-   D41 staff state and bulk setting, plus intake fields visible in the list as
-   they arrive. This is a target and scope decision, not a delivery-feasibility
-   or implementation claim. Continue with F1 below.
-2. **F1** derived-from-Word versus stored/editable writeup fields
-   (recommended: derived). **F2** intake-field freeze at First Cut. **F3** rank
-   and "Recommend for" write-back and editable amount.
-3. **I1** CSO intake fields replace, sit beside, or merge into the Initial
-   Assessment. **D1** home for offramp justification and staff notes. **O1**
-   leadership delivery per packet (workbook, magic links, both).
-4. Carried: rank per program; whether "about 50" is a target; CSO's
-   confirmation of the source inference and of the one-page writeup shape (D21).
+1. **S1:** November 15 target for D41 staff state/bulk setting and intake fields
+   visible as they arrive; delivery feasibility still needs verification.
+2. **F1:** edit short fields in the app, backed by Dataverse. Generated Word
+   versions retain the field baseline; later Word edits are flagged for human
+   or machine-assisted reconciliation. Document composition and detailed
+   reconciliation mechanics remain to design.
+3. **F2:** freeze shared packets; app fields remain editable for later packets.
+4. **F3 rank:** use existing Dataverse ranking records; no final rank on the
+   request. **F3 amount:** overrides and "Do not approve" deferred until later
+   in the cycle; retain existing invited/requested amount behavior for now.
+5. **I1:** editable app fields are the intake working surface. Whether to
+   assemble an Initial Assessment Word document from them is deferred.
+6. **Next owner questions:** D1 (offramp justification/staff notes storage), O1
+   (leadership delivery), then carried rank-per-program / ~50 target / CSO
+   source and one-page-shape confirmations.
 
 ### Verified Open
 
