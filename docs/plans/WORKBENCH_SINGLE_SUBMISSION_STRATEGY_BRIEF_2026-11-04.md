@@ -3,7 +3,7 @@ title: Workbench single-submission strategy brief
 domain: workbench
 kind: plan
 status: draft
-summary: Historical planning inventory and owner direction to design the whole staff workflow before changing Workbench structure or automations.
+summary: Historical planning inventory, owner direction to design the whole staff workflow first, and the CSO review-workbook field inventory and source analysis (short fields condense the edited Word writeup).
 canonical: false
 owner: product-engineering
 related:
@@ -126,8 +126,86 @@ Design implications, not yet decisions: the four Claude-drafted fields with
 fixed formats are a concrete candidate shape for the Initial Assessment
 overhaul; the Field Primer does not appear. The workbook omits reviewer
 finding, Program Coordinator work and documents, which the Workbench still
-covers. Next step: a field inventory mapping each column to where it lives
-today and what produces it.
+covers. The field inventory and source analysis follow.
+
+## Workbook field inventory and source analysis — 2026-11-04
+
+### Where each column lives today
+
+[Delegated read-only source inventory with file:line evidence. Re-verified by
+grep in this session: no lib/pages/shared/scripts reads or writes of the four
+`wmkf_ai_*` fields named below, `wmkf_institutiontype` or a program-at-submission
+field, and "Recommended Do Not Invite" appears only in test-request tooling.
+Other rows are as reported, not independently re-checked.]
+Built and producing data: request number, PD, organization, applicant title and
+abstract, request amount, working program, East/West (`account.wmkf_eastwest`,
+read only by Proposal Ranking), review scores and the AI review synthesis
+(`akoya_request.wmkf_reviewsynthesisjson`), and rank (Proposal Ranking tables
+only; never written back to the request). Dataverse field exists but no app
+writer: short title (`wmkf_wmkfprojectdescription`; today only the grantee-title
+cron writes it), methods/keywords/team/fit fields (`wmkf_ai_methodologies`,
+`wmkf_ai_keywords`, `wmkf_ai_teaminfo`, `wmkf_ai_fitassessment`; no reads or
+writes in lib/pages/shared/scripts), institution type
+(`account.wmkf_institutiontype`; unread). Decided, not built: the D41 staff
+state, the D31 Triaged write, the triage reason list, the offramp outcome and
+justification (D36/D50) and program at submission (D30). None found by the
+inventory: a lay-abstract field, request-level staff-only notes and a frozen
+First Cut rationale.
+
+### How the D26 writeup text is produced
+
+[VERIFIED via source] One generation run, started by a staff member, executes
+`pre-site-visit.proposal-core.generate` with two inputs only: the AI Materials
+proposal narrative and a request-context JSON
+(`lib/services/pre-site-visit/proposal-core-service.js:188-215`). It writes
+eight sections to `wmkf_requestdocument` columns
+(`lib/services/pre-site-visit/artifact-model.js:54-63`) plus the whole output
+in `wmkf_presiteproposalcorejson`, and renders the Word template
+(`lib/services/pre-site-visit/docx-renderer.js`). The template also takes
+Dataverse fields, a deterministic funding-history sentence and, when reviews
+exist, a deterministic referee section (`proposal-core-service.js:305-336`).
+Recommendation, Scientific Presentation and graphical abstract stay as staff
+placeholders. The Final Writeup row copies the Draft's section columns
+(`lib/services/final-writeup/transition-model.js:21-26`) and points to the same
+SharePoint file. [VERIFIED via owner-approved Production read, 1002874] the
+Draft and Final Writeup rows reference one file (same SharePoint item; recorded
+eTag revisions 1 and 97). Staff edits live only in Word; the Dataverse section columns keep the
+first AI draft.
+
+### Which source the CSO's fields come from
+
+[VERIFIED via owner-approved, read-only Production reads of six requests:
+1002874, 1002835, 1003074, 1003024, 1002988, 1002963; nothing written] Each
+workbook sentence was compared, by word overlap, with the request's Dataverse
+fields, request-document rows and SharePoint file text. Best-matching source:
+
+| Column | Result across the six |
+|---|---|
+| Short title | Exact match to `wmkf_wmkfprojectdescription` in all six |
+| Lay abstract | Applicant text (Phase I lay abstract or `wmkf_abstract`), sometimes with the Pre-Research Presentation Brief, in four; edited Word writeup in two |
+| Methods, key personnel, First Cut rationale | Edited Word writeup in most cases; 1002874's methods and rationale were closer to the unedited Dataverse columns |
+| Reviewer summary, presentation summary, final rationale | Edited Word writeup in every case; the Dataverse columns hold no review or presentation text |
+
+[INFERRED, pending the CSO's confirmation] The workbook's prose columns are
+short condensations, by staff or AI, of each request's final edited writeup,
+plus the applicant's lay abstract and the short title. Where the writeup had
+been edited heavily, the Dataverse section columns matched poorly
+(0.06–0.30 overlap), so they cannot stand in for final text.
+
+### Planning consequences (proposed, not decided)
+
+1. Board- and Chairs-stage short fields are generated from the current Word
+   writeup at the point a packet is needed, then staff edit them. Reading the
+   Dataverse section columns would miss staff edits.
+2. J27 intake fields cannot come from a writeup, which does not exist at
+   intake. Generate them from the submitted proposal and the applicant's lay
+   abstract, in the CSO's formats; the D26 rows give 23 worked examples. This
+   overlaps D37 (Connor's on-submit flows) and the Initial Assessment overhaul.
+3. Staff writing stays in one place, the Word writeup. Only judgments not yet
+   in the writeup need a separate staff field (offramp justification, staff
+   notes).
+4. Each short field needs a stated stage, source and audience, including the
+   First Cut rationale's freeze until the final rationale replaces it.
 
 ## Next discussion
 
