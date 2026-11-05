@@ -122,6 +122,9 @@ comments.
 - **F3 amount:** defer amount overrides and "Do not approve" as later-cycle
   edge cases. Continue existing invited-amount/requested-amount fallback;
   neither new override controls nor amount write-back is approved here.
+- **O1:** plan both workbook delivery and a magic-link browser view for
+  leadership packets, using the same frozen packet content (F2). Exact access,
+  sharing and delivery mechanics remain to design.
 - **D1:** staff notes and offramp justification are single editable fields,
   without a logged entry history. Staff notes remain internal. Exact Dataverse
   field names/provisioning still need verification; platform audit settings
@@ -203,8 +206,11 @@ platform-level auditing.
   stage filters; the per-proposal workspace shows the same fields with their
   source and freshness. This is the Workbench design question in the strategy
   brief; this plan supplies its data contract.
-- **Leadership delivery:** owner question O1: workbook attachments, magic-link
-  views, or both, for each packet.
+- **Leadership delivery (O1 resolved, owner 2026-11-05):** provide both a
+  downloadable workbook and a magic-link browser view for leadership packets.
+  Both represent the same frozen packet content, with linked proposal access
+  in the browser. Exact sharing, access and delivery mechanics remain to
+  design; this is PLANNED, not a deployed capability.
 
 ## Staging
 
@@ -220,7 +226,6 @@ platform-level auditing.
 
 ## Open owner questions
 
-- O1 — leadership delivery form per packet.
 - Carried from earlier discussion: rank per program; whether "about 50" is a
   target; the CSO's confirmation of the workbook source inference and of the
   one-page writeup shape (D21).

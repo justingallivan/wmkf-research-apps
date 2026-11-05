@@ -68,8 +68,9 @@ The cycle information plan records:
 6. **D1:** staff notes and offramp justification are single editable fields
    without a logged entry history; exact Dataverse provisioning remains to
    verify. Platform auditing was not changed or decided.
-7. **Next owner questions:** O1 (leadership delivery), then carried
-   rank-per-program / ~50 target / CSO
+7. **O1:** plan both workbook delivery and a magic-link browser view of the
+   same frozen leadership packet; detailed access/delivery design remains open.
+8. **Next owner questions:** carried rank-per-program / ~50 target / CSO
    source and one-page-shape confirmations.
 
 ### Verified Open
