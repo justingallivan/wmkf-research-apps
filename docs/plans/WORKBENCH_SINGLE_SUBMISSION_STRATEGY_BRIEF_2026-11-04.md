@@ -92,6 +92,43 @@ not implementation. Existing release records remain checkpoint-specific.
   status-badge code remains; old tab links fall back to Overview. No deployment
   of the removal is claimed.
 
+## CSO review workbook — 2026-11-04 discussion
+
+[VERIFIED via reading the workbook in this session] The CSO's
+`J27_Review_Workbook_Mockup_v9.xlsx` (owner's copy; holds applicant data, so it
+is not stored in this repo) models the cycle's information. Sheet 1 is a master
+with one row per application (199 D26 rows reshaped to the J27 flow), columns
+grouped Intake → Decisions → After review → Finalist → Status, and a row naming
+each field's source (Portal, Claude draft, Staff, a named meeting, Records).
+Sheets 2, 3, 3b and 4 are audience packets: a typed Request # looks up a column
+subset from the master. Sheet 4 rows become the Board writeup cover page, and
+it totals recommended count and dollars by program and East/West. A Lists sheet
+holds a proposed triage-reason list and placeholder D26 keyword lists.
+
+Fields and their stated sources: short title, lay abstract, methods, key
+personnel, First Cut rationale, triage flag and reason, field and methods
+keywords (Claude drafts; staff edit); staff notes (never shown to Chairs or
+Board); First Cut Y/N (Research Meeting); Semi-finalist Y/N (Program Chairs
+meeting); reviewer summary opening with the scores; Finalist or Offramp;
+research presentation summary; final rationale (replaces the First Cut
+rationale, which is frozen until then); rank and Recommend for (dollars or
+"Do not approve", from the Ranking Meetings).
+
+[VERIFIED via owner discussion] Decisions recorded as D50 in the alignment log:
+the workbook is a spec of what the apps must gather, not the staff workspace;
+its packets can be regenerated as workbooks or replaced by better views. Staff
+approve the post-review offramp with a written justification and no reason
+list; the proposed list is for triage only; presentations follow reviews.
+Chairs and interested Board members weigh in on the ~50 in advance; staff
+narrow to ~25; the Chairs decide.
+
+Design implications, not yet decisions: the four Claude-drafted fields with
+fixed formats are a concrete candidate shape for the Initial Assessment
+overhaul; the Field Primer does not appear. The workbook omits reviewer
+finding, Program Coordinator work and documents, which the Workbench still
+covers. Next step: a field inventory mapping each column to where it lives
+today and what produces it.
+
 ## Next discussion
 
 Start with a process map and short design principles. Walk a new proposal,
