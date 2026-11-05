@@ -3,7 +3,7 @@ title: Workbench single-submission strategy brief
 domain: workbench
 kind: plan
 status: draft
-summary: Historical planning inventory and D26 workbook source analysis, with Nov 5 J27 direction for app-editable short fields, versioned Word reconciliation and frozen shared packets.
+summary: Historical planning inventory and D26 workbook source analysis, with Nov 5 J27 direction for app-editable short fields, versioned Word reconciliation and frozen shared packets; later CSO guidance and the owner hold on status/workspace design are in the cycle information plan.
 canonical: false
 owner: product-engineering
 related:
@@ -186,7 +186,9 @@ fields, request-document rows and SharePoint file text. Best-matching source:
 | Methods, key personnel, First Cut rationale | Edited Word writeup in most cases; 1002874's methods and rationale were closer to the unedited Dataverse columns |
 | Reviewer summary, presentation summary, final rationale | Edited Word writeup in every case; the Dataverse columns hold no review or presentation text |
 
-[INFERRED, pending the CSO's confirmation] The workbook's prose columns are
+[INFERRED from the six-request comparison; broadly supported by the CSO email
+supplied Nov 5, which says Claude mocked up the workbook from current-cycle
+writeups; exact per-field lineage remains unconfirmed.] The workbook's prose columns are
 short condensations, by staff or AI, of each request's final edited writeup,
 plus the applicant's lay abstract and the short title. Where the writeup had
 been edited heavily, the Dataverse section columns matched poorly
@@ -211,6 +213,16 @@ been edited heavily, the Dataverse section columns matched poorly
    are deferred to later in the cycle; use existing amount behavior for now.
 5. November 15 remains the first-slice target for staff state/bulk setting and
    intake fields visible as they arrive (S1). Delivery feasibility is unverified.
+6. Later Nov 5 owner follow-up leaves statuses, workflow markers and workspace
+   views open pending colleague input. Do not build from the earlier state list
+   or the assistant's proposed/confirmed triage distinction. January 6 remains
+   in play; schedule unchanged until revised calendar is settled.
+7. CSO email supplied Nov 5 broadly confirms the workbook was a Claude mockup
+   from D26 writeups. It calls for impact in abstract/rationale, intake-first
+   drafts with later PD editing, First Cut-only sharing without the internal
+   log and with proposal links, and Chairs cover sheets reusing tracking data.
+   Exact formats/materials and consultant tracking still need decisions. Full
+   bounded guidance is in the cycle information plan below.
 
 The staged plan and remaining questions are in
 `docs/plans/J27_CYCLE_INFORMATION_PLAN_2026-11-04.md` (draft).

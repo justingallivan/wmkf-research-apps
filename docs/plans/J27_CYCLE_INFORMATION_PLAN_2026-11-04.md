@@ -3,7 +3,7 @@ title: J27 cycle information plan
 domain: workbench
 kind: plan
 status: draft
-summary: Staged plan to gather, generate and deliver the information in the CSO's J27 review workbook — field contract, intake generation, packet generation, decision records and outputs — with owner-confirmed app editing, versioned Word reconciliation, packet snapshots and the Nov 15 first-slice target.
+summary: Staged plan to gather, generate and deliver the information in the CSO's J27 review workbook — field contract, intake generation, packet generation, decision records and outputs — with owner-confirmed app editing, versioned Word reconciliation, packet snapshots and the Nov 15 first-slice target; status/workspace design remains open pending colleague input.
 canonical: false
 owner: product-engineering
 related:
@@ -36,7 +36,7 @@ intake row). This plan's stages overlap D13 as follows.
 |---|---|---|
 | J27 proposals visible in the Workbench list (R-1) | Outside this plan | See `docs/plans/J27_READY_FOR_REVIEW_VISIBILITY_PLAN_2026-11-02.md` |
 | Per-proposal AI summary / Initial Assessment, suggested PD, expertise (R-3) | Stage 2 | Intake outputs split between Connor's flows (D37) and app jobs; format now defined by the CSO workbook; Initial Assessment overhaul pending |
-| Staff states, settable in bulk; my/all PD filter | Stage 4 | D41 field not built |
+| Staff states, settable in bulk; my/all PD filter | Stage 4 | Status/workspace model reopened Nov 5 pending colleague input; earlier D41 is not a frozen build specification |
 | Triage flags and decline-note drafts (J-1) | Stages 2 and 4 | Triage reason list proposed, not final (D50) |
 | Sorting/columns, MR/S&E counts, First Cut spreadsheet (J-2) | Stages 3 and 5 | Not built |
 
@@ -45,7 +45,9 @@ target for the thin first slice: D41 staff state and bulk setting, plus intake
 fields visible in the Workbench list as they arrive. Later stages follow
 separately. [VERIFIED via owner response: "Keep November 15" to the first-slice
 scope question.] This confirms the target and scope, not implementation
-completion or verified delivery feasibility.
+completion or verified delivery feasibility. The later Nov 5 discussion left
+the status/workspace design open, so the exact first-slice implementation
+contract still needs colleague input.
 
 ## Principles
 
@@ -64,7 +66,12 @@ completion or verified delivery feasibility.
 6. **Pinned sources.** Every generated field and packet records which source
    and version it came from, so staleness is visible.
 
-## Stage map by the J27 calendar
+## Stage map by the J27 calendar (unchanged; awaiting calendar revision)
+
+Owner direction, 2026-11-05: leave the schedule unchanged; January 6 remains
+in play. The CSO email discusses January 6/13 triage and moving toward First
+Cut around January 20, but this is not authority to move the existing dates.
+Use the calendar to anchor work once revisions are settled.
 
 Inputs follow the calendar, not the audience. Intake drafts use submitted
 materials. Staff edit the resulting app fields; later summaries use the
@@ -95,7 +102,7 @@ comments.
 | Key personnel | Name (role), rank and department; institution only if different; short expertise; at most one closing team sentence | Intake | Proposal, personnel records | App job (open in D37) | All | Stored |
 | First Cut rationale | 1–3 sentences on key impact | Intake | Proposal | App job (open in D37) | Chairs, Board | Stored and app-editable; shared packet snapshot frozen (F2) |
 | Field / methods keywords | From controlled lists | Intake | Proposal | Connor's flow (D37) | Staff, packets | Stored; full lists pending |
-| Triage flag and reason | One list value plus one sentence | Intake | Proposal | AI flags; staff decide (D17/D38) | Staff only | Stored |
+| AI concern / primary triage reason | Distinct advisory concern and staff reason concepts; exact fields/options open | Intake and staff meetings | Proposal and staff judgment | AI flags concerns; staff decide | Staff only | Status, attention fields and workspace views pending colleague input |
 | Staff notes | Free text | Any | Staff | Staff | Staff only, never Chairs or Board | Single editable field; no entry history (D1) |
 | Reviewer summary | Opens with the scores; agreement, concerns | After review | Reviews, synthesis, writeup | Generated draft, staff edit in app | Staff, Board | Stored and app-editable (F1) |
 | Offramp justification | One or two sentences | After review | Staff judgment | Staff (D50) | Staff, records | Single editable field; no entry history (D1); exact field open (D36) |
@@ -139,6 +146,51 @@ comments.
   Assessment Word document assembled from them is needed. This decision does
   not retire or remove the existing D26 document workflow.
 
+## CSO email and owner follow-up — received in chat 2026-11-05
+
+[VERIFIED via email text supplied by Justin; no attachment was read this
+session. This is product guidance, not implementation evidence.]
+
+- Claude made the workbook mockup from current-cycle writeups. This broadly
+  confirms the D26 source inference; it does not certify every field's exact
+  lineage or settle the final document template.
+- The discussed format removes the separate executive-summary impact bullet,
+  embedding impact in the abstract and rationale. The hope is to generate the
+  short content on the first intake pass, using an impact statement as the
+  initial rationale, with PD editing as the cycle proceeds. Exact lengths,
+  prompt/input contracts and generation timing remain to verify/design.
+- By Dec 9 the hoped-for intake includes concern flags, keywords, lay abstract,
+  short title, lead-PD expertise suggestions, Board experts and possible
+  consultant needs. PDs check concerns first and can identify other proposals
+  for triage; staff aim to touch every proposal in meetings. A separate primary
+  triage reason list needs group discussion. Consultant tracking was suggested;
+  its exact field/UI is not approved yet.
+- First Cut recipients receive the First Cut sheet only, without the internal
+  log, with a link to each full proposal. The email asks about up to 50 links;
+  link access/content needs implementation verification. O1 still plans both
+  workbook and browser delivery from the same packet snapshot.
+- For the Chairs meeting, Sarah sends an updated tracking sheet with brief
+  staff rationale and assembles the Diligent book. Cover sheets reuse the same
+  information. Connor is mocking up the reduced Chairs proposal; omission of
+  bios/support documents is tentative in the email. Exact cover-sheet shape,
+  proposal contents and approvals remain open. The email's maybe 18–24
+  shortlist is guidance, not a new enforced count or calendar change.
+
+### Open workflow/status design — owner hold
+
+[VERIFIED via owner follow-up, 2026-11-05.] Justin distinguished (1) making a
+workspace of about 300 proposals tractable, with views limited to the current
+work/discussion, from (2) recording the proposal's lifecycle standing. Leave
+statuses, staff workflow markers and workspace views open pending colleague
+input. The earlier Submitted / Flagged for concerns / Triaged / Under
+consideration / Recommend to Program Chairs / Invited for Peer Review / Not
+invited list remains an earlier proposal, not the accepted implementation
+contract. Neither proposed/confirmed triage states nor the assistant's later
+single-field simplification was adopted. Staff generally record the meeting's
+result rather than process history; this does not settle the necessary queues,
+attention fields or lifecycle representation. D1's simple notes/justification
+editing decision remains separate.
+
 ## Part 2 — Intake generation
 
 Split by owner, per D37 and D14.
@@ -148,8 +200,8 @@ Split by owner, per D37 and D14.
   prompt, the target field and the format. Needed from Connor: target field for
   the lay abstract (none exists), confirmation that the short-title prompt is
   `grantee-title.generate` or its edit, and the keyword lists.
-- **App jobs (pending the open D37 producer split):** methods, key personnel, First Cut rationale and the triage flag
-  sentence. Proposed: one governed prompt over the AI Materials narrative plus
+- **App jobs (pending the open D37 producer split):** methods, key personnel, First Cut rationale and the AI concern
+  explanation; exact concern/reason split awaits colleague input. Proposed: one governed prompt over the AI Materials narrative plus
   request context, the same input shape as the existing Draft generator
   (`lib/services/pre-site-visit/proposal-core-service.js:188-215`), returning
   the CSO's formats as structured output. It runs for every complete proposal,
@@ -170,12 +222,16 @@ A packet is a generated, version-pinned selection of fields for one audience.
   fields plus program, keywords, region,
   institution type. Personalized by expertise for each Chair (J-2). Delivered
   with proposal access through magic links (D34; mechanism not designed).
-  Also circulated to interested Board members (D50).
+  Also circulated to interested Board members (D50). Per the CSO email,
+  exclude the internal log and include per-proposal links; access must be
+  verified before delivery.
 - **Semi-finalist (sheet 3):** same columns, ~25, after the Chairs meeting.
   The Grants Manager records the Chairs outcome in Dataverse (D35/D39); the
   app reads it.
 - **One-page writeups (Feb 10):** reuse the Executive Summary machinery and the
-  existing release-to-SharePoint path (D21). The CSO is to confirm its shape.
+  existing release-to-SharePoint path (D21). The email describes a cover sheet reusing tracking fields ahead of reduced
+  proposal materials, with Connor preparing mockups. Exact shape and contents
+  remain to settle; no new date is approved.
 - **After review (sheet 3b):** reviewer summary built from the deterministic
   score sentence (`composeScoreSentence`,
   `shared/utils/review-writeup-paragraphs.js:588`), the AI review synthesis and
@@ -192,8 +248,8 @@ A packet is a generated, version-pinned selection of fields for one audience.
 
 | Decision | Recorded where | Status |
 |---|---|---|
-| Staff triage states, including First Cut (~50) and Recommend to Program Chairs (~25) | New `akoya_request` staff-state field (D41) | Not built; name and options to settle |
-| Triaged | Also writes Phase I `Recommended Do Not Invite` (D31) | Not built |
+| Staff triage states, including First Cut (~50) and Recommend to Program Chairs (~25) | New `akoya_request` staff-state field (D41) | Earlier D41 proposal; status/workspace contract reopened pending colleague input |
+| Triaged | Earlier D31 proposes Phase I `Recommended Do Not Invite` write | Not built per prior audit; revisit against accepted status model before build |
 | Chairs outcome | Grants Manager sets `wmkf_phaseistatus` and request status (D35/D39) | Process decided; app reads |
 | Offramp after reviews | Staff decide (D50); app displays; formal status in AkoyaGO (D36) | AkoyaGO field open; justification field open |
 | Invited to presentation | Possibly `wmkf_phaseiistatus` | Open (alignment log) |
@@ -223,7 +279,7 @@ platform-level auditing.
 
 | Stage | Contents | Depends on |
 |---|---|---|
-| 0 (thin D13 slice) | D41 staff-state field and bulk setting; intake fields visible in the Workbench list as they arrive | S1 resolved; Connor for field provisioning |
+| 0 (thin D13 slice) | D41 staff-state field and bulk setting; intake fields visible in the Workbench list as they arrive | S1 target retained; colleague input on status/workspace model; Connor provisioning |
 | 1 | Field contract accepted; prompt formats written | F1, F2, I1 resolved; exact field/schema contracts still to verify; F3 amount deferred |
 | 2 | App intake job for methods, key personnel, First Cut rationale; Connor's flows for the rest | D37 split; test set review |
 | 3a | First Cut and semi-finalist packets with workbook export and magic-link delivery | Stages 0–2; D34 design |
@@ -233,8 +289,12 @@ platform-level auditing.
 
 ## Open owner questions
 
-- The CSO's confirmation of the workbook source inference and of the
-  one-page writeup shape (D21).
+- Statuses, workflow markers and workspace views: owner awaiting colleague
+  input; do not freeze the earlier list or add process history by assumption.
+- Intake field formats/lengths, primary triage reasons and consultant tracking.
+- Exact Chairs cover-sheet shape and reduced proposal contents (D21); Connor
+  mockups remain to inspect. The email broadly confirms the workbook source.
+- Revised calendar once settled; keep dates unchanged in the meantime.
 
 ## Deferred decisions
 

@@ -1,120 +1,114 @@
-# Session 665 Prompt: Answer the J27 cycle information plan's owner questions
+# Session 666 Prompt: Resume J27 intake content; await colleague workflow input
 
-## Session 664 Summary — Claude, 2026-11-04 Pacific
+## Session 665 Summary — Codex, 2026-11-05 Pacific
 
-[VERIFIED via owner discussion and owner-approved read-only Production reads]
-Reviewed the CSO's J27 review workbook (`J27_Review_Workbook_Mockup_v9.xlsx`,
-owner's copy; applicant data, not stored in the repo) and turned it into a
-staged plan. Owner deferred the plan's questions to this session.
+[VERIFIED via owner discussion and local git/check commands.] Planning and
+owner decision records only. No runtime implementation, schema or prompt
+change, live data write, or new Production read. No push performed.
 
 ### What Was Completed
 
-1. **Repo hygiene.** The recurring "claude-config: local changes uncommitted"
-   startup warning came from `~/.claude`, not this repo. Committed the
-   Impeccable upgrade and settings there (claude-config 5cecdf1; stray
-   installer `description` key removed; `skills/.trash/` ignored). In this repo,
-   committed the matching hook files and the Oct 19 Board writeups critique and
-   ignored `output/` (f835ca9ab).
-2. **Owner decisions recorded as D50** in the alignment log (5e53f5a93): staff
-   approve the post-review offramp with a written justification and no reason
-   list; presentations are scheduled only after reviews; the workbook's
-   proposed reason list is for triage only; Chairs and interested Board members
-   weigh in on the ~50 in advance, staff narrow to ~25, the Chairs decide; the
-   workbook is a spec, not a workspace. Rank came from Proposal Ranking.
-3. **Field inventory and source analysis** in the Workbench strategy brief
-   (a4df9324a). Six D26 requests (1002874, 1002835, 1003074, 1003024, 1002988,
-   1002963) were read with owner approval, nothing written. The workbook's
-   prose fields condense each request's final edited Word writeup; lay
-   abstracts mostly come from the applicant's own text. The Draft generator
-   writes AI sections to `wmkf_requestdocument` columns once; staff edits live
-   only in the Word file, which the Final Writeup row shares. Marked as
-   inference pending the CSO's confirmation (owner asked her).
-4. **Draft plan** `docs/plans/J27_CYCLE_INFORMATION_PLAN_2026-11-04.md`
-   (7f3ea0d40): field contract, intake generation, packet generation, decision
-   records and outputs, staged by the J27 calendar. Linked from the brief.
+1. **Startup:** fast-forwarded clean main by five commits to `df0662946`;
+   memory and skills symlinks correct; all 72 defined checks/self-tests passed
+   sequentially, including both reachable Factory ledgers and types.
+2. **Owner decisions:** short fields edited in the app, backed by Dataverse;
+   Word generation retains the field baseline/version and later edits need
+   detection/reconciliation. First Cut freezes the shared packet, not app
+   fields. Rank stays in existing Dataverse ranking records; show program and
+   combined ranks in packets for now. Amount overrides/Do not approve deferred.
+   Editable intake fields replace a mandatory Word assessment in the plan;
+   whether to produce that Word output is deferred. Notes and offramp
+   justification are simple editable fields without an entry history. Plan
+   workbook and magic-link delivery from the same packet. ~50 is flexible.
+3. **CSO email:** Justin supplied email text, not a successfully read workbook
+   attachment. Claude mocked up the tracking workbook from current-cycle
+   writeups. Content direction: impact embedded in abstract/rationale instead
+   of a separate bullet; initial impact statement as placeholder rationale;
+   intake-first drafts and later PD intervention. First Cut sheet only, no
+   internal log, proposal links; Chairs cover sheets reuse tracking fields,
+   reduced proposal contents being mocked up by Connor. Exact formats and
+   materials remain open. The email broadly supports prior source inference,
+   without proving every field's lineage.
+4. **Schedule and workflow hold:** November 15 remains the first-slice target,
+   but exact implementation scope awaits decisions/verification. Do not move
+   calendar dates based on the email. January 6 remains in play; wait for the
+   revised calendar before anchoring timing. Statuses, workflow markers and
+   workspace views are OPEN pending colleagues' input. Justin distinguished
+   tractability of ~300 proposals from lifecycle standing; earlier state lists,
+   proposed/confirmed triage and the assistant's single-field simplification
+   are not accepted implementation contracts.
 
-### Commits
+### Commits — local main, unpushed
 
-| Commit | Work | Destination |
-|---|---|---|
-| f835ca9ab | Impeccable hooks, critique, ignore output/ | main |
-| 5e53f5a93 | D50 decision record | main |
-| a4df9324a | Field inventory and source analysis | main |
-| 7f3ea0d40 | J27 cycle information plan | main |
-| claude-config 5cecdf1 | ~/.claude Impeccable upgrade and settings | justingallivan/claude-config |
-| (this stop) | Handoff and pilot observation row | main |
-
-All docs/config only. No runtime code, Dataverse write, prompt or flag change.
+- `14c957ebe` — confirm November 15 first-slice target.
+- `6e49d4435` — app editing, Word reconciliation, packet freeze and rank decisions.
+- `c3948e048` — simple staff notes/justification fields.
+- `5c0947646` — workbook plus magic-link leadership delivery.
+- `4109251da` — flexible First Cut size.
+- `586376116` — program and combined packet ranks, revisable later.
+- This stop commit — CSO guidance, open workflow/status design and handoff.
 
 ## Next Items
 
-### Owner Decision Needed — primary next session
+### Verified Open — product discussion, not build authorization
 
-[VERIFIED via owner discussion, 2026-11-05; product decisions, not shipped behavior.]
-The cycle information plan records:
+1. **Intake content formats/lengths:** last proposed independent next task while
+   colleague input is pending. Evidence: current chat and cycle information
+   plan's field contract. Resume with short title, lay abstract, methods, key
+   personnel and impact/initial rationale. Do not infer fixed lengths or a
+   final template from the mockup. No Excel attachment was read this session.
+2. **Connor coordination:** exact intake producer split, lay-abstract field,
+   keyword lists and short-title prompt remain unverified dependencies from
+   the plan/Nov 4 inventory. Recheck before planning schema or runtime changes.
+3. **Word version reconciliation:** intent decided; section mapping, check
+   timing, baselines, concurrent edits and human/machine scope need design and
+   source/provisioning verification before implementation.
 
-1. **S1:** November 15 target for D41 staff state/bulk setting and intake fields
-   visible as they arrive; delivery feasibility still needs verification.
-2. **F1:** edit short fields in the app, backed by Dataverse. Generated Word
-   versions retain the field baseline; later Word edits are flagged for human
-   or machine-assisted reconciliation. Document composition and detailed
-   reconciliation mechanics remain to design.
-3. **F2:** freeze shared packets; app fields remain editable for later packets.
-4. **F3 rank:** use existing Dataverse ranking records; no final rank on the
-   request. Plan both within-program and combined ranks in leadership packets,
-   subject to later owner revision; exact source/derivation remains to verify.
-   **F3 amount:** overrides and "Do not approve" deferred until later
-   in the cycle; retain existing invited/requested amount behavior for now.
-5. **I1:** editable app fields are the intake working surface. Whether to
-   assemble an Initial Assessment Word document from them is deferred.
-6. **D1:** staff notes and offramp justification are single editable fields
-   without a logged entry history; exact Dataverse provisioning remains to
-   verify. Platform auditing was not changed or decided.
-7. **O1:** plan both workbook delivery and a magic-link browser view of the
-   same frozen leadership packet; detailed access/delivery design remains open.
-8. **First Cut size:** "about 50" is a flexible planning target, with no
-   app-enforced limit.
-9. **Remaining owner/CSO questions:** CSO source inference and one-page
-   writeup-shape confirmations. Core owner questions S1/F1/F2/F3-rank/I1/D1/O1
-   are resolved; F3 amount and Initial Assessment Word output are deferred.
+### Owner / Colleague Decision Needed
 
-### Verified Open
+- Statuses vs attention/workflow markers vs filtered workspace views; hold for
+  colleague input. Staff generally record the meeting result, not its process
+  history; that does not eliminate useful work queues. Consultant-needed
+  tracking and primary triage reasons remain suggestions to settle.
+- Exact Chairs cover-sheet and reduced-proposal contents; Connor mockups are
+  not yet inspected. Email's maybe 18–24 is guidance, not an enforced count.
+- Calendar revisions when settled; existing schedule unchanged and January 6
+  still in play. November 15 target retained, feasibility not established.
 
-1. **Connor items for intake (D37/D14):** target field for the lay abstract
-   (none exists), confirmation of the short-title prompt, full keyword lists.
-   Evidence: plan Part 2; brief inventory.
-2. **Status-tab removal** remains on `codex/remove-workbench-status-tab`
-   (d0329dd1c), pushed, not on main [VERIFIED via git merge-base at this stop].
-   Promote only on owner request.
+### Parked / Do Not Reopen Without New Decision
 
-### Parked
+- Recommended-amount overrides / Do not approve: later-cycle edge cases.
+- Initial Assessment Word output: decide later, use editable app fields now.
+- Package reprocessing, complementary reviewer-panel coverage and custom
+  intake portal remain parked under their owning plans/prior handoff.
+- No final rank required on the request; program and combined packet ranks are
+  the current plan, explicitly revisable by owner.
 
-- **Package reprocessing** on `codex/proposal-package-reprocessing-plan`
-  (e5cc38eb3; not on main, verified at this stop). Resume after flows settle.
-- Complementary reviewer-panel coverage (owner parked Oct 21); custom intake
-  portal.
+### Verify Before Acting / Local Continuity
 
-### Verify Before Acting
-
-- Production-read approval this session covered only the six named requests and
-  two user-name lookups. It is not standing permission.
-- The workbook-source finding is text-similarity inference over 6 of 23
-  requests; the CSO's answer is authoritative.
-- Extracted request text from this session sits in the session scratchpad
-  (`req*/texts.json`); it is temporary and not in the repo.
-- Previous handoff carryovers (funding-history proof, phase-i.checkin
-  deprecation is a decision not a live retirement, PR #631–633 deployment not
-  probed) still hold; see `git show 5e6def44d:SESSION_PROMPT.md`.
+- **User-reported, unverified:** uploading a particular Excel file hangs the
+  Codex app. User requested session end; no reproduction or cause established.
+  Do not retry upload during closeout. Coordinate an alternative next session.
+- **No push:** coordinating chat reports automatic approval review blocked a
+  main push because it may trigger Production deployment; it will resolve
+  that with Justin after local closeout. Do not interpret this handoff as
+  authorization to bypass the block. Local commits will not yet reach the
+  other Mac. Verify branch/status/upstream before any later git action.
+- Prior Production-read permission covered only the six named Nov 4 requests
+  and two user lookups; not standing permission. No Factory fixture, ledger,
+  provider credential, flag or live prompt row changed this session.
+- Earlier status-tab removal and package-reprocessing branch existence/merge
+  claims were not re-probed at this stop. Preserve them and unknown WIP; no
+  cleanup, retirement, branch disposal or promotion authorized.
+- Prior funding-history proof, phase-i.checkin retirement distinction and
+  PR #631–633 deployment limits are historical carryovers requiring fresh
+  checks before action. Full preceding handoff: `git show
+  586376116:SESSION_PROMPT.md` (verified retrievable at this stop).
 
 ## Concurrent Streams and Preservation
 
-Previous Session 662 handoff is retrievable with
-`git show dc268a6b2:SESSION_PROMPT.md` (verified readable at this stop).
-Earlier detailed concurrent boundaries remain at
-`git show 2cba25544:SESSION_PROMPT.md`; shared-prompt history at
-`git show a66e09091:SESSION_PROMPT.md`. These are historical context, not current
-permissions. This session did not change Factory fixtures, test ledgers,
-provider credentials, environment flags or live prompt rows.
+These are dated inherited resume boundaries, not fresh deployment audits or
+permissions. Preserve fixtures, artifacts and other worktrees.
 
 | Owner / stream | Resume boundary and authority |
 |---|---|
@@ -127,31 +121,29 @@ provider credentials, environment flags or live prompt rows.
 | Codex / terminology | `docs/audits/terminology-completion-audit-2026-11-01.md`; preserve acceptance limits and local colleague brief. |
 | Other worktrees/local artifacts | Prior handoff has dated locations; preserve unknown WIP and private rehearsal evidence. No worktree/artifact disposal authorized. |
 
-
-Other local branches/worktrees were preserved. Only this session's three
-outstanding branches were newly pushed; no unrelated WIP was staged, stashed,
-reset or deleted. Another session identified itself as read-only during the
-planning work. Recheck worktree ownership and branch/status before acting.
-
-
 ## Key Files and Validation
 
-| File | Purpose |
-|---|---|
-| docs/plans/J27_CYCLE_INFORMATION_PLAN_2026-11-04.md | Staged plan and open owner questions — resume point |
-| docs/plans/WORKBENCH_SINGLE_SUBMISSION_STRATEGY_BRIEF_2026-11-04.md | Workbook summary, field inventory, source analysis |
-| docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md | D50 and the earlier J27 decisions (D13, D21, D36, D37, D41) |
-| lib/services/pre-site-visit/proposal-core-service.js | Draft generator inputs (narrative + request context) |
-| lib/services/pre-site-visit/artifact-model.js | Draft section → `wmkf_requestdocument` column map |
+- `docs/plans/J27_CYCLE_INFORMATION_PLAN_2026-11-04.md`: current decisions,
+  supplied email guidance, remaining product/design questions.
+- `docs/plans/WORKBENCH_SINGLE_SUBMISSION_STRATEGY_BRIEF_2026-11-04.md`:
+  D26 source evidence plus current direction; D26 findings are not J27 build proof.
+- `.claude-memory/project-grant-phasing-evolution.md`: retrieval pointer updated
+  for editable intake and the open status/workspace model.
+- Earlier alignment log remains dated decision history; the current plan's
+  Nov 5 owner hold governs further status/workspace design.
 
-Startup ran all 72 check gates and self-tests sequentially: green. Doc gates
-(docs-catalog, doc-currency, fact-consistency, doc-symbol-refs,
-build-claim-freshness, secret-scan, scaffolding-tokens, harness-framing,
-drain-table and prompt-storage mentions) passed after each docs commit.
+Startup checks: 72/72 passed sequentially. During decision commits, relevant
+currency, fact consistency and catalog checks passed; bounded path/freshness
+and secret checks also passed. All 22 stop-time checks/self-tests passed sequentially: doc currency, fact
+consistency, catalog, symbol references, build-claim freshness, secret scan,
+scaffolding tokens, harness framing, drain/prompt-storage mentions, memory
+router and agent invariants. These establish doc-policy checks, not runtime
+delivery.
+Claim-evidence report: `npm run report:claim-evidence-pilot -- --current`
+returned unavailable because local state could not be read. No observation row
+was fabricated. No MEMORY.md router edit or router crossing notice this session.
+CLAUDE.md unchanged.
 
-Claim-evidence pilot: 1 advisory event this session; row added to
-`docs/AGENT_ADJACENT_VERIFICATION_PILOT_DIRECTIVE.md`. No MEMORY.md router
-edit. CLAUDE.md needed no change.
-
-Milestone determination: **no entry required** — planning and decision
-records only; nothing shipped.
+**Milestone determination: no DEVELOPMENT_LOG.md entry required.** This
+session records planning intent and decisions; no capability or strategic
+architecture was shipped and no incident resolution is claimed.
