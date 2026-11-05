@@ -3,7 +3,7 @@ title: J27 cycle information plan
 domain: workbench
 kind: plan
 status: draft
-summary: Staged plan to gather, generate and deliver the information in the CSO's J27 review workbook — field contract, intake generation, packet generation, decision records and outputs — with the Nov 15 readiness collision called out.
+summary: Staged plan to gather, generate and deliver the information in the CSO's J27 review workbook — field contract, intake generation, packet generation, decision records and outputs — with the owner-confirmed Nov 15 first-slice target.
 canonical: false
 owner: product-engineering
 related:
@@ -24,7 +24,7 @@ better views. Present-state evidence lives in the strategy brief section
 This is a draft plan. Nothing here is built by being written down, and items
 marked as owner questions are not decided.
 
-## Schedule collision: D13 (Nov 15)
+## November 15 first-slice target (D13 / S1)
 
 D13 commits December readiness by Nov 15, 2026. The Oct 31 backlog audit
 records the J27 staff-state workflow as partial: the old Advancing/Set aside
@@ -40,9 +40,12 @@ intake row). This plan's stages overlap D13 as follows.
 | Triage flags and decline-note drafts (J-1) | Stages 2 and 4 | Triage reason list proposed, not final (D50) |
 | Sorting/columns, MR/S&E counts, First Cut spreadsheet (J-2) | Stages 3 and 5 | Not built |
 
-**Owner question S1:** keep Nov 15 for a thin first slice (staff state plus
-intake fields visible in the list), or move the D13 date. The plan's staging
-below assumes the thin-slice option.
+**S1 resolved — owner decision, 2026-11-05:** keep November 15, 2026 as the
+target for the thin first slice: D41 staff state and bulk setting, plus intake
+fields visible in the Workbench list as they arrive. Later stages follow
+separately. [VERIFIED via owner response: "Keep November 15" to the first-slice
+scope question.] This confirms the target and scope, not implementation
+completion or verified delivery feasibility.
 
 ## Principles
 
@@ -192,7 +195,7 @@ app table with audit history.
 
 | Stage | Contents | Depends on |
 |---|---|---|
-| 0 (thin D13 slice) | D41 staff-state field and bulk setting; intake fields visible in the Workbench list as they arrive | S1; Connor for field provisioning |
+| 0 (thin D13 slice) | D41 staff-state field and bulk setting; intake fields visible in the Workbench list as they arrive | S1 resolved; Connor for field provisioning |
 | 1 | Field contract accepted; prompt formats written | F1–F3, I1 |
 | 2 | App intake job for methods, key personnel, First Cut rationale; Connor's flows for the rest | D37 split; test set review |
 | 3a | First Cut and semi-finalist packets with workbook export and magic-link delivery | Stages 0–2; D34 design |
@@ -202,7 +205,6 @@ app table with audit history.
 
 ## Open owner questions
 
-- S1 — Nov 15 thin slice or new date.
 - F1 — derived versus stored writeup fields.
 - F2 — intake field freeze at First Cut.
 - F3 — rank and "Recommend for" write-back and amount editing.

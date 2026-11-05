@@ -50,13 +50,13 @@ All docs/config only. No runtime code, Dataverse write, prompt or flag change.
 
 ### Owner Decision Needed — primary next session
 
-All in `docs/plans/J27_CYCLE_INFORMATION_PLAN_2026-11-04.md`, "Open owner
-questions". Owner chose to take them next session.
+Remaining questions are in `docs/plans/J27_CYCLE_INFORMATION_PLAN_2026-11-04.md`,
+"Open owner questions". S1 was resolved by the owner on 2026-11-05.
 
-1. **S1 — Nov 15 (D13) collision.** D13 commits December readiness by Nov 15;
-   the Oct 31 backlog audit records the staff-state workflow, bulk changes and
-   First Cut output as not built. Thin slice (D41 staff-state field plus intake
-   fields in the list) or a new date. Most time-sensitive.
+1. **S1 resolved, 2026-11-05:** owner kept November 15 for the first slice:
+   D41 staff state and bulk setting, plus intake fields visible in the list as
+   they arrive. This is a target and scope decision, not a delivery-feasibility
+   or implementation claim. Continue with F1 below.
 2. **F1** derived-from-Word versus stored/editable writeup fields
    (recommended: derived). **F2** intake-field freeze at First Cut. **F3** rank
    and "Recommend for" write-back and editable amount.
