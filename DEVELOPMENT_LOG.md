@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## November 2026 — Review filing calendar repaired; Admin shows prompt destinations (Session 663, Codex)
+
+**Milestone:** Fixed calendar pagination blocking review DOCX filing; made shared-prompt usage and output destinations visible in Admin.
+**Sessions:** Session 663; owner-approved calendar reads, three CI-green PR merges, workflow history investigation and design discussion.
+**Ship state:**
+- PR #631, merge `7e0df0195`: calendar page preference matches the 500-row query bound; 112 observed cycle rows no longer hit the default 100-row page. Unexpected pagination still fails closed.
+- PR #632 (`9267a1602`): Power Automate flow usage choice. PR #633 (`af5d82dd8`): built-in destination tables/fields, configured schema targets and explicit unknowns in Admin.
+- Main merges verified; automatic deployment triggered, but deployment outcomes and a new filing/write smoke were not checked. No live prompt retirement was performed.
+- Owner chose holistic single-submission Workbench design before further incremental UI builds. Status-tab removal is pushed/unmerged; app-only package reprocessing is retained/deferred pending redesigned flows.
+**Why it matters:** Restores a blocked calendar dependency and exposes where prompts write, while preserving a whole-process design boundary for the next Workbench iteration.
+**Pointers:** `docs/plans/WORKBENCH_SINGLE_SUBMISSION_STRATEGY_BRIEF_2026-11-04.md`; `shared/config/adminPromptDestinations.js`; `scripts/probe-review-docx-calendar.mjs`; commits `e5b8ebc5f`, `9eca195bd`, `143efedbc`, `d0329dd1c`.
+
 ## November 2026 — Draft writeups use a consistent institutional funding scope (Session 662, Codex)
 
 **Milestone:** Institutional Funding History count, total and latest award now describe one owner-approved award population.
