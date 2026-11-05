@@ -126,3 +126,6 @@ smoke-results-*.txt
 # stray agent run logs at repo root
 /*.log
 /.swc
+
+# Local generated deliverables (decks, zips, build images)
+output/

@@ -6,10 +6,10 @@
         "hooks": [
           {
             "type": "command",
-            "command": "[ ! -f '/Users/gallivan/.agents/skills/impeccable/scripts/hook.mjs' ] || node '/Users/gallivan/.agents/skills/impeccable/scripts/hook.mjs'",
+            "command": "[ ! -f '/Users/gallivan/.agents/skills/impeccable/scripts/impeccable' ] || '/Users/gallivan/.agents/skills/impeccable/scripts/impeccable' hook",
+            "commandWindows": "cmd /c if exist \"\\Users\\gallivan\\.agents\\skills\\impeccable\\scripts\\impeccable.cmd\" \"\\Users\\gallivan\\.agents\\skills\\impeccable\\scripts\\impeccable.cmd\" hook",
             "timeout": 5,
-            "statusMessage": "Checking UI changes",
-            "commandWindows": "if exist \"/Users/gallivan/.agents/skills/impeccable/scripts/hook.mjs\" (node \"/Users/gallivan/.agents/skills/impeccable/scripts/hook.mjs\" & exit /b)"
+            "statusMessage": "Checking UI changes"
           }
         ]
       }
@@ -19,10 +19,10 @@
         "hooks": [
           {
             "type": "command",
-            "command": "[ ! -f '/Users/gallivan/.agents/skills/impeccable/scripts/hook.mjs' ] || node '/Users/gallivan/.agents/skills/impeccable/scripts/hook.mjs'",
+            "command": "[ ! -f '/Users/gallivan/.agents/skills/impeccable/scripts/impeccable' ] || '/Users/gallivan/.agents/skills/impeccable/scripts/impeccable' hook",
+            "commandWindows": "cmd /c if exist \"\\Users\\gallivan\\.agents\\skills\\impeccable\\scripts\\impeccable.cmd\" \"\\Users\\gallivan\\.agents\\skills\\impeccable\\scripts\\impeccable.cmd\" hook",
             "timeout": 30,
-            "statusMessage": "Design deep pass",
-            "commandWindows": "if exist \"/Users/gallivan/.agents/skills/impeccable/scripts/hook.mjs\" (node \"/Users/gallivan/.agents/skills/impeccable/scripts/hook.mjs\" & exit /b)"
+            "statusMessage": "Design deep pass"
           }
         ]
       }
