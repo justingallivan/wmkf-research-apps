@@ -207,6 +207,9 @@ been edited heavily, the Dataverse section columns matched poorly
 4. Each short field needs a stated stage, source and audience, including the
    First Cut rationale's freeze until the final rationale replaces it.
 
+The staged plan built on this analysis is
+`docs/plans/J27_CYCLE_INFORMATION_PLAN_2026-11-04.md` (draft).
+
 ## Next discussion
 
 Start with a process map and short design principles. Walk a new proposal,
