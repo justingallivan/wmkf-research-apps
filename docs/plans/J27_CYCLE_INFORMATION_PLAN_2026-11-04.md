@@ -122,6 +122,8 @@ comments.
 - **F3 amount:** defer amount overrides and "Do not approve" as later-cycle
   edge cases. Continue existing invited-amount/requested-amount fallback;
   neither new override controls nor amount write-back is approved here.
+- **First Cut size:** "about 50" is a flexible planning target, not an
+  app-enforced limit (owner, 2026-11-05).
 - **O1:** plan both workbook delivery and a magic-link browser view for
   leadership packets, using the same frozen packet content (F2). Exact access,
   sharing and delivery mechanics remain to design.
@@ -160,7 +162,8 @@ Split by owner, per D37 and D14.
 
 A packet is a generated, version-pinned selection of fields for one audience.
 
-- **First Cut (sheet 2), ~50:** intake fields plus program, keywords, region,
+- **First Cut (sheet 2), ~50 (flexible target; no enforced limit):** intake
+  fields plus program, keywords, region,
   institution type. Personalized by expertise for each Chair (J-2). Delivered
   with proposal access through magic links (D34; mechanism not designed).
   Also circulated to interested Board members (D50).
@@ -226,8 +229,8 @@ platform-level auditing.
 
 ## Open owner questions
 
-- Carried from earlier discussion: rank per program; whether "about 50" is a
-  target; the CSO's confirmation of the workbook source inference and of the
+- Carried from earlier discussion: rank per program; the CSO's confirmation
+  of the workbook source inference and of the
   one-page writeup shape (D21).
 
 ## Deferred decisions
