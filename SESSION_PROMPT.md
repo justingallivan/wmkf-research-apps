@@ -1,105 +1,98 @@
-# Session 664 Prompt: Design the whole single-submission Workbench workflow
+# Session 665 Prompt: Answer the J27 cycle information plan's owner questions
 
-## Session 663 Summary — Codex, 2026-11-04 Pacific
+## Session 664 Summary — Claude, 2026-11-04 Pacific
 
-[VERIFIED via owner discussion] Justin wants a holistic rethink of Workbench
-function and form, using the single-submission process rather than incremental
-applets. Begin with a process map, roles, decisions, information continuity and
-connected cycle/proposal experiences before choosing tabs or implementing.
+[VERIFIED via owner discussion and owner-approved read-only Production reads]
+Reviewed the CSO's J27 review workbook (`J27_Review_Workbook_Mockup_v9.xlsx`,
+owner's copy; applicant data, not stored in the repo) and turned it into a
+staged plan. Owner deferred the plan's questions to this session.
 
 ### What Was Completed
 
-1. **Review DOCX calendar failure fixed.** Owner-approved read-only Production
-   probes showed 112 matching Grant Cycle rows: the default 100-row page caused
-   calendar_unavailable before review discovery. Prefer maxpagesize=500 now
-   matches the existing top=500 bound; unexpected pagination still fails closed.
-   Regression coverage and GET-only diagnostic were added. PR #631 merged as
-   7e0df0195 after CI passed. No new filing/write smoke was run.
-2. **Admin prompt improvements.** Power Automate flow usage choice: PR #632,
-   merge 9267a1602. Built-in prompt output destinations (table/field, dynamic
-   schemas and explicit unknowns): PR #633, merge af5d82dd8. Both merged after
-   CI passed. Automatic main deployment was triggered; deployment outcomes were
-   not independently checked in this session.
-3. **Deprecated prompt decision resolved.** Owner says phase-i.checkin is
-   deprecated. Recorded in the shared-library plan; no live Dataverse retirement
-   or catalog edit was performed. Original 58750fcb7 is pushed on its branch;
-   docs-only cherry-pick on main is 1607811ab.
-4. **Connor's reusable child-flow instructions saved.** Proposed bounded first
-   subset of the Executor, shared current prompt lookup, frozen row/version,
-   validation, provider completion checks and audit lineage. No PA flow built.
-5. **Package reprocessing plan retained and deferred.** App analyses/documents
-   only, excluding Connor's assembly/AI flows. Owner expects Field Primer and
-   Initial Assessment overhaul; settle workflows first. Plan branch is pushed.
-   Initial stage list, retention periods and supported lifecycle stages remain
-   provisional, not accepted decisions.
-6. **Component/workflow investigation.** Reviewed Primer, Initial Assessment
-   history, Board snapshot and Draft inputs. Draft does not reuse IA content or
-   staff edits. Retrieved single-phase plans/memories/wiki/logs and saved a
-   strategic discussion brief with superseded decisions identified.
-7. **Status tab removal completed, not merged.** d0329dd1c removes navigation
-   and rendering, retaining Overview status and shared badge code. Old status
-   links fall back to Overview. 33 focused tests and relevant gates passed;
-   lint had zero errors and five existing hook warnings. Feature branch pushed.
+1. **Repo hygiene.** The recurring "claude-config: local changes uncommitted"
+   startup warning came from `~/.claude`, not this repo. Committed the
+   Impeccable upgrade and settings there (claude-config 5cecdf1; stray
+   installer `description` key removed; `skills/.trash/` ignored). In this repo,
+   committed the matching hook files and the Oct 19 Board writeups critique and
+   ignored `output/` (f835ca9ab).
+2. **Owner decisions recorded as D50** in the alignment log (5e53f5a93): staff
+   approve the post-review offramp with a written justification and no reason
+   list; presentations are scheduled only after reviews; the workbook's
+   proposed reason list is for triage only; Chairs and interested Board members
+   weigh in on the ~50 in advance, staff narrow to ~25, the Chairs decide; the
+   workbook is a spec, not a workspace. Rank came from Proposal Ranking.
+3. **Field inventory and source analysis** in the Workbench strategy brief
+   (a4df9324a). Six D26 requests (1002874, 1002835, 1003074, 1003024, 1002988,
+   1002963) were read with owner approval, nothing written. The workbook's
+   prose fields condense each request's final edited Word writeup; lay
+   abstracts mostly come from the applicant's own text. The Draft generator
+   writes AI sections to `wmkf_requestdocument` columns once; staff edits live
+   only in the Word file, which the Final Writeup row shares. Marked as
+   inference pending the CSO's confirmation (owner asked her).
+4. **Draft plan** `docs/plans/J27_CYCLE_INFORMATION_PLAN_2026-11-04.md`
+   (7f3ea0d40): field contract, intake generation, packet generation, decision
+   records and outputs, staged by the J27 calendar. Linked from the brief.
 
-### Commits and remote destinations
+### Commits
 
-| Commit | Work | Destination / state |
+| Commit | Work | Destination |
 |---|---|---|
-| e5b8ebc5f / 7e0df0195 | Calendar paging fix / PR #631 merge | main; merged |
-| 9eca195bd / 9267a1602 | Power Automate usage / PR #632 merge | main; merged |
-| 143efedbc / af5d82dd8 | Prompt output destinations / PR #633 merge | main; merged |
-| 58750fcb7 / 1607811ab | Prompt deprecation decision / docs cherry-pick | Pushed original branch; main docs |
-| 84da8eb2e, e5cc38eb3 | Reprocessing plan, then owner deferral | codex/proposal-package-reprocessing-plan; pushed, unmerged |
-| d0329dd1c | Remove redundant Workbench Status tab | codex/remove-workbench-status-tab; pushed, unmerged |
+| f835ca9ab | Impeccable hooks, critique, ignore output/ | main |
+| 5e53f5a93 | D50 decision record | main |
+| a4df9324a | Field inventory and source analysis | main |
+| 7f3ea0d40 | J27 cycle information plan | main |
+| claude-config 5cecdf1 | ~/.claude Impeccable upgrade and settings | justingallivan/claude-config |
+| (this stop) | Handoff and pilot observation row | main |
 
-The stop commit saves this handoff, discussion brief, child-flow guide and
-milestone log. Owner explicitly approved docs on main with features separate.
-No unmerged runtime feature is promoted by this stop.
+All docs/config only. No runtime code, Dataverse write, prompt or flag change.
 
 ## Next Items
 
-### Owner Discussion — primary next session
+### Owner Decision Needed — primary next session
 
-1. **Whole-process Workbench design.** Read
-   docs/plans/WORKBENCH_SINGLE_SUBMISSION_STRATEGY_BRIEF_2026-11-04.md.
-   Map staff work from intake through Board decision, including offramps;
-   define what analyses/documents support each decision and what staff edits
-   carry forward; design cycle and proposal views together; then develop a few
-   connected screen concepts. Current tabs are not fixed requirements.
-2. **Field Primer and Initial Assessment.** Their purposes, content, overlap,
-   placement and downstream reuse need owner decisions. Do not treat the D26
-   pilot's format or old staged-pipeline design as the settled J27 workflow.
-3. **Status-tab feature promotion.** Completed branch is available if the owner
-   wants a PR. No PR or merge was requested for this change before stop; do not
-   infer runtime promotion from the instruction to put everything in Git.
+All in `docs/plans/J27_CYCLE_INFORMATION_PLAN_2026-11-04.md`, "Open owner
+questions". Owner chose to take them next session.
 
-### Parked — retain, do not start automatically
+1. **S1 — Nov 15 (D13) collision.** D13 commits December readiness by Nov 15;
+   the Oct 31 backlog audit records the staff-state workflow, bulk changes and
+   First Cut output as not built. Thin slice (D41 staff-state field plus intake
+   fields in the list) or a new date. Most time-sensitive.
+2. **F1** derived-from-Word versus stored/editable writeup fields
+   (recommended: derived). **F2** intake-field freeze at First Cut. **F3** rank
+   and "Recommend for" write-back and editable amount.
+3. **I1** CSO intake fields replace, sit beside, or merge into the Initial
+   Assessment. **D1** home for offramp justification and staff notes. **O1**
+   leadership delivery per packet (workbook, magic links, both).
+4. Carried: rank per program; whether "about 50" is a target; CSO's
+   confirmation of the source inference and of the one-page writeup shape (D21).
 
-- **Package reprocessing.** Resume only after new flows, sources, outputs,
-  dependencies and staff-edit/lifecycle boundaries are decided. Retrieve
-  codex/proposal-package-reprocessing-plan at e5cc38eb3; its sole plan file is
-  docs/plans/ADMIN_PROPOSAL_PACKAGE_REPROCESSING_PLAN_2026-11-04.md and is not
-  on main. Preserve the feature; revise the dated stage inventory before build.
-- **Complementary reviewer-panel coverage.** Owner parked October 21; no pilot
-  has run. See .claude-memory/project-reviewer-panel-coverage-pilot.md.
-- Custom intake portal remains parked; J27 intake uses GOApply. No historical
-  pipeline, expanded extraction schema or proposed screening criterion is
-  approved by the discussion brief.
+### Verified Open
 
-### Verify Before Acting / observation boundaries
+1. **Connor items for intake (D37/D14):** target field for the lay abstract
+   (none exists), confirmation of the short-title prompt, full keyword lists.
+   Evidence: plan Part 2; brief inventory.
+2. **Status-tab removal** remains on `codex/remove-workbench-status-tab`
+   (d0329dd1c), pushed, not on main [VERIFIED via git merge-base at this stop].
+   Promote only on owner request.
 
-- Prior Production-read approval applied only to the specific calendar probes.
-  It is not standing permission for other Production reads or any write.
-- Funding-history Word generation and first natural per-reminder history
-  observation were not revisited. Prior owner deferral of staged proof remains;
-  do not regenerate staff documents or send test emails merely to create proof.
-- phase-i.checkin deprecation is a resolved owner decision, not proof of live
-  retirement. Do not revive the old question for Connor or publish that draft.
-- Historical J27 notes proposing front-end request-status advancement are
-  superseded by October decisions: staff recommend in the app; Grants Manager
-  records Chairs outcomes in Dataverse. Full new triage UI is not already built.
-- PR #631–633 are merged, freshly confirmed with gh pr view at stop. Their
-  deployment outcomes were not probed; no new release smoke is asserted.
+### Parked
+
+- **Package reprocessing** on `codex/proposal-package-reprocessing-plan`
+  (e5cc38eb3; not on main, verified at this stop). Resume after flows settle.
+- Complementary reviewer-panel coverage (owner parked Oct 21); custom intake
+  portal.
+
+### Verify Before Acting
+
+- Production-read approval this session covered only the six named requests and
+  two user-name lookups. It is not standing permission.
+- The workbook-source finding is text-similarity inference over 6 of 23
+  requests; the CSO's answer is authoritative.
+- Extracted request text from this session sits in the session scratchpad
+  (`req*/texts.json`); it is temporary and not in the repo.
+- Previous handoff carryovers (funding-history proof, phase-i.checkin
+  deprecation is a decision not a live retirement, PR #631–633 deployment not
+  probed) still hold; see `git show 5e6def44d:SESSION_PROMPT.md`.
 
 ## Concurrent Streams and Preservation
 
@@ -128,29 +121,25 @@ outstanding branches were newly pushed; no unrelated WIP was staged, stashed,
 reset or deleted. Another session identified itself as read-only during the
 planning work. Recheck worktree ownership and branch/status before acting.
 
+
 ## Key Files and Validation
 
 | File | Purpose |
 |---|---|
-| docs/plans/WORKBENCH_SINGLE_SUBMISSION_STRATEGY_BRIEF_2026-11-04.md | Planning inventory and holistic design resume point |
-| docs/plans/POWER_AUTOMATE_SHARED_PROMPT_CHILD_FLOW_GUIDE_2026-11-04.md | Saved proposed instructions for Connor; not implemented |
-| docs/plans/SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md | Deprecated check-in decision |
-| shared/config/adminPromptDestinations.js | Admin output destination catalog |
-| scripts/probe-review-docx-calendar.mjs | GET-only calendar diagnostic; fresh approval required for Production |
+| docs/plans/J27_CYCLE_INFORMATION_PLAN_2026-11-04.md | Staged plan and open owner questions — resume point |
+| docs/plans/WORKBENCH_SINGLE_SUBMISSION_STRATEGY_BRIEF_2026-11-04.md | Workbook summary, field inventory, source analysis |
+| docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md | D50 and the earlier J27 decisions (D13, D21, D36, D37, D41) |
+| lib/services/pre-site-visit/proposal-core-service.js | Draft generator inputs (narrative + request context) |
+| lib/services/pre-site-visit/artifact-model.js | Draft section → `wmkf_requestdocument` column map |
 
-Validation before stop: calendar fix 160 focused tests; usage choice 83;
-prompt destinations 61; Status removal 33. Runtime PR checks passed before
-merges. Reprocessing plan received a fresh read-only review; fixed review-mode
-email side effects and source-drift cancellation/lease concerns. It remains
-provisional/deferred. Stop-time document currency, fact consistency, canonical pointers, symbol
-references, build-claim freshness, catalog, memory router and J27 register
-gates passed with their paired self-tests where present. These checks do not
-mean every historical runtime suite reran.
+Startup ran all 72 check gates and self-tests sequentially: green. Doc gates
+(docs-catalog, doc-currency, fact-consistency, doc-symbol-refs,
+build-claim-freshness, secret-scan, scaffolding-tokens, harness-framing,
+drain-table and prompt-storage mentions) passed after each docs commit.
 
-Claim-evidence pilot report: local state could not be read; no observation row
-invented. No MEMORY.md router edit or growth advisory occurred this session.
-CLAUDE.md needed no change: root instructions are unaffected.
+Claim-evidence pilot: 1 advisory event this session; row added to
+`docs/AGENT_ADJACENT_VERIFICATION_PILOT_DIRECTIVE.md`. No MEMORY.md router
+edit. CLAUDE.md needed no change.
 
-Milestone determination: **entry added** to DEVELOPMENT_LOG.md for the calendar
-incident fix and shipped Admin prompt improvements, with the strategic design
-pivot distinguished from unmerged/deferred work.
+Milestone determination: **no entry required** — planning and decision
+records only; nothing shipped.
