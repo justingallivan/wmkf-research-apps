@@ -61,7 +61,9 @@ The cycle information plan records:
    reconciliation mechanics remain to design.
 3. **F2:** freeze shared packets; app fields remain editable for later packets.
 4. **F3 rank:** use existing Dataverse ranking records; no final rank on the
-   request. **F3 amount:** overrides and "Do not approve" deferred until later
+   request. Plan both within-program and combined ranks in leadership packets,
+   subject to later owner revision; exact source/derivation remains to verify.
+   **F3 amount:** overrides and "Do not approve" deferred until later
    in the cycle; retain existing invited/requested amount behavior for now.
 5. **I1:** editable app fields are the intake working surface. Whether to
    assemble an Initial Assessment Word document from them is deferred.
@@ -72,8 +74,9 @@ The cycle information plan records:
    same frozen leadership packet; detailed access/delivery design remains open.
 8. **First Cut size:** "about 50" is a flexible planning target, with no
    app-enforced limit.
-9. **Next owner questions:** carried rank-per-program / CSO source and
-   one-page-shape confirmations.
+9. **Remaining owner/CSO questions:** CSO source inference and one-page
+   writeup-shape confirmations. Core owner questions S1/F1/F2/F3-rank/I1/D1/O1
+   are resolved; F3 amount and Initial Assessment Word output are deferred.
 
 ### Verified Open
 

@@ -101,7 +101,7 @@ comments.
 | Offramp justification | One or two sentences | After review | Staff judgment | Staff (D50) | Staff, records | Single editable field; no entry history (D1); exact field open (D36) |
 | Presentation summary | Short paragraph | After presentation | Presentation material; exact draft inputs to settle | Generated draft, staff edit in app | Board | Stored and app-editable (F1) |
 | Final rationale | Impact plus rationale after review and presentation | Before ranking | Review/presentation evidence and staff judgment; exact draft inputs to settle | Generated draft, staff edit in app | Board | Stored and app-editable (F1) |
-| Rank | Ordered position | Ranking | Existing Dataverse Proposal Ranking records | Ranking meetings | Board | Read from ranking records; no request-level copy (F3) |
+| Rank | Program position and combined position | Ranking | Existing Dataverse Proposal Ranking records | Ranking meetings | Board | Read from ranking records; no request-level copy (F3) |
 | Recommend for | Existing invited/requested amount for now | Ranking | Existing ranking amount behavior | Ranking meetings | Board | Overrides and "Do not approve" deferred to later-cycle discussion (F3) |
 
 ### Owner decisions — 2026-11-05
@@ -119,6 +119,10 @@ comments.
   Later packets use updated values; an already shared packet stays historical.
 - **F3 rank:** no final rank field on the request. Read rank from existing
   Dataverse Proposal Ranking records (ordered request IDs within a round/list).
+  Plan to show both within-program and combined ranks in leadership packets
+  (owner, 2026-11-05); the owner may revise this presentation choice later.
+  Exact source lists/revisions and derivation still need verification before
+  implementation.
 - **F3 amount:** defer amount overrides and "Do not approve" as later-cycle
   edge cases. Continue existing invited-amount/requested-amount fallback;
   neither new override controls nor amount write-back is approved here.
@@ -229,8 +233,7 @@ platform-level auditing.
 
 ## Open owner questions
 
-- Carried from earlier discussion: rank per program; the CSO's confirmation
-  of the workbook source inference and of the
+- The CSO's confirmation of the workbook source inference and of the
   one-page writeup shape (D21).
 
 ## Deferred decisions
