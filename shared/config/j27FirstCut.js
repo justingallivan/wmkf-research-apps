@@ -1,0 +1,6 @@
+export const FIRST_CUT_STATUS = Object.freeze({ yes: 100000004, no: 100000005 });
+
+export function isFirstCutEditable(status) {
+  return status === null || status === 100000000
+    || status === FIRST_CUT_STATUS.yes || status === FIRST_CUT_STATUS.no;
+}

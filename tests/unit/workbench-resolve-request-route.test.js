@@ -36,6 +36,7 @@ const SELECT = [
   'akoya_title',
   '_wmkf_grantcycle_value',
   'akoya_requeststatus',
+  'wmkf_phaseistatus',
   'wmkf_organizationname',
   '_akoya_applicantid_value',
   '_wmkf_projectleader_value',

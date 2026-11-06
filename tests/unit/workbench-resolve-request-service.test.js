@@ -28,6 +28,7 @@ jest.mock('../../lib/dataverse/adapters/operations-grant-cycle', () => ({
 import { resolveWorkbenchRequest } from '../../lib/services/workbench/resolve-request-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 import { STATUS_CLASS } from '../../lib/services/dataverse-export/constants';
+import { processAnnotations } from '../../lib/services/dynamics/annotations';
 import { DynamicsService } from '../../lib/services/dynamics-service';
 
 const EXPAND = 'wmkf_GrantCycle($select=wmkf_cyclecode)';
@@ -68,6 +69,28 @@ test('GUID path: adapter getById, DTO projected', async () => {
   // meetingDate is the linked cycle's calendar Board date, not the request's own date.
   expect(getCycleDatesById).toHaveBeenCalledWith(CYCLE_ID);
   expect(body).toMatchObject({ cycleCode: 'J26', cycleLabel: 'June 2026', meetingDate: '2026-06-04' });
+});
+
+test.each(['GUID', 'number'])('%s path: exposes the normalized J27 row version and Phase I status', async (path) => {
+  const row = processAnnotations({
+    ...RECORD,
+    wmkf_GrantCycle: { wmkf_cyclecode: 'J27' },
+    wmkf_phaseistatus: 100000004,
+    'wmkf_phaseistatus@OData.Community.Display.V1.FormattedValue': 'Scored',
+    '@odata.etag': 'W/"123"',
+  });
+  getById.mockResolvedValue(row);
+  findByRequestNumber.mockResolvedValue({ records: [row] });
+
+  const body = await resolveWorkbenchRequest(path === 'GUID'
+    ? { requestId: REQ, requestNumber: '' }
+    : { requestId: '', requestNumber: RECORD.akoya_requestnum });
+
+  expect(body).toMatchObject({
+    requestVersion: 'W/"123"',
+    phaseIStatus: 100000004,
+    phaseIStatusLabel: 'Scored',
+  });
 });
 
 test('a June meeting date with no Grant Cycle link has no cycle and no Board date', async () => {

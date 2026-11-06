@@ -24,6 +24,24 @@ better views. Present-state evidence lives in the strategy brief section
 This is a draft plan. Nothing here is built by being written down, and items
 marked as owner questions are not decided.
 
+## J27 Phase I app implementation order
+
+Justin owns the app. The first build is a single-proposal First Cut decision in
+the Workbench Proposal tab. The lead PD or a superuser can save Yes (Scored,
+`100000004`) or No (Not Scored, `100000005`) to `akoya_request.wmkf_phaseistatus`.
+Blank, Pending Committee Review, Scored and Not Scored are editable starting
+states. Other statuses are read-only. [VERIFIED via owner decision and
+Production Dataverse choice metadata.] The server must reject stale row
+versions and keep final invitation decisions with the Grants Manager.
+
+Semi-finalist follows after verifying the J27 draft-email triggers and deciding
+whether staff need to retain the original First Cut answer. A recommendation
+replaces the same status field and makes First Cut read-only. Connor owns the
+intake AI summary, fit flag, fit rationale and draft staff rationale. Initial
+Assessment, disposition reason and staff rationale saves depend on the shared
+field contract. Bulk changes, queues and packet exports are later work. The
+November 15 scope below was set for the earlier slice and needs reconfirmation.
+
 ## November 15 first-slice target (D13 / S1)
 
 D13 commits December readiness by Nov 15, 2026. The Oct 31 backlog audit

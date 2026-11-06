@@ -28,6 +28,7 @@ import { useProfile } from '../../shared/context/ProfileContext';
 import { readEmailSignaturePreference } from '../../shared/config/reviewerFinderPreferences';
 import ReviewersTab from '../../shared/components/reviewers/ReviewersTab';
 import ReviewsTab from '../../shared/components/workbench/ReviewsTab';
+import FirstCutCard from '../../shared/components/workbench/FirstCutCard';
 import ProposalTab from '../../shared/components/workbench/ProposalTab';
 import IntegrityTab from '../../shared/components/workbench/IntegrityTab';
 import OverviewTab from '../../shared/components/workbench/OverviewTab';
@@ -259,7 +260,19 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
           previewReadOnly={reviewerSurfaceReadOnly}
         />
       ) : activeTab === 'proposal' ? (
-        <ProposalTab key={routeRequestId || ''} context={visibleContext} requestId={routeRequestId || ''} />
+        <>
+          {visibleContext?.cycleCode === 'J27' && (
+            <FirstCutCard
+              key={routeRequestId}
+              context={visibleContext}
+              canManage={canManage && !previewReadOnly}
+              refresh={() => {
+                if (routeStateRef.current.generation === routeGeneration) return loadCtx(routeRequestId);
+              }}
+            />
+          )}
+          <ProposalTab key={routeRequestId || ''} context={visibleContext} requestId={routeRequestId || ''} />
+        </>
       ) : activeTab === 'integrity' ? (
         <IntegrityTab key={routeRequestId || ''} requestId={routeRequestId || ''} />
       ) : activeTab === 'initial-writeup' ? (
