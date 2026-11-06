@@ -2,6 +2,7 @@
 
 import { saveFirstCut } from '../../lib/services/workbench/first-cut-service';
 import { getById, updateById } from '../../lib/dataverse/adapters/grant-request';
+import { processAnnotations } from '../../lib/services/dynamics/annotations';
 import { getUserRole } from '../../lib/utils/auth';
 
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
@@ -18,13 +19,13 @@ const requestId = '11111111-1111-1111-1111-111111111111';
 const callerSystemId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 const version = 'W/"123"';
 const input = { requestId, callerSystemId, version, profileId: 7, decision: 'yes' };
-const row = {
+const row = processAnnotations({
   akoya_requestid: requestId,
   _wmkf_programdirector_value: callerSystemId.toUpperCase(),
   wmkf_phaseistatus: null,
   wmkf_GrantCycle: { wmkf_cyclecode: 'J27' },
   '@odata.etag': version,
-};
+});
 
 beforeEach(() => {
   jest.resetAllMocks();
@@ -64,8 +65,8 @@ test('superuser can edit an unassigned request; other staff cannot', async () =>
 test.each([
   { wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } },
   { wmkf_GrantCycle: null },
-  { '@odata.etag': 'W/"124"' },
-  { '@odata.etag': undefined },
+  { _etag: 'W/"124"' },
+  { _etag: undefined },
 ])('rejects an ineligible cycle or stale/missing version: %o', async (changes) => {
   getById.mockResolvedValue({ ...row, ...changes });
   await expect(saveFirstCut(input)).rejects.toMatchObject({ httpStatus: 409 });
