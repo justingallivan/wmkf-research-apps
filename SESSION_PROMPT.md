@@ -1,71 +1,55 @@
-# Session 667 Prompt: Recap J27 Phase I and agree ownership with Connor
+# Session 668 Prompt: Resume the J27 Workbench redesign when ready
 
-## Session 666 Summary — Codex, 2026-11-05 Pacific
+## Session 667 Summary — Codex, 2026-11-05 Pacific
 
-[VERIFIED via owner discussion, local workbook inspection, and startup gates.]
-Planning discussion only. The group-notes workbook was read locally and
-compared with the prior mockup. All 72 startup checks and self-tests passed.
-The five unverifiable J27 register entries were advisory. No implementation,
-schema or prompt changes, or live Dataverse reads or writes occurred.
+- [VERIFIED via GitHub and owner observation] PR #635 merged as `dc3eb5233`. The
+  separate Workbench Status tab is gone in Production. Overview retains request
+  status and old Status links fall back to Overview. First Cut remains on
+  Proposal after PR #634 (`71d4b6cfb`). CI passed on #635.
+- [VERIFIED via owner discussion] Reviewed cycle-level queues and request-level
+  navigation in D26. The similar tab names and styling obscure the difference
+  between managing a cycle and working on one request. The owner chose to offer
+  both **My work** and **All requests** at the cycle level and parked the wider
+  redesign for a future session.
+- [VERIFIED via local browser] The isolated UI checkout used sandbox request
+  #1000368 to verify Overview. Production request #1002852 was used as a
+  read-only D26 design reference. No redesign was implemented.
 
-### Phase I decisions to recap
+## Next Items
 
-| Item | Agreed behavior | Owner or dependency |
-|---|---|---|
-| AI Summary | Generated on intake by Power Automate | Connor creates prompts, flows and necessary Dataverse structures |
-| AI Fit Flag | Dataverse choice: Fit, Not a fit, Unclear | Connor |
-| AI Fit Rationale | Generated text explaining the choice in all three cases | Connor |
-| Initial Assessment | Staff set Not yet assessed (default), Recommend advancement, or Recommend triage in the app | App workstream; confirm exact storage and ownership with Connor |
-| Disposition reason | Staff use free text and may add it later. Show which requests lack a disposition, which lack a reason, and which have both | App workstream; confirm which field records disposition at each step |
-| Rationale | Connor's flow drafts it. Staff edit it in the app. It includes impact and the basis for staff interest or concern | Connor for generation; app workstream for editing |
-| First Cut | Staff set Yes or No in the app. Write Phase I Scored or Not scored, respectively | App workstream; verify existing choice values and transitions |
-| Semi-finalist | Staff set Yes or No in the app. Write Phase I Recommended Invite or Recommended Do not invite, respectively | App workstream; verify existing choice values and transitions |
+### Parked — J27 Workbench design
 
-The workbook's Lists tab proposes Phase I codes Proposal submitted, Flagged
-for concerns, Triaged, Under Consideration and Recommend Program Chairs (25),
-and Phase II codes Invited to Peer Review and Not Invited. Treat those labels
-as discussion evidence. The link between the AI fit result and Flagged for
-concerns, the full lifecycle/workspace model, and any fixed counts remain open.
+Resume when Justin reopens the design discussion. Use the J27 cycle information
+plan and current owner decisions to map the staff journey from one submitted
+package through intake, staff assessment, First Cut, the Chairs decision, and
+peer review if invited. Treat open workflow and ownership decisions as open.
+Use D26 request #1002852 and the screenshots from this chat for density and
+navigation evidence. The example omits J27 steps and includes D26-specific
+features from the two-submission cycle.
 
-### Verified open — next session
+Sketch the cycle queues and the request workspace together. Prototype First
+Cut with synthetic J27 proposals, including one that advances and one that
+stops. Test finding work, opening the relevant task, seeing the evidence and
+next action, and returning to the same filtered queue. Keep stopped requests
+findable in All requests. Classify D26-only tools before changing their
+navigation. The per-request First Cut control has shipped. The proposed
+queue-to-decision experience remains design work.
 
-1. Justin requested a recap and a concise shared summary for Connor and Justin
-   that distinguishes agreed decisions from open items and assigns who creates
-   what. Begin with the Phase I table above and the updated workbook. Confirm
-   ownership of app work, shared field contracts, and any remaining intake
-   outputs before assigning them. The summary is a review draft for the two
-   owners. No request to send it was made.
-2. Reconcile the accepted decisions into the cycle plan after the recap.
-   Its earlier producer split and staff-state assumptions predate this
-   discussion. Use the group-notes workbook as evidence, including the
-   differences from the earlier workbook. Verify Dataverse field and option
-   mappings before implementation. The November 15 target is carried forward
-   from the prior plan, with exact scope and feasibility still open.
-3. Keep open the formats and ownership for other intake content (short title,
-   lay abstract, methods, key personnel and keywords), the role of the staff
-   workspace queues, and the exact Chairs materials and calendar revisions.
+### J27 Phase I coordination
 
-### Parked — Phase II
+The Phase I decisions, workbook pointer, ownership questions for Connor, and
+parked Phase II details are preserved in `git show e869e6c2c:SESSION_PROMPT.md`.
+First Cut implementation has moved since that handoff. Use the current cycle
+plan and source to check the rest before turning any item into an assignment.
 
-After Program Chairs approve, staff move approved requests into internal
-Phase II in AkoyaGO. Reviewer finding and reviews should broadly follow D26.
-Connor still needs to identify the existing Dataverse mapping for staff
-recommendation. One staff-written offramp justification is the working
-direction for reason and note. The workbook still shows a dropdown and Chairs
-approval copy that differ from D50. Review Phase II changes later.
+## Key References
 
-### Evidence and continuity
-
-- Workbook: `~/Library/Mobile Documents/com~apple~CloudDocs/Documents/Keck Foundation/Templates/J27_Review_Workbook_Mockup_v9 Group Notes 11-5.xlsx`.
-  Read locally. Start with staff master columns E–N and the Lists tab.
-- Current plan: `docs/plans/J27_CYCLE_INFORMATION_PLAN_2026-11-04.md`.
-  Prior handoff, including settled packet and editing decisions and remaining
-  guardrails: `git show 2f9e47cbd:SESSION_PROMPT.md`.
-- Historical retirement and cleanup items remain unverified before action.
-  Prior Production-read permissions remain limited to their named lookups.
+- `docs/plans/J27_CYCLE_INFORMATION_PLAN_2026-11-04.md` — J27 decisions and open
+  workspace questions.
+- `docs/plans/WORKBENCH_SINGLE_SUBMISSION_STRATEGY_BRIEF_2026-11-04.md` — historical
+  design inventory.
+- `pages/workbench/[requestId].js` — request navigation and First Cut entry point.
 - Claim-evidence report could not read local state. No observation was added.
-- No DEVELOPMENT_LOG.md entry required. This session settled planning
-  decisions and shipped no capability.
 
 ## Concurrent Streams and Preservation
 

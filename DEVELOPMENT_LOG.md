@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## November 2026 — Separate Workbench Status tab removed (Session 667, Codex)
+
+**Milestone:** Shipped the removal of the duplicate request Status tab.
+**Sessions:** Session 667.
+**Ship state:**
+- PR #635 merged as `dc3eb5233` after CI passed. Justin confirmed the tab was gone in Production.
+- Overview still displays request status. Old Status links open Overview.
+- The Proposal tab retains the First Cut control from PR #634.
+**Why it matters:** Staff have one place to see request status while the J27 navigation redesign is parked.
+**Pointers:** `pages/workbench/[requestId].js`, `shared/components/workbench/OverviewTab.js`, PR #635.
+
 ## November 2026 — Review filing calendar repaired; Admin shows prompt destinations (Session 663, Codex)
 
 **Milestone:** Fixed calendar pagination blocking review DOCX filing; made shared-prompt usage and output destinations visible in Admin.
