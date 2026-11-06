@@ -55,10 +55,11 @@ test('Integrity is gated by the integrity-screener app grant and follows Proposa
   expect(visibleTabsFor(() => true)).toContainEqual(expect.objectContaining({ key: 'integrity', gate: 'integrity-screener' }));
 });
 
-test('without the grant, the tab button is absent and ?tab=review-panel deep-links fall back to Overview (never a blank panel)', () => {
+test.each([['review-panel', 'Review Panel'], ['status', 'Status']])('unavailable %s deep-links fall back to Overview without a tab button', (tab, label) => {
+  mockQuery.tab = tab;
   mockAccess = { isSuperuser: true, hasAccess: () => false }; // superuser alone is NOT the gate — the grant is
   render(<WorkbenchRequest />);
-  expect(screen.queryByRole('button', { name: 'Review Panel' })).toBeNull();
+  expect(screen.queryByRole('button', { name: label })).toBeNull();
   expect(screen.getByTestId('overview-tab')).toBeInTheDocument();
   expect(screen.queryByTestId('review-panel-tab')).toBeNull();
 });
