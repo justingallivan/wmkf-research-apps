@@ -1,6 +1,6 @@
 /** @jest-environment node */
 
-import { saveFirstCut } from '../../lib/services/workbench/first-cut-service';
+import { saveFirstCut, saveSemiFinalist } from '../../lib/services/workbench/first-cut-service';
 import { getById, updateById } from '../../lib/dataverse/adapters/grant-request';
 import { processAnnotations } from '../../lib/services/dynamics/annotations';
 import { getUserRole } from '../../lib/utils/auth';
@@ -82,5 +82,39 @@ test('maps a concurrent Dataverse edit to a conflict without retrying', async ()
 test('saving the same decision skips the PATCH', async () => {
   getById.mockResolvedValue({ ...row, wmkf_phaseistatus: 100000004 });
   await expect(saveFirstCut(input)).resolves.toEqual({ success: true });
+  expect(updateById).not.toHaveBeenCalled();
+});
+
+test.each([
+  [100000004, 'yes', 707510005],
+  [100000004, 'no', 707510006],
+  [707510005, 'no', 707510006],
+  [707510006, 'yes', 707510005],
+])('saves a Semi-finalist recommendation from %s to %s', async (current, decision, status) => {
+  getById.mockResolvedValue({ ...row, wmkf_phaseistatus: current });
+  await expect(saveSemiFinalist({ ...input, decision })).resolves.toEqual({ success: true });
+  expect(updateById).toHaveBeenCalledWith(requestId, { wmkf_phaseistatus: status }, {
+    ifMatch: version, actingUserSystemId: callerSystemId,
+  });
+});
+
+test.each([null, 100000000, 100000005, 100000003, 100000002, 999])(
+  'refuses a Semi-finalist save from %s',
+  async (current) => {
+    getById.mockResolvedValue({ ...row, wmkf_phaseistatus: current });
+    await expect(saveSemiFinalist(input)).rejects.toMatchObject({ httpStatus: 409 });
+    expect(updateById).not.toHaveBeenCalled();
+  },
+);
+
+test('repeating a Semi-finalist recommendation skips the PATCH', async () => {
+  getById.mockResolvedValue({ ...row, wmkf_phaseistatus: 707510005 });
+  await expect(saveSemiFinalist(input)).resolves.toEqual({ success: true });
+  expect(updateById).not.toHaveBeenCalled();
+});
+
+test('a stale recommendation cannot overwrite a later decision', async () => {
+  getById.mockResolvedValue({ ...row, wmkf_phaseistatus: 707510006, _etag: 'W/"124"' });
+  await expect(saveSemiFinalist(input)).rejects.toMatchObject({ httpStatus: 409 });
   expect(updateById).not.toHaveBeenCalled();
 });

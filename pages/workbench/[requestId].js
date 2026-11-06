@@ -28,6 +28,7 @@ import { useProfile } from '../../shared/context/ProfileContext';
 import { readEmailSignaturePreference } from '../../shared/config/reviewerFinderPreferences';
 import ReviewersTab from '../../shared/components/reviewers/ReviewersTab';
 import ReviewsTab from '../../shared/components/workbench/ReviewsTab';
+import { isSemiFinalistEditable } from '../../shared/config/j27FirstCut';
 import FirstCutCard from '../../shared/components/workbench/FirstCutCard';
 import ProposalTab from '../../shared/components/workbench/ProposalTab';
 import IntegrityTab from '../../shared/components/workbench/IntegrityTab';
@@ -262,6 +263,17 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
           {visibleContext?.cycleCode === 'J27' && (
             <FirstCutCard
               key={routeRequestId}
+              context={visibleContext}
+              canManage={canManage && !previewReadOnly}
+              refresh={() => {
+                if (routeStateRef.current.generation === routeGeneration) return loadCtx(routeRequestId);
+              }}
+            />
+          )}
+          {visibleContext?.cycleCode === 'J27' && isSemiFinalistEditable(visibleContext.phaseIStatus) && (
+            <FirstCutCard
+              key={`semi-finalist:${routeRequestId}`}
+              semiFinalist
               context={visibleContext}
               canManage={canManage && !previewReadOnly}
               refresh={() => {
