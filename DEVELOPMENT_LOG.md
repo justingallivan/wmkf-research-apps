@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## November 2026 — J27 First Cut ships in Workbench (Session 667, Codex)
+
+**Milestone:** J27 lead PDs and superusers can save First Cut on the Proposal tab.
+**Sessions:** Session 667 covered the Phase I recap, build, independent review, sandbox rehearsal and release.
+**Ship state:**
+- PR #634 (`71d4b6cf`) maps Yes to Scored and No to Not Scored. The server limits edits to eligible starting statuses and rejects stale versions.
+- The sandbox browser rehearsal verified both saves and stale-edit rejection. Full Jest passed after the resolver test projection was corrected.
+- PR #635 (`dc3eb523`) removed the standalone Status tab. Overview still shows request status and Proposal still carries First Cut. Production deployment `7592275420` succeeded.
+**Why it matters:** Staff can record the first J27 selection decision directly on the proposal and see when a newer edit has superseded theirs.
+**Pointers:** `docs/plans/J27_CYCLE_INFORMATION_PLAN_2026-11-04.md` and `docs/atlas/dataverse-akoya-request.md`.
+
 ## November 2026 — Review filing calendar repaired; Admin shows prompt destinations (Session 663, Codex)
 
 **Milestone:** Fixed calendar pagination blocking review DOCX filing; made shared-prompt usage and output destinations visible in Admin.

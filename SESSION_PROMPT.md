@@ -1,71 +1,79 @@
-# Session 667 Prompt: Recap J27 Phase I and agree ownership with Connor
+# Session 668 Prompt: Resume J27 Phase I after First Cut
 
-## Session 666 Summary — Codex, 2026-11-05 Pacific
+## Session 667 Summary — Codex, 2026-11-05 Pacific
 
-[VERIFIED via owner discussion, local workbook inspection, and startup gates.]
-Planning discussion only. The group-notes workbook was read locally and
-compared with the prior mockup. All 72 startup checks and self-tests passed.
-The five unverifiable J27 register entries were advisory. No implementation,
-schema or prompt changes, or live Dataverse reads or writes occurred.
+- **DONE [VERIFIED via PR #634, CI and sandbox browser rehearsal].** First Cut
+  shipped in `71d4b6cf`. Justin owns the app. On the J27 Workbench Proposal
+  tab, the request's lead PD or a superuser can save Yes → Scored
+  (`100000004`) or No → Not Scored (`100000005`) when Phase I Status is blank,
+  Pending Committee Review, Scored or Not Scored. Other statuses are read-only.
+- **DONE [VERIFIED via PR #635, integrated tests and Production deployment].**
+  The UI exploration chat removed the standalone Status tab in `dc3eb523`.
+  Request status remains on Overview and First Cut stays on Proposal. The
+  combined branch passed 58 focused tests. GitHub Production deployment
+  `7592275420` for `dc3eb523` succeeded. No Production write smoke was run.
+- **Sandbox proof.** Synthetic request 1000368 was created directly through the
+  sandbox Dataverse API, outside the Test Request Factory. It is titled
+  `TEST: J27 First Cut browser rehearsal 91d4c65f` and has no Factory marker or
+  ledger run. Local Workbench saved Yes, rejected a stale No from a second tab,
+  then saved No from the refreshed tab. Not Scored persisted after reload.
+  The fixture remains in the sandbox. Preserve it unless the owner directs
+  otherwise. Local app server was stopped after the rehearsal.
+- **Review and CI.** Claude Opus identified the normalized `_etag` mismatch.
+  `f2fa1b154` fixed both services and added adapter-shaped regression coverage.
+  `5eb3e686b` corrected a stale resolver test projection after the first CI
+  run. Full Jest passed before merge. The claim-evidence report could not read
+  local state, so no pilot observation was added.
 
-### Phase I decisions to recap
+## Next Items
 
-| Item | Agreed behavior | Owner or dependency |
-|---|---|---|
-| AI Summary | Generated on intake by Power Automate | Connor creates prompts, flows and necessary Dataverse structures |
-| AI Fit Flag | Dataverse choice: Fit, Not a fit, Unclear | Connor |
-| AI Fit Rationale | Generated text explaining the choice in all three cases | Connor |
-| Initial Assessment | Staff set Not yet assessed (default), Recommend advancement, or Recommend triage in the app | App workstream; confirm exact storage and ownership with Connor |
-| Disposition reason | Staff use free text and may add it later. Show which requests lack a disposition, which lack a reason, and which have both | App workstream; confirm which field records disposition at each step |
-| Rationale | Connor's flow drafts it. Staff edit it in the app. It includes impact and the basis for staff interest or concern | Connor for generation; app workstream for editing |
-| First Cut | Staff set Yes or No in the app. Write Phase I Scored or Not scored, respectively | App workstream; verify existing choice values and transitions |
-| Semi-finalist | Staff set Yes or No in the app. Write Phase I Recommended Invite or Recommended Do not invite, respectively | App workstream; verify existing choice values and transitions |
+### Verified Open
 
-The workbook's Lists tab proposes Phase I codes Proposal submitted, Flagged
-for concerns, Triaged, Under Consideration and Recommend Program Chairs (25),
-and Phase II codes Invited to Peer Review and Not Invited. Treat those labels
-as discussion evidence. The link between the AI fit result and Flagged for
-concerns, the full lifecycle/workspace model, and any fixed counts remain open.
+1. **Semi-finalist.** The app behavior is planned. Yes writes Recommended Invite
+   (`707510005`) and No writes Recommended Do Not Invite (`707510006`), both
+   verified in Production choice metadata. These replace First Cut in the same
+   `wmkf_phaseistatus` field. The existing First Cut guard locks both
+   recommendations. Before implementing the Semi-finalist save, verify J27
+   draft-email triggers and repeat-edit behavior. Historical workflow evidence
+   lives in `lib/services/test-requests/status-transitions.js`.
+2. **Intake display and staff field contract.** Connor owns intake AI Summary,
+   Fit Flag (Fit, Not a fit, Unclear), Fit Rationale, and draft staff rationale.
+   Justin owns the app. Agree on the fields and draft-to-edit handoff before
+   staff saves. Initial Assessment defaults to Not yet assessed, with
+   Recommend advancement and Recommend triage as staff choices. Disposition
+   reason is editable free text and can be supplied later. Staff need to see
+   which requests lack the disposition or reason and which have both.
 
-### Verified open — next session
+### Owner Decision Needed
 
-1. Justin requested a recap and a concise shared summary for Connor and Justin
-   that distinguishes agreed decisions from open items and assigns who creates
-   what. Begin with the Phase I table above and the updated workbook. Confirm
-   ownership of app work, shared field contracts, and any remaining intake
-   outputs before assigning them. The summary is a review draft for the two
-   owners. No request to send it was made.
-2. Reconcile the accepted decisions into the cycle plan after the recap.
-   Its earlier producer split and staff-state assumptions predate this
-   discussion. Use the group-notes workbook as evidence, including the
-   differences from the earlier workbook. Verify Dataverse field and option
-   mappings before implementation. The November 15 target is carried forward
-   from the prior plan, with exact scope and feasibility still open.
-3. Keep open the formats and ownership for other intake content (short title,
-   lay abstract, methods, key personnel and keywords), the role of the staff
-   workspace queues, and the exact Chairs materials and calendar revisions.
+- Decide whether staff need to retain the original First Cut answer after a
+  Semi-finalist recommendation replaces the status. Grants Manager owns final
+  Invited and Not Invited outcomes.
+- Confirm whether the AI fit flag affects Flagged for concerns, the remaining
+  intake output formats and owners, staff queues, Chairs materials, and calendar
+  changes. The November 15 target was for earlier scope and needs reconfirmation.
 
-### Parked — Phase II
+### Parked
 
-After Program Chairs approve, staff move approved requests into internal
-Phase II in AkoyaGO. Reviewer finding and reviews should broadly follow D26.
-Connor still needs to identify the existing Dataverse mapping for staff
-recommendation. One staff-written offramp justification is the working
-direction for reason and note. The workbook still shows a dropdown and Chairs
-approval copy that differ from D50. Review Phase II changes later.
+- Phase II, bulk edits, queues and packet exports. See the cycle plan for the
+  parked requirements and prior decisions.
 
-### Evidence and continuity
+### Verify Before Acting
 
-- Workbook: `~/Library/Mobile Documents/com~apple~CloudDocs/Documents/Keck Foundation/Templates/J27_Review_Workbook_Mockup_v9 Group Notes 11-5.xlsx`.
-  Read locally. Start with staff master columns E–N and the Lists tab.
-- Current plan: `docs/plans/J27_CYCLE_INFORMATION_PLAN_2026-11-04.md`.
-  Prior handoff, including settled packet and editing decisions and remaining
-  guardrails: `git show 2f9e47cbd:SESSION_PROMPT.md`.
-- Historical retirement and cleanup items remain unverified before action.
-  Prior Production-read permissions remain limited to their named lookups.
-- Claim-evidence report could not read local state. No observation was added.
-- No DEVELOPMENT_LOG.md entry required. This session settled planning
-  decisions and shipped no capability.
+- Historical retirement and cleanup items require live caller checks. Prior
+  Production-read permissions remain scoped to their named lookups.
+- Session 666 and the workbook reference are preserved at
+  `git show e869e6c2c:SESSION_PROMPT.md`. For earlier packet and editing
+  decisions see `git show 2f9e47cbd:SESSION_PROMPT.md`.
+
+### Key Files
+
+| File | Purpose |
+|---|---|
+| `docs/plans/J27_CYCLE_INFORMATION_PLAN_2026-11-04.md` | Phase I build order and remaining decisions |
+| `shared/components/workbench/FirstCutCard.js` | Proposal-tab control |
+| `lib/services/workbench/resolve-request-service.js` | J27 status and row version for the Proposal tab |
+| `pages/api/workbench/first-cut.js` and `lib/services/workbench/first-cut-service.js` | Guarded, conditional First Cut save |
 
 ## Concurrent Streams and Preservation
 
