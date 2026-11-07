@@ -227,3 +227,36 @@ test('Final Writeup reads the saved visit assessment while the Deliberations dra
   view.rerender(<WorkbenchRequest staffReviewSummary />);
   expect(screen.getByRole('textbox', { name: 'Staff assessment of the visit' })).toHaveValue('Unsaved assessment edit');
 });
+
+test('J27 Initial Assessment keeps the rationale draft while staff open Word assessment or Reports', async () => {
+  tabName = 'initial-assessment';
+  const view = render(<WorkbenchRequest staffReviewSummary initialRationaleEnabled />);
+  await act(async () => {
+    pending.get('/api/workbench/resolve-request?requestId=request-a')({
+      ok: true, json: async () => ({ success: true, requestId: 'request-a', cycleCode: 'J27' }),
+    });
+  });
+  await act(async () => {
+    pending.get('/api/workbench/initial-assessment-rationale?requestId=request-a')({
+      ok: true, json: async () => ({ rationale: 'Saved rationale', version: 'W/"123"' }),
+    });
+  });
+
+  const editor = screen.getByRole('textbox', { name: 'Staff rationale' });
+  expect(editor).toHaveValue('Saved rationale');
+  expect(screen.getByText('Proposal and AI intake findings')).toBeInTheDocument();
+  fireEvent.change(editor, { target: { value: 'Unsaved rationale' } });
+
+  tabName = 'initial-writeup';
+  view.rerender(<WorkbenchRequest staffReviewSummary initialRationaleEnabled />);
+  expect(screen.getByRole('button', { name: 'Word assessment' })).toHaveAttribute('aria-current', 'page');
+  expect(screen.queryByRole('textbox', { name: 'Staff rationale' })).toBeNull();
+
+  tabName = 'reviews';
+  view.rerender(<WorkbenchRequest staffReviewSummary initialRationaleEnabled />);
+  expect(screen.queryByRole('textbox', { name: 'Staff rationale' })).toBeNull();
+
+  tabName = 'initial-assessment';
+  view.rerender(<WorkbenchRequest staffReviewSummary initialRationaleEnabled />);
+  expect(screen.getByRole('textbox', { name: 'Staff rationale' })).toHaveValue('Unsaved rationale');
+});

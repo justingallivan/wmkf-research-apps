@@ -6,6 +6,8 @@
  * phase `section` navigation.
  */
 
+import { initialAssessmentRationaleEnabled } from '../../lib/utils/initial-assessment-rationale-readiness';
+import InitialAssessmentRationale from '../../shared/components/workbench/InitialAssessmentRationale';
 import { meetingRosterSchemaEnabled } from '../../lib/utils/meeting-roster-readiness';
 import MeetingRoster from '../../shared/components/workbench/MeetingRoster';
 import StaffVisitAssessment from '../../shared/components/workbench/StaffVisitAssessment';
@@ -63,7 +65,7 @@ const LEGACY_TAB_ALIASES = {
   'site-visit': 'staff-deliberations',
 };
 
-export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary = false, meetingRosterEnabled = false }) {
+export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary = false, meetingRosterEnabled = false, initialRationaleEnabled = false }) {
   const router = useRouter();
   const { data: session } = useSession();
   const { isSuperuser, hasAccess } = useAppAccess();
@@ -79,6 +81,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
   const routeRequestId = typeof requestId === 'string' && requestId ? requestId : null;
   const routeKey = routeRequestId?.toLowerCase() || '';
   const [visitEditorRequestId, setVisitEditorRequestId] = useState(null);
+  const [rationaleEditorRequestId, setRationaleEditorRequestId] = useState(null);
   const routeStateRef = useRef({ key: routeKey, generation: 0 });
   if (routeStateRef.current.key !== routeKey) {
     routeStateRef.current = {
@@ -97,6 +100,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
 
   // The redesigned shell follows the same sandbox boundary as the tested fields.
   const phaseLayout = staffReviewSummary && visibleContext?.cycleCode === 'J27';
+  const showInitialRationale = phaseLayout && initialRationaleEnabled;
   const phaseTabs = [
     { key: 'overview', label: 'Overview' },
     { key: 'initial-assessment', label: 'Initial Assessment' },
@@ -125,9 +129,9 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
   const phase = legacy?.[0] || (tabParam && visibleTabKeys.has(tabParam) ? tabParam : 'overview');
   const requestedSection = legacy?.[1] || (typeof router.query.section === 'string' ? router.query.section : null);
   const sections = !phaseLayout ? [] : phase === 'initial-assessment' ? [
-    { key: 'proposal', label: 'Proposal' },
+    { key: 'proposal', label: showInitialRationale ? 'Assessment' : 'Proposal' },
     ...(hasAccess('integrity-screener') === true ? [{ key: 'integrity', label: 'Integrity' }] : []),
-    { key: 'assessment', label: 'Assessment' },
+    { key: 'assessment', label: showInitialRationale ? 'Word assessment' : 'Assessment' },
   ] : phase === 'peer-review' ? [
     { key: 'panel', label: 'Panel' }, { key: 'reports', label: 'Reports' },
     ...(hasAccess('review-panel') === true ? [{ key: 'group-review', label: 'Group review' }] : []),
@@ -145,6 +149,12 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
   const activeTab = phaseLayout ? (phaseContent[phase]?.[section || 'default'] || 'overview')
     : (tabParam && visibleTabKeys.has(tabParam) ? tabParam : 'overview');
   const reviewerSurfaceReadOnly = previewReadOnly && ['reviewers', 'reviews'].includes(activeTab);
+  const editingInitialRationale = showInitialRationale && activeTab === 'proposal';
+
+  useEffect(() => {
+    if (editingInitialRationale) setRationaleEditorRequestId(routeRequestId);
+  }, [editingInitialRationale, routeRequestId]);
+
 
   useEffect(() => {
     if (activeTab === 'staff-deliberations') setVisitEditorRequestId(routeRequestId);
@@ -322,6 +332,12 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
         </div>
       )}
 
+      {showInitialRationale && (editingInitialRationale || rationaleEditorRequestId === routeRequestId) && (
+        <div hidden={!editingInitialRationale}>
+          <InitialAssessmentRationale key={routeRequestId} requestId={routeRequestId} />
+        </div>
+      )}
+
       {phaseLinkPending ? (
         <Card hover={false}>
           <p className="text-sm text-gray-600" role="status">
@@ -365,7 +381,17 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
               }}
             />
           )}
-          <ProposalTab key={routeRequestId || ''} context={visibleContext} requestId={routeRequestId || ''} />
+          {showInitialRationale ? (
+            <details key={routeRequestId} open={rawTabParam === 'proposal'}
+              className="rounded-xl border bg-white p-5">
+              <summary className="cursor-pointer font-semibold">Proposal and AI intake findings</summary>
+              <div className="mt-4">
+                <ProposalTab context={visibleContext} requestId={routeRequestId} />
+              </div>
+            </details>
+          ) : (
+            <ProposalTab key={routeRequestId || ''} context={visibleContext} requestId={routeRequestId || ''} />
+          )}
         </>
       ) : activeTab === 'integrity' ? (
         <IntegrityTab key={routeRequestId || ''} requestId={routeRequestId || ''} />
@@ -429,7 +455,7 @@ export async function getServerSideProps() {
     && classifyTarget(process.env.DYNAMICS_URL) !== 'sandbox';
   const staffReviewSummary = process.env.VERCEL_ENV !== 'production'
     && classifyTarget(process.env.DYNAMICS_URL) === 'sandbox';
-  return { props: { previewReadOnly, staffReviewSummary, meetingRosterEnabled: meetingRosterSchemaEnabled() } };
+  return { props: { previewReadOnly, staffReviewSummary, meetingRosterEnabled: meetingRosterSchemaEnabled(), initialRationaleEnabled: initialAssessmentRationaleEnabled() } };
 }
 
 export default function WorkbenchRequestGuard(props) {
