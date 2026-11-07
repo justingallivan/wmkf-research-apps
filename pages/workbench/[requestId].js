@@ -1,19 +1,9 @@
 /**
- * Request Workbench — per-request shell (tier-3).
- *
- * Renders the request context header + the tab strip. LIVE tabs: Reviewers
- * (Find, Invite Reviewers, Track Reviewers via ReviewerManagePanel; Phase 3
- * applicant-reviewer ingestion + in-panel search), Proposal (documents + AI
- * content + Field Primer, S258/S260), Reviews (read-back of submitted reviews —
- * decoded Q1/Q3/Q10 ratings + file download), and — Group A, S260 — Overview
- * (per-request command center, including read-only request status), Awardee
- * (grantee-deliverables workflow), and Initial Assessment
- * (governed DOCX producer/read model), and Staff Deliberations (S466 merge of
- * the former Pre Site Visit Writeup + Site Visit tabs: durable Word producer,
- * guarded share hand-off, logistics, materials distribution, guarded reopen —
- * old tab keys alias in), plus Final Writeup group-review handoff and Word launch. The
- * default landing is Overview. Tab + sub-tab selection is query-string driven
- * (?tab=reviewers&sub=track) for deep-links.
+ * Request Workbench shell. Sandbox J27 development uses five workflow phases,
+ * with legacy tab links resolved to their existing components. Other targets
+ * retain the existing tab layout. Existing server authorization and storage
+ * contracts are unchanged. Reviewer `sub` navigation remains independent of
+ * phase `section` navigation.
  */
 
 import { meetingRosterSchemaEnabled } from '../../lib/utils/meeting-roster-readiness';
@@ -80,13 +70,6 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
   const { preferences } = useProfile();
   const { requestId } = router.query;
 
-  const visibleTabs = useMemo(() => visibleTabsFor(hasAccess), [hasAccess]);
-  const visibleTabKeys = useMemo(() => new Set(visibleTabs.map((t) => t.key)), [visibleTabs]);
-  const rawTabParam = typeof router.query.tab === 'string' ? router.query.tab : null;
-  const tabParam = rawTabParam ? (LEGACY_TAB_ALIASES[rawTabParam] || rawTabParam) : null;
-  const activeTab = tabParam && visibleTabKeys.has(tabParam) ? tabParam : 'overview';
-  const reviewerSurfaceReadOnly = previewReadOnly && ['reviewers', 'reviews'].includes(activeTab);
-
   const [ctx, setCtx] = useState(null);
   const [ctxOwnerGeneration, setCtxOwnerGeneration] = useState(-1);
   const [error, setError] = useState(null);
@@ -96,9 +79,6 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
   const routeRequestId = typeof requestId === 'string' && requestId ? requestId : null;
   const routeKey = routeRequestId?.toLowerCase() || '';
   const [visitEditorRequestId, setVisitEditorRequestId] = useState(null);
-  useEffect(() => {
-    if (activeTab === 'staff-deliberations') setVisitEditorRequestId(routeRequestId);
-  }, [activeTab, routeRequestId]);
   const routeStateRef = useRef({ key: routeKey, generation: 0 });
   if (routeStateRef.current.key !== routeKey) {
     routeStateRef.current = {
@@ -114,6 +94,61 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
   const visibleError = error && errorRequestId?.toLowerCase() === routeRequestId?.toLowerCase()
     ? error
     : null;
+
+  // The redesigned shell follows the same sandbox boundary as the tested fields.
+  const phaseLayout = staffReviewSummary && visibleContext?.cycleCode === 'J27';
+  const phaseTabs = [
+    { key: 'overview', label: 'Overview' },
+    { key: 'initial-assessment', label: 'Initial Assessment' },
+    { key: 'peer-review', label: 'Peer Review' },
+    { key: 'deliberations', label: 'Deliberations' },
+    { key: 'final-assessment', label: 'Final Assessment' },
+  ];
+  const visibleTabs = phaseLayout ? phaseTabs : visibleTabsFor(hasAccess);
+  const visibleTabKeys = useMemo(() => new Set(visibleTabs.map((t) => t.key)), [visibleTabs]);
+  const rawTabParam = typeof router.query.tab === 'string' ? router.query.tab : null;
+  const phaseLinkPending = staffReviewSummary && !visibleContext
+    && ['initial-assessment', 'peer-review', 'deliberations', 'final-assessment'].includes(rawTabParam);
+  const tabParam = rawTabParam ? (LEGACY_TAB_ALIASES[rawTabParam] || rawTabParam) : null;
+  const legacySections = {
+    proposal: ['initial-assessment', 'proposal'],
+    integrity: ['initial-assessment', 'integrity'],
+    'initial-writeup': ['initial-assessment', 'assessment'],
+    reviewers: ['peer-review', 'panel'],
+    reviews: ['peer-review', 'reports'],
+    'review-panel': ['peer-review', 'group-review'],
+    'staff-deliberations': ['deliberations', null],
+    'final-writeup': ['final-assessment', null],
+    awardee: ['overview', 'awardee'],
+  };
+  const legacy = phaseLayout ? legacySections[tabParam] : null;
+  const phase = legacy?.[0] || (tabParam && visibleTabKeys.has(tabParam) ? tabParam : 'overview');
+  const requestedSection = legacy?.[1] || (typeof router.query.section === 'string' ? router.query.section : null);
+  const sections = !phaseLayout ? [] : phase === 'initial-assessment' ? [
+    { key: 'proposal', label: 'Proposal' },
+    ...(hasAccess('integrity-screener') === true ? [{ key: 'integrity', label: 'Integrity' }] : []),
+    { key: 'assessment', label: 'Assessment' },
+  ] : phase === 'peer-review' ? [
+    { key: 'panel', label: 'Panel' }, { key: 'reports', label: 'Reports' },
+    ...(hasAccess('review-panel') === true ? [{ key: 'group-review', label: 'Group review' }] : []),
+  ] : phase === 'overview' ? [
+    { key: 'summary', label: 'Summary' }, { key: 'awardee', label: 'Awardee' },
+  ] : [];
+  const section = sections.some((item) => item.key === requestedSection) ? requestedSection : sections[0]?.key;
+  const phaseContent = {
+    'initial-assessment': { proposal: 'proposal', integrity: 'integrity', assessment: 'initial-writeup' },
+    'peer-review': { panel: 'reviewers', reports: 'reviews', 'group-review': 'review-panel' },
+    overview: { summary: 'overview', awardee: 'awardee' },
+    deliberations: { default: 'staff-deliberations' },
+    'final-assessment': { default: 'final-writeup' },
+  };
+  const activeTab = phaseLayout ? (phaseContent[phase]?.[section || 'default'] || 'overview')
+    : (tabParam && visibleTabKeys.has(tabParam) ? tabParam : 'overview');
+  const reviewerSurfaceReadOnly = previewReadOnly && ['reviewers', 'reviews'].includes(activeTab);
+
+  useEffect(() => {
+    if (activeTab === 'staff-deliberations') setVisitEditorRequestId(routeRequestId);
+  }, [activeTab, routeRequestId]);
 
   useEffect(() => {
     const scroller = tabScrollerRef.current;
@@ -169,9 +204,16 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
     };
   }, [requestId, loadCtx]);
 
-  const selectTab = async (key) => {
+  const selectTab = async (key, nextSection) => {
+    const destination = phaseLayout ? legacySections[key] : null;
+    const destinationPhase = destination?.[0] || key;
+    const reviewerQuery = phaseLayout && phase === 'peer-review' && destinationPhase === 'peer-review'
+      ? Object.fromEntries(['sub', 'proposalFile', 'repairCandidate', 'repairSuggestion']
+        .filter((name) => typeof router.query[name] === 'string')
+        .map((name) => [name, router.query[name]]))
+      : {};
     try { await router.push(
-      { pathname: `/workbench/${requestId}`, query: { ...(requestNumber ? { n: requestNumber } : {}), tab: key } },
+      { pathname: `/workbench/${requestId}`, query: { ...reviewerQuery, ...(requestNumber ? { n: requestNumber } : {}), tab: destination?.[0] || key, ...((destination?.[1] || nextSection) ? { section: destination?.[1] || nextSection } : {}) } },
       undefined,
       { shallow: true },
     ); } catch (navigationError) { if (!navigationError?.cancelled) throw navigationError; }
@@ -222,16 +264,16 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
       )}
 
       {/* Tab strip */}
-      <div ref={tabScrollerRef} className="border-b border-gray-200 mb-6 overflow-x-auto">
+      <div hidden={phaseLinkPending} ref={tabScrollerRef} className="border-b border-gray-200 mb-6 overflow-x-auto">
         <nav className="flex gap-1 min-w-max" aria-label="Request sections">
           {visibleTabs.map((t) => (
             <button
               key={t.key}
               type="button"
               onClick={() => selectTab(t.key)}
-              aria-current={activeTab === t.key ? 'page' : undefined}
+              aria-current={(phaseLayout ? phase : activeTab) === t.key ? 'page' : undefined}
               className={`px-3 py-2 text-sm font-medium border-b-2 whitespace-nowrap ${
-                activeTab === t.key
+                (phaseLayout ? phase : activeTab) === t.key
                   ? 'border-gray-900 text-gray-900'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
@@ -241,6 +283,33 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
           ))}
         </nav>
       </div>
+
+      {sections.length > 0 && (
+        <nav className="flex flex-wrap gap-2 mb-6" aria-label={`${phaseTabs.find((item) => item.key === phase)?.label || 'Phase'} sections`}>
+          {sections.filter((item) => item.key !== 'group-review').map((item) => (
+            <button key={item.key} type="button" onClick={() => selectTab(phase, item.key)}
+              aria-current={(section === 'group-review' ? 'panel' : section) === item.key ? 'page' : undefined}
+              className={`rounded-lg px-3 py-2 text-sm font-medium ${(section === 'group-review' ? 'panel' : section) === item.key ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+              {item.label}
+            </button>
+          ))}
+        </nav>
+      )}
+
+      {phaseLayout && phase === 'peer-review' && section !== 'reports' && hasAccess('review-panel') === true && (
+        <nav className="flex gap-4 mb-6 text-sm" aria-label="Panel tools">
+          {[
+            { key: 'panel', label: 'Reviewer roster' },
+            { key: 'group-review', label: 'Group review' },
+          ].map((item) => (
+            <button key={item.key} type="button" onClick={() => selectTab('peer-review', item.key)}
+              aria-current={section === item.key ? 'page' : undefined}
+              className={`py-2 border-b-2 ${section === item.key ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500'}`}>
+              {item.label}
+            </button>
+          ))}
+        </nav>
+      )}
 
       {staffReviewSummary && visibleContext?.cycleCode === 'J27' && activeTab === 'staff-deliberations' && (
         <StaffReviewSummary key={`deliberations-review-summary:${routeRequestId}`} requestId={routeRequestId} readOnly />
@@ -253,7 +322,15 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
         </div>
       )}
 
-      {activeTab === 'overview' ? (
+      {phaseLinkPending ? (
+        <Card hover={false}>
+          <p className="text-sm text-gray-600" role="status">
+            {visibleError ? 'Request details are required to open this phase.' : 'Loading request details…'}
+          </p>
+          {visibleError && <button type="button" className="mt-3 text-sm font-medium underline"
+            onClick={() => loadCtx(routeRequestId)}>Retry</button>}
+        </Card>
+      ) : activeTab === 'overview' ? (
         <OverviewTab
           key={routeRequestId || ''}
           context={visibleContext}
