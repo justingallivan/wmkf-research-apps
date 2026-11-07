@@ -16,6 +16,7 @@
  * (?tab=reviewers&sub=track) for deep-links.
  */
 
+import StaffVisitAssessment from '../../shared/components/workbench/StaffVisitAssessment';
 import StaffReviewSummary from '../../shared/components/workbench/StaffReviewSummary';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/router';
@@ -92,6 +93,10 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
   const tabScrollerRef = useRef(null);
   const routeRequestId = typeof requestId === 'string' && requestId ? requestId : null;
   const routeKey = routeRequestId?.toLowerCase() || '';
+  const [visitEditorRequestId, setVisitEditorRequestId] = useState(null);
+  useEffect(() => {
+    if (activeTab === 'staff-deliberations') setVisitEditorRequestId(routeRequestId);
+  }, [activeTab, routeRequestId]);
   const routeStateRef = useRef({ key: routeKey, generation: 0 });
   if (routeStateRef.current.key !== routeKey) {
     routeStateRef.current = {
@@ -235,6 +240,16 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
         </nav>
       </div>
 
+      {staffReviewSummary && visibleContext?.cycleCode === 'J27' && activeTab === 'staff-deliberations' && (
+        <StaffReviewSummary key={`deliberations-review-summary:${routeRequestId}`} requestId={routeRequestId} readOnly />
+      )}
+      {staffReviewSummary && visibleContext?.cycleCode === 'J27'
+        && (activeTab === 'staff-deliberations' || visitEditorRequestId === routeRequestId) && (
+        <div hidden={activeTab !== 'staff-deliberations'}>
+          <StaffVisitAssessment key={`staff-visit-editor:${routeRequestId}`} requestId={routeRequestId} />
+        </div>
+      )}
+
       {activeTab === 'overview' ? (
         <OverviewTab
           key={routeRequestId || ''}
@@ -293,23 +308,26 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
           requestId={typeof requestId === 'string' ? requestId : ''}
         />
       ) : activeTab === 'staff-deliberations' ? (
-        <>
-          {staffReviewSummary && visibleContext?.cycleCode === 'J27' && (
-            <StaffReviewSummary key={`staff-review-summary:${routeRequestId}`} requestId={routeRequestId} readOnly />
-          )}
-          <StaffDeliberationsTab
-            key={typeof requestId === 'string' ? requestId : ''}
-            requestId={typeof requestId === 'string' ? requestId : ''}
-            requestNumber={visibleContext?.requestNumber || requestNumber || ''}
-            isSuperuser={isSuperuser}
-            onSelectTab={selectTab}
-          />
-        </>
-      ) : activeTab === 'final-writeup' ? (
-        <FinalWriteupTab
+        <StaffDeliberationsTab
           key={typeof requestId === 'string' ? requestId : ''}
           requestId={typeof requestId === 'string' ? requestId : ''}
+          requestNumber={visibleContext?.requestNumber || requestNumber || ''}
+          isSuperuser={isSuperuser}
+          onSelectTab={selectTab}
         />
+      ) : activeTab === 'final-writeup' ? (
+        <>
+          {staffReviewSummary && visibleContext?.cycleCode === 'J27' && (
+            <>
+              <StaffReviewSummary key={`staff-review-summary:${routeRequestId}`} requestId={routeRequestId} readOnly />
+              <StaffVisitAssessment key={`staff-visit-assessment:${routeRequestId}`} requestId={routeRequestId} readOnly />
+            </>
+          )}
+          <FinalWriteupTab
+            key={typeof requestId === 'string' ? requestId : ''}
+            requestId={typeof requestId === 'string' ? requestId : ''}
+          />
+        </>
       ) : activeTab === 'awardee' ? (
         <AwardeeTab
           key={typeof requestId === 'string' ? requestId : ''}

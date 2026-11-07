@@ -1,0 +1,12 @@
+{
+  "name": "akoya-request-j27-staff-visit-assessment",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "akoya_request",
+  "attributes": [{
+    "type": "Memo",
+    "schemaName": "wmkf_StaffVisitAssessment",
+    "displayName": "Staff Visit Assessment",
+    "description": "Staff-authored assessment of the presentation and discussion for the Workbench Deliberations handoff.",
+    "maxLength": 10000
+  }]
+}

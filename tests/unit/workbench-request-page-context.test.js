@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 let routeId = 'request-a';
 let tabName = 'overview';
@@ -13,7 +13,7 @@ jest.mock('next/router', () => ({
 }));
 jest.mock('next-auth/react', () => ({ useSession: () => ({ data: { user: { profileName: 'Test User', dynamicsSystemuserId: 'user-1' } } }) }));
 jest.mock('next/link', () => function LinkStub({ children }) { return <a href="#">{children}</a>; });
-jest.mock('../../shared/components/Layout', () => ({ __esModule: true, default: ({ children }) => <div>{children}</div>, Card: ({ children }) => <div>{children}</div> }));
+jest.mock('../../shared/components/Layout', () => ({ __esModule: true, default: ({ children }) => <div>{children}</div>, Card: ({ children }) => <div>{children}</div>, Button: ({ children, type, disabled, onClick }) => <button type={type} disabled={disabled} onClick={onClick}>{children}</button> }));
 jest.mock('../../shared/components/RequireAppAccess', () => function RequireAppAccessStub({ children }) { return children; });
 jest.mock('../../shared/context/AppAccessContext', () => ({ useAppAccess: () => ({ isSuperuser: false, hasAccess: () => true }) }));
 jest.mock('../../shared/context/ProfileContext', () => ({ useProfile: () => ({ preferences: {} }) }));
@@ -199,4 +199,31 @@ test('T5(e) unparseable non-2xx body (e.g. a 502 HTML page) falls back to the st
     });
   });
   await waitFor(() => expect(screen.getByText(/Failed to load request \(502\)/)).toBeInTheDocument());
+});
+
+test('Final Writeup reads the saved visit assessment while the Deliberations draft survives tab switching', async () => {
+  tabName = 'staff-deliberations';
+  const view = render(<WorkbenchRequest staffReviewSummary />);
+  const resolve = async (url, body) => {
+    await act(async () => pending.get(url)({ ok: true, json: async () => body }));
+  };
+  await resolve('/api/workbench/resolve-request?requestId=request-a', {
+    success: true, requestId: 'request-a', cycleCode: 'J27',
+  });
+  const assessmentUrl = '/api/workbench/staff-visit-assessment?requestId=request-a';
+  const record = { assessment: 'Saved assessment', version: 'W/"123"' };
+  await resolve(assessmentUrl, record);
+  fireEvent.change(screen.getByRole('textbox', { name: 'Staff assessment of the visit' }), {
+    target: { value: 'Unsaved assessment edit' },
+  });
+
+  tabName = 'final-writeup';
+  view.rerender(<WorkbenchRequest staffReviewSummary />);
+  await resolve(assessmentUrl, record);
+  expect(screen.getByText('Saved assessment')).toBeInTheDocument();
+  expect(screen.queryByRole('textbox', { name: 'Staff assessment of the visit' })).toBeNull();
+
+  tabName = 'staff-deliberations';
+  view.rerender(<WorkbenchRequest staffReviewSummary />);
+  expect(screen.getByRole('textbox', { name: 'Staff assessment of the visit' })).toHaveValue('Unsaved assessment edit');
 });
