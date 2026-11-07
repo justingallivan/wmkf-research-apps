@@ -23,6 +23,7 @@
  * Dataverse answer snapshots; the browser only requests and downloads it.
  */
 
+import StaffReviewSummary from './StaffReviewSummary';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { requestEnvelope } from '../../utils/api-request';
 import { Card } from '../Layout';
@@ -814,7 +815,7 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry, updating =
   );
 }
 
-export default function ReviewsTab({ requestId, previewReadOnly = false }) {
+export default function ReviewsTab({ requestId, previewReadOnly = false, showStaffReviewSummary = false }) {
   // Phase 2: the live admin-panel question set (or null on fetch failure —
   // fail-soft per the route; the matrix derivation falls back to
   // snapshot-order-only and marks nothing retired in that case).
@@ -944,9 +945,14 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
     </div>
   ) : null;
 
+  const staffSummary = showStaffReviewSummary && activeProposal && (
+    <StaffReviewSummary key={requestId} requestId={requestId} reviewers={submitted}
+      evidenceHash={activeProposal.staffReviewEvidenceHash} refreshReports={load} />
+  );
   if (submitted.length === 0 && outstanding.length === 0) {
     return (
       <div className="space-y-4">
+        {staffSummary}
         {refreshNotice}
         {updating && <p className="text-sm text-gray-500" role="status">Updating reviews…</p>}
         <Card hover={false}>
@@ -973,6 +979,7 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
 
   return (
     <div className="space-y-4">
+      {staffSummary}
       {refreshNotice}
       {updating && <p className="text-sm text-gray-500" role="status">Updating reviews…</p>}
       {outstanding.length > 0 && (

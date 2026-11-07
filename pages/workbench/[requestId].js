@@ -16,6 +16,7 @@
  * (?tab=reviewers&sub=track) for deep-links.
  */
 
+import StaffReviewSummary from '../../shared/components/workbench/StaffReviewSummary';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
@@ -69,7 +70,7 @@ const LEGACY_TAB_ALIASES = {
   'site-visit': 'staff-deliberations',
 };
 
-export function WorkbenchRequest({ previewReadOnly = false }) {
+export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary = false }) {
   const router = useRouter();
   const { data: session } = useSession();
   const { isSuperuser, hasAccess } = useAppAccess();
@@ -284,6 +285,7 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
           key={typeof requestId === 'string' ? requestId : ''}
           requestId={typeof requestId === 'string' ? requestId : ''}
           previewReadOnly={reviewerSurfaceReadOnly}
+          showStaffReviewSummary={staffReviewSummary && visibleContext?.cycleCode === 'J27'}
         />
       ) : activeTab === 'review-panel' ? (
         <ReviewPanelTab
@@ -291,13 +293,18 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
           requestId={typeof requestId === 'string' ? requestId : ''}
         />
       ) : activeTab === 'staff-deliberations' ? (
-        <StaffDeliberationsTab
-          key={typeof requestId === 'string' ? requestId : ''}
-          requestId={typeof requestId === 'string' ? requestId : ''}
-          requestNumber={visibleContext?.requestNumber || requestNumber || ''}
-          isSuperuser={isSuperuser}
-          onSelectTab={selectTab}
-        />
+        <>
+          {staffReviewSummary && visibleContext?.cycleCode === 'J27' && (
+            <StaffReviewSummary key={`staff-review-summary:${routeRequestId}`} requestId={routeRequestId} readOnly />
+          )}
+          <StaffDeliberationsTab
+            key={typeof requestId === 'string' ? requestId : ''}
+            requestId={typeof requestId === 'string' ? requestId : ''}
+            requestNumber={visibleContext?.requestNumber || requestNumber || ''}
+            isSuperuser={isSuperuser}
+            onSelectTab={selectTab}
+          />
+        </>
       ) : activeTab === 'final-writeup' ? (
         <FinalWriteupTab
           key={typeof requestId === 'string' ? requestId : ''}
@@ -321,7 +328,9 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
 export async function getServerSideProps() {
   const previewReadOnly = process.env.VERCEL_ENV === 'preview'
     && classifyTarget(process.env.DYNAMICS_URL) !== 'sandbox';
-  return { props: { previewReadOnly } };
+  const staffReviewSummary = process.env.VERCEL_ENV !== 'production'
+    && classifyTarget(process.env.DYNAMICS_URL) === 'sandbox';
+  return { props: { previewReadOnly, staffReviewSummary } };
 }
 
 export default function WorkbenchRequestGuard(props) {
