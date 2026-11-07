@@ -16,6 +16,8 @@
  * (?tab=reviewers&sub=track) for deep-links.
  */
 
+import { meetingRosterSchemaEnabled } from '../../lib/utils/meeting-roster-readiness';
+import MeetingRoster from '../../shared/components/workbench/MeetingRoster';
 import StaffVisitAssessment from '../../shared/components/workbench/StaffVisitAssessment';
 import StaffReviewSummary from '../../shared/components/workbench/StaffReviewSummary';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -71,7 +73,7 @@ const LEGACY_TAB_ALIASES = {
   'site-visit': 'staff-deliberations',
 };
 
-export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary = false }) {
+export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary = false, meetingRosterEnabled = false }) {
   const router = useRouter();
   const { data: session } = useSession();
   const { isSuperuser, hasAccess } = useAppAccess();
@@ -246,6 +248,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
       {staffReviewSummary && visibleContext?.cycleCode === 'J27'
         && (activeTab === 'staff-deliberations' || visitEditorRequestId === routeRequestId) && (
         <div hidden={activeTab !== 'staff-deliberations'}>
+          {meetingRosterEnabled && <MeetingRoster key={`meeting-roster-editor:${routeRequestId}`} requestId={routeRequestId} />}
           <StaffVisitAssessment key={`staff-visit-editor:${routeRequestId}`} requestId={routeRequestId} />
         </div>
       )}
@@ -320,6 +323,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
           {staffReviewSummary && visibleContext?.cycleCode === 'J27' && (
             <>
               <StaffReviewSummary key={`staff-review-summary:${routeRequestId}`} requestId={routeRequestId} readOnly />
+              {meetingRosterEnabled && <MeetingRoster key={`meeting-roster-reader:${routeRequestId}`} requestId={routeRequestId} readOnly />}
               <StaffVisitAssessment key={`staff-visit-assessment:${routeRequestId}`} requestId={routeRequestId} readOnly />
             </>
           )}
@@ -348,7 +352,7 @@ export async function getServerSideProps() {
     && classifyTarget(process.env.DYNAMICS_URL) !== 'sandbox';
   const staffReviewSummary = process.env.VERCEL_ENV !== 'production'
     && classifyTarget(process.env.DYNAMICS_URL) === 'sandbox';
-  return { props: { previewReadOnly, staffReviewSummary } };
+  return { props: { previewReadOnly, staffReviewSummary, meetingRosterEnabled: meetingRosterSchemaEnabled() } };
 }
 
 export default function WorkbenchRequestGuard(props) {
