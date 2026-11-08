@@ -28,7 +28,7 @@ describe('fetchReviewerRollup (characterization)', () => {
   test('golden path: aggregates counts per request from the queried rows', async () => {
     const spy = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
       records: [
-        { _wmkf_request_value: REQUEST_A, wmkf_selected: true, wmkf_invited: true, wmkf_accepted: true, wmkf_declined: false, wmkf_emailsentat: '2026-01-01', wmkf_responsetype: RESPONSE_TYPE_MAP.accepted, wmkf_reviewstatus: 100000004 },
+        { _wmkf_request_value: REQUEST_A, wmkf_selected: true, wmkf_invited: true, wmkf_accepted: true, wmkf_declined: false, wmkf_emailsentat: '2026-01-01', wmkf_responsetype: RESPONSE_TYPE_MAP.accepted, wmkf_reviewstatus: 100000003, wmkf_reviewreceivedat: '2026-01-02' },
         { _wmkf_request_value: REQUEST_A, wmkf_selected: false, wmkf_invited: true, wmkf_accepted: false, wmkf_declined: true, wmkf_emailsentat: '2026-01-01', wmkf_responsetype: RESPONSE_TYPE_MAP.declined, wmkf_reviewstatus: null },
         { _wmkf_request_value: REQUEST_B, wmkf_selected: true, wmkf_invited: false, wmkf_accepted: false, wmkf_declined: false, wmkf_emailsentat: null, wmkf_responsetype: null, wmkf_reviewstatus: null },
       ],
@@ -42,7 +42,8 @@ describe('fetchReviewerRollup (characterization)', () => {
       accepted: 1,
       declined: 1,
       held: 0,
-      completed: 1,
+      received: 1,
+      completed: 0,
       progress: {
         total: 2, accepted: 1, pending: 0, released: 0, declined: 1, uninvited: 0,
       },
@@ -60,7 +61,7 @@ describe('fetchReviewerRollup (characterization)', () => {
     expect(spy).toHaveBeenCalledTimes(1);
     const [entitySet, opts] = spy.mock.calls[0];
     expect(entitySet).toBe('wmkf_appreviewersuggestions');
-    expect(opts.select).toBe('_wmkf_request_value,wmkf_selected,wmkf_invited,wmkf_accepted,wmkf_declined,wmkf_emailsentat,wmkf_responsetype,wmkf_reviewstatus');
+    expect(opts.select).toBe('_wmkf_request_value,wmkf_selected,wmkf_invited,wmkf_accepted,wmkf_declined,wmkf_emailsentat,wmkf_responsetype,wmkf_reviewstatus,wmkf_reviewreceivedat');
     expect(opts.filter).toContain(`_wmkf_request_value eq ${REQUEST_A}`);
     expect(opts.filter).toContain(`_wmkf_request_value eq ${REQUEST_B}`);
     expect(opts.filter).toContain('(wmkf_selected eq true or wmkf_declined eq true or wmkf_responsetype eq 100000001)');

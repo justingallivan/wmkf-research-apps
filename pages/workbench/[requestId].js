@@ -360,6 +360,9 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
           context={visibleContext}
           requestId={routeRequestId || ''}
           onSelectTab={selectTab}
+          j27Handoffs={phaseLayout}
+          initialRationaleEnabled={initialRationaleEnabled}
+          meetingRosterEnabled={meetingRosterEnabled}
         />
       ) : activeTab === 'reviewers' ? (
         <ReviewersTab
