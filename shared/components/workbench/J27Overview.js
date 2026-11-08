@@ -52,6 +52,18 @@ function nextAction(context, handoff, progress, semiFinalistEnabled) {
       : 'Check the reviewer roster and progress in Peer Review.' };
 }
 
+function initialAssessmentDecision(context) {
+  switch (context.phaseIStatus) {
+    case FIRST_CUT_STATUS.yes: return 'First Cut · Scored';
+    case FIRST_CUT_STATUS.no: return 'First Cut · Not Scored';
+    case SEMI_FINALIST_STATUS.yes: return 'Semi-finalist · Yes';
+    case SEMI_FINALIST_STATUS.no: return 'Semi-finalist · No';
+    default:
+      if (isFirstCutEditable(context.phaseIStatus)) return 'No decision recorded';
+      return context.phaseIStatusLabel ? `Phase I status · ${context.phaseIStatusLabel}` : 'Couldn’t check the decision';
+  }
+}
+
 function savedLabel(value) {
   if (value === undefined) return 'Unavailable in this setup';
   if (value === null) return 'Couldn’t check';
@@ -113,8 +125,14 @@ export default function J27Overview({ context, requestId, reviewerProgress,
           Open Reports
         </button>
       )}
-      {(showPeerReview || showDeliberations) && (
-        <dl aria-label="Saved staff work" className="mt-4 grid gap-4 border-t border-gray-200 pt-4 text-sm sm:grid-cols-2">
+      {handoff && (
+        <dl aria-label="Saved staff work"
+          className={`mt-4 grid gap-4 border-t border-gray-200 pt-4 text-sm sm:grid-cols-2 ${showPeerReview && showDeliberations ? 'lg:grid-cols-3' : ''}`}>
+          <div>
+            <dt className="font-semibold">Initial Assessment</dt>
+            <dd className="text-gray-600">{initialAssessmentDecision(context)}</dd>
+            {initialRationaleEnabled && <dd className="text-gray-600">Staff rationale · {savedLabel(handoff.rationale)}</dd>}
+          </div>
           {showPeerReview && (
             <div>
               <dt className="font-semibold">Peer Review</dt>

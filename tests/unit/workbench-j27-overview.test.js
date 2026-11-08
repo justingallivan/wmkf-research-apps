@@ -2,7 +2,7 @@
 
 import { fireEvent, render, screen } from '@testing-library/react';
 import OverviewTab from '../../shared/components/workbench/OverviewTab';
-import { FIRST_CUT_STATUS } from '../../shared/config/j27FirstCut';
+import { FIRST_CUT_STATUS, SEMI_FINALIST_STATUS } from '../../shared/config/j27FirstCut';
 
 const context = {
   requestId: 'request-a', requestStatus: 'Phase I Pending', statusClass: 'IN_FLIGHT',
@@ -93,4 +93,18 @@ test('a failed read stays unknown once that stage has relevant evidence', async 
   expect(await screen.findByText('Visit assessment · Couldn’t check')).toBeVisible();
   expect(screen.getByText('Staff review summary · Couldn’t check')).toBeVisible();
   expect(screen.getByText(/staff assessment in Deliberations/)).toBeVisible();
+});
+
+
+test.each([
+  [null, 'No decision recorded', '', 'No saved text'],
+  [FIRST_CUT_STATUS.yes, 'First Cut · Scored', 'Saved rationale', 'Saved'],
+  [SEMI_FINALIST_STATUS.yes, 'Semi-finalist · Yes', 'Saved rationale', 'Saved'],
+])('keeps the Initial Assessment checkpoint after peer review (%s)', async (phaseIStatus, decision, rationale, rationaleStatus) => {
+  renderOverview({ status: { phaseIStatus }, reads: { 'initial-assessment-rationale': { rationale } } });
+  expect(await screen.findByRole('heading', { name: 'Staff review summary saved' })).toBeVisible();
+  const checkpoint = screen.getByText('Initial Assessment', { exact: true }).closest('div');
+  expect(checkpoint).toHaveTextContent(decision);
+  expect(checkpoint).toHaveTextContent(`Staff rationale · ${rationaleStatus}`);
+  if (phaseIStatus === SEMI_FINALIST_STATUS.yes) expect(checkpoint).not.toHaveTextContent('First Cut');
 });
