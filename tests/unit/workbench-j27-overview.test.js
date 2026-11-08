@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import OverviewTab from '../../shared/components/workbench/OverviewTab';
 import { FIRST_CUT_STATUS } from '../../shared/config/j27FirstCut';
 
@@ -16,7 +16,7 @@ const base = {
   'meeting-roster': { presentation: null },
 };
 
-function renderOverview({ reads = {}, status = {} } = {}) {
+function renderOverview({ reads = {}, status = {}, onSelectTab } = {}) {
   global.fetch = jest.fn(async (url, options) => {
     const endpoint = String(url).split('?')[0].split('/').at(-1);
     if (options?.method && options.method !== 'GET') throw new Error('Overview must be read-only');
@@ -24,7 +24,7 @@ function renderOverview({ reads = {}, status = {} } = {}) {
     return { ok: body != null, json: async () => body };
   });
   render(<OverviewTab context={{ ...context, ...status }} requestId={context.requestId}
-    j27Handoffs initialRationaleEnabled meetingRosterEnabled />);
+    j27Handoffs initialRationaleEnabled meetingRosterEnabled onSelectTab={onSelectTab} />);
 }
 
 test('intake shows one instruction and keeps later-stage empty states out of the summary', async () => {
@@ -51,7 +51,7 @@ test('a saved visit points to the Board recommendation and preserves handoff evi
     'meeting-roster': { presentation: { id: 'visit' }, stale: false, roster: {} },
   } });
   expect(await screen.findByRole('heading', { name: 'Visit assessment saved' })).toBeVisible();
-  expect(screen.getByText(/in Final Assessment to prepare the Board recommendation/)).toBeVisible();
+  expect(screen.getByText(/Final Assessment shows the Board draft status/)).toBeVisible();
   expect(screen.getByText('Recorded request status').closest('dl')).toHaveTextContent('Phase I Pending');
   expect(screen.getByText('1 report received')).toBeVisible();
   expect(screen.getByText('Attendance · Confirmed')).toBeVisible();
@@ -59,10 +59,12 @@ test('a saved visit points to the Board recommendation and preserves handoff evi
   expect(global.fetch.mock.calls.filter(([url]) => url.includes('reviewer-rollup'))).toHaveLength(1);
 });
 
-test('saved review prose without a presentation points staff to Peer Review', async () => {
-  renderOverview();
+test('saved review prose without a presentation opens Reports directly', async () => {
+  const onSelectTab = jest.fn();
+  renderOverview({ onSelectTab });
   expect(await screen.findByRole('heading', { name: 'Staff review summary saved' })).toBeVisible();
-  expect(screen.getByText(/summary and reports in Peer Review/)).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Open Reports' }));
+  expect(onSelectTab).toHaveBeenCalledWith('reviews');
   expect(screen.queryByText(/Visit assessment ·/)).toBeNull();
 });
 

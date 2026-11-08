@@ -28,8 +28,8 @@ jest.mock('../../shared/components/workbench/StatusTab', () => function Stub() {
 jest.mock('../../shared/components/workbench/AwardeeTab', () => function Stub() { return <div />; });
 jest.mock('../../shared/components/workbench/InitialAssessmentRationale', () => function Stub() { return <div />; });
 jest.mock('../../shared/components/workbench/InitialAssessmentTab', () => function Stub() { return <div />; });
-jest.mock('../../shared/components/workbench/StaffDeliberationsTab', () => function Stub() {
-  return <h2>Presentation and staff discussion</h2>;
+jest.mock('../../shared/components/workbench/StaffDeliberationsTab', () => function Stub({ presentationContext }) {
+  return <><h2>Presentation and staff discussion</h2>{presentationContext}</>;
 });
 jest.mock('../../shared/components/workbench/FinalWriteupTab', () => function Stub() {
   return <h2>Board recommendation</h2>;
@@ -41,8 +41,9 @@ jest.mock('../../shared/components/workbench/StaffVisitAssessment', () => functi
 jest.mock('../../shared/components/workbench/MeetingRoster', () => function Stub() {
   return <h3>Meeting roster</h3>;
 });
-jest.mock('../../shared/components/workbench/StaffReviewSummary', () => function Stub({ inline }) {
-  return inline ? <h3>Staff review summary</h3> : <details><summary>Staff review summary</summary></details>;
+jest.mock('../../shared/components/workbench/StaffReviewSummary', () => function Stub({ onOpenReports }) {
+  if (onOpenReports) return <h3>Staff interpretation from Reports</h3>;
+  return <h3>Staff review summary</h3>;
 });
 jest.mock('../../shared/components/reviewers/ReviewersTab', () => function ReviewerStub() { return <div data-testid="reviewer-roster" />; });
 jest.mock('../../shared/components/workbench/OverviewTab', () => function OverviewStub() { return <div data-testid="overview-tab" />; });
@@ -275,10 +276,10 @@ test('J27 Deliberations leads with the presentation and keeps staff inputs below
   const presentation = screen.getByRole('heading', { name: 'Presentation and staff discussion' });
   const roster = screen.getByRole('heading', { name: 'Meeting roster' });
   const visit = screen.getByRole('heading', { name: 'Staff assessment of the visit' });
-  const reviewSummary = screen.getByText('Staff review summary');
-  expect(presentation.compareDocumentPosition(roster)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  const interpretation = screen.getByRole('heading', { name: 'Staff interpretation from Reports' });
+  expect(presentation.compareDocumentPosition(interpretation)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  expect(interpretation.compareDocumentPosition(roster)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   expect(roster.compareDocumentPosition(visit)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-  expect(visit.compareDocumentPosition(reviewSummary)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 });
 
 test('J27 Final Assessment leads with the Board recommendation and groups the three saved records', async () => {

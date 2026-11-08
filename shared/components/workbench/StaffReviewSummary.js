@@ -3,7 +3,7 @@ import { Button, Card } from '../Layout';
 import { requestJson } from '../../utils/api-request';
 import { composeReviewerFacts } from '../../utils/review-writeup-paragraphs';
 
-export default function StaffReviewSummary({ requestId, evidenceHash, reviewers = [], refreshReports, readOnly = false, inline = false }) {
+export default function StaffReviewSummary({ requestId, evidenceHash, reviewers = [], refreshReports, readOnly = false, onOpenReports = null }) {
   const [record, setRecord] = useState(null);
   const [draft, setDraft] = useState('');
   const [error, setError] = useState('');
@@ -75,6 +75,30 @@ export default function StaffReviewSummary({ requestId, evidenceHash, reviewers 
     <p className="mt-2 text-sm text-amber-800">Review evidence changed since the summary was saved.</p>
   );
 
+  if (readOnly && onOpenReports) {
+    return (
+      <section aria-label="Staff interpretation from Reports" className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+          <h3 className="text-base font-semibold text-gray-900">Staff interpretation from Reports</h3>
+          <button type="button" onClick={onOpenReports}
+            className="rounded-md text-sm font-semibold text-blue-800 underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-blue-600">
+            Open Reports
+          </button>
+        </div>
+        <p className="mt-2 max-w-prose whitespace-pre-wrap text-sm text-gray-700">
+          {error || (record ? record.summary || 'No staff interpretation saved.' : 'Loading staff interpretation…')}
+        </p>
+        {evidenceNotice}
+        {record && (
+          <details className="mt-3 text-sm">
+            <summary className="cursor-pointer font-medium text-gray-700">Reviewer facts</summary>
+            <p className="mt-1 max-w-prose text-gray-700">{record.reviewerFacts ?? 'Reviewer facts could not be loaded.'}</p>
+          </details>
+        )}
+      </section>
+    );
+  }
+
   if (readOnly) {
     const content = error ? <p role="alert" className="mt-2 text-sm text-red-700">{error}</p> : record ? (
       <dl className="mt-3 space-y-3 text-sm">
@@ -89,22 +113,17 @@ export default function StaffReviewSummary({ requestId, evidenceHash, reviewers 
         </div>
       </dl>
     ) : <p className="mt-2 text-sm" role="status">Loading staff summary…</p>;
-    return inline ? (
+    return (
       <section className="py-3">
         <h3 className="text-sm font-semibold text-gray-900">Staff review summary</h3>
         {content}
       </section>
-    ) : (
-      <details className="mb-4 rounded-lg border bg-white p-4">
-        <summary className="cursor-pointer font-semibold">Staff review summary</summary>
-        {content}
-      </details>
     );
   }
 
   return (
     <Card hover={false}>
-      <h2 className="font-semibold">Staff review summary</h2>
+      <h2 id="staff-review-summary-heading" tabIndex={-1} className="scroll-mt-4 font-semibold">Staff review summary</h2>
       <p className="mt-2 text-sm font-medium">Reviewer facts</p>
       <p className="text-sm">{composeReviewerFacts(reviewers)}</p>
       {evidenceNotice}

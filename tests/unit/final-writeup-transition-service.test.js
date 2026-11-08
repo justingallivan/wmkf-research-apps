@@ -438,6 +438,7 @@ test.each([true, false])('status projects the exact pending Final from populated
     available: true,
     phase: hasGenerating ? 'starting' : 'ready',
     canStart: true,
+    presentationSchedule: 'ended',
     startBlockedReason: null,
     canAdvance: false,
     sourceArtifactId: SOURCE_ID,
@@ -776,7 +777,7 @@ test('GET readiness and POST both block group review before the scheduled end', 
   const status = await getFinalWriteupStatus({
     requestId: REQUEST_ID, actingUserSystemId: LEAD_PD_ID,
   }, h.dependencies);
-  expect(status).toMatchObject({ canStart: false, startBlockedReason: 'final_writeup_site_visit_not_ended' });
+  expect(status).toMatchObject({ canStart: false, startBlockedReason: 'final_writeup_site_visit_not_ended', presentationSchedule: 'upcoming' });
   await expect(startFinalWriteup({
     requestId: REQUEST_ID, expectedArtifactId: SOURCE_ID, actingUserSystemId: LEAD_PD_ID,
   }, h.dependencies)).rejects.toMatchObject({ code: 'final_writeup_site_visit_not_ended' });

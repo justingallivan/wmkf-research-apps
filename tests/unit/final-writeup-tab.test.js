@@ -760,3 +760,19 @@ test('J27 retains Board draft tools when group review setup is inactive', async 
   expect(await screen.findByText('Draft preparation available')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Ready for group review' })).toBeNull();
 });
+
+test('J27 distinguishes the draft link from an unverified schedule and a blocked group review', async () => {
+  global.fetch.mockResolvedValueOnce(response({
+    ...readyStatus(false),
+    presentationSchedule: 'unverified',
+    startBlockedReason: 'final_writeup_site_visit_not_ended',
+    sourceFile: { name: 'Board draft.docx', webUrl: 'https://sharepoint.test/draft.docx' },
+  }));
+  render(<FinalWriteupTab requestId={REQUEST_ID} renderBoardDraft={() => null} />);
+  expect(await screen.findByRole('link', { name: 'Open draft in Word' })).toBeVisible();
+  expect(screen.getByText('Board draft.docx')).toBeVisible();
+  expect(screen.getByText(/The presentation end could not be verified/)).toBeVisible();
+  expect(screen.getByRole('link', { name: 'Open meeting record' })).toHaveAttribute('href', `/meeting-tracker/visits/${REQUEST_ID}`);
+  expect(screen.getByText('Waiting for a verified presentation end.')).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'Ready for group review' })).toBeNull();
+});

@@ -234,3 +234,23 @@ test('an unparseable send failure is visible', async () => {
   await sendFromPreview();
   expect(await screen.findByText(/Could not send the reminder/i)).toBeInTheDocument();
 });
+
+test('J27 Reports remembers Compare across mounts and returns focus to the summary', async () => {
+  const proposal = { ...PROPOSAL, reviewers: [{
+    ...PROPOSAL.reviewers[0], reviewReceivedAt: '2026-08-02T00:00:00Z',
+  }] };
+  global.fetch = jest.fn(async (url) => String(url).includes('/staff-review-summary')
+    ? { ok: true, status: 200, json: async () => ({ summary: '', version: 'version-1' }) }
+    : reviewersOk(proposal));
+  sessionStorage.removeItem(`workbench:reports-view:${REQUEST_ID}`);
+  const first = render(<ReviewsTab requestId={REQUEST_ID} showStaffReviewSummary />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Compare' }));
+  expect(screen.getByRole('button', { name: 'Compare' })).toHaveAttribute('aria-pressed', 'true');
+  fireEvent.click(screen.getByRole('button', { name: 'Back to staff summary' }));
+  expect(screen.getByRole('heading', { name: 'Staff review summary' })).toHaveFocus();
+  first.unmount();
+
+  render(<ReviewsTab requestId={REQUEST_ID} showStaffReviewSummary />);
+  expect(await screen.findByRole('button', { name: 'Compare' })).toHaveAttribute('aria-pressed', 'true');
+  sessionStorage.removeItem(`workbench:reports-view:${REQUEST_ID}`);
+});

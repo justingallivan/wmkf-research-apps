@@ -31,6 +31,14 @@ function transitionErrorMessage(error, boardDraftAvailable = false) {
     : error?.message;
 }
 // Phases with a current Final row: review tracking loads and the review panel renders.
+const PRESENTATION_SCHEDULE_LABEL = {
+  missing: 'No presentation is scheduled.',
+  upcoming: 'The scheduled presentation has yet to end.',
+  ended: 'The presentation end is verified.',
+  unverified: 'The presentation end could not be verified.',
+  not_checked: 'Timing is checked for staff who can start group review.',
+};
+
 const IN_REVIEW_PHASES = new Set(['group-review', 'leadership-review']);
 const STAGE_PRESENTATION = Object.freeze({
   'group-review': {
@@ -546,6 +554,10 @@ export default function FinalWriteupTab({ requestId, renderBoardDraft = null }) 
     ? acknowledgement.signOffRoster
     : null;
   const notSignedOff = programDirectorsNotSignedOff(signOffRoster);
+  const draftVisible = status?.sourceFileHidden !== true && Boolean(status?.sourceFile?.webUrl);
+  const presentationSchedule = status?.presentationSchedule
+    || (status?.startBlockedReason ? 'unverified' : 'not_checked');
+  const showScheduleLink = presentationSchedule === 'missing' || presentationSchedule === 'unverified';
 
   return (
     <div className="space-y-4">
@@ -719,26 +731,58 @@ export default function FinalWriteupTab({ requestId, renderBoardDraft = null }) 
           <div className="mt-6 flex flex-col gap-5 rounded-xl border border-gray-200 bg-gray-50 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="max-w-2xl">
               <h3 className="text-lg font-semibold text-gray-900">{status.startBlockedReason ? 'Group review is not available yet' : 'Group review has not started'}</h3>
-              <p className="mt-1 text-sm leading-6 text-gray-600">
-                Mark the writeup ready for group review when colleagues should see it. This records the current Word version.
-                {status.handoffEmailEnabled === true
-                  ? ' The other Program Directors for this grant program get an email from the lead Program Director with a link.'
-                  : ' No email is sent.'}
-              </p>
-              {status.sourceFile?.name && (
-                <p className="mt-2 text-xs text-gray-500">{status.sourceFile.name}</p>
-              )}
-              {status.startCompatibilityReason === 'legacy_review_schedule_unverified' && (
-                <p className="mt-3 text-sm text-amber-800">This uses the existing completed writeup. Presentation timing has not been verified.</p>
-              )}
-              {!status.canStart && (
-                <p className="mt-3 text-sm font-medium text-amber-800">
-                  {status.startBlockedReason === 'final_writeup_site_visit_not_ended'
-                    ? 'Group review becomes available after the scheduled presentation ends.'
-                    : status.startBlockedReason
-                      ? 'The presentation schedule could not be verified. Check Staff Deliberations before starting group review.'
-                      : 'Only the lead Program Director or a superuser can start this stage.'}
+              {(!boardDraftAvailable || status.canStart) && (
+                <p className="mt-1 text-sm leading-6 text-gray-600">
+                  Mark the writeup ready for group review when colleagues should see it. This records the current Word version.
+                  {status.handoffEmailEnabled === true
+                    ? ' The other Program Directors for this grant program get an email from the lead Program Director with a link.'
+                    : ' No email is sent.'}
                 </p>
+              )}
+              {boardDraftAvailable ? (
+                <dl className="mt-4 grid gap-3 text-sm">
+                  <div>
+                    <dt className="font-semibold text-gray-900">Word draft</dt>
+                    <dd className="text-gray-700">{draftVisible
+                      ? (status.sourceFile.name || 'Available to open.')
+                      : status.sourceFileHidden ? 'The draft is unavailable to you.' : 'No Word link is available.'}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-semibold text-gray-900">Presentation schedule</dt>
+                    <dd className="text-gray-700">
+                      {PRESENTATION_SCHEDULE_LABEL[presentationSchedule] || PRESENTATION_SCHEDULE_LABEL.not_checked}
+                      {showScheduleLink && (
+                        <> <a className="font-medium text-blue-800 underline underline-offset-2"
+                          href={`/meeting-tracker/visits/${encodeURIComponent(requestId)}`}>Open meeting record</a></>
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="font-semibold text-gray-900">Group review</dt>
+                    <dd className="text-gray-700">{status.canStart ? 'Ready to start when the draft is complete.'
+                      : presentationSchedule === 'upcoming' ? 'Waiting for the presentation to end.'
+                        : status.startBlockedReason ? 'Waiting for a verified presentation end.'
+                          : 'The lead Program Director or a superuser can start group review.'}</dd>
+                  </div>
+                </dl>
+              ) : (
+                <>
+                  {status.sourceFile?.name && (
+                    <p className="mt-2 text-xs text-gray-500">{status.sourceFile.name}</p>
+                  )}
+                  {status.startCompatibilityReason === 'legacy_review_schedule_unverified' && (
+                    <p className="mt-3 text-sm text-amber-800">This uses the existing completed writeup. Presentation timing has not been verified.</p>
+                  )}
+                  {!status.canStart && (
+                    <p className="mt-3 text-sm font-medium text-amber-800">
+                      {status.startBlockedReason === 'final_writeup_site_visit_not_ended'
+                        ? 'Group review becomes available after the scheduled presentation ends.'
+                        : status.startBlockedReason
+                          ? 'The presentation schedule could not be verified. Check Staff Deliberations before starting group review.'
+                          : 'Only the lead Program Director or a superuser can start this stage.'}
+                    </p>
+                  )}
+                </>
               )}
             </div>
             {(status.canStart || (status.sourceFileHidden !== true && status.sourceFile?.webUrl)) && (

@@ -238,6 +238,7 @@ export default function StaffDeliberationsTab({
   isSuperuser = false,
   onSelectTab = null,
   mode = 'legacy',
+  presentationContext = null,
   boardDraftAlreadyLinked = false,
   watchForReadyDraft = false,
   onDraftChange = null,
@@ -1397,7 +1398,7 @@ export default function StaffDeliberationsTab({
       : correctionDraft ? 'Corrections in progress'
         : generating || pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING ? 'Preparing…'
           : (readyFile || writeupHidden) && preSiteDraftReady ? `Draft ready${draftWarnings.length ? ` · ${draftWarnings.length} ${draftWarnings.length === 1 ? 'thing' : 'things'} to check` : ''}`
-            : due ? 'Not prepared yet' : 'Optional before the presentation';
+            : due ? 'Not prepared yet' : boardDraftOnly ? null : 'Optional before the presentation';
   // Post-visit drafting hands off to group review from step 4 (owner 2026-10-06).
   const handOffOpen = !boardDraftOnly && preSiteShared && milestoneComplete && !preSiteFinal && !correctionDraft && finalReview?.phase === 'ready';
   const canHandOff = handOffOpen && finalReview.canStart === true
@@ -1614,6 +1615,7 @@ export default function StaffDeliberationsTab({
         <Card hover={false} padding="p-0">
           <ol>{presentationStep}</ol>
         </Card>
+        {presentationContext}
         {meetingDetails}
         {materialsCard}
       </section>
@@ -1626,7 +1628,7 @@ export default function StaffDeliberationsTab({
       number={boardDraftOnly ? null : 1}
       title={boardDraftOnly ? 'Board recommendation draft' : 'Draft writeup'}
       status={boardDraftOnly ? 'current' : writeupStatus}
-      summary={<p className={summaryClass}>{writeupSummary}</p>}
+      summary={writeupSummary && <p className={summaryClass}>{writeupSummary}</p>}
       details={readyFile ? (
         <div className="mt-2 text-sm text-gray-700">
           <p className="text-gray-600">{boardDraftOnly
@@ -1700,7 +1702,14 @@ export default function StaffDeliberationsTab({
       )}
     >
       {boardDraftOnly && !checkingStatus && !due && !artifact && !error && (
-        <p className="mt-2 text-sm text-gray-600">Prepare the Board draft after the scheduled presentation ends.</p>
+        <p className="mt-2 text-sm text-gray-600">
+          {timing?.availability === 'missing' ? 'No presentation is scheduled.'
+            : timing?.availability === 'available' ? 'Prepare the Board draft after the scheduled presentation ends.'
+              : 'The presentation end could not be verified.'}
+          {timing?.availability !== 'available' && (
+            <> <Link href={`/meeting-tracker/visits/${encodeURIComponent(requestId)}`} className="font-medium text-blue-800 underline">Open meeting record</Link></>
+          )}
+        </p>
       )}
       {error && (
         <p className="mt-2 text-sm text-red-800" role="alert">{error}</p>

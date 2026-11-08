@@ -21,7 +21,7 @@ function nextAction(context, handoff, progress, semiFinalistEnabled) {
   }
   if (handoff.visit) {
     return { heading: 'Visit assessment saved',
-      detail: 'Use the visit assessment, review summary, and attendance in Final Assessment to prepare the Board recommendation.' };
+      detail: 'Final Assessment shows the Board draft status and whether group review can start.' };
   }
   if (handoff.presentation) {
     return { heading: 'Presentation record available',
@@ -29,11 +29,11 @@ function nextAction(context, handoff, progress, semiFinalistEnabled) {
   }
   if (handoff.review) {
     return { heading: 'Staff review summary saved',
-      detail: 'Review the summary and reports in Peer Review to decide what follows.' };
+      detail: 'Use the reports and saved interpretation to decide what follows.', reports: true };
   }
   if (progress?.counts?.received > 0) {
     return { heading: 'Reviewer reports received',
-      detail: 'Read the reports and record the staff interpretation in Peer Review.' };
+      detail: 'Read the reports and record the staff interpretation.', reports: true };
   }
   if (context.phaseIStatus === SEMI_FINALIST_STATUS.yes) {
     return { heading: 'Semi-finalist recommendation recorded as Yes',
@@ -59,7 +59,7 @@ function savedLabel(value) {
 }
 
 export default function J27Overview({ context, requestId, reviewerProgress,
-  initialRationaleEnabled, semiFinalistEnabled, meetingRosterEnabled }) {
+  initialRationaleEnabled, semiFinalistEnabled, meetingRosterEnabled, onOpenReports }) {
   const [loaded, setLoaded] = useState(null);
   useEffect(() => {
     const controller = new AbortController();
@@ -107,6 +107,12 @@ export default function J27Overview({ context, requestId, reviewerProgress,
         {action?.heading || 'Checking what’s saved…'}
       </h2>
       {action?.detail && <p className="mt-2 max-w-prose text-sm text-gray-700">{action.detail}</p>}
+      {action?.reports && onOpenReports && (
+        <button type="button" onClick={onOpenReports}
+          className="mt-2 min-h-11 rounded-md text-sm font-semibold text-blue-800 underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-blue-600">
+          Open Reports
+        </button>
+      )}
       {(showPeerReview || showDeliberations) && (
         <dl aria-label="Saved staff work" className="mt-4 grid gap-4 border-t border-gray-200 pt-4 text-sm sm:grid-cols-2">
           {showPeerReview && (

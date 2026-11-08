@@ -452,6 +452,10 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
           isSuperuser={isSuperuser}
           onSelectTab={selectTab}
           mode={phaseLayout ? 'presentation' : 'legacy'}
+          presentationContext={phaseLayout ? (
+            <StaffReviewSummary key={routeRequestId} requestId={routeRequestId} readOnly
+              onOpenReports={() => selectTab('reviews')} />
+          ) : null}
         />
       ) : activeTab === 'final-writeup' ? (
         <>
@@ -472,7 +476,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
             <details key={routeRequestId} className="mt-4 rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
               <summary className="cursor-pointer font-semibold text-gray-900">Supporting evidence</summary>
               <div className="mt-2 divide-y divide-gray-200">
-                <StaffReviewSummary requestId={routeRequestId} readOnly inline />
+                <StaffReviewSummary requestId={routeRequestId} readOnly />
                 {meetingRosterEnabled && <MeetingRoster requestId={routeRequestId} readOnly />}
                 <StaffVisitAssessment requestId={routeRequestId} readOnly />
               </div>
@@ -496,9 +500,6 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
           {meetingRosterEnabled && <MeetingRoster key={`meeting-roster-editor:${routeRequestId}`} requestId={routeRequestId} />}
           <StaffVisitAssessment key={`staff-visit-editor:${routeRequestId}`} requestId={routeRequestId} />
         </div>
-      )}
-      {phaseLayout && activeTab === 'staff-deliberations' && (
-        <StaffReviewSummary key={`deliberations-review-summary:${routeRequestId}`} requestId={routeRequestId} readOnly />
       )}
 
     </Layout>
