@@ -226,7 +226,7 @@ function stateSentence({ loading, runs, activeRun }) {
   return `The latest panel ${verb} — ${launchedByLine(latest).replace(/^Launched /, 'launched ')}.`;
 }
 
-export default function ReviewPanelTab({ requestId }) {
+export default function ReviewPanelTab({ requestId, title = 'Review Panel' }) {
   const [data, setData] = useState(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [loading, setLoading] = useState(true);
@@ -382,7 +382,7 @@ export default function ReviewPanelTab({ requestId }) {
       <Card hover={false}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-gray-900">Review Panel</h2>
+            <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
             <p className="mt-2 max-w-2xl text-sm text-gray-700" data-testid="review-panel-state-sentence">
               {stateSentence({ loading, runs, activeRun })}
             </p>

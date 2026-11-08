@@ -67,6 +67,9 @@ const LEGACY_TAB_ALIASES = {
   'site-visit': 'staff-deliberations',
 };
 
+// Preserve the existing section key for saved links.
+const AI_REVIEW_PANEL = { key: 'group-review', label: 'AI Review Panel' };
+
 export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary = false, meetingRosterEnabled = false, initialRationaleEnabled = false, semiFinalistEnabled = false, semiFinalistRehearsalRequestId = null, integritySimulationIds = [], automaticIntegrityEnabled = false }) {
   const router = useRouter();
   const { data: session } = useSession();
@@ -145,7 +148,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
     { key: 'assessment', label: 'Assessment', legacyOnly: showInitialRationale },
   ] : phase === 'peer-review' ? [
     { key: 'panel', label: 'Panel' }, { key: 'reports', label: 'Reports' },
-    ...(hasAccess('review-panel') === true ? [{ key: 'group-review', label: 'Group review' }] : []),
+    ...(hasAccess('review-panel') === true ? [AI_REVIEW_PANEL] : []),
   ] : [];
   const section = sections.some((item) => item.key === requestedSection) ? requestedSection : sections[0]?.key;
   const visibleSections = sections.filter((item) => !item.legacyOnly && item.key !== 'group-review');
@@ -331,7 +334,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
         <nav className="flex gap-4 mb-6 text-sm" aria-label="Panel tools">
           {[
             { key: 'panel', label: 'Reviewer roster' },
-            { key: 'group-review', label: 'Group review' },
+            AI_REVIEW_PANEL,
           ].map((item) => (
             <button key={item.key} type="button" onClick={() => selectTab('peer-review', item.key)}
               aria-current={section === item.key ? 'page' : undefined}
@@ -447,6 +450,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
         <ReviewPanelTab
           key={typeof requestId === 'string' ? requestId : ''}
           requestId={typeof requestId === 'string' ? requestId : ''}
+          title={phaseLayout ? AI_REVIEW_PANEL.label : undefined}
         />
       ) : activeTab === 'staff-deliberations' ? (
         <StaffDeliberationsTab

@@ -35,7 +35,8 @@ beforeEach(() => { global.fetch = jest.fn(); });
 
 test('fetches the per-request read and renders Launch enabled only when the server says launchable', async () => {
   global.fetch.mockResolvedValue(ok(body()));
-  render(<ReviewPanelTab requestId={REQ} />);
+  render(<ReviewPanelTab requestId={REQ} title="AI Review Panel" />);
+  expect(screen.getByRole('heading', { name: 'AI Review Panel', exact: true })).toBeInTheDocument();
   await waitFor(() => expect(screen.getByRole('button', { name: 'Launch panel' })).not.toBeDisabled());
   // The GET now goes through readResponse -> requestEnvelope (shared/utils/api-request.js),
   // which always passes an init object ({ method: 'GET', signal: undefined }) even when the

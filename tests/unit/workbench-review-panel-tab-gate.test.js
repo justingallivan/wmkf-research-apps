@@ -35,7 +35,7 @@ jest.mock('../../shared/components/workbench/StaffVisitAssessment', () => functi
 jest.mock('../../shared/components/workbench/StaffReviewSummary', () => function Stub() { return <div />; });
 jest.mock('../../shared/components/reviewers/ReviewersTab', () => function ReviewerStub() { return <div data-testid="reviewer-roster" />; });
 jest.mock('../../shared/components/workbench/OverviewTab', () => function OverviewStub() { return <div data-testid="overview-tab" />; });
-jest.mock('../../shared/components/workbench/ReviewPanelTab', () => function ReviewPanelStub(props) { return <div data-testid="review-panel-tab" data-request-id={props.requestId} />; });
+jest.mock('../../shared/components/workbench/ReviewPanelTab', () => function ReviewPanelStub(props) { return <div data-testid="review-panel-tab" data-request-id={props.requestId} data-title={props.title} />; });
 
 import { WorkbenchRequest, visibleTabsFor } from '../../pages/workbench/[requestId]';
 
@@ -129,16 +129,19 @@ test.each(['review-panel', 'integrity'])('sandbox legacy %s link cannot mount a 
   global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, requestId: 'request-1', cycleCode: 'J27' }) }));
   await act(async () => { render(<WorkbenchRequest staffReviewSummary />); });
   expect(screen.queryByTestId('review-panel-tab')).toBeNull();
-  expect(screen.queryByRole('button', { name: 'Group review' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'AI Review Panel' })).toBeNull();
   expect(screen.queryByRole('button', { name: 'Integrity' })).toBeNull();
 });
 
-test('sandbox canonical group-review link retains the grant and request binding', async () => {
+test('the existing group-review link opens the AI Review Panel with its new label', async () => {
   mockAccess = { isSuperuser: false, hasAccess: (key) => key === 'review-panel' };
   mockQuery = { requestId: 'request-1', tab: 'peer-review', section: 'group-review' };
   global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, requestId: 'request-1', cycleCode: 'J27' }) }));
   await act(async () => { render(<WorkbenchRequest staffReviewSummary />); });
   expect(screen.getByTestId('review-panel-tab')).toHaveAttribute('data-request-id', 'request-1');
+  expect(screen.getByTestId('review-panel-tab')).toHaveAttribute('data-title', 'AI Review Panel');
+  expect(screen.getByRole('button', { name: 'AI Review Panel', exact: true })).toHaveAttribute('aria-current', 'page');
+  expect(screen.queryByRole('button', { name: 'Group review', exact: true })).toBeNull();
 });
 
 
