@@ -25,8 +25,8 @@ function nextAction(context, handoff, progress) {
       label: 'Open Initial Assessment', tab: 'initial-assessment' };
   }
   if (handoff.visit) {
-    return { heading: 'Visit assessment saved',
-      detail: 'Review the saved handoff and check the status of the Word recommendation.',
+    return { heading: 'Review the material for Final Assessment',
+      detail: 'The visit assessment is saved. You can read it in Final Assessment alongside any saved review summary and attendance.',
       label: 'Open Final Assessment', tab: 'final-assessment' };
   }
   if (handoff.presentation) {
@@ -106,13 +106,12 @@ export default function J27Overview({ context, requestId, reviewerProgress, onSe
   return (
     <Card hover={false}>
       <section aria-labelledby="j27-overview-heading">
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Where this request stands</p>
-        <h2 id="j27-overview-heading" className="mt-1 text-xl font-semibold text-gray-900">
-          {action?.heading || 'Checking the saved handoffs…'}
-        </h2>
-        <p className="mt-1 text-sm text-gray-600">
-          Request status <span className="font-medium text-gray-900">{context.requestStatus || 'Not set'}</span>
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          {terminal ? 'Request outcome' : 'Suggested next step'}
         </p>
+        <h2 id="j27-overview-heading" className="mt-1 text-xl font-semibold text-gray-900">
+          {action?.heading || 'Checking what’s saved…'}
+        </h2>
         {action?.detail && <p className="mt-2 text-sm text-gray-700">{action.detail}</p>}
         {action?.tab && onSelectTab && (
           <button type="button" onClick={() => onSelectTab(action.tab)}
@@ -120,8 +119,12 @@ export default function J27Overview({ context, requestId, reviewerProgress, onSe
             {action.label}
           </button>
         )}
+        <dl className="mt-5 flex flex-wrap gap-x-2 gap-y-1 border-t border-gray-200 pt-4 text-sm">
+          <dt className="text-gray-600">Recorded status in Dataverse</dt>
+          <dd className="font-medium text-gray-900">{context.requestStatus || 'Not set'}</dd>
+        </dl>
         {handoff && (
-          <dl className="mt-5 grid gap-3 border-t border-gray-200 pt-4 text-sm sm:grid-cols-3">
+          <dl aria-label="Saved staff work" className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
             <div><dt className="font-semibold">Initial Assessment</dt>
               <dd className="text-gray-600">First Cut · {firstCut}</dd>
               {initialRationaleEnabled && <dd className="text-gray-600">Staff rationale · {savedLabel(handoff.rationale)}</dd>}

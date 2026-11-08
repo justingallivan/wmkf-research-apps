@@ -34,8 +34,12 @@ test('a saved visit assessment opens the Final Assessment handoff while displayi
     'staff-visit-assessment': { assessment: 'Saved visit assessment' },
     'meeting-roster': { presentation: { id: 'visit' }, stale: false, roster: {} },
   } });
-  expect(await screen.findByRole('heading', { name: 'Visit assessment saved' })).toBeVisible();
-  expect(screen.getAllByText('Phase I Pending')[0]).toBeVisible();
+  expect(await screen.findByRole('heading', { name: 'Review the material for Final Assessment' })).toBeVisible();
+  expect(screen.getByText('Suggested next step')).toBeVisible();
+  expect(screen.getByText(/The visit assessment is saved/)).toBeVisible();
+  const recordedStatus = screen.getByText('Recorded status in Dataverse').closest('dl');
+  expect(recordedStatus).toHaveTextContent('Phase I Pending');
+  expect(recordedStatus).not.toHaveTextContent('Final Assessment');
   expect(screen.getByText('1 report received')).toBeVisible();
   expect(screen.getByText('Attendance · Confirmed')).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: 'Open Final Assessment' }));
