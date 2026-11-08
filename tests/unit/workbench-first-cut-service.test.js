@@ -5,12 +5,12 @@ import { getById, updateById } from '../../lib/dataverse/adapters/grant-request'
 import { processAnnotations } from '../../lib/services/dynamics/annotations';
 import { getUserRole } from '../../lib/utils/auth';
 
-import { j27SemiFinalistEnabled, j27IntegrityTarget } from '../../lib/utils/j27-integrity-readiness';
+import { j27SemiFinalistEnabled, j27IntegrityTarget, j27SemiFinalistRehearsalRequestId } from '../../lib/utils/j27-integrity-readiness';
 import { isJ27SandboxFactoryRequest } from '../../lib/services/workbench/j27-integrity-jobs';
 import { scheduleJ27IntegrityScreen, confirmJ27IntegrityDecision } from '../../lib/services/workbench/j27-integrity-dispatch';
 
 jest.mock('../../lib/utils/j27-integrity-readiness', () => ({
-  j27SemiFinalistEnabled: jest.fn(), j27IntegrityTarget: jest.fn(),
+  j27SemiFinalistEnabled: jest.fn(), j27IntegrityTarget: jest.fn(), j27SemiFinalistRehearsalRequestId: jest.fn(),
 }));
 jest.mock('../../lib/services/workbench/j27-integrity-jobs', () => ({
   isJ27SandboxFactoryRequest: jest.fn(),
@@ -161,6 +161,18 @@ describe('sandbox Semi-finalist decision', () => {
     await expect(saveSemiFinalist(input)).resolves.toEqual({ success: true });
     expect(updateById).not.toHaveBeenCalled();
     expect(scheduleJ27IntegrityScreen).not.toHaveBeenCalled();
+  });
+
+  test('dropdown-only Preview accepts exactly the configured request without Factory or screening access', async () => {
+    j27SemiFinalistRehearsalRequestId.mockReturnValue(requestId);
+    j27IntegrityTarget.mockReturnValue(null);
+    getById.mockResolvedValue({ ...factoryRow, wmkf_istestrequest: null, wmkf_testcreationrunid: null });
+    await expect(saveSemiFinalist(input)).resolves.toEqual({ success: true });
+    expect(isJ27SandboxFactoryRequest).not.toHaveBeenCalled();
+    expect(scheduleJ27IntegrityScreen).not.toHaveBeenCalled();
+    updateById.mockClear();
+    await expect(saveSemiFinalist({ ...input, requestId: runId })).rejects.toMatchObject({ httpStatus: 403 });
+    expect(updateById).not.toHaveBeenCalled();
   });
 
   test('rejects an ordinary, wrong-host or unscored record before enqueueing', async () => {

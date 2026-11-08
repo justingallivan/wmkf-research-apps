@@ -105,3 +105,33 @@ test('leaves reviewer controls enabled when the server does not classify the dep
   expect(screen.queryByText('Preview is read-only for reviewer work.')).not.toBeInTheDocument();
   expect(screen.getByTestId('reviewers-tab')).toHaveAttribute('data-preview-read-only', 'false');
 });
+
+test('the exact dropdown rehearsal is admitted only in sandbox Preview with screening explicitly off', async () => {
+  const id = '1a651d20-4a8a-471d-a6c8-f165ec112ccc';
+  const env = jest.replaceProperty(process, 'env', {
+    ...process.env,
+    VERCEL_ENV: 'preview',
+    DYNAMICS_URL: `https://${SANDBOX_HOSTS[0]}`,
+    J27_SEMI_FINALIST_ENABLED: 'on',
+    J27_INITIAL_RATIONALE_SCHEMA_READY: 'on',
+    TEST_REQUEST_ISOLATION: 'on',
+    J27_AUTOMATIC_INTEGRITY: 'off',
+    J27_SEMI_FINALIST_REHEARSAL_REQUEST_ID: id.toUpperCase(),
+  });
+  try {
+    await expect(getServerSideProps()).resolves.toMatchObject({ props: {
+      semiFinalistEnabled: true, semiFinalistRehearsalRequestId: id, automaticIntegrityEnabled: false,
+    } });
+    process.env.J27_AUTOMATIC_INTEGRITY = 'on';
+    await expect(getServerSideProps()).resolves.toMatchObject({ props: {
+      semiFinalistRehearsalRequestId: null, automaticIntegrityEnabled: true,
+    } });
+    process.env.J27_AUTOMATIC_INTEGRITY = 'off';
+    process.env.VERCEL_ENV = 'production';
+    await expect(getServerSideProps()).resolves.toMatchObject({ props: {
+      semiFinalistEnabled: false, semiFinalistRehearsalRequestId: null, automaticIntegrityEnabled: false,
+    } });
+  } finally {
+    env.restore();
+  }
+});

@@ -13,7 +13,11 @@ current Dataverse ETag. The decision replaces First Cut in the same
 A ready factory run must bind the test request, run ID, and sandbox hostname
 before the save. This protects the shared screening history from copied
 Production request GUIDs. `J27_SEMI_FINALIST_ENABLED=on` also requires the
-existing rationale and test-isolation gates.
+existing rationale and test-isolation gates. For a dropdown-only Preview,
+`J27_SEMI_FINALIST_REHEARSAL_REQUEST_ID` admits exactly the designated sandbox
+request while `J27_AUTOMATIC_INTEGRITY` is explicitly `off`. This path does
+not reach the Factory lookup or screen queue. The automatic path still
+needs a verified connection to the separate sandbox Factory ledger.
 
 With `J27_AUTOMATIC_INTEGRITY=on`, a changed Yes reserves a row keyed by target
 hostname and request GUID and starts a durable Vercel workflow. Only the exact
