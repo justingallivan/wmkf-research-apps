@@ -35,7 +35,7 @@ beforeEach(() => {
 });
 
 test('happy path returns the one-line objective + meta', async () => {
-  const TITLE_OUT = 'To visualize electrical communication in fungal networks';
+  const TITLE_OUT = 'Electrical communication in fungal networks';
   executePrompt.mockResolvedValue(execResult(TITLE_OUT));
 
   const out = await generateGranteeTitle({ sourceTitle: TITLE, sourceAbstract: ABSTRACT });
@@ -109,7 +109,7 @@ test('re-surfaces an Executor short-output throw with context', async () => {
 test('throws if the model returns a too-short title', async () => {
   executePrompt.mockResolvedValue(execResult('To x'));
   await expect(generateGranteeTitle({ sourceTitle: TITLE, sourceAbstract: ABSTRACT }))
-    .rejects.toThrow(/valid "To …" objective/);
+    .rejects.toThrow(/empty or too-short title/);
 });
 
 test('keeps an abbreviation period (does not strip "U.S.")', async () => {
@@ -124,22 +124,25 @@ test('strips smart (curly) quotes', async () => {
   expect(out.editedTitle).toBe('To map the human RNA structurome');
 });
 
-test('skips a preamble line and returns the "To …" objective line', async () => {
-  executePrompt.mockResolvedValue(execResult('Here is the objective:\nTo decode the spinal cord-immune axis'));
+test.each([
+  'To decode the spinal cord-immune axis',
+  'How individual worms shape their colonies',
+])('skips a preamble line and returns the title %s', async (title) => {
+  executePrompt.mockResolvedValue(execResult(`Here is the objective:\n${title}`));
   const out = await generateGranteeTitle({ sourceTitle: TITLE, sourceAbstract: ABSTRACT });
-  expect(out.editedTitle).toBe('To decode the spinal cord-immune axis');
+  expect(out.editedTitle).toBe(title);
 });
 
-test('throws on a refusal / non-"To" output that clears the length floor', async () => {
+test('throws on a plain-text refusal that clears the length floor', async () => {
   executePrompt.mockResolvedValue(execResult('I cannot determine an objective from this abstract.'));
   await expect(generateGranteeTitle({ sourceTitle: TITLE, sourceAbstract: ABSTRACT }))
-    .rejects.toThrow(/valid "To …" objective/);
+    .rejects.toThrow(/refusal instead of a title/);
 });
 
 test('throws when cleanup collapses to empty (fence-only output)', async () => {
   executePrompt.mockResolvedValue(execResult('```\n\n```'));
   await expect(generateGranteeTitle({ sourceTitle: TITLE, sourceAbstract: ABSTRACT }))
-    .rejects.toThrow(/valid "To …" objective/);
+    .rejects.toThrow(/empty or too-short title/);
 });
 
 test('throws if the run is unexpectedly blocked', async () => {
