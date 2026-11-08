@@ -6,7 +6,7 @@
 // without the grant falls back to Overview — the client projection of the
 // route's requireAppAccess('review-panel') (feedback-ui-gates-must-mirror-server-guards).
 
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 
 const mockPush = jest.fn();
 let mockQuery = { requestId: 'request-1', tab: 'review-panel' };
@@ -152,7 +152,10 @@ test('the existing group-review link opens the AI Review Panel with its new labe
   await act(async () => { render(<WorkbenchRequest staffReviewSummary />); });
   expect(screen.getByTestId('review-panel-tab')).toHaveAttribute('data-request-id', 'request-1');
   expect(screen.getByTestId('review-panel-tab')).toHaveAttribute('data-title', 'AI Review Panel');
-  expect(screen.getByRole('button', { name: 'AI Review Panel', exact: true })).toHaveAttribute('aria-current', 'page');
+  const sections = within(screen.getByRole('navigation', { name: 'Peer Review sections' }));
+  expect(sections.getAllByRole('button').map(button => button.textContent)).toEqual(['Panel', 'Reports', 'AI Review Panel']);
+  expect(sections.getByRole('button', { name: 'AI Review Panel', exact: true })).toHaveAttribute('aria-current', 'page');
+  expect(sections.getByRole('button', { name: 'Panel', exact: true })).not.toHaveAttribute('aria-current');
   expect(screen.queryByRole('button', { name: 'Group review', exact: true })).toBeNull();
 });
 
@@ -187,7 +190,7 @@ test.each([
   ['proposal', 'Initial Assessment', 'Proposal'],
   ['initial-writeup', 'Initial Assessment', 'Assessment'],
   ['reviewers', 'Peer Review', 'Panel'],
-  ['review-panel', 'Peer Review', 'Panel'],
+  ['review-panel', 'Peer Review', 'AI Review Panel'],
   ['pre-site-visit', 'Deliberations', null],
   ['site-visit', 'Deliberations', null],
   ['staff-deliberations', 'Deliberations', null],

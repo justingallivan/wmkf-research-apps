@@ -154,7 +154,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
     ...(hasAccess('review-panel') === true ? [AI_REVIEW_PANEL] : []),
   ] : [];
   const section = sections.some((item) => item.key === requestedSection) ? requestedSection : sections[0]?.key;
-  const visibleSections = sections.filter((item) => !item.legacyOnly && item.key !== 'group-review');
+  const visibleSections = sections.filter((item) => !item.legacyOnly);
   const phaseContent = {
     'initial-assessment': { proposal: 'proposal', integrity: 'integrity', assessment: 'initial-writeup' },
     'peer-review': { panel: 'reviewers', reports: 'reviews', 'group-review': 'review-panel' },
@@ -325,23 +325,8 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
         <nav className="flex flex-wrap gap-2 mb-6" aria-label={`${phaseTabs.find((item) => item.key === phase)?.label || 'Phase'} sections`}>
           {visibleSections.map((item) => (
             <button key={item.key} type="button" onClick={() => selectTab(phase, item.key)}
-              aria-current={(section === 'group-review' ? 'panel' : section) === item.key ? 'page' : undefined}
-              className={`rounded-lg px-3 py-2 text-sm font-medium ${(section === 'group-review' ? 'panel' : section) === item.key ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
-              {item.label}
-            </button>
-          ))}
-        </nav>
-      )}
-
-      {phaseLayout && phase === 'peer-review' && section !== 'reports' && hasAccess('review-panel') === true && (
-        <nav className="flex gap-4 mb-6 text-sm" aria-label="Panel tools">
-          {[
-            { key: 'panel', label: 'Reviewer roster' },
-            AI_REVIEW_PANEL,
-          ].map((item) => (
-            <button key={item.key} type="button" onClick={() => selectTab('peer-review', item.key)}
               aria-current={section === item.key ? 'page' : undefined}
-              className={`py-2 border-b-2 ${section === item.key ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500'}`}>
+              className={`rounded-lg px-3 py-2 text-sm font-medium ${section === item.key ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
               {item.label}
             </button>
           ))}

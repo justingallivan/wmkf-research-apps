@@ -9,7 +9,7 @@ const RESPONSE_LABELS = {
   withdrawn_sufficient: 'Released',
 };
 
-export default function ReviewerRosterOverview({ candidates, reviewers, loading, incomplete, onRetry, onNavigate }) {
+export default function ReviewerRosterOverview({ candidates, reviewers, loading, incomplete, onRetry }) {
   const reviewersById = new Map(reviewers.map((reviewer) => [reviewer.suggestionId, reviewer]));
   const people = new Map(candidates.map((candidate) => [candidate.suggestionId, candidate]));
   for (const reviewer of reviewers) {
@@ -18,14 +18,7 @@ export default function ReviewerRosterOverview({ candidates, reviewers, loading,
 
   return (
     <section aria-labelledby="reviewer-roster-heading" className="rounded-xl border border-gray-200 bg-white">
-      <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
-        <h2 id="reviewer-roster-heading" className="text-lg font-semibold text-gray-900">Reviewer roster</h2>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" size="sm" variant="outline" onClick={() => onNavigate('candidates')}>Invite reviewers</Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => onNavigate('track')}>Track reviewers</Button>
-          <Button type="button" size="sm" onClick={() => onNavigate('find')}>Find reviewers</Button>
-        </div>
-      </div>
+      <h2 id="reviewer-roster-heading" className="px-5 py-4 text-lg font-semibold text-gray-900">Reviewer roster</h2>
 
       {loading ? (
         <p role="status" className="border-t border-gray-200 px-5 py-4 text-sm text-gray-600">Loading reviewer roster…</p>

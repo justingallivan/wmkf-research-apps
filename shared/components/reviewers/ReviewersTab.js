@@ -47,6 +47,12 @@ const SUB_TABS = [
   { key: 'candidates', label: 'Invite Reviewers' },
   { key: 'track', label: 'Track Reviewers' },
 ];
+const PANEL_TABS = [
+  { key: 'roster', label: 'Reviewer roster' },
+  { key: 'find', label: 'Find reviewers' },
+  { key: 'candidates', label: 'Invite reviewers' },
+  { key: 'track', label: 'Track reviewers' },
+];
 const SUB_TAB_KEYS = new Set(SUB_TABS.map((t) => t.key));
 
 // How long a confirmed-invite overlay is allowed to stand before a plain
@@ -499,85 +505,81 @@ export default function ReviewersTab({
 
   return (
     <div className="space-y-4">
-      <div hidden={current === 'roster'}
-        className={current === 'roster' ? 'hidden' : 'border-b border-gray-200 flex flex-wrap items-center justify-between'}>
-        <nav className="flex flex-wrap gap-1" aria-label="Reviewer tools">
-          {rosterFirst && (
-            <button type="button" onClick={() => selectSub('roster')}
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:underline">
-              Back to roster
+      <div className={rosterFirst ? 'space-y-3' : 'border-b border-gray-200 flex flex-wrap items-center justify-between'}>
+        <nav className={`flex flex-wrap gap-x-2 ${rosterFirst ? 'border-b border-gray-200' : ''}`}
+          aria-label={rosterFirst ? 'Reviewer panel views' : 'Reviewer tools'}>
+          {(rosterFirst ? PANEL_TABS : SUB_TABS).map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => selectSub(t.key)}
+              aria-current={current === t.key ? 'page' : undefined}
+              className={`flex items-center py-2 text-sm font-medium border-b-2 ${rosterFirst ? 'min-h-11 px-3' : 'px-4'} ${
+                current === t.key
+                  ? 'border-gray-900 text-gray-900'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {t.label}
+              {t.key === 'candidates' ? (
+                <SubTabBadge count={candidatesToInvite} workRemaining={candidatesToInvite} />
+              ) : t.key === 'track' ? (
+                // Track Reviewers folds in pending decline-referrals so the tab
+                // signals them (amber) even when no reviewer has accepted yet —
+                // otherwise the badge reads 0 and staff never open the tab where
+                // the referral callout lives (the all-declined-before-accept case).
+                <SubTabBadge
+                  count={countForMode(reviewers, t.key) + declineReferrals.length + pendingInvites.length}
+                  workRemaining={workRemainingForMode(reviewers, t.key) + declineReferrals.length + pendingInvites.length}
+                />
+              ) : null}
             </button>
-          )}
-          {SUB_TABS.map((t) => {
-            const isManage = t.key !== 'find';
-            return (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => selectSub(t.key)}
-                className={`flex items-center px-4 py-2 text-sm font-medium border-b-2 ${
-                  current === t.key
-                    ? 'border-gray-900 text-gray-900'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                {rosterFirst && t.key === 'find' ? 'Find reviewers' : t.label}
-                {t.key === 'candidates' ? (
-                  <SubTabBadge count={candidatesToInvite} workRemaining={candidatesToInvite} />
-                ) : isManage ? (
-                  // Track Reviewers folds in pending decline-referrals so the tab
-                  // signals them (amber) even when no reviewer has accepted yet —
-                  // otherwise the badge reads 0 and staff never open the tab where
-                  // the referral callout lives (the all-declined-before-accept case).
-                  <SubTabBadge
-                    count={countForMode(reviewers, t.key) + (t.key === 'track' ? declineReferrals.length + pendingInvites.length : 0)}
-                    workRemaining={workRemainingForMode(reviewers, t.key) + (t.key === 'track' ? declineReferrals.length + pendingInvites.length : 0)}
-                  />
-                ) : null}
-              </button>
-            );
-          })}
+          ))}
         </nav>
-        <button
-          type="button"
-          onClick={() => setCampaignOpen(true)}
-          disabled={!canEdit}
-          className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-40"
-          title={previewReadOnly
-            ? 'Campaign settings are disabled in read-only Preview'
-            : !canManage
-              ? 'Only the lead Program Director or a superuser can edit campaign settings'
-            : "Edit this request's reviewer campaign settings (days to respond, review due date)"}
-        >
-          ⚙ Campaign settings
-        </button>
-        <button
-          type="button"
-          onClick={() => setTemplatesOpen(true)}
-          disabled={previewReadOnly}
-          className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-40"
-          title={previewReadOnly
-            ? 'Email templates are disabled in read-only Preview'
-            : 'Edit your default reviewer email templates'}
-        >
-          ✎ Email templates
-        </button>
-        {previewReadOnly ? (
-          <span
-            className="px-1 py-1 text-xs text-gray-400 opacity-40 whitespace-nowrap"
-            title="Template management is disabled in read-only Preview"
-            aria-disabled="true"
-          >
-            Manage in Profile →
-          </span>
-        ) : (
-          <Link
-            href="/profile-settings"
-            className="text-xs text-gray-400 hover:text-gray-700 px-1 py-1 whitespace-nowrap"
-            title="Manage all your email templates in Profile Settings"
-          >
-            Manage in Profile →
-          </Link>
+        {(!rosterFirst || current === 'candidates') && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1" aria-label="Invitation settings">
+            <button
+              type="button"
+              onClick={() => setCampaignOpen(true)}
+              disabled={!canEdit}
+              className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-40"
+              title={previewReadOnly
+                ? 'Campaign settings are disabled in read-only Preview'
+                : !canManage
+                  ? 'Only the lead Program Director or a superuser can edit campaign settings'
+                : "Edit this request's reviewer campaign settings (days to respond, review due date)"}
+            >
+              ⚙ Campaign settings
+            </button>
+            <button
+              type="button"
+              onClick={() => setTemplatesOpen(true)}
+              disabled={previewReadOnly}
+              className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-40"
+              title={previewReadOnly
+                ? 'Email templates are disabled in read-only Preview'
+                : 'Edit your default reviewer email templates'}
+            >
+              ✎ Email templates
+            </button>
+            {previewReadOnly ? (
+              <span
+                className="px-1 py-1 text-xs text-gray-400 opacity-40 whitespace-nowrap"
+                title="Template management is disabled in read-only Preview"
+                aria-disabled="true"
+              >
+                Manage in Profile →
+              </span>
+            ) : (
+              <Link
+                href="/profile-settings"
+                className="text-xs text-gray-400 hover:text-gray-700 px-1 py-1 whitespace-nowrap"
+                title="Manage all your email templates in Profile Settings"
+              >
+                Manage in Profile →
+              </Link>
+            )}
+          </div>
         )}
       </div>
 
@@ -609,7 +611,6 @@ export default function ReviewersTab({
           loading={loading || candidatesLoading}
           incomplete={Boolean(error || candidateLoadError)}
           onRetry={refreshAll}
-          onNavigate={selectSub}
         />
       ) : current === null ? (
         <div className="flex justify-center py-12">

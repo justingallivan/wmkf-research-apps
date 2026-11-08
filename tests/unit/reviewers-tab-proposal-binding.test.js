@@ -197,14 +197,22 @@ test('J27 opens on one roster with invitation, response and review progress, and
   expect(cells(/Accepted reviewer/)).toEqual(['Invited', 'Accepted', 'Review Received']);
   expect(findPanelProps).toBeNull();
 
-  fireEvent.click(screen.getByRole('button', { name: 'Find reviewers' }));
+  const navigation = screen.getByRole('navigation', { name: 'Reviewer panel views' });
+  const order = () => within(navigation).getAllByRole('button').map(button => button.firstChild.textContent);
+  expect(order()).toEqual(['Reviewer roster', 'Find reviewers', 'Invite reviewers', 'Track reviewers']);
+  expect(within(navigation).getByRole('button', { name: 'Reviewer roster' })).toHaveAttribute('aria-current', 'page');
+
+  fireEvent.click(within(navigation).getByRole('button', { name: 'Find reviewers' }));
   const [{ query }] = router.push.mock.lastCall;
   expect(query).toEqual({ ...router.query, sub: 'find' });
 
   router.query = query;
   rerender(<ReviewersTab requestId={REQ} rosterFirst />);
   expect(await screen.findByTestId('persist-proposal')).toHaveAttribute('data-file-key', existingKey);
-  fireEvent.click(screen.getByRole('button', { name: 'Back to roster' }));
+  expect(order()).toEqual(['Reviewer roster', 'Find reviewers', 'Invite reviewers', 'Track reviewers']);
+  expect(within(navigation).getByRole('button', { name: 'Find reviewers' })).toHaveAttribute('aria-current', 'page');
+  expect(screen.queryByRole('button', { name: /Campaign settings/ })).toBeNull();
+  fireEvent.click(within(navigation).getByRole('button', { name: 'Reviewer roster' }));
   expect(router.push.mock.lastCall[0].query).toEqual({
     requestId: REQ, tab: 'peer-review', section: 'panel', proposalFile: existingKey,
   });
