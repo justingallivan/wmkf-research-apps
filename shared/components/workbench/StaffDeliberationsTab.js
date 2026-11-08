@@ -1570,7 +1570,7 @@ export default function StaffDeliberationsTab({
   const presentationStep = (
     <Step
       number={presentationOnly ? null : 4}
-      title="Presentation"
+      title={presentationOnly ? 'Presentation and staff discussion' : 'Presentation'}
       status={presentationOnly ? (due ? 'done' : 'current') : stepStatus('presentation')}
       summary={(
         <>
@@ -1611,10 +1611,10 @@ export default function StaffDeliberationsTab({
             </button>
           </p>
         )}
-        {meetingDetails}
         <Card hover={false} padding="p-0">
           <ol>{presentationStep}</ol>
         </Card>
+        {meetingDetails}
         {materialsCard}
       </section>
     );

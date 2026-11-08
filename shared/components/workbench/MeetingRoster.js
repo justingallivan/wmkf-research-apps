@@ -127,9 +127,8 @@ export default function MeetingRoster({ requestId, readOnly = false }) {
     });
   }
 
-  return (
-    <details className="mb-4 rounded-lg border bg-white p-4">
-      <summary className="font-semibold">Meeting roster</summary>
+  const content = (
+    <>
       {!record && !error && <p className="mt-2 text-sm">Loading roster…</p>}
       {record && !record.presentation && !error && !notice && <p className="mt-2 text-sm">No presentation is available for this roster.</p>}
       {record?.stale && <p className="mt-2 text-sm text-amber-800">Presentation details changed. Attendance needs reconfirmation.</p>}
@@ -182,6 +181,17 @@ export default function MeetingRoster({ requestId, readOnly = false }) {
       {readOnly && record?.presentation && !record.stale && !record.sentence && <p className="mt-2 text-sm">No attendance sentence saved.</p>}
       {notice && <p className="mt-2 text-sm" role="status">{notice}</p>}
       {error && <p className="mt-2 text-sm text-red-700" role="alert">{error}</p>}
+    </>
+  );
+  return readOnly ? (
+    <section className="py-3">
+      <h3 className="text-sm font-semibold text-gray-900">Meeting roster</h3>
+      {content}
+    </section>
+  ) : (
+    <details className="mb-4 rounded-lg border bg-white p-4">
+      <summary className="cursor-pointer font-semibold">Meeting roster</summary>
+      {content}
     </details>
   );
 }

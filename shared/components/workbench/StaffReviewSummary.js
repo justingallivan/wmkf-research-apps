@@ -3,7 +3,7 @@ import { Button, Card } from '../Layout';
 import { requestJson } from '../../utils/api-request';
 import { composeReviewerFacts } from '../../utils/review-writeup-paragraphs';
 
-export default function StaffReviewSummary({ requestId, evidenceHash, reviewers = [], refreshReports, readOnly = false }) {
+export default function StaffReviewSummary({ requestId, evidenceHash, reviewers = [], refreshReports, readOnly = false, inline = false }) {
   const [record, setRecord] = useState(null);
   const [draft, setDraft] = useState('');
   const [error, setError] = useState('');
@@ -76,22 +76,28 @@ export default function StaffReviewSummary({ requestId, evidenceHash, reviewers 
   );
 
   if (readOnly) {
-    return (
+    const content = error ? <p role="alert" className="mt-2 text-sm text-red-700">{error}</p> : record ? (
+      <dl className="mt-3 space-y-3 text-sm">
+        <div>
+          <dt className="font-medium">Reviewer facts</dt>
+          <dd>{record.reviewerFacts ?? 'Reviewer facts could not be loaded.'}</dd>
+          {evidenceNotice}
+        </div>
+        <div>
+          <dt className="font-medium">Staff interpretation</dt>
+          <dd className="whitespace-pre-wrap">{record.summary || 'No staff interpretation saved.'}</dd>
+        </div>
+      </dl>
+    ) : <p className="mt-2 text-sm" role="status">Loading staff summary…</p>;
+    return inline ? (
+      <section className="py-3">
+        <h3 className="text-sm font-semibold text-gray-900">Staff review summary</h3>
+        {content}
+      </section>
+    ) : (
       <details className="mb-4 rounded-lg border bg-white p-4">
         <summary className="cursor-pointer font-semibold">Staff review summary</summary>
-        {error ? <p role="alert" className="mt-2 text-sm text-red-700">{error}</p> : record ? (
-          <dl className="mt-3 space-y-3 text-sm">
-            <div>
-              <dt className="font-medium">Reviewer facts</dt>
-              <dd>{record.reviewerFacts ?? 'Reviewer facts could not be loaded.'}</dd>
-              {evidenceNotice}
-            </div>
-            <div>
-              <dt className="font-medium">Staff interpretation</dt>
-              <dd className="whitespace-pre-wrap">{record.summary || 'No staff interpretation saved.'}</dd>
-            </div>
-          </dl>
-        ) : <p className="mt-2 text-sm" role="status">Loading staff summary…</p>}
+        {content}
       </details>
     );
   }

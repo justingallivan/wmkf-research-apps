@@ -28,11 +28,22 @@ jest.mock('../../shared/components/workbench/StatusTab', () => function Stub() {
 jest.mock('../../shared/components/workbench/AwardeeTab', () => function Stub() { return <div />; });
 jest.mock('../../shared/components/workbench/InitialAssessmentRationale', () => function Stub() { return <div />; });
 jest.mock('../../shared/components/workbench/InitialAssessmentTab', () => function Stub() { return <div />; });
-jest.mock('../../shared/components/workbench/StaffDeliberationsTab', () => function Stub() { return <div />; });
-jest.mock('../../shared/components/workbench/FinalWriteupTab', () => function Stub() { return <div />; });
+jest.mock('../../shared/components/workbench/StaffDeliberationsTab', () => function Stub() {
+  return <h2>Presentation and staff discussion</h2>;
+});
+jest.mock('../../shared/components/workbench/FinalWriteupTab', () => function Stub() {
+  return <h2>Board recommendation</h2>;
+});
 jest.mock('../../shared/components/workbench/IntegrityTab', () => function Stub() { return <div />; });
-jest.mock('../../shared/components/workbench/StaffVisitAssessment', () => function Stub() { return <div />; });
-jest.mock('../../shared/components/workbench/StaffReviewSummary', () => function Stub() { return <div />; });
+jest.mock('../../shared/components/workbench/StaffVisitAssessment', () => function Stub() {
+  return <h3>Staff assessment of the visit</h3>;
+});
+jest.mock('../../shared/components/workbench/MeetingRoster', () => function Stub() {
+  return <h3>Meeting roster</h3>;
+});
+jest.mock('../../shared/components/workbench/StaffReviewSummary', () => function Stub({ inline }) {
+  return inline ? <h3>Staff review summary</h3> : <details><summary>Staff review summary</summary></details>;
+});
 jest.mock('../../shared/components/reviewers/ReviewersTab', () => function ReviewerStub() { return <div data-testid="reviewer-roster" />; });
 jest.mock('../../shared/components/workbench/OverviewTab', () => function OverviewStub() { return <div data-testid="overview-tab" />; });
 jest.mock('../../shared/components/workbench/ReviewPanelTab', () => function ReviewPanelStub(props) { return <div data-testid="review-panel-tab" data-request-id={props.requestId} data-title={props.title} />; });
@@ -253,4 +264,34 @@ test.each([
   }) }));
   await act(async () => { render(<WorkbenchRequest staffReviewSummary initialRationaleEnabled semiFinalistEnabled />); });
   expect(Boolean(screen.queryByRole('combobox', { name: 'Recommend as a semi-finalist?' }))).toBe(visible);
+});
+
+
+test('J27 Deliberations leads with the presentation and keeps staff inputs below it', async () => {
+  mockQuery = { requestId: 'request-1', tab: 'deliberations' };
+  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, requestId: 'request-1', cycleCode: 'J27' }) }));
+  await act(async () => { render(<WorkbenchRequest staffReviewSummary meetingRosterEnabled />); });
+
+  const presentation = screen.getByRole('heading', { name: 'Presentation and staff discussion' });
+  const roster = screen.getByRole('heading', { name: 'Meeting roster' });
+  const visit = screen.getByRole('heading', { name: 'Staff assessment of the visit' });
+  const reviewSummary = screen.getByText('Staff review summary');
+  expect(presentation.compareDocumentPosition(roster)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  expect(roster.compareDocumentPosition(visit)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  expect(visit.compareDocumentPosition(reviewSummary)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+});
+
+test('J27 Final Assessment leads with the Board recommendation and groups the three saved records', async () => {
+  mockQuery = { requestId: 'request-1', tab: 'final-assessment' };
+  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, requestId: 'request-1', cycleCode: 'J27' }) }));
+  await act(async () => { render(<WorkbenchRequest staffReviewSummary meetingRosterEnabled />); });
+
+  const recommendation = screen.getByRole('heading', { name: 'Board recommendation' });
+  const evidence = screen.getByText('Supporting evidence').closest('details');
+  expect(recommendation.compareDocumentPosition(evidence)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  expect(evidence).not.toHaveAttribute('open');
+  expect(evidence.querySelectorAll('details')).toHaveLength(0);
+  expect(evidence).toHaveTextContent('Staff review summary');
+  expect(evidence).toHaveTextContent('Meeting roster');
+  expect(evidence).toHaveTextContent('Staff assessment of the visit');
 });

@@ -67,10 +67,10 @@ export default function StaffVisitAssessment({ requestId, readOnly = false }) {
   const content = error || record?.assessment || (record ? 'No visit assessment saved.' : 'Loading…');
   if (readOnly) {
     return (
-      <details className="mb-4 rounded-lg border bg-white p-4">
-        <summary className="font-semibold">Staff assessment of the visit</summary>
+      <section className="py-3">
+        <h3 className="text-sm font-semibold text-gray-900">Staff assessment of the visit</h3>
         <p className="mt-2 whitespace-pre-wrap text-sm">{content}</p>
-      </details>
+      </section>
     );
   }
 

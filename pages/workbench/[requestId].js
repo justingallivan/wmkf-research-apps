@@ -348,17 +348,6 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
         </nav>
       )}
 
-      {staffReviewSummary && visibleContext?.cycleCode === 'J27' && activeTab === 'staff-deliberations' && (
-        <StaffReviewSummary key={`deliberations-review-summary:${routeRequestId}`} requestId={routeRequestId} readOnly />
-      )}
-      {staffReviewSummary && visibleContext?.cycleCode === 'J27'
-        && (activeTab === 'staff-deliberations' || visitEditorRequestId === routeRequestId) && (
-        <div hidden={activeTab !== 'staff-deliberations'}>
-          {meetingRosterEnabled && <MeetingRoster key={`meeting-roster-editor:${routeRequestId}`} requestId={routeRequestId} />}
-          <StaffVisitAssessment key={`staff-visit-editor:${routeRequestId}`} requestId={routeRequestId} />
-        </div>
-      )}
-
       {showInitialRationale && (editingInitialRationale || rationaleEditorRequestId === routeRequestId) && (
         <div hidden={!editingInitialRationale}>
           <InitialAssessmentRationale key={routeRequestId} requestId={routeRequestId}
@@ -466,13 +455,6 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
         />
       ) : activeTab === 'final-writeup' ? (
         <>
-          {staffReviewSummary && visibleContext?.cycleCode === 'J27' && (
-            <>
-              <StaffReviewSummary key={`staff-review-summary:${routeRequestId}`} requestId={routeRequestId} readOnly />
-              {meetingRosterEnabled && <MeetingRoster key={`meeting-roster-reader:${routeRequestId}`} requestId={routeRequestId} readOnly />}
-              <StaffVisitAssessment key={`staff-visit-assessment:${routeRequestId}`} requestId={routeRequestId} readOnly />
-            </>
-          )}
           <FinalWriteupTab
             key={routeRequestId || ''}
             requestId={routeRequestId || ''}
@@ -486,6 +468,16 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
               />
             ) : null}
           />
+          {phaseLayout && (
+            <details key={routeRequestId} className="mt-4 rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
+              <summary className="cursor-pointer font-semibold text-gray-900">Supporting evidence</summary>
+              <div className="mt-2 divide-y divide-gray-200">
+                <StaffReviewSummary requestId={routeRequestId} readOnly inline />
+                {meetingRosterEnabled && <MeetingRoster requestId={routeRequestId} readOnly />}
+                <StaffVisitAssessment requestId={routeRequestId} readOnly />
+              </div>
+            </details>
+          )}
         </>
       ) : activeTab === 'awardee' ? (
         <AwardeeTab
@@ -498,6 +490,17 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
           <p className="text-sm text-gray-500">This panel is coming in a later update.</p>
         </Card>
       )}
+
+      {phaseLayout && (activeTab === 'staff-deliberations' || visitEditorRequestId === routeRequestId) && (
+        <div hidden={activeTab !== 'staff-deliberations'} className="mt-4">
+          {meetingRosterEnabled && <MeetingRoster key={`meeting-roster-editor:${routeRequestId}`} requestId={routeRequestId} />}
+          <StaffVisitAssessment key={`staff-visit-editor:${routeRequestId}`} requestId={routeRequestId} />
+        </div>
+      )}
+      {phaseLayout && activeTab === 'staff-deliberations' && (
+        <StaffReviewSummary key={`deliberations-review-summary:${routeRequestId}`} requestId={routeRequestId} readOnly />
+      )}
+
     </Layout>
   );
 }
