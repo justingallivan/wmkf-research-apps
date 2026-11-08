@@ -130,13 +130,17 @@ export default function ReviewersTab({
       candidate?.declined || candidate?.responseType === 'declined'
     )),
   ], [candidates, removedCandidates]);
-  // Candidates badge: saved candidates not yet invited (and not accepted/declined).
-  const candidatesToInvite = candidates.filter((c) => !c.invited && !c.accepted && !c.declined).length;
+  // Staff can record a received report without an invitation or acceptance.
+  // Such rows belong to Track and Reports, even with both flags unset.
+  const inviteCandidates = candidates.filter((c) => !c.reviewReceivedAt);
+  const candidatesToInvite = inviteCandidates.filter((c) => (
+    !c.invited && !c.accepted && !c.declined && !c.responseType && c.canRemove !== false
+  )).length;
   // Invited, no answer yet, not closed by a response type. These never reach
   // the reviewers roster (accepted onward), yet synthesis waits on them, so
   // Track Reviewers lists them as a trailing group and counts them (owner,
   // 2026-09-09: an unanswered invite was invisible everywhere but Invite).
-  const pendingInvites = candidates.filter((c) => c.invited && !c.accepted && !c.declined && !c.responseType);
+  const pendingInvites = inviteCandidates.filter((c) => c.invited && !c.accepted && !c.declined && !c.responseType);
 
   const subParam = typeof router.query.sub === 'string' ? router.query.sub : null;
   const normalizedSubParam = subParam === 'invite' || subParam === 'completed' ? 'track' : subParam;
@@ -632,7 +636,7 @@ export default function ReviewersTab({
       ) : current === 'candidates' ? (
         <ReviewerInvitePanel
           requestId={requestId}
-          candidates={candidates}
+          candidates={inviteCandidates}
           removedCandidates={removedCandidates}
           loading={candidatesLoading}
           onRefresh={refreshAll}

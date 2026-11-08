@@ -169,11 +169,16 @@ test('J27 opens on one roster with invitation, response and review progress, and
   router.query = { requestId: REQ, tab: 'peer-review', section: 'panel', proposalFile: existingKey };
   const originalFetch = global.fetch;
   const accepted = { suggestionId: 'a', name: 'Accepted reviewer', invited: true };
+  const receivedWithoutInvite = {
+    suggestionId: 'r', name: 'Received without invite', invited: false, accepted: false,
+    reviewReceivedAt: '2026-11-07T12:00:00Z', canRemove: false,
+  };
   const candidates = [
     { suggestionId: 'p', name: 'Pending reviewer', invited: true },
     { suggestionId: 'd', name: 'Declined reviewer', invited: true, responseType: 'declined' },
     { suggestionId: 's', name: 'Saved candidate' },
     accepted,
+    receivedWithoutInvite,
   ];
   global.fetch = jest.fn((url) => {
     if (url.includes('/api/reviewer-finder/my-candidates')) {
@@ -182,7 +187,10 @@ test('J27 opens on one roster with invitation, response and review progress, and
     if (url.includes('/api/review-manager/reviewers')) {
       return Promise.resolve({ ok: true, json: async () => ({
         success: true,
-        proposals: [{ reviewers: [{ ...accepted, reviewStatus: 'review_received' }] }],
+        proposals: [{ reviewers: [
+          { ...accepted, reviewStatus: 'review_received' },
+          { ...receivedWithoutInvite, reviewStatus: 'review_received' },
+        ] }],
       }) });
     }
     return originalFetch(url);
@@ -195,11 +203,13 @@ test('J27 opens on one roster with invitation, response and review progress, and
   expect(cells(/Declined reviewer/)).toEqual(['Invited', 'Declined', '—']);
   expect(cells(/Saved candidate/)).toEqual(['Not invited', '—', '—']);
   expect(cells(/Accepted reviewer/)).toEqual(['Invited', 'Accepted', 'Review Received']);
+  expect(cells(/Received without invite/)).toEqual(['Unconfirmed', 'Accepted', 'Review Received']);
   expect(findPanelProps).toBeNull();
 
   const navigation = screen.getByRole('navigation', { name: 'Reviewer panel views' });
   const order = () => within(navigation).getAllByRole('button').map(button => button.firstChild.textContent);
   expect(order()).toEqual(['Reviewer roster', 'Find reviewers', 'Invite reviewers', 'Track reviewers']);
+  expect(within(navigation).getByRole('button', { name: 'Invite reviewers 1' })).toBeInTheDocument();
   expect(within(navigation).getByRole('button', { name: 'Reviewer roster' })).toHaveAttribute('aria-current', 'page');
 
   fireEvent.click(within(navigation).getByRole('button', { name: 'Find reviewers' }));
@@ -216,4 +226,7 @@ test('J27 opens on one roster with invitation, response and review progress, and
   expect(router.push.mock.lastCall[0].query).toEqual({
     requestId: REQ, tab: 'peer-review', section: 'panel', proposalFile: existingKey,
   });
+  router.query = { ...router.query, sub: 'candidates' };
+  rerender(<ReviewersTab requestId={REQ} rosterFirst />);
+  expect(invitePanelProps.candidates.map((candidate) => candidate.suggestionId)).toEqual(['p', 'd', 's', 'a']);
 });
