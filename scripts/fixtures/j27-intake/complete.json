@@ -1,0 +1,15 @@
+{
+  "id": "complete",
+  "materialsVersion": "j27-mock-complete-v1",
+  "applicantTitle": "TEST J27: Electrical communication across fungal networks",
+  "layAbstract": "Fungi grow into branching networks. We want to learn whether electrical changes let one branch tell another when food is nearby. We will watch electrical signals while introducing food to one part of a network. The work could show how an organism without nerves coordinates its growth.",
+  "summaryFields": "Scientific Question: Do electrical signals coordinate distant fungal branches?\nPotential Impact: Explain coordination without a nervous system. Establish how local nutrient signals affect network growth.\nRisks: Signals may decay across branch junctions.\nEnabling Advances: The team has demonstrated a fluorescent voltage sensor in fungal cells.\nNew Area: Electrical signaling between fungal branches.\nPeer Groups: Fungal growth and signaling labs.\nPrior Support: No award addresses electrical transmission between fungal branches.",
+  "proposalText": "[page 1]\nProject Narrative\nFungal networks redistribute resources after a branch encounters nutrients. The project asks whether electrical signals coordinate distant branches. The team will deliver nutrients locally and measure electrical signals before and after the stimulus.\n[page 2]\nPreliminary Data and Approach\nThe team has demonstrated a fluorescent voltage sensor in fungal cells. Live microscopy will follow signal propagation across junctions. Signals may decay across branch junctions, leaving transmission unresolved.",
+  "roster": [
+    { "name": "Avery Example", "role": "PI", "rank": "associate professor", "department": "biology", "institution": "Example Institute A" },
+    { "name": "Morgan Sample", "role": "Co-PI", "rank": "professor", "department": "physics", "institution": "Example Institute B" }
+  ],
+  "biosketches": "Avery Example (PI): studies fungal growth and fluorescent voltage sensing.\nMorgan Sample (Co-PI): develops optical measurements of electrical signals.",
+  "otherSupport": "Avery Example: Current award on nutrient uptake in plant roots. Morgan Sample: No current or pending support.",
+  "keckAbstracts": "Mock Award on Mineral Growth (2025)\nThis award measured the formation of ice crystals on mineral surfaces."
+}

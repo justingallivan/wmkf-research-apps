@@ -1,0 +1,14 @@
+{
+  "id": "missing-other-support",
+  "materialsVersion": "j27-mock-missing-other-support-v1",
+  "applicantTitle": "TEST J27: A portable sensor for detecting copper in drinking water",
+  "layAbstract": "We will build a portable device that measures copper in drinking water. The device could help people decide when to send water for a laboratory test. Our tests will measure how accurately it reads copper at different concentrations.",
+  "summaryFields": "Scientific Question: Can a portable device detect copper at useful concentrations?\nPotential Impact: Provide a device for screening drinking water. Reduce unnecessary laboratory tests.\nRisks: Other dissolved metals may interfere with the reading.\nEnabling Advances: A benchtop copper probe has been demonstrated.\nNew Area: Miniaturizing the probe.\nPeer Groups: Water sensor developers.\nPrior Support: Other Support unavailable.",
+  "proposalText": "[page 1]\nProject Narrative\nThe near-term goal is a portable device for screening drinking water. The project will build a handheld reader and compare its accuracy to a laboratory assay. The proposed outcomes are device accuracy and battery life.\n[page 2]\nApproach\nThe team has demonstrated a benchtop copper probe. It will integrate the probe with a handheld reader. Other dissolved metals may interfere with the reading.",
+  "roster": [
+    { "name": "Jordan Example", "role": "PI", "rank": "assistant professor", "department": "chemistry", "institution": "Example Institute C" }
+  ],
+  "biosketches": "Jordan Example (PI): develops electrochemical assays for dissolved metals.",
+  "otherSupport": null,
+  "keckAbstracts": "Mock Award on Mineral Growth (2025)\nThis award measured the formation of ice crystals on mineral surfaces."
+}

@@ -1,0 +1,15 @@
+{
+  "id": "known-keck-overlap",
+  "materialsVersion": "j27-mock-known-keck-overlap-v1",
+  "applicantTitle": "TEST J27: How salt changes freezing on mineral surfaces",
+  "layAbstract": "Ice often starts forming on a surface. We want to know how dissolved salt changes which places on a mineral freeze first. We will use a cold chamber to watch ice form on pieces of one mineral while varying the salt in the water.",
+  "summaryFields": "Scientific Question: How does dissolved salt affect where ice first forms on a mineral surface?\nPotential Impact: Explain which surface sites start freezing. Clarify how salt changes the early stages of ice growth.\nRisks: Salt may accumulate unevenly.\nEnabling Advances: The team has demonstrated a chamber that images freezing as it happens.\nNew Area: Linking site-specific freezing to salt concentration.\nPeer Groups: Ice nucleation laboratories.\nPrior Support: No award addresses the role of salt.",
+  "proposalText": "[page 1]\nProject Narrative\nThe project asks how salt changes where ice first forms on a mineral surface. It will compare freezing at surface sites across three salt concentrations.\n[page 2]\nApproach\nThe team has demonstrated a chamber that images freezing as it happens. It will add a controlled salt gradient. Salt may accumulate unevenly and obscure which sites are responsible for the effect.",
+  "roster": [
+    { "name": "Casey Example", "role": "PI", "rank": "professor", "department": "chemistry", "institution": "Example Institute D" },
+    { "name": "Riley Sample", "role": "Co-PI", "rank": "assistant professor", "department": "earth science", "institution": "Example Institute D" }
+  ],
+  "biosketches": "Casey Example (PI): measures ice formation with optical imaging.\nRiley Sample (Co-PI): characterizes mineral surfaces.",
+  "otherSupport": "Casey Example: Current award on cloud aerosol counting. Riley Sample: No current or pending support.",
+  "keckAbstracts": "Mock Award on Mineral Growth (2025)\nThis award measured the formation of ice crystals on mineral surfaces. It mapped freezing sites with a cold optical chamber.\n\nMock Award on Fungal Growth (2024)\nThis award tracked the movement of water through fungal branches."
+}
