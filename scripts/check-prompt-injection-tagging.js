@@ -522,6 +522,13 @@ const SURFACES = [
     promptFiles: ['shared/config/prompts/j27-methodology.js'],
     callSiteFiles: ['lib/services/execute-prompt.js'],
   },
+  {
+    // P4 wraps the official roster, biosketches, proposal, and current Methodology.
+    id: 'j27-personnel',
+    status: 'migrated',
+    promptFiles: ['shared/config/prompts/j27-personnel.js'],
+    callSiteFiles: ['lib/services/execute-prompt.js'],
+  },
 ];
 
 // Prompt-builder files known NOT to be untrusted-content surfaces (so the

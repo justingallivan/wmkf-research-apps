@@ -78,6 +78,7 @@ afterAll(() => { global.fetch = originalFetch; });
 import { executePrompt } from '../../lib/services/execute-prompt';
 import * as J27ExecutiveSummary from '../../shared/config/prompts/j27-executive-summary';
 import * as J27Methodology from '../../shared/config/prompts/j27-methodology';
+import * as J27Personnel from '../../shared/config/prompts/j27-personnel';
 import { PROMPT_OUTPUT_SCHEMA as REVIEW_SYNTHESIS_OUTPUT_SCHEMA } from '../../shared/config/prompts/review-synthesis';
 import {
   PROMPT_OUTPUT_SCHEMA as PRE_SITE_OUTPUT_SCHEMA,
@@ -256,6 +257,67 @@ describe('J27 intake Methodology', () => {
   test('rejects an unsupported method status', async () => {
     const response = { ...output, enabling_methods: [{ ...output.enabling_methods[0], status: 'guessed' }] };
     await expect(runMethodology({ response })).rejects.toThrow(/in_hand, to_build/);
+  });
+});
+
+describe('J27 intake Personnel', () => {
+  const methodology = 'Staff revised the methodology to emphasize imaging through soil.';
+  const roster = [{ name: 'Taylor Example', role: 'PI', rank: 'professor', department: 'biology' }];
+  const output = {
+    personnel: '<u>Taylor Example</u>, professor of biology, studies fungal communication. Example brings the microscopy expertise needed for imaging.',
+    people: [{
+      ...roster[0], institution: '', expertise: 'fungal microscopy',
+      pioneer: { method: '', proposal_statement: '', biosketch_citation: '' },
+    }],
+    word_budget: 45,
+    titles_dropped: [],
+    open_questions: [{ type: 'expertise_gap', detail: 'Soil imaging expertise is unclear.', page: 2, section: 'Approach' }],
+  };
+
+  function runPersonnel({ includeMethodology = true, response = output } = {}) {
+    promptRow = {
+      ...buildPromptRow([]),
+      wmkf_ai_promptname: J27Personnel.PROMPT_NAME,
+      wmkf_ai_systemprompt: J27Personnel.SYSTEM_PROMPT,
+      wmkf_ai_promptbody: J27Personnel.USER_PROMPT_TEMPLATE,
+      wmkf_ai_promptvariables: JSON.stringify(J27Personnel.PROMPT_VARIABLES),
+      wmkf_ai_promptoutputschema: JSON.stringify(J27Personnel.PROMPT_OUTPUT_SCHEMA),
+    };
+    getRecordImpl = async (entitySet) => entitySet === 'akoya_requests' ? REQUEST_ROW : null;
+    setClaudeJson(response);
+    return executePrompt({
+      promptName: J27Personnel.PROMPT_NAME,
+      requestId: REQUEST_ROW.akoya_requestid,
+      runSource: 'Vercel Test',
+      requireNoPersistence: true,
+      overrideVariables: {
+        proposal_text: '[page 2] The team will image fungal cells in soil.',
+        key_personnel: JSON.stringify(roster),
+        biosketches: 'Taylor Example: fungal microscopy.',
+        ...(includeMethodology ? { methodology } : {}),
+      },
+    });
+  }
+
+  test('passes the official roster and current Methodology and returns questions separately', async () => {
+    const result = await runPersonnel();
+    const providerCall = fetchedBodies.find(({ url }) => url.includes('/v1/messages'));
+    const body = JSON.parse(providerCall.body).messages[0].content;
+    expect(body).toContain(JSON.stringify(roster));
+    expect(body).toContain(methodology);
+    expect(body.match(/\[\[WMKF-UNTRUSTED-CONTENT/g)).toHaveLength(4);
+    expect(result.parsed).toEqual(output);
+    expect(updateCalls).toHaveLength(0);
+  });
+
+  test('fails before generation when the caller omits Methodology', async () => {
+    await expect(runPersonnel({ includeMethodology: false })).rejects.toThrow(/Required override variable "methodology"/);
+    expect(fetchedBodies.some(({ url }) => url.includes('/v1/messages'))).toBe(false);
+  });
+
+  test('rejects a non-PI or non-Co-PI output role', async () => {
+    const response = { ...output, people: [{ ...output.people[0], role: 'Collaborator' }] };
+    await expect(runPersonnel({ response })).rejects.toThrow(/PI, Co-PI/);
   });
 });
 
