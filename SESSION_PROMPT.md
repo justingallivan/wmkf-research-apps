@@ -1,92 +1,83 @@
-# Session 668 Prompt: Resume J27 Phase I after First Cut
+# Session 669 Prompt: Resume J27 leadership reconciliation
 
-## Session 667 Summary — Codex, 2026-11-05 Pacific
+## Session 668 Summary — leadership-reconciliation worktree
 
-- **DONE [VERIFIED via PR #634, CI and sandbox browser rehearsal].** First Cut
-  shipped in `71d4b6cf`. Justin owns the app. On the J27 Workbench Proposal
-  tab, the request's lead PD or a superuser can save Yes → Scored
-  (`100000004`) or No → Not Scored (`100000005`) when Phase I Status is blank,
-  Pending Committee Review, Scored or Not Scored. Other statuses are read-only.
-- **DONE [VERIFIED via PR #635, integrated tests and Production deployment].**
-  The UI exploration chat removed the standalone Status tab in `dc3eb523`.
-  Request status remains on Overview and First Cut stays on Proposal. The
-  combined branch passed 58 focused tests. GitHub Production deployment
-  `7592275420` for `dc3eb523` succeeded. No Production write smoke was run.
-- **Sandbox proof.** Synthetic request 1000368 was created directly through the
-  sandbox Dataverse API, outside the Test Request Factory. It is titled
-  `TEST: J27 First Cut browser rehearsal 91d4c65f` and has no Factory marker or
-  ledger run. Local Workbench saved Yes, rejected a stale No from a second tab,
-  then saved No from the refreshed tab. Not Scored persisted after reload.
-  The fixture remains in the sandbox. Preserve it unless the owner directs
-  otherwise. Local app server was stopped after the rehearsal.
-- **Review and CI.** Claude Opus identified the normalized `_etag` mismatch.
-  `f2fa1b154` fixed both services and added adapter-shaped regression coverage.
-  `5eb3e686b` corrected a stale resolver test projection after the first CI
-  run. Full Jest passed before merge. The claim-evidence report could not read
-  local state, so no pilot observation was added.
+- **DONE [VERIFIED via branch commits and sandbox readback].** P1 allows
+  titles without a “To” opening. P2–P6 have governed definitions. The
+  sandbox has P1–P6 v1 and the Intake comparison field. Fixture tests and
+  a live prompt-only synthetic rehearsal ran. The end-to-end paired
+  Dataverse rehearsal still needs a usable Factory request and the
+  deployed ternary flow receipt.
+- **DONE [VERIFIED via live rehearsal receipts].** The D26 comparison
+  covered all 23 staff-invited proposals using their Phase I materials.
+  The retired Check-in ternary proxy returned 22 Fit and one Unclear.
+  Beth’s P6 returned yellow feasibility on all 23. Justin emailed the
+  report to colleagues. The local HTML is private rehearsal evidence
+  and is outside Git.
+- **DONE [VERIFIED via 7996d7ac2, 42 focused tests, and sandbox readback].**
+  P8 Field Analysis is separate from the Field Primer. Its governed
+  `j27.field-analysis.generate` v1 is in the sandbox catalog. The service
+  reuses OpenAlex and PubMed for literature leads and validates citations
+  against caller-supplied checked sources. It returns the brief, open
+  questions, and PD notes separately. The request field, staff panel,
+  source-opening workflow, automation, and live P8 rehearsal remain planned.
+- The claim-evidence pilot report could not read local observation state.
+  No pilot row was added. No production milestone shipped in this
+  workstream, so no development-log entry was required.
+
+### Commits
+
+- `a15578a08`, `0f6b6547b` — Adapt P1 short title and allow non-“To” openings.
+- `34220caca`, `edb709fed`, `9be2942f0`, `94a774186` — Govern P2–P5.
+- `580c7ccc0`, `52e872dfc`, `b511deabd` — Pair P6 with independent fit, add
+  the fixture runner, and record the sandbox rehearsal.
+- `7996d7ac2` — Add governed First Cut Field Analysis and its handoff lists.
 
 ## Next Items
 
-### Verified Open
-
-1. **Semi-finalist.** The app behavior is planned. Yes writes Recommended Invite
-   (`707510005`) and No writes Recommended Do Not Invite (`707510006`), both
-   verified in Production choice metadata. These replace First Cut in the same
-   `wmkf_phaseistatus` field. The existing First Cut guard locks both
-   recommendations. Before implementing the Semi-finalist save, verify J27
-   draft-email triggers and repeat-edit behavior. Historical workflow evidence
-   lives in `lib/services/test-requests/status-transitions.js`.
-2. **Intake display and staff field contract.** Connor owns intake AI Summary,
-   Fit Flag (Fit, Not a fit, Unclear), Fit Rationale, and draft staff rationale.
-   Justin owns the app. Agree on the fields and draft-to-edit handoff before
-   staff saves. Initial Assessment defaults to Not yet assessed, with
-   Recommend advancement and Recommend triage as staff choices. Disposition
-   reason is editable free text and can be supplied later. Staff need to see
-   which requests lack the disposition or reason and which have both.
-
 ### Owner Decision Needed
 
-- Decide whether staff need to retain the original First Cut answer after a
-  Semi-finalist recommendation replaces the status. Grants Manager owns final
-  Invited and Not Invited outcomes.
-- Confirm whether the AI fit flag affects Flagged for concerns, the remaining
-  intake output formats and owners, staff queues, Chairs materials, and calendar
-  changes. The November 15 target was for earlier scope and needs reconfirmation.
-
-### Parked
-
-- Phase II, bulk edits, queues and packet exports. See the cycle plan for the
-  parked requirements and prior decisions.
+1. **Fit screen [PARKED until staff feedback].** Justin currently favors
+   ternary. Leave the decision open until he has heard back. The D26
+   Check-in result was a proxy. The deployed Connor prompt or receipt
+   still needs to be identified before an exact flow comparison.
+2. **P8 implementation follow-up [PARKED at Justin’s request].** Resume
+   the discussion of Connor’s and Justin’s responsibilities before
+   provisioning the request field or building the panel or trigger.
+   Connor’s open items are timestamp semantics, Summary field mappings,
+   the P2–P4 question handoff, and sandbox provisioning. Justin’s open
+   items are the staff-only manual run, source verification, and separate
+   brief, question, and note views. The detailed list is in
+   `docs/plans/J27_INTAKE_FIT_COMPARISON.md` under First Cut Field Analysis.
 
 ### Verify Before Acting
 
-- Historical retirement and cleanup items require live caller checks. Prior
-  Production-read permissions remain scoped to their named lookups.
-- Session 666 and the workbook reference are preserved at
-  `git show e869e6c2c:SESSION_PROMPT.md`. For earlier packet and editing
-  decisions see `git show 2f9e47cbd:SESSION_PROMPT.md`.
+- Recheck sandbox permissions, proposal timestamp semantics, and the
+  source for saved intake questions before a live P8 run. The current
+  intake rehearsal keeps questions in the receipt.
+- Keep production release and Dataverse changes within their separately
+  authorized scope. This branch is the handoff destination for the
+  leadership workstream.
 
-### Key Files
+## Key Files
 
 | File | Purpose |
 |---|---|
-| `docs/plans/J27_CYCLE_INFORMATION_PLAN_2026-11-04.md` | Phase I build order and remaining decisions |
-| `shared/components/workbench/FirstCutCard.js` | Proposal-tab control |
-| `lib/services/workbench/resolve-request-service.js` | J27 status and row version for the Proposal tab |
-| `pages/api/workbench/first-cut.js` and `lib/services/workbench/first-cut-service.js` | Guarded, conditional First Cut save |
+| `docs/plans/J27_INTAKE_FIT_COMPARISON.md` | Intake state and Connor/Justin P8 action lists |
+| `shared/config/prompts/j27-field-analysis.js` | Governed P8 definition |
+| `lib/services/workbench/j27-field-analysis.js` | Literature lead search and validated P8 draft |
+| `scripts/seed-j27-field-analysis-prompt.js` | Create-only P8 catalog bootstrap |
+| `scripts/fixtures/j27-intake/README.md` | Intake rehearsal and prerequisites |
 
 ## Concurrent Streams and Preservation
 
-These are dated inherited resume boundaries, not fresh deployment audits or
-permissions. Preserve fixtures, artifacts and other worktrees.
+The prior handoff is retrievable with
+`git show 7996d7ac2:SESSION_PROMPT.md`. Its worktree and permission
+notes are historical.
 
-| Owner / stream | Resume boundary and authority |
+| Stream | Owning plan or resume boundary |
 |---|---|
-| Codex / J27 Factory | `docs/plans/J27_TEST_REQUEST_FACTORY_FINISH_PLAN_2026-11-02.md` and `docs/TEST_REQUEST_FACTORY_FORM_RUNBOOK.md`; completed bounded rehearsal and owner-deferred broader workflow. Full historical evidence/ledger identities remain in the prior handoff and owning receipts. |
-| Claude / Preview CSRF | PR #620 and closeout #621 merged; `docs/plans/PREVIEW_ALIAS_CSRF_ORIGIN_PLAN_2026-11-03.md`. No new test writes authorized. |
-| Claude / per-reminder history | PR #625 runtime and #628 closeout merged; `docs/plans/PER_REMINDER_HISTORY_PLAN_2026-11-03.md` and `docs/atlas/postgres-reviewer-reminder-events.md`. Staged proof owner-deferred; do not reuse or mutate preserved fixtures. |
-| Claude / shared prompts | `docs/plans/SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md`; `phase-i.checkin` deprecation is resolved by owner decision 2026-11-04. Smoke/name-length uncertainty and parked catalog/group work need fresh verification before becoming tasks. |
-| Codex / Integrity | Session 658 at `git show 9db614417:SESSION_PROMPT.md`; first Dec 1 monthly refresh is future at this stop. Preserve `.integrity-backups/2026-11-02-pre-refresh/`; no restore authorized. |
-| Claude / reviewer outcomes and invitations | `docs/plans/INVITED_REVIEWER_OUTCOMES_PLAN_2026-10-31.md` and `docs/plans/REVIEWER_INVITATION_CALENDAR_BUILD_PLAN_2026-10-29.md`; not re-audited here. |
-| Codex / terminology | `docs/audits/terminology-completion-audit-2026-11-01.md`; preserve acceptance limits and local colleague brief. |
-| Other worktrees/local artifacts | Prior handoff has dated locations; preserve unknown WIP and private rehearsal evidence. No worktree/artifact disposal authorized. |
+| J27 Phase I workflow | `docs/plans/J27_CYCLE_INFORMATION_PLAN_2026-11-04.md` and the prior Session 668 handoff for First Cut and Semi-finalist. Recheck the owning branch for newer work. |
+| J27 Test Request Factory | `docs/plans/J27_TEST_REQUEST_FACTORY_FINISH_PLAN_2026-11-02.md` and `docs/TEST_REQUEST_FACTORY_FORM_RUNBOOK.md`. Preserve existing fixtures and evidence. |
+| Shared prompt library | `docs/plans/SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md`. The retired Check-in prompt was used only as D26 comparison evidence. |
+| Other concurrent work | The prior handoff indexes Preview CSRF, reminder history, integrity, reviewer outcomes and invitations, and terminology. Their owning plans and branches remain authoritative. |

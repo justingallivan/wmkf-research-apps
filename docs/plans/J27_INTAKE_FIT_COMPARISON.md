@@ -73,6 +73,10 @@ the Intake snapshot when those stages are added.
 
 ## First Cut Field Analysis (P8)
 
+**Resume status:** Justin parked the implementation follow-up for the next
+session. Revisit the handoff responsibilities before starting provisioning,
+source verification, the staff panel, or automation.
+
 **Implemented on this branch:** The governed `j27.field-analysis.generate`
 prompt drafts State of play, Novelty, and Claims checked in at most 600
 words. It returns open questions and PD notes separately. The sandbox
