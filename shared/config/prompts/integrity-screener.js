@@ -20,7 +20,7 @@ For "flag_for_review", include up to three findings. Each finding must have:
 - "identityEvidence": a short verbatim excerpt from that result showing a distinctive detail beyond the applicant's name.
 - "conductEvidence": a short verbatim excerpt from that result describing the reported conduct or finding.
 
-Copy each excerpt from the headline or snippet. Do not paraphrase or provide URLs. Return an empty "findings" array for "clear" and "inconclusive". Return JSON only.`;
+Copy each excerpt from the headline or snippet. Do not paraphrase or provide URLs. Return an empty "findings" array for "clear" and "inconclusive". Return the JSON object only, without Markdown fences or additional explanation.`;
 }
 
 module.exports = { integrityPrompts: { newsAnalysis } };

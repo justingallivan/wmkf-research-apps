@@ -823,9 +823,15 @@ Source policy 3 (live via PR #607, 2026-11-02) removes the PubPeer analysis prom
 as `flag_for_review`, `clear`, or `inconclusive`. It treats a shared name
 alone as insufficient and distinguishes allegations from official findings.
 A flag requires a numbered source and verbatim identity and conduct excerpts.
-The app checks both excerpts against that source and displays the original
-search result URL. Invalid responses and source failures leave the news
+Supported models return schema-constrained JSON. The app checks both excerpts
+against the cited source and displays the original search result URL. Invalid responses and source failures leave the news
 screen incomplete. Historical saved results keep their existing format.
+
+**[VERIFIED via synthetic live Claude evaluation]** Haiku 4.5 returned the
+expected outcomes with the schema enabled for an allegation, an official
+finding, a clear namesake, routine academic news, and ambiguous identity.
+A simulated search outage stopped before model analysis. This evaluation
+used supplied search results.
 
 The executable prompt is in `shared/config/prompts/integrity-screener.js`.
 

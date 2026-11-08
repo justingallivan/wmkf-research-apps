@@ -232,6 +232,10 @@ test('a grounded allegation survives old clear wording and carries its original 
   expect(result.sources.news.summary).toContain('Reported allegation: “was accused of diverting grant funds”');
   expect(result.sources.news.summary).toContain('Identity evidence: “a materials scientist at Example University”');
   expect(mockComplete.mock.calls[0][0].system).toContain('A shared name is insufficient.');
+  expect(mockComplete.mock.calls[0][0].outputConfig.format).toMatchObject({
+    type: 'json_schema',
+    schema: { properties: { outcome: { enum: ['flag_for_review', 'clear', 'inconclusive'] } } },
+  });
   expect(mockComplete.mock.calls[0][0].messages[0].content).toContain('[6] Example University opens an inquiry');
   expect(result.matchCount).toBe(1);
   await expectAlertFlag(result, true);
@@ -257,6 +261,9 @@ test.each([
   ['invented conduct evidence', () => modelNews('flag_for_review', [{ ...citedAllegation, conductEvidence: 'was convicted of fraud' }])],
   ['a nonexistent citation', () => modelNews('flag_for_review', [{ ...citedAllegation, sourceIndex: 2 }])],
   ['unexpected prose', () => mockComplete.mockResolvedValue({ text: 'Nothing of concern was identified.' })],
+  ['fenced JSON followed by extra prose', () => mockComplete.mockResolvedValue({
+    text: '```json\n{"outcome":"clear","findings":[]}\n```\nAn extra explanation.',
+  })],
 ])('%s is incomplete and produces no news finding', async (_label, response) => {
   mockNews([allegation]);
   response();
@@ -264,6 +271,15 @@ test.each([
   expect(result.sources.news).toMatchObject({ analysisOutcome: 'inconclusive', hasConcerns: false, error: expect.any(String) });
   expect(integrityIncomplete(result)).toBe(true);
   await expectAlertFlag(result, false);
+});
+
+test('a single fenced JSON value still passes evidence checks for legacy model overrides', async () => {
+  mockNews([allegation]);
+  mockComplete.mockResolvedValue({ text: '```json\n{"outcome":"inconclusive","findings":[]}\n```' });
+  const result = await screen();
+  expect(result.sources.news).toMatchObject({
+    analysisOutcome: 'inconclusive', error: 'The available news evidence was inconclusive.',
+  });
 });
 
 test.each([strict, {}])('a search outage stays incomplete in either caller (%j)', async options => {
