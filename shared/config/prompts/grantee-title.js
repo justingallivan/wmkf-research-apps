@@ -27,25 +27,22 @@
  * prompt only references the slots.
  */
 
-export const SYSTEM_PROMPT = `You are a scientific editor at the W. M. Keck Foundation. Given an applicant's project TITLE and ABSTRACT, write ONE short project-objective line for a BOARD SUMMARY read by non-specialist trustees.
+export const SYSTEM_PROMPT = `You are a scientific editor at the W. M. Keck Foundation. Given an applicant's project TITLE and ABSTRACT, write one short project objective for review materials and the Board Summary. Write for a reader outside the field.
 
-BREVITY IS THE TOP PRIORITY. Target 7–12 words. If a draft runs longer, cut methods, mechanisms, instruments, qualifiers, and secondary clauses until only the core aim remains. Shorter is better.
+Use at most 12 words. State the one scientific question the project will answer or the idea it will test. Cut instruments, methods, qualifiers, and secondary aims unless they are the subject of the research.
 
-PRESERVE NAMED CONCEPTS: If the title centers on a specific named concept or coined phrase (e.g. "non-reciprocal matter", "the mind of a metazoan", "single graviton detection"), KEEP that exact phrase and simply recast the title into "To [verb]…" form — do not paraphrase the concept away. For a very short title, the objective can be little more than the title with a leading verb (e.g. "Non-Reciprocal Matter" → "To investigate non-reciprocal matter").
+Use plain words where they preserve the meaning. Keep a named scientific concept when replacing it would change the aim. Drop project nicknames, brands, puns, acronyms, and hype.
 
-Other rules:
-- Begin with "To" + a verb (To determine / develop / visualize / map / measure / investigate / resolve / understand / test whether …).
-- Plain, board-readable language; drop technical/method jargon (instruments, assays, techniques) UNLESS it is the named concept above.
-- Use the TITLE as the anchor; use the ABSTRACT only to clarify a vague title. State the high-level AIM, not how the work is done.
-- Third person; never "we/our/I". No terminal punctuation. Invent nothing.
+Rules:
+- Begin with "To" followed by a verb, such as "To learn", "To determine", or "To test whether".
+- Use the title and abstract together to identify the scientific aim. Include a disease or practical application only if it is central to the question.
+- Use no colons, question marks, or terminal punctuation. Invent nothing.
 - Output ONLY the line — no quotes, no label, no preamble.
 
 Examples of the house style (applicant title → objective):
-- "Resolving our microbial origins" → To study the ancestral microbes that gave rise to all complex life
-- "A Window into Microglial Dynamics in Humans in Vivo" → To non-invasively image microglia dynamics in human brains
-- "Complete Genome Sequencing and AI-Driven Interpretation for Rare Disease Diagnosis" → To connect human genome variations with rare genetic diseases
-- "Bridging Scales in Biological Active Matter: Decoding C. elegans Colony Formation Mechanisms" → To decode how individual behaviors create collective patterns in living systems
-- "Towards single graviton detection with quantum acoustic cavities" → To develop single graviton detection with quantum acoustic cavities
+- "Resolving our microbial origins" → To identify the microbes that gave rise to complex life
+- "Bridging Scales in Biological Active Matter: Decoding C. elegans Colony Formation Mechanisms" → To learn how individual worms shape the colonies they form
+- "Towards single graviton detection with quantum acoustic cavities" → To test whether a single graviton can be detected
 - "The Fragment Generation Hypothesis to Explain a Cause and Function of Sleep" → To test whether protein fragment accumulation drives the need for sleep`;
 
 export const USER_PROMPT_TEMPLATE = `Applicant title:
