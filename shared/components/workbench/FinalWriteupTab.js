@@ -25,9 +25,9 @@ const ACKNOWLEDGEMENT_SCHEMA_NOT_READY = 'final_writeup_acknowledgement_schema_n
 const SITE_VISIT_PREREQUISITE_MESSAGE = 'Final writeup needs a draft writeup first. '
   + 'Check draft writeup preparation in Staff Deliberations. It becomes available after the scheduled research presentation ends.';
 
-function transitionErrorMessage(error) {
+function transitionErrorMessage(error, boardDraftAvailable = false) {
   return error?.code === 'final_writeup_source_missing'
-    ? SITE_VISIT_PREREQUISITE_MESSAGE
+    ? boardDraftAvailable ? 'The Board draft changed. Refresh Final Assessment to see the current draft.' : SITE_VISIT_PREREQUISITE_MESSAGE
     : error?.message;
 }
 // Phases with a current Final row: review tracking loads and the review panel renders.
@@ -249,12 +249,16 @@ function ReviewerInitial({ reviewer }) {
   );
 }
 
-export default function FinalWriteupTab({ requestId }) {
+export default function FinalWriteupTab({ requestId, renderBoardDraft = null }) {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(false);
   const [starting, setStarting] = useState(false);
   const [advancing, setAdvancing] = useState(false);
   const [error, setError] = useState(null);
+  const [needsBoardDraft, setNeedsBoardDraft] = useState(false);
+  const [showBoardDraft, setShowBoardDraft] = useState(false);
+  const [statusReload, setStatusReload] = useState(0);
+  const reloadStatus = useCallback(() => setStatusReload(value => value + 1), []);
   // null | 'group' | 'leadership': which governed transition the dialog confirms.
   const [confirming, setConfirming] = useState(null);
   const [acknowledgement, setAcknowledgement] = useState(null);
@@ -267,6 +271,7 @@ export default function FinalWriteupTab({ requestId }) {
   const cancelButtonRef = useRef(null);
   const confirmButtonRef = useRef(null);
 
+  const boardDraftAvailable = Boolean(renderBoardDraft);
   const load = useCallback(async (signal) => {
     if (!requestId) return null;
     return fetchStatus(requestId, signal);
@@ -288,11 +293,18 @@ export default function FinalWriteupTab({ requestId }) {
     if (requestId) {
       load(controller.signal)
         .then((next) => {
-          if (activeController.current === controller) setStatus(next);
+          if (activeController.current === controller) {
+            setStatus(next);
+            setNeedsBoardDraft(false);
+          }
         })
         .catch((loadError) => {
           if (activeController.current === controller && loadError?.name !== 'AbortError') {
-            setError(transitionErrorMessage(loadError));
+            const draftNeeded = boardDraftAvailable && (
+              loadError.code === 'final_writeup_source_missing' || loadError.code === 'final_writeup_source_ineligible'
+            );
+            setNeedsBoardDraft(draftNeeded);
+            if (!draftNeeded) setError(transitionErrorMessage(loadError));
           }
         })
         .finally(() => {
@@ -303,7 +315,7 @@ export default function FinalWriteupTab({ requestId }) {
       controller.abort();
       acknowledgementController.current?.abort();
     };
-  }, [requestId, load]);
+  }, [requestId, load, boardDraftAvailable, statusReload]);
 
   const acknowledgementArtifactId = IN_REVIEW_PHASES.has(status?.phase)
     ? status?.artifact?.artifactId || null
@@ -420,7 +432,7 @@ export default function FinalWriteupTab({ requestId }) {
       }
     } catch (startError) {
       if (activeController.current === controller && startError?.name !== 'AbortError') {
-        setError(transitionErrorMessage(startError));
+        setError(transitionErrorMessage(startError, boardDraftAvailable));
       }
     } finally {
       if (activeController.current === controller) {
@@ -542,29 +554,7 @@ export default function FinalWriteupTab({ requestId }) {
           <p>{error}</p>
           <button
             type="button"
-            onClick={() => {
-              activeController.current?.abort();
-              const controller = new AbortController();
-              activeController.current = controller;
-              setError(null);
-              setLoading(true);
-              load(controller.signal)
-                .then((next) => {
-                  if (activeController.current === controller) setStatus(next);
-                })
-                .catch((loadError) => {
-                  if (activeController.current === controller
-                    && loadError?.name !== 'AbortError') {
-                    setError(transitionErrorMessage(loadError));
-                  }
-                })
-                .finally(() => {
-                  if (activeController.current === controller) {
-                    activeController.current = null;
-                    setLoading(false);
-                  }
-                });
-            }}
+            onClick={reloadStatus}
             className="mt-2 font-medium underline decoration-red-300 underline-offset-4 hover:decoration-red-700 focus:outline-none focus:ring-2 focus:ring-red-700 focus:ring-offset-2"
           >
             Try again
@@ -574,9 +564,11 @@ export default function FinalWriteupTab({ requestId }) {
 
       <Card hover={false}>
         <div className="max-w-3xl">
-          <h2 className="text-xl font-semibold tracking-tight text-gray-900">Final writeup</h2>
+          <h2 className="text-xl font-semibold tracking-tight text-gray-900">{boardDraftAvailable ? 'Board recommendation' : 'Final writeup'}</h2>
           <p className="mt-2 text-sm leading-6 text-gray-600">
-            The final writeup continues the same editable document prepared as the draft writeup. Starting a review records its current Word version.
+            {boardDraftAvailable
+              ? 'Write the Board recommendation in Word. Starting group review records its current Word version.'
+              : 'The final writeup continues the same editable document prepared as the draft writeup. Starting a review records its current Word version.'}
           </p>
         </div>
 
@@ -776,6 +768,24 @@ export default function FinalWriteupTab({ requestId }) {
           </div>
         ) : null}
       </Card>
+
+      {boardDraftAvailable && (needsBoardDraft || status) && (
+        needsBoardDraft ? renderBoardDraft({ onDraftChange: reloadStatus, watchForReadyDraft: true }) : (
+          <details className="rounded-lg border bg-white p-4" onToggle={event => {
+            if (event.currentTarget.open) setShowBoardDraft(true);
+          }}>
+            <summary className="cursor-pointer font-semibold">Board draft tools</summary>
+            {showBoardDraft && (
+              <div className="mt-3">
+                {renderBoardDraft({
+                  boardDraftAlreadyLinked: Boolean(status.sourceFile?.webUrl || artifact?.file?.webUrl),
+                  onDraftChange: reloadStatus,
+                })}
+              </div>
+            )}
+          </details>
+        )
+      )}
 
       {confirming && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="presentation">

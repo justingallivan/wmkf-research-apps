@@ -100,3 +100,34 @@ test('saving fails closed if staff attribution is disabled', async () => {
   expect(res.status).toHaveBeenCalledWith(503);
   expect(updateById).not.toHaveBeenCalled();
 });
+
+test('the downstream handoff reads current facts and the saved interpretation together', async () => {
+  getById.mockResolvedValue({ ...row, wmkf_staffreviewsummary: body.summary, wmkf_staffreviewevidencehash: evidenceHash });
+  const currentEvidenceHash = 'b'.repeat(64);
+  getReviewers.mockResolvedValue({ proposals: [{
+    proposalId: requestId,
+    staffReviewEvidenceHash: currentEvidenceHash,
+    reviewers: [
+      { name: 'Taylor Example', affiliation: 'Field Science Center', reviewReceivedAt: '2026-11-07', reviewerOverallAssessment: 4 },
+      { name: 'Robin Example', affiliation: 'Coastal Research Institute', reviewReceivedAt: '2026-11-07', reviewerOverallAssessment: 5 },
+      { name: 'Pending Reviewer', affiliation: 'Example University' },
+    ],
+  }] });
+  const res = response();
+  await handler({ method: 'GET', query: { requestId, includeReviewerFacts: '1' } }, res);
+  expect(res.json).toHaveBeenCalledWith({
+    summary: body.summary, evidenceHash, version, currentEvidenceHash,
+    reviewerFacts: 'We received two reviews with scores of one Excellent and one Very Good. The reviewers were Robin Example of Coastal Research Institute; and Taylor Example of Field Science Center.',
+  });
+  expect(updateById).not.toHaveBeenCalled();
+});
+
+test('a failed reviewer read still returns the saved staff interpretation', async () => {
+  getById.mockResolvedValue({ ...row, wmkf_staffreviewsummary: body.summary });
+  getReviewers.mockRejectedValue(new Error('Source unavailable'));
+  const res = response();
+  await handler({ method: 'GET', query: { requestId, includeReviewerFacts: '1' } }, res);
+  expect(res.json).toHaveBeenCalledWith({
+    summary: body.summary, evidenceHash: null, version, currentEvidenceHash: null, reviewerFacts: null,
+  });
+});

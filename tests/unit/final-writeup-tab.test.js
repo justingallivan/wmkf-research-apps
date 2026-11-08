@@ -725,3 +725,38 @@ describe('leadership digest copy (group-review Stage 5)', () => {
     expect(dialog).not.toHaveTextContent(absent);
   });
 });
+
+test('J27 prepares the Board draft here and reloads the same Word workflow when preparation completes', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response({
+      error: 'A Draft writeup is required before Final writeup can start.',
+      code: 'final_writeup_source_missing',
+    }, 409))
+    .mockResolvedValueOnce(response({ ...readyStatus(), sourceFile: {
+      name: 'Draft.docx', webUrl: 'https://sharepoint.test/site-visit.docx',
+    } }));
+  render(<FinalWriteupTab requestId={REQUEST_ID} renderBoardDraft={({ onDraftChange }) => (
+    <button type="button" onClick={onDraftChange}>Finish preparing draft</button>
+  )} />);
+
+  expect(screen.getByRole('heading', { name: 'Board recommendation' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Ready for group review' })).toBeNull();
+  fireEvent.click(await screen.findByRole('button', { name: 'Finish preparing draft' }));
+  expect(await screen.findByRole('link', { name: 'Open draft in Word' })).toHaveAttribute('href', 'https://sharepoint.test/site-visit.docx');
+  expect(screen.getByRole('button', { name: 'Ready for group review' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Finish preparing draft' })).toBeNull();
+  expect(global.fetch.mock.calls.every(([, init]) => init.method === 'GET')).toBe(true);
+});
+
+test('J27 retains Board draft tools when group review setup is inactive', async () => {
+  global.fetch.mockResolvedValueOnce(response({ available: false, phase: 'unavailable' }));
+  render(<FinalWriteupTab requestId={REQUEST_ID} renderBoardDraft={({ boardDraftAlreadyLinked }) => (
+    <p>{boardDraftAlreadyLinked ? 'Draft already linked' : 'Draft preparation available'}</p>
+  )} />);
+  expect(await screen.findByRole('heading', { name: 'Final writeup setup is not active' })).toBeInTheDocument();
+  const tools = screen.getByText('Board draft tools').closest('details');
+  tools.open = true;
+  fireEvent(tools, new Event('toggle'));
+  expect(await screen.findByText('Draft preparation available')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Ready for group review' })).toBeNull();
+});

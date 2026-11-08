@@ -4,7 +4,7 @@ import { isGuid } from '../../../lib/utils/guid';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
 import {
-  getStaffReviewSummary, saveStaffReviewSummary, staffReviewSummaryEnabled,
+  getStaffReviewHandoff, getStaffReviewSummary, saveStaffReviewSummary, staffReviewSummaryEnabled,
 } from '../../../lib/services/workbench/staff-review-summary-service';
 
 export const config = { api: { bodyParser: { sizeLimit: '64kb' } } };
@@ -24,7 +24,10 @@ export default async function handler(req, res) {
   }
   return withDalContext('workbench-staff-review-summary', async () => {
     try {
-      if (req.method === 'GET') return res.status(200).json(await getStaffReviewSummary(requestId));
+      if (req.method === 'GET') {
+        const read = req.query.includeReviewerFacts === '1' ? getStaffReviewHandoff : getStaffReviewSummary;
+        return res.status(200).json(await read(requestId));
+      }
       const actor = actorRefFromSession(access.session);
       if (!isGuid(actor)) return res.status(403).json({ error: 'A mapped staff identity is required.' });
       if (process.env.DYNAMICS_IMPERSONATION_ENABLED !== 'true') {

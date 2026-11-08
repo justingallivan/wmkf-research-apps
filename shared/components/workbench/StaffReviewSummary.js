@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button, Card } from '../Layout';
 import { requestJson } from '../../utils/api-request';
-import { composeScoreSentence, composeReviewerSentence } from '../../utils/review-writeup-paragraphs';
+import { composeReviewerFacts } from '../../utils/review-writeup-paragraphs';
 
 export default function StaffReviewSummary({ requestId, evidenceHash, reviewers = [], refreshReports, readOnly = false }) {
   const [record, setRecord] = useState(null);
@@ -12,7 +12,8 @@ export default function StaffReviewSummary({ requestId, evidenceHash, reviewers 
   const [conflictSummary, setConflictSummary] = useState(null);
   const generation = useRef(0);
   const endpoint = '/api/workbench/staff-review-summary';
-  const read = () => requestJson(endpoint + '?requestId=' + encodeURIComponent(requestId));
+  const read = () => requestJson(endpoint + '?requestId=' + encodeURIComponent(requestId)
+    + (readOnly ? '&includeReviewerFacts=1' : ''));
 
   useEffect(() => {
     const current = ++generation.current;
@@ -24,7 +25,7 @@ export default function StaffReviewSummary({ requestId, evidenceHash, reviewers 
       if (generation.current === current) setError(failure.message);
     });
     return () => { generation.current += 1; };
-  }, [requestId]);
+  }, [requestId, readOnly]);
 
   async function save(event) {
     event.preventDefault();
@@ -68,24 +69,39 @@ export default function StaffReviewSummary({ requestId, evidenceHash, reviewers 
     }
   }
 
+  const currentEvidenceHash = readOnly ? record?.currentEvidenceHash : evidenceHash;
+  const evidenceChanged = Boolean(record?.evidenceHash && currentEvidenceHash && record.evidenceHash !== currentEvidenceHash);
+  const evidenceNotice = evidenceChanged && (
+    <p className="mt-2 text-sm text-amber-800">Review evidence changed since the summary was saved.</p>
+  );
+
   if (readOnly) {
     return (
       <details className="mb-4 rounded-lg border bg-white p-4">
-        <summary className="font-semibold">Staff review summary</summary>
-        <p className="mt-2 whitespace-pre-wrap text-sm">{error || record?.summary || (record ? 'No staff summary saved.' : 'Loading…')}</p>
+        <summary className="cursor-pointer font-semibold">Staff review summary</summary>
+        {error ? <p role="alert" className="mt-2 text-sm text-red-700">{error}</p> : record ? (
+          <dl className="mt-3 space-y-3 text-sm">
+            <div>
+              <dt className="font-medium">Reviewer facts</dt>
+              <dd>{record.reviewerFacts ?? 'Reviewer facts could not be loaded.'}</dd>
+              {evidenceNotice}
+            </div>
+            <div>
+              <dt className="font-medium">Staff interpretation</dt>
+              <dd className="whitespace-pre-wrap">{record.summary || 'No staff interpretation saved.'}</dd>
+            </div>
+          </dl>
+        ) : <p className="mt-2 text-sm" role="status">Loading staff summary…</p>}
       </details>
     );
   }
 
-  const scores = composeScoreSentence(reviewers).sentence;
-  const names = composeReviewerSentence(reviewers)?.runs.map(run => run.text).join('');
-  const evidenceChanged = Boolean(record?.evidenceHash && evidenceHash && record.evidenceHash !== evidenceHash);
   return (
     <Card hover={false}>
       <h2 className="font-semibold">Staff review summary</h2>
       <p className="mt-2 text-sm font-medium">Reviewer facts</p>
-      <p className="text-sm">{scores || 'No reviews received.'} {names}</p>
-      {evidenceChanged && <p className="mt-2 text-sm text-amber-800">Review evidence changed since the summary was saved.</p>}
+      <p className="text-sm">{composeReviewerFacts(reviewers)}</p>
+      {evidenceNotice}
       {record && (
         <form className="mt-3 space-y-2" onSubmit={save}>
           <label className="block text-sm font-medium" htmlFor="staff-review-interpretation">Staff interpretation</label>

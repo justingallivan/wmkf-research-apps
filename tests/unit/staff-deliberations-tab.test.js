@@ -1921,3 +1921,23 @@ test.each(['draftDirty', 'recoveryPending', 'mutationPending'])('retains a close
   await act(async () => lastDistributionProps.onRetentionChange({ draftDirty: false, editorDirty: false, mutationPending: false, recoveryPending: false }));
   expect(screen.queryByTestId('mock-source-artifact-id')).toBeNull();
 });
+
+test('J27 Deliberations shows presentation evidence and skips earlier Word workflows', async () => {
+  queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(DRAFT) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} mode="presentation" />);
+  expect(await screen.findByRole('heading', { name: /Presentation/ })).toBeInTheDocument();
+  await waitFor(() => expect(calls('presiteGet')).toHaveLength(1));
+  expect(calls('briefGet')).toHaveLength(0);
+  expect(screen.queryByRole('link', { name: /Edit draft writeup in Word/ })).toBeNull();
+  expect(screen.queryByRole('button', { name: /Generate proposal discussion brief/ })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Ready for group review' })).toBeNull();
+});
+
+test('Board draft preparation retains the existing file and excludes early brief and review actions', async () => {
+  queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(DRAFT) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} mode="board-draft" />);
+  expect(await screen.findByRole('link', { name: 'Edit draft writeup in Word' })).toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx');
+  expect(screen.getByRole('heading', { name: /Board recommendation draft/ })).toBeInTheDocument();
+  expect(calls('briefGet')).toHaveLength(0);
+  expect(screen.queryByRole('button', { name: 'Ready for group review' })).toBeNull();
+});

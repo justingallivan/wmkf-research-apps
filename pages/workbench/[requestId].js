@@ -135,7 +135,10 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
     'staff-deliberations': ['deliberations', null],
     'final-writeup': ['final-assessment', null],
   };
-  const legacy = phaseLayout ? legacySections[tabParam] : null;
+  const legacy = phaseLayout && tabParam === 'staff-deliberations'
+    && router.asPath?.endsWith('#deliberations-writeup')
+    ? legacySections['final-writeup']
+    : phaseLayout ? legacySections[tabParam] : null;
   // Preserve the former Overview/Awardee bookmark for requests with an award.
   const awardeeBookmark = showAwardee && tabParam === 'overview' && router.query.section === 'awardee';
   const phase = awardeeBookmark ? 'awardee'
@@ -459,6 +462,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
           requestNumber={visibleContext?.requestNumber || requestNumber || ''}
           isSuperuser={isSuperuser}
           onSelectTab={selectTab}
+          mode={phaseLayout ? 'presentation' : 'legacy'}
         />
       ) : activeTab === 'final-writeup' ? (
         <>
@@ -470,8 +474,17 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
             </>
           )}
           <FinalWriteupTab
-            key={typeof requestId === 'string' ? requestId : ''}
-            requestId={typeof requestId === 'string' ? requestId : ''}
+            key={routeRequestId || ''}
+            requestId={routeRequestId || ''}
+            renderBoardDraft={phaseLayout ? (props) => (
+              <StaffDeliberationsTab
+                requestId={routeRequestId}
+                requestNumber={visibleContext?.requestNumber || requestNumber || ''}
+                isSuperuser={isSuperuser}
+                mode="board-draft"
+                {...props}
+              />
+            ) : null}
           />
         </>
       ) : activeTab === 'awardee' ? (

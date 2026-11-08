@@ -1073,7 +1073,7 @@ export default function ReviewsTab({ requestId, previewReadOnly = false, showSta
         updating={updating}
         previewReadOnly={previewReadOnly}
       />
-      {submitted.length > 0 && (
+      {submitted.length > 0 && !showStaffReviewSummary && (
         <WriteupParagraphsCard
           reviewers={submitted}
           synthesis={activeProposal?.reviewSynthesis ?? null}
