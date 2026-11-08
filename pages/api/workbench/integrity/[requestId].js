@@ -7,6 +7,8 @@ import { withDalContext } from '../../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../../lib/services/service-http-error';
 import { getWorkbenchIntegrityContext } from '../../../../lib/services/workbench/integrity-service';
 import { readJ27IntegrityJob } from '../../../../lib/services/workbench/j27-integrity-jobs';
+import { isJ27IntegritySimulationRequest } from '../../../../lib/utils/j27-integrity-readiness';
+import { getJ27IntegritySimulationSql } from '../../../../lib/services/workbench/j27-integrity-simulation';
 import { isGuid } from '../../../../lib/utils/guid';
 
 export default async function handler(req, res) {
@@ -38,14 +40,17 @@ export default async function handler(req, res) {
 
   return withDalContext('workbench-integrity-latest', async () => {
     try {
-      const result = await getWorkbenchIntegrityContext({
+      const simulated = isJ27IntegritySimulationRequest(requestId);
+      const input = {
         requestId,
         profileId: access.profileId,
-        actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null,
+        actingUserSystemId: simulated ? null : access.session?.user?.dynamicsSystemuserId || null,
         beforeRunId,
-      });
+      };
+      const result = simulated ? await getWorkbenchIntegrityContext(input, { sql: getJ27IntegritySimulationSql() })
+        : await getWorkbenchIntegrityContext(input);
       const automaticScreen = beforeRunId === null ? await readJ27IntegrityJob(requestId) : null;
-      return res.status(200).json({ ...result, ...(automaticScreen && { automaticScreen }) });
+      return res.status(200).json({ ...result, ...(automaticScreen && { automaticScreen }), ...(simulated && { simulated: true }) });
     } catch (error) {
       if (error instanceof ServiceHttpError) {
         return res.status(error.httpStatus).json(error.body || { error: error.message });

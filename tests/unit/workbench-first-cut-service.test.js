@@ -10,7 +10,7 @@ import { isJ27SandboxFactoryRequest } from '../../lib/services/workbench/j27-int
 import { scheduleJ27IntegrityScreen, confirmJ27IntegrityDecision } from '../../lib/services/workbench/j27-integrity-dispatch';
 
 jest.mock('../../lib/utils/j27-integrity-readiness', () => ({
-  j27SemiFinalistEnabled: jest.fn(), j27IntegrityTarget: jest.fn(), j27SemiFinalistRehearsalRequestId: jest.fn(),
+  j27SemiFinalistEnabled: jest.fn(), j27IntegrityTarget: jest.fn(), j27SemiFinalistRehearsalRequestId: jest.fn(), j27IntegritySimulationRequestIds: () => [],
 }));
 jest.mock('../../lib/services/workbench/j27-integrity-jobs', () => ({
   isJ27SandboxFactoryRequest: jest.fn(),

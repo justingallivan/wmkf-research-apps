@@ -1,13 +1,21 @@
 /** @jest-environment node */
 import { runJ27IntegrityJob } from '../../lib/services/workbench/j27-integrity-worker';
-import { j27IntegrityTarget } from '../../lib/utils/j27-integrity-readiness';
+import { j27IntegrityTarget, j27IntegritySimulationRequestIds, isJ27IntegritySimulationRequest } from '../../lib/utils/j27-integrity-readiness';
 import { runWorkbenchIntegrityScreen } from '../../lib/services/workbench/integrity-service';
 import {
   claimJ27IntegrityScreen, confirmJ27IntegrityEligibility, finishJ27IntegrityClaim,
   readJ27IntegrityAttempt, saveJ27IntegrityRun,
 } from '../../lib/services/workbench/j27-integrity-jobs';
 
-jest.mock('../../lib/utils/j27-integrity-readiness', () => ({ j27IntegrityTarget: jest.fn() }));
+jest.mock('../../lib/utils/j27-integrity-readiness', () => ({
+  j27IntegrityTarget: jest.fn(),
+  j27IntegritySimulationRequestIds: jest.fn(),
+  isJ27IntegritySimulationRequest: jest.fn(),
+}));
+jest.mock('../../lib/services/workbench/j27-integrity-simulation', () => ({
+  getJ27IntegritySimulationSql: () => 'isolated-sql',
+  simulatedIntegrityEngine: { screenApplicants: jest.fn() },
+}));
 jest.mock('../../lib/dataverse/core/context', () => ({ withDalContext: (_label, fn) => fn() }));
 jest.mock('../../lib/services/model-override-loader', () => ({ loadModelOverrides: jest.fn() }));
 jest.mock('../../lib/services/workbench/integrity-service', () => ({ runWorkbenchIntegrityScreen: jest.fn() }));
@@ -28,6 +36,7 @@ const screen = () => runJ27IntegrityJob(target, requestId, version);
 beforeEach(() => {
   jest.resetAllMocks();
   j27IntegrityTarget.mockReturnValue(target);
+  j27IntegritySimulationRequestIds.mockReturnValue([]);
   claimJ27IntegrityScreen.mockResolvedValue(job);
   confirmJ27IntegrityEligibility.mockResolvedValue(true);
 });
@@ -63,4 +72,17 @@ test('the worker passes persisted result ownership through the claim', async () 
     expect.objectContaining({ saveRun: expect.any(Function) }),
   );
   expect(saveJ27IntegrityRun).toHaveBeenCalledWith(job, result);
+});
+
+test('Preview simulation refuses unrelated requests and substitutes the isolated engine and SQL', async () => {
+  j27IntegritySimulationRequestIds.mockReturnValue([requestId]);
+  isJ27IntegritySimulationRequest.mockReturnValue(false);
+  await expect(screen()).resolves.toBe('done');
+  expect(claimJ27IntegrityScreen).not.toHaveBeenCalled();
+  isJ27IntegritySimulationRequest.mockReturnValue(true);
+  await expect(screen()).resolves.toBe('done');
+  expect(runWorkbenchIntegrityScreen).toHaveBeenCalledWith(
+    expect.objectContaining({ claudeApiKey: 'simulated', serpApiKey: null }),
+    expect.objectContaining({ sql: 'isolated-sql', IntegrityService: { screenApplicants: expect.any(Function) } }),
+  );
 });

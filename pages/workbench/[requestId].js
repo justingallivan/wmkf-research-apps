@@ -6,7 +6,7 @@
  * phase `section` navigation.
  */
 
-import { j27IntegrityTarget, j27SemiFinalistEnabled, j27SemiFinalistRehearsalRequestId } from '../../lib/utils/j27-integrity-readiness';
+import { j27IntegrityTarget, j27SemiFinalistEnabled, j27SemiFinalistRehearsalRequestId, j27IntegritySimulationRequestIds } from '../../lib/utils/j27-integrity-readiness';
 import { initialAssessmentRationaleEnabled } from '../../lib/utils/initial-assessment-rationale-readiness';
 import InitialAssessmentRationale from '../../shared/components/workbench/InitialAssessmentRationale';
 import { meetingRosterSchemaEnabled } from '../../lib/utils/meeting-roster-readiness';
@@ -67,7 +67,7 @@ const LEGACY_TAB_ALIASES = {
   'site-visit': 'staff-deliberations',
 };
 
-export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary = false, meetingRosterEnabled = false, initialRationaleEnabled = false, semiFinalistEnabled = false, semiFinalistRehearsalRequestId = null, automaticIntegrityEnabled = false }) {
+export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary = false, meetingRosterEnabled = false, initialRationaleEnabled = false, semiFinalistEnabled = false, semiFinalistRehearsalRequestId = null, integritySimulationIds = [], automaticIntegrityEnabled = false }) {
   const router = useRouter();
   const { data: session } = useSession();
   const { isSuperuser, hasAccess } = useAppAccess();
@@ -104,8 +104,9 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
   // The redesigned shell follows the same sandbox boundary as the tested fields.
   const phaseLayout = staffReviewSummary && visibleContext?.cycleCode === 'J27';
   const showInitialRationale = phaseLayout && initialRationaleEnabled;
-  const showSemiFinalist = showInitialRationale && semiFinalistEnabled && (semiFinalistRehearsalRequestId
-    ? routeKey === semiFinalistRehearsalRequestId : visibleContext.isTestRequest === true);
+  const rehearsalIds = semiFinalistRehearsalRequestId ? [semiFinalistRehearsalRequestId] : integritySimulationIds;
+  const showSemiFinalist = showInitialRationale && semiFinalistEnabled && (rehearsalIds.length
+    ? rehearsalIds.includes(routeKey) : visibleContext.isTestRequest === true);
   const showAwardee = phaseLayout && visibleContext.statusClass === 'DECIDED_AWARD';
   const phaseTabs = [
     { key: 'overview', label: 'Overview' },
@@ -491,6 +492,7 @@ export async function getServerSideProps() {
     previewReadOnly, staffReviewSummary, meetingRosterEnabled: meetingRosterSchemaEnabled(),
     initialRationaleEnabled: initialAssessmentRationaleEnabled(), semiFinalistEnabled: j27SemiFinalistEnabled(),
     semiFinalistRehearsalRequestId: j27SemiFinalistRehearsalRequestId(),
+    integritySimulationIds: j27IntegritySimulationRequestIds(),
     automaticIntegrityEnabled: Boolean(j27IntegrityTarget()),
   } };
 }

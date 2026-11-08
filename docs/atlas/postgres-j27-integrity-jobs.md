@@ -36,6 +36,16 @@ reservations become visible failures and release the manual screen guard.
 The worker saves the screening history and job completion in one Postgres
 statement fenced by the lease token.
 
+## Simulated Preview rehearsal
+
+The `simulate` mode admits exactly two designated sandbox request IDs in
+Preview. The first request can reserve a single workflow run. The second
+accepts No without reserving work. The worker uses the existing leases and
+screening save path with a fixture engine instead of search and model calls.
+Queue, screening history, and alert reads use a restricted rehearsal schema
+in the sandbox ledger database, separate from app and Factory tables.
+The linked Integrity view identifies the simulated finding.
+
 ## Alerts and retention
 
 The Integrity page reads the job state alongside the existing screening

@@ -7,6 +7,7 @@ import { loadModelOverrides } from '../../../../../lib/services/model-override-l
 import { ServiceHttpError } from '../../../../../lib/services/service-http-error';
 import { runWorkbenchIntegrityScreen } from '../../../../../lib/services/workbench/integrity-service';
 import { readJ27IntegrityJob } from '../../../../../lib/services/workbench/j27-integrity-jobs';
+import { isJ27IntegritySimulationRequest } from '../../../../../lib/utils/j27-integrity-readiness';
 import { isGuid } from '../../../../../lib/utils/guid';
 
 const limiter = nextRateLimiter({ max: 5 });
@@ -28,6 +29,9 @@ export default async function handler(req, res) {
   const rawRequestId = req.query.requestId;
   const requestId = typeof rawRequestId === 'string' ? rawRequestId.trim() : '';
   if (!isGuid(requestId)) return res.status(400).json({ error: 'requestId must be a GUID' });
+  if (isJ27IntegritySimulationRequest(requestId)) {
+    return res.status(409).json({ error: 'This request is reserved for automatic screening rehearsal.' });
+  }
 
   try {
     // The integrity engine resolves its model synchronously from the warmed
