@@ -26,6 +26,7 @@ jest.mock('../../shared/components/workbench/ReviewsTab', () => function Stub() 
 jest.mock('../../shared/components/workbench/ProposalTab', () => function Stub() { return <div />; });
 jest.mock('../../shared/components/workbench/StatusTab', () => function Stub() { return <div />; });
 jest.mock('../../shared/components/workbench/AwardeeTab', () => function Stub() { return <div />; });
+jest.mock('../../shared/components/workbench/InitialAssessmentRationale', () => function Stub() { return <div />; });
 jest.mock('../../shared/components/workbench/InitialAssessmentTab', () => function Stub() { return <div />; });
 jest.mock('../../shared/components/workbench/StaffDeliberationsTab', () => function Stub() { return <div />; });
 jest.mock('../../shared/components/workbench/FinalWriteupTab', () => function Stub() { return <div />; });
@@ -235,4 +236,19 @@ test('current Panel navigation preserves reviewer selection and repair query sta
     tab: 'peer-review', section: 'panel', sub: 'find', proposalFile: 'document-key',
     repairCandidate: 'candidate', repairSuggestion: 'suggestion',
   } }, undefined, { shallow: true });
+});
+
+test.each([
+  [null, true, false],
+  [100000005, true, false],
+  [100000004, false, false],
+  [100000004, true, true],
+])('J27 exposes Semi-finalist only after First Cut passes on a test request (%s, %s)', async (phaseIStatus, isTestRequest, visible) => {
+  mockAccess = { isSuperuser: true, hasAccess: () => true };
+  mockQuery = { requestId: 'request-1', tab: 'initial-assessment' };
+  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({
+    success: true, requestId: 'request-1', cycleCode: 'J27', isTestRequest, phaseIStatus, requestVersion: 'W/"1"',
+  }) }));
+  await act(async () => { render(<WorkbenchRequest staffReviewSummary initialRationaleEnabled semiFinalistEnabled />); });
+  expect(Boolean(screen.queryByRole('combobox', { name: 'Recommend as a semi-finalist?' }))).toBe(visible);
 });

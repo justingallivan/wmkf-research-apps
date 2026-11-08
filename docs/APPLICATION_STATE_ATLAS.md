@@ -122,6 +122,7 @@ Promote any of these to a per-entity page if app code starts writing to it.
 | Identity (Postgres) + Wave 1 retired entries | `user_profiles` (live); `user_app_access`, `user_preferences`, `system_settings` (RETIRED 2026-05-12, now Dataverse-only) | [postgres-infra-tables.md](atlas/postgres-infra-tables.md) |
 | Dynamics Explorer state | `dynamics_explorer_requests`, `dynamics_query_log`, `dynamics_feedback`, `dynamics_user_roles`, `dynamics_restrictions` — migration 033 applied and was schema/tracker-read-back in Production on 2026-08-21; one signed-in request proved exact lifecycle/query/usage joins | same |
 | Expertise Finder | `expertise_roster`, `expertise_matches` | same |
+| J27 automatic Integrity Screen | `j27_integrity_jobs` | [BRANCH-BUILT] Sandbox factory rehearsal only. Migration 096, disabled by default. | [postgres-j27-integrity-jobs.md](atlas/postgres-j27-integrity-jobs.md) |
 | Integrity Screener | `integrity_screenings`, `integrity_screening_reviews`, `screening_dismissals`, `retractions` | same; request-scoped Workbench screening/history/review is live since 2026-09-30 (PR #366, `fdaec0b1f`); migrations 056–057 applied and verified |
 | Virtual Review Panel (legacy, retired 2026-10-04) | `panel_reviews`, `panel_review_items` | same; tables retained as read-only history, no live writer (service archived to `_archived/lib/services/panel-review-service.js`, S573) |
 | Intake portal (pre-pilot) | `intake_drafts`, `intake_audit` | same |

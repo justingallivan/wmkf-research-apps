@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FIRST_CUT_STATUS, isFirstCutEditable } from '../../config/j27FirstCut';
+import { FIRST_CUT_STATUS, isFirstCutEditable, SEMI_FINALIST_STATUS } from '../../config/j27FirstCut';
 import { requestEnvelope } from '../../utils/api-request';
 
 const terminalClasses = new Set(['DECIDED_AWARD', 'DECIDED_NO_AWARD', 'WITHDRAWN']);
@@ -7,13 +7,17 @@ function memoPresent(record, field) {
   return typeof record[field] === 'string' ? Boolean(record[field].trim()) : null;
 }
 
-function nextAction(context, handoff, progress) {
+function nextAction(context, handoff, progress, semiFinalistEnabled) {
   if (terminalClasses.has(context.statusClass)) {
     return { heading: context.requestStatus || 'Request outcome recorded' };
   }
   if (context.phaseIStatus === FIRST_CUT_STATUS.no) {
     return { heading: 'First Cut marked Not Scored',
       detail: 'The decision and staff rationale are in Initial Assessment.' };
+  }
+  if (context.phaseIStatus === SEMI_FINALIST_STATUS.no) {
+    return { heading: 'Semi-finalist recommendation recorded as No',
+      detail: 'The recommendation is in Initial Assessment.' };
   }
   if (handoff.visit) {
     return { heading: 'Visit assessment saved',
@@ -31,6 +35,10 @@ function nextAction(context, handoff, progress) {
     return { heading: 'Reviewer reports received',
       detail: 'Read the reports and record the staff interpretation in Peer Review.' };
   }
+  if (context.phaseIStatus === SEMI_FINALIST_STATUS.yes) {
+    return { heading: 'Semi-finalist recommendation recorded as Yes',
+      detail: 'Check Initial Assessment for the recommendation and integrity findings.' };
+  }
   if (context.phaseIStatus !== FIRST_CUT_STATUS.yes) {
     if (handoff.rationale === false && isFirstCutEditable(context.phaseIStatus)) {
       return { heading: 'Initial assessment pending',
@@ -40,7 +48,8 @@ function nextAction(context, handoff, progress) {
       detail: 'Check the decision and supporting evidence in Initial Assessment.' };
   }
   return { heading: 'First Cut marked Scored',
-    detail: 'Check the reviewer roster and progress in Peer Review.' };
+    detail: semiFinalistEnabled ? 'Record the semi-finalist recommendation in Initial Assessment.'
+      : 'Check the reviewer roster and progress in Peer Review.' };
 }
 
 function savedLabel(value) {
@@ -50,7 +59,7 @@ function savedLabel(value) {
 }
 
 export default function J27Overview({ context, requestId, reviewerProgress,
-  initialRationaleEnabled, meetingRosterEnabled }) {
+  initialRationaleEnabled, semiFinalistEnabled, meetingRosterEnabled }) {
   const [loaded, setLoaded] = useState(null);
   useEffect(() => {
     const controller = new AbortController();
@@ -85,10 +94,10 @@ export default function J27Overview({ context, requestId, reviewerProgress,
   const handoff = loaded?.requestId === requestId ? loaded : null;
   const terminal = terminalClasses.has(context.statusClass);
   const action = terminal || (handoff && reviewerProgress.status !== 'loading')
-    ? nextAction(context, handoff, reviewerProgress.data) : null;
+    ? nextAction(context, handoff, reviewerProgress.data, semiFinalistEnabled) : null;
   const received = reviewerProgress.data?.counts?.received;
   const showPeerReview = Boolean(handoff && (
-    context.phaseIStatus === FIRST_CUT_STATUS.yes || handoff.review || received > 0
+    handoff.review || received > 0 || (!semiFinalistEnabled && context.phaseIStatus === FIRST_CUT_STATUS.yes)
   ));
   const showDeliberations = Boolean(handoff && (handoff.presentation || handoff.visit));
 

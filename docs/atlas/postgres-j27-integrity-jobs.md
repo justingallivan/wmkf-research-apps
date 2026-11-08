@@ -1,0 +1,52 @@
+# J27 automatic Integrity Screen jobs
+
+**[BRANCH-BUILT]** Migration 096 defines `j27_integrity_jobs`. The rehearsal is
+off by default and has no Production admission. No live migration or screening
+is implied by the source.
+
+## Write and read paths
+
+The J27 Initial Assessment dropdown calls `POST /api/workbench/first-cut` with
+stage `semi-finalist`, authenticated lead PD or superuser authority, and the
+current Dataverse ETag. The decision replaces First Cut in the same
+`akoya_request.wmkf_phaseistatus` field. There is no separate decision field.
+A ready factory run must bind the test request, run ID, and sandbox hostname
+before the save. This protects the shared screening history from copied
+Production request GUIDs. `J27_SEMI_FINALIST_ENABLED=on` also requires the
+existing rationale and test-isolation gates.
+
+With `J27_AUTOMATIC_INTEGRITY=on`, a changed Yes reserves a row keyed by target
+hostname and request GUID and starts a durable Vercel workflow. Only the exact
+successful conditional save confirms its reservation. An unconfirmed reservation
+cannot start screening. A dispatch or confirmation failure does not prevent
+the recommendation from saving. The UI reports the two outcomes separately. Repeated Yes submissions do not start
+another screen. A completed automatic screen stays in history if staff revise
+their recommendation.
+
+The worker takes a six-minute lease before calling the existing request
+Integrity Screen. It rechecks J27, the sandbox factory binding and the
+current affirmative status (Recommended Invite or Invited). A No or a
+withdrawal before the claim is processed skips paid work. A claim that
+might have called a provider is never automatically repeated. Expired
+reservations become visible failures and release the manual screen guard.
+The worker saves the screening history and job completion in one Postgres
+statement fenced by the lease token.
+
+## Alerts and retention
+
+The Integrity page reads the job state alongside the existing screening
+history. Workbench requests alerts for its signed-in user, using the current
+Dataverse lead PD assignment and existing app grants. A latest automatic
+screen with findings remains visible until staff record an integrity review
+or a later screen supersedes it. A clear result does not produce an alert.
+PubPeer remains manual. The automation does not send emails.
+
+The table stores one bounded job row per target and request, with no person
+or evidence data in the job itself. Screening data remains in
+`integrity_screenings`. Fresh installations apply the numbered migrations.
+**[VERIFIED via sandbox Dataverse read-only metadata and workflow reads]**
+Both recommendation choices exist. The sandbox has an active classic
+decline-draft workflow registered on Phase I status updates. The query did
+not establish which recommendation choices create drafts. Verify those
+effects before turning on the Preview decision. Production admission and treatment of historical direct-triage No values
+require separate review. Real provider use requires explicit authorization.

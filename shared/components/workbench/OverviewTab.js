@@ -113,7 +113,7 @@ function ReviewerProgress({ state, showHint }) {
   );
 }
 
-export default function OverviewTab({ context, requestId, onSelectTab, j27Handoffs, initialRationaleEnabled, meetingRosterEnabled }) {
+export default function OverviewTab({ context, requestId, onSelectTab, j27Handoffs, initialRationaleEnabled, semiFinalistEnabled, meetingRosterEnabled }) {
   const reviewerProgress = useReviewerProgress(requestId);
   const info = context?.proposalInfo || {};
   const coPIs = Array.isArray(info.coPIs) ? info.coPIs : [];
@@ -196,7 +196,7 @@ export default function OverviewTab({ context, requestId, onSelectTab, j27Handof
     <div className="space-y-4">
       <J27Overview key={requestId} context={context} requestId={requestId}
         reviewerProgress={reviewerProgress}
-        initialRationaleEnabled={initialRationaleEnabled} meetingRosterEnabled={meetingRosterEnabled} />
+        initialRationaleEnabled={initialRationaleEnabled} semiFinalistEnabled={semiFinalistEnabled} meetingRosterEnabled={meetingRosterEnabled} />
       <details className="rounded-xl border border-gray-200 bg-white p-4">
         <summary className="cursor-pointer text-sm font-semibold">Request details</summary>
         <div className="mt-4">{details}</div>

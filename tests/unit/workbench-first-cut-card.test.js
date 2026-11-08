@@ -64,3 +64,16 @@ test('a failed save restores the last saved choice and explains the conflict', a
   expect(screen.getByRole('alert')).toHaveTextContent('The request changed');
   expect(screen.queryByText('First Cut saved.')).toBeNull();
 });
+
+test('the semi-finalist dropdown saves immediately and keeps screen uncertainty separate', async () => {
+  requestJson.mockResolvedValue({ success: true, automaticScreen: 'unconfirmed' });
+  render(<FirstCutCard context={context} canManage refresh={jest.fn()} semiFinalist automaticIntegrityEnabled />);
+  expect(screen.getByText(/schedules an Integrity Screen in the background/)).toBeVisible();
+  await act(async () => { fireEvent.change(screen.getByRole('combobox', { name: 'Recommend as a semi-finalist?' }), { target: { value: 'yes' } }); });
+  expect(requestJson).toHaveBeenCalledTimes(1);
+  expect(requestJson).toHaveBeenCalledWith('/api/workbench/first-cut', expect.objectContaining({
+    body: { requestId: context.requestId, decision: 'yes', version: context.requestVersion, stage: 'semi-finalist' },
+  }));
+  expect(screen.getByRole('status')).toHaveTextContent('Recommendation saved.');
+  expect(screen.getByRole('alert')).toHaveTextContent('automatic Integrity Screen could not be confirmed');
+});

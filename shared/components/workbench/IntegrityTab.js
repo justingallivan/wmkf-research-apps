@@ -367,6 +367,9 @@ export default function IntegrityTab({ requestId }) {
     }
   };
 
+  const automaticScreen = currentRecord?.automaticScreen;
+  const automaticPending = automaticScreen === 'queued' || automaticScreen === 'running';
+
   if (loadingRequestId === requestId) {
     return <Card hover={false}><p className="text-sm text-gray-600" role="status">Loading integrity information…</p></Card>;
   }
@@ -386,10 +389,19 @@ export default function IntegrityTab({ requestId }) {
             <h2 className="text-lg font-semibold text-gray-900">Integrity screen</h2>
             <p className="mt-1 max-w-3xl text-sm text-gray-600">Screens the request’s PI and Co-PIs using public integrity sources. Results support human review and are not a determination of misconduct.</p>
           </div>
-          <Button onClick={runScreen} disabled={!people.length || !requestId || missingNames.length > 0 || uncertainRun || reviewUncertain || reviewSubmitting || refreshingRun} loading={running}>
+          <Button onClick={runScreen} disabled={automaticPending || !people.length || !requestId || missingNames.length > 0 || uncertainRun || reviewUncertain || reviewSubmitting || refreshingRun} loading={running}>
             {running ? 'Screening…' : 'Run screen'}
           </Button>
         </div>
+        {automaticPending && (
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <p className="text-sm text-gray-700" role="status">
+              {automaticScreen === 'queued' ? 'Automatic screen scheduled.' : 'Automatic screen in progress.'}
+            </p>
+            <Button variant="outline" size="sm" onClick={reloadSavedRun} loading={refreshingRun}>Check status</Button>
+          </div>
+        )}
+        {automaticScreen === 'failed' && <p className="mt-3 text-sm text-amber-800">The automatic screen could not be completed. Check the latest saved screen before running it again.</p>}
         {missingNames.length > 0 && <p className="mt-2 text-sm text-amber-800">A screen cannot run because {missingNames.length === 1 ? 'one person has' : `${missingNames.length} people have`} no usable name or Dataverse contact record. Reload the request people details before screening.</p>}
         {uncertainRun && <Button className="mt-2" variant="outline" onClick={reloadSavedRun} loading={refreshingRun}>Reload saved screen</Button>}
         <h3 className="mt-5 text-base font-semibold text-gray-900">People to be screened</h3>
@@ -410,7 +422,7 @@ export default function IntegrityTab({ requestId }) {
       <Card hover={false}>
         <h2 className="text-lg font-semibold text-gray-900">Latest saved screen</h2>
         {!latestRun ? (
-          <p className="mt-2 text-sm text-gray-600">No saved screen yet. Run a screen to see findings here.</p>
+          <p className="mt-2 text-sm text-gray-600">{automaticPending ? 'Findings will appear here when the automatic screen finishes.' : 'No saved screen yet. Run a screen to see findings here.'}</p>
         ) : (
           <>
             <p className="mt-1 text-sm text-gray-600">Run {formatDate(latestRun.createdAt)} · {latestRun.matchCount || 0} items reported</p>

@@ -6,6 +6,7 @@
  * phase `section` navigation.
  */
 
+import { j27IntegrityTarget, j27SemiFinalistEnabled } from '../../lib/utils/j27-integrity-readiness';
 import { initialAssessmentRationaleEnabled } from '../../lib/utils/initial-assessment-rationale-readiness';
 import InitialAssessmentRationale from '../../shared/components/workbench/InitialAssessmentRationale';
 import { meetingRosterSchemaEnabled } from '../../lib/utils/meeting-roster-readiness';
@@ -24,6 +25,7 @@ import { useProfile } from '../../shared/context/ProfileContext';
 import { readEmailSignaturePreference } from '../../shared/config/reviewerFinderPreferences';
 import ReviewersTab from '../../shared/components/reviewers/ReviewersTab';
 import ReviewsTab from '../../shared/components/workbench/ReviewsTab';
+import { isSemiFinalistEditable } from '../../shared/config/j27FirstCut';
 import FirstCutCard from '../../shared/components/workbench/FirstCutCard';
 import ProposalTab from '../../shared/components/workbench/ProposalTab';
 import IntegrityTab from '../../shared/components/workbench/IntegrityTab';
@@ -65,7 +67,7 @@ const LEGACY_TAB_ALIASES = {
   'site-visit': 'staff-deliberations',
 };
 
-export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary = false, meetingRosterEnabled = false, initialRationaleEnabled = false }) {
+export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary = false, meetingRosterEnabled = false, initialRationaleEnabled = false, semiFinalistEnabled = false, automaticIntegrityEnabled = false }) {
   const router = useRouter();
   const { data: session } = useSession();
   const { isSuperuser, hasAccess } = useAppAccess();
@@ -102,6 +104,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
   // The redesigned shell follows the same sandbox boundary as the tested fields.
   const phaseLayout = staffReviewSummary && visibleContext?.cycleCode === 'J27';
   const showInitialRationale = phaseLayout && initialRationaleEnabled;
+  const showSemiFinalist = showInitialRationale && semiFinalistEnabled && visibleContext.isTestRequest === true;
   const showAwardee = phaseLayout && visibleContext.statusClass === 'DECIDED_AWARD';
   const phaseTabs = [
     { key: 'overview', label: 'Overview' },
@@ -224,6 +227,10 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
       ctxLoadGeneration.current += 1;
     };
   }, [requestId, loadCtx]);
+
+  const refreshPhaseIStatus = () => {
+    if (routeStateRef.current.generation === routeGeneration) return loadCtx(routeRequestId);
+  };
 
   const selectTab = async (key, nextSection) => {
     const destination = phaseLayout ? legacySections[key] : null;
@@ -366,6 +373,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
           onSelectTab={selectTab}
           j27Handoffs={phaseLayout}
           initialRationaleEnabled={initialRationaleEnabled}
+          semiFinalistEnabled={showSemiFinalist}
           meetingRosterEnabled={meetingRosterEnabled}
         />
       ) : activeTab === 'reviewers' ? (
@@ -391,9 +399,17 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
               key={`first-cut:${routeRequestId}`}
               context={visibleContext}
               canManage={canManage && !previewReadOnly}
-              refresh={() => {
-                if (routeStateRef.current.generation === routeGeneration) return loadCtx(routeRequestId);
-              }}
+              refresh={refreshPhaseIStatus}
+            />
+          )}
+          {showSemiFinalist && isSemiFinalistEditable(visibleContext.phaseIStatus) && (
+            <FirstCutCard
+              key={`semi-finalist:${routeRequestId}`}
+              context={visibleContext}
+              canManage={canManage && !previewReadOnly}
+              refresh={refreshPhaseIStatus}
+              semiFinalist
+              automaticIntegrityEnabled={automaticIntegrityEnabled}
             />
           )}
           {showInitialRationale ? (
@@ -470,7 +486,11 @@ export async function getServerSideProps() {
     && classifyTarget(process.env.DYNAMICS_URL) !== 'sandbox';
   const staffReviewSummary = process.env.VERCEL_ENV !== 'production'
     && classifyTarget(process.env.DYNAMICS_URL) === 'sandbox';
-  return { props: { previewReadOnly, staffReviewSummary, meetingRosterEnabled: meetingRosterSchemaEnabled(), initialRationaleEnabled: initialAssessmentRationaleEnabled() } };
+  return { props: {
+    previewReadOnly, staffReviewSummary, meetingRosterEnabled: meetingRosterSchemaEnabled(),
+    initialRationaleEnabled: initialAssessmentRationaleEnabled(), semiFinalistEnabled: j27SemiFinalistEnabled(),
+    automaticIntegrityEnabled: Boolean(j27IntegrityTarget()),
+  } };
 }
 
 export default function WorkbenchRequestGuard(props) {

@@ -21,6 +21,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { requestEnvelope } from '../../utils/api-request';
 import Layout from '../Layout';
+import IntegrityAlerts from './IntegrityAlerts';
 import ToolbarSelect from '../ToolbarSelect';
 import WorkbenchViewsNav, { VIEWS } from './WorkbenchViewsNav';
 import { RequestLocator } from './RequestLocator';
@@ -35,7 +36,7 @@ import { WORKBENCH_LOCATION_KEYS, buildWorkbenchHref, readWorkbenchQuery } from 
 
 const sameLocation = (a, b) => WORKBENCH_LOCATION_KEYS.every((key) => a[key] === b[key]);
 
-export function WorkbenchShell({ previewReadOnly = false }) {
+export function WorkbenchShell({ previewReadOnly = false, j27IntegrityEnabled = false }) {
   const router = useRouter();
 
   // URL-mirrored state. Local state is the render source; every change is
@@ -246,6 +247,8 @@ export function WorkbenchShell({ previewReadOnly = false }) {
           </div>
         )}
       </div>
+
+      {j27IntegrityEnabled && <IntegrityAlerts />}
 
       {cyclesError && (
         <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm" role="alert">

@@ -6,6 +6,7 @@ import { requireAppAccess } from '../../../../lib/utils/auth';
 import { withDalContext } from '../../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../../lib/services/service-http-error';
 import { getWorkbenchIntegrityContext } from '../../../../lib/services/workbench/integrity-service';
+import { readJ27IntegrityJob } from '../../../../lib/services/workbench/j27-integrity-jobs';
 import { isGuid } from '../../../../lib/utils/guid';
 
 export default async function handler(req, res) {
@@ -43,7 +44,8 @@ export default async function handler(req, res) {
         actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null,
         beforeRunId,
       });
-      return res.status(200).json(result);
+      const automaticScreen = beforeRunId === null ? await readJ27IntegrityJob(requestId) : null;
+      return res.status(200).json({ ...result, ...(automaticScreen && { automaticScreen }) });
     } catch (error) {
       if (error instanceof ServiceHttpError) {
         return res.status(error.httpStatus).json(error.body || { error: error.message });
