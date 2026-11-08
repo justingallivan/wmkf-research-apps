@@ -31,6 +31,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import ReviewerRosterOverview from './ReviewerRosterOverview';
 import ReviewerManagePanel from './ReviewerManagePanel';
 import { reviewerDocumentIsPending } from './reviewer-document-state';
 import ReviewerFindPanel from './ReviewerFindPanel';
@@ -75,6 +76,7 @@ export default function ReviewersTab({
   deadlineActorContext = null,
   settings = {},
   previewReadOnly = false,
+  rosterFirst = false,
 }) {
   const router = useRouter();
   const [proposal, setProposal] = useState(null);
@@ -83,6 +85,7 @@ export default function ReviewersTab({
   const [candidates, setCandidates] = useState([]);
   const [removedCandidates, setRemovedCandidates] = useState([]);
   const [candidatesLoading, setCandidatesLoading] = useState(true);
+  const [candidateLoadError, setCandidateLoadError] = useState(null);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [campaignOpen, setCampaignOpen] = useState(false);
   const [declineReferrals, setDeclineReferrals] = useState([]);
@@ -211,18 +214,15 @@ export default function ReviewersTab({
     const gen = ++candidatesGenRef.current;
     const isCurrent = () => rid === currentRequestIdRef.current && gen === candidatesGenRef.current;
     setCandidatesLoading(true);
+    setCandidateLoadError(null);
     try {
-      const { ok, data, error } = await requestEnvelope(
+      const { ok, data, error: loadError } = await requestEnvelope(
         `/api/reviewer-finder/my-candidates?requestId=${encodeURIComponent(rid)}`,
         { tolerantBody: true },
       );
       if (!isCurrent()) return; // request changed or a newer load superseded this one
-      if (!ok) {
-        setError(error.message);
-        setCandidates([]);
-        setRemovedCandidates([]);
-        return;
-      }
+      if (!ok) throw new Error(loadError.message);
+      if (!Array.isArray(data.proposals)) throw new Error('Saved candidate data was unavailable.');
       const prop = (data.proposals && data.proposals[0]) || null;
       const rows = (prop && prop.candidates) || [];
       const removed = (prop && prop.removedCandidates) || [];
@@ -243,8 +243,9 @@ export default function ReviewersTab({
         reconcileTimerRef.current = setTimeout(() => loadCandidates(), OVERLAY_RECONCILE_MS);
       }
       setRemovedCandidates(Array.isArray(removed) ? removed : []);
-    } catch {
+    } catch (e) {
       if (isCurrent()) {
+        setCandidateLoadError(e.message);
         setCandidates([]);
         setRemovedCandidates([]);
       }
@@ -307,8 +308,14 @@ export default function ReviewersTab({
   }, [loadCandidates, loadReviewers, loadDeclineReferrals]);
 
   const selectSub = (key) => {
+    const query = { ...router.query, sub: key };
+    if (key === 'roster') {
+      delete query.sub;
+      delete query.repairCandidate;
+      delete query.repairSuggestion;
+    }
     router.push(
-      { pathname: router.pathname, query: { ...router.query, sub: key } },
+      { pathname: router.pathname, query },
       undefined,
       { shallow: true },
     );
@@ -445,10 +452,9 @@ export default function ReviewersTab({
     });
   };
 
-  // When the URL names no sub-tab, land on a state-aware default (computed, not
-  // a redirect — so the choice stays implicit until the user clicks). While the
-  // fetch is in flight we don't guess.
-  const current = activeSub || (loading ? null : computeDefaultSub(reviewers));
+  // Explicit sub-tab links retain their tools. J27 opens on the roster;
+  // the legacy default waits for reviewer data before choosing a tool.
+  const current = activeSub || (rosterFirst ? 'roster' : loading ? null : computeDefaultSub(reviewers));
   const pendingReviewDocumentKey = current === 'track'
     ? reviewers
       .filter(reviewerDocumentIsPending)
@@ -493,9 +499,15 @@ export default function ReviewersTab({
 
   return (
     <div className="space-y-4">
-      {/* Sub-tab strip */}
-      <div className="border-b border-gray-200 flex items-center justify-between">
-        <nav className="flex gap-1">
+      <div hidden={current === 'roster'}
+        className={current === 'roster' ? 'hidden' : 'border-b border-gray-200 flex flex-wrap items-center justify-between'}>
+        <nav className="flex flex-wrap gap-1" aria-label="Reviewer tools">
+          {rosterFirst && (
+            <button type="button" onClick={() => selectSub('roster')}
+              className="px-4 py-2 text-sm font-medium text-gray-700 hover:underline">
+              Back to roster
+            </button>
+          )}
           {SUB_TABS.map((t) => {
             const isManage = t.key !== 'find';
             return (
@@ -509,7 +521,7 @@ export default function ReviewersTab({
                     : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >
-                {t.label}
+                {rosterFirst && t.key === 'find' ? 'Find reviewers' : t.label}
                 {t.key === 'candidates' ? (
                   <SubTabBadge count={candidatesToInvite} workRemaining={candidatesToInvite} />
                 ) : isManage ? (
@@ -574,7 +586,14 @@ export default function ReviewersTab({
         <CampaignConfigModal requestId={requestId} onClose={() => setCampaignOpen(false)} />
       )}
 
-      {error && (
+      {current !== 'roster' && candidateLoadError && (
+        <div className="p-3 bg-amber-50 text-amber-800 rounded-lg text-sm" role="status">
+          Couldn’t load reviewers: {candidateLoadError}{' '}
+          <button type="button" onClick={() => loadCandidates()} className="underline">Retry</button>
+        </div>
+      )}
+
+      {current !== 'roster' && error && (
         <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
           Couldn’t load reviewers: {error}{' '}
           <button type="button" onClick={loadReviewers} disabled={loading} className="underline">
@@ -583,7 +602,16 @@ export default function ReviewersTab({
         </div>
       )}
 
-      {current === null ? (
+      {current === 'roster' ? (
+        <ReviewerRosterOverview
+          candidates={candidates}
+          reviewers={[...reviewers, ...(proposal?.noResponseHistory || [])]}
+          loading={loading || candidatesLoading}
+          incomplete={Boolean(error || candidateLoadError)}
+          onRetry={refreshAll}
+          onNavigate={selectSub}
+        />
+      ) : current === null ? (
         <div className="flex justify-center py-12">
           <div className="w-6 h-6 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin" />
         </div>

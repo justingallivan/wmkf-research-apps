@@ -225,7 +225,7 @@ test('canonical phase links wait for request context and remain retryable on fai
   expect(screen.getByRole('button', { name: 'Reports', exact: true })).toHaveAttribute('aria-current', 'page');
 });
 
-test('current Panel navigation preserves reviewer selection and repair query state', async () => {
+test('Panel navigation returns to the roster and retains the Finder proposal choice', async () => {
   mockAccess = { isSuperuser: false, hasAccess: () => true };
   mockQuery = { requestId: 'request-1', tab: 'peer-review', section: 'panel', sub: 'find',
     proposalFile: 'document-key', repairCandidate: 'candidate', repairSuggestion: 'suggestion' };
@@ -233,8 +233,7 @@ test('current Panel navigation preserves reviewer selection and repair query sta
   await act(async () => { render(<WorkbenchRequest staffReviewSummary />); });
   fireEvent.click(screen.getByRole('button', { name: 'Panel', exact: true }));
   expect(mockPush).toHaveBeenLastCalledWith({ pathname: '/workbench/request-1', query: {
-    tab: 'peer-review', section: 'panel', sub: 'find', proposalFile: 'document-key',
-    repairCandidate: 'candidate', repairSuggestion: 'suggestion',
+    tab: 'peer-review', section: 'panel', proposalFile: 'document-key',
   } }, undefined, { shallow: true });
 });
 

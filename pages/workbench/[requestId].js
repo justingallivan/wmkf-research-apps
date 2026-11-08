@@ -237,9 +237,10 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
   const selectTab = async (key, nextSection) => {
     const destination = phaseLayout ? legacySections[key] : null;
     const destinationPhase = destination?.[0] || key;
+    const openingRoster = key === 'peer-review' && (!nextSection || nextSection === 'panel');
     const reviewerQuery = phaseLayout && phase === 'peer-review' && destinationPhase === 'peer-review'
       ? Object.fromEntries(['sub', 'proposalFile', 'repairCandidate', 'repairSuggestion']
-        .filter((name) => typeof router.query[name] === 'string')
+        .filter((name) => (!openingRoster || name === 'proposalFile') && typeof router.query[name] === 'string')
         .map((name) => [name, router.query[name]]))
       : {};
     try { await router.push(
@@ -393,6 +394,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
           canManage={canManage}
           settings={reviewerSettings}
           previewReadOnly={reviewerSurfaceReadOnly}
+          rosterFirst={phaseLayout}
         />
       ) : activeTab === 'proposal' ? (
         <>
