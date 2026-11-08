@@ -529,6 +529,13 @@ const SURFACES = [
     promptFiles: ['shared/config/prompts/j27-personnel.js'],
     callSiteFiles: ['lib/services/execute-prompt.js'],
   },
+  {
+    // P5 wraps proposal, application answers, and the current review text and evidence.
+    id: 'j27-intake-rationale',
+    status: 'migrated',
+    promptFiles: ['shared/config/prompts/j27-intake-rationale.js'],
+    callSiteFiles: ['lib/services/execute-prompt.js'],
+  },
 ];
 
 // Prompt-builder files known NOT to be untrusted-content surfaces (so the

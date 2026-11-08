@@ -79,6 +79,7 @@ import { executePrompt } from '../../lib/services/execute-prompt';
 import * as J27ExecutiveSummary from '../../shared/config/prompts/j27-executive-summary';
 import * as J27Methodology from '../../shared/config/prompts/j27-methodology';
 import * as J27Personnel from '../../shared/config/prompts/j27-personnel';
+import * as J27IntakeRationale from '../../shared/config/prompts/j27-intake-rationale';
 import { PROMPT_OUTPUT_SCHEMA as REVIEW_SYNTHESIS_OUTPUT_SCHEMA } from '../../shared/config/prompts/review-synthesis';
 import {
   PROMPT_OUTPUT_SCHEMA as PRE_SITE_OUTPUT_SCHEMA,
@@ -318,6 +319,73 @@ describe('J27 intake Personnel', () => {
   test('rejects a non-PI or non-Co-PI output role', async () => {
     const response = { ...output, people: [{ ...output.people[0], role: 'Collaborator' }] };
     await expect(runPersonnel({ response })).rejects.toThrow(/PI, Co-PI/);
+  });
+});
+
+describe('J27 Intake Rationale', () => {
+  const summary = 'Staff edited the summary to focus on fungal signaling.';
+  const methodology = 'Staff edited the Methodology to emphasize live imaging.';
+  const methods = [{ method: 'Soil imaging', status: 'to_build', page: 3, section: 'Approach' }];
+  const output = {
+    rationale: 'The work could reveal how fungi communicate in soil. The team combines live imaging with voltage sensing. The payoff depends on adapting imaging to soil.',
+    opening_used: 'The work could reveal',
+    impact_basis: 'Uses the stated payoff of understanding fungal communication.',
+    risks: [{ risk: 'Imaging has not been shown to work in soil.', source: 'proposal reading', page: 3, section: 'Approach' }],
+    judgment_words: [],
+  };
+
+  function runRationale({ includeEvidence = true, response = output } = {}) {
+    promptRow = {
+      ...buildPromptRow([]),
+      wmkf_ai_promptname: J27IntakeRationale.PROMPT_NAME,
+      wmkf_ai_systemprompt: J27IntakeRationale.SYSTEM_PROMPT,
+      wmkf_ai_promptbody: J27IntakeRationale.USER_PROMPT_TEMPLATE,
+      wmkf_ai_promptvariables: JSON.stringify(J27IntakeRationale.PROMPT_VARIABLES),
+      wmkf_ai_promptoutputschema: JSON.stringify(J27IntakeRationale.PROMPT_OUTPUT_SCHEMA),
+    };
+    getRecordImpl = async (entitySet) => entitySet === 'akoya_requests'
+      ? { ...REQUEST_ROW, wmkf_ai_summary: summary }
+      : null;
+    setClaudeJson(response);
+    return executePrompt({
+      promptName: J27IntakeRationale.PROMPT_NAME,
+      requestId: REQUEST_ROW.akoya_requestid,
+      runSource: 'Vercel Test',
+      requireNoPersistence: true,
+      overrideVariables: {
+        proposal_text: '[page 3] The team will adapt live imaging to soil.',
+        summary_fields: 'Risks: Imaging in soil is unproven.',
+        executive_summary: 'A stale summary.',
+        methodology,
+        ...(includeEvidence ? { enabling_methods: JSON.stringify(methods) } : {}),
+      },
+    });
+  }
+
+  test('uses the saved summary and current P3 evidence and returns a draft without writing the request', async () => {
+    const result = await runRationale();
+    const providerCall = fetchedBodies.find(({ url }) => url.includes('/v1/messages'));
+    const body = JSON.parse(providerCall.body).messages[0].content;
+    expect(body).toContain(summary);
+    expect(body).not.toContain('A stale summary.');
+    expect(body).toContain(methodology);
+    expect(body).toContain(JSON.stringify(methods));
+    expect(result.parsed).toEqual(output);
+    expect(updateCalls).toHaveLength(0);
+  });
+
+  test('requires P3 evidence before dispatching generation', async () => {
+    await expect(runRationale({ includeEvidence: false })).rejects.toThrow(/Required override variable "enabling_methods"/);
+    expect(fetchedBodies.some(({ url }) => url.includes('/v1/messages'))).toBe(false);
+  });
+
+  test('regenerates a new draft while leaving request fields untouched', async () => {
+    const first = await runRationale();
+    const response = { ...output, rationale: 'Fungal signaling could become measurable in soil. The work combines two techniques. Soil imaging remains unproven.' };
+    const second = await runRationale({ response });
+    expect(first.parsed.rationale).toBe(output.rationale);
+    expect(second.parsed.rationale).toBe(response.rationale);
+    expect(updateCalls).toHaveLength(0);
   });
 });
 
