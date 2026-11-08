@@ -4,6 +4,8 @@ const mockComplete = jest.fn();
 jest.mock('@vercel/postgres', () => ({ sql: (...args) => mockSql(...args) }));
 jest.mock('../../lib/services/llm-client.js', () => ({ LLMClient: jest.fn().mockImplementation(() => ({ complete: mockComplete })) }));
 const { IntegrityService } = require('../../lib/services/integrity-service');
+const { saveJ27IntegrityRun } = require('../../lib/services/workbench/j27-integrity-jobs');
+const { integrityIncomplete } = require('../../shared/utils/integrity-evidence');
 const { IntegrityMatchingService } = require('../../lib/services/integrity-matching-service');
 const strict = { strictSourceErrors: true };
 const emptyResponse = (url) => ({ ok: true, json: async () => ({ search_metadata: { status: 'Success' }, [new URL(url).searchParams.get('engine') === 'google_news' ? 'news_results' : 'organic_results']: [] }) });
@@ -17,7 +19,7 @@ beforeEach(() => {
     const query = Array.isArray(parts) ? parts.join('?') : String(parts);
     return Promise.resolve({ rows: query.includes('SELECT EXISTS') ? [{ available: true }] : query.includes('to_regclass') ? [{ relation: null }] : [] });
   });
-  mockComplete.mockReset().mockResolvedValue({ text: 'No concerns found.' });
+  mockComplete.mockReset().mockResolvedValue({ text: '{"outcome":"clear","findings":[]}' });
   global.fetch = jest.fn().mockImplementation(emptyResponse);
 });
 afterEach(() => { jest.restoreAllMocks(); global.fetch = originalFetch; });
@@ -189,6 +191,87 @@ test('strict summary failure is exposed by the generator and cannot be approved 
   const result = await screen();
   expect(result.sources.pubpeer).toMatchObject({ mode: 'manual', searched: false, error: null });
   expect(result.sources.news.error).toBe('Search result analysis failed');
+});
+
+const allegation = {
+  title: 'Example University opens an inquiry into grant spending',
+  link: 'https://example.org/inquiry',
+  snippet: 'Ada Example, a materials scientist at Example University, was accused of diverting grant funds. A separate earlier audit said no concerns found.',
+};
+const citedAllegation = {
+  sourceIndex: 1,
+  kind: 'allegation',
+  identityEvidence: 'a materials scientist at Example University',
+  conductEvidence: 'was accused of diverting grant funds',
+};
+const mockNews = items => global.fetch.mockResolvedValue({ ok: true, json: async () => ({
+  search_metadata: { status: 'Success' }, news_results: items,
+}) });
+const modelNews = (outcome, findings = []) => mockComplete.mockResolvedValue({
+  text: JSON.stringify({ outcome, findings }),
+});
+async function expectAlertFlag(result, expected) {
+  await saveJ27IntegrityRun({
+    target_host: 'sandbox.example', request_id: '11111111-1111-4111-8111-111111111111',
+    lease_token: '22222222-2222-4222-8222-222222222222',
+  }, { screenedPeople: [], results: [result], matchCount: result.matchCount });
+  const [parts, ...values] = mockSql.mock.calls.at(-1);
+  expect(parts.findIndex(part => part.includes('flagged = '))).toBeGreaterThanOrEqual(0);
+  expect(values[parts.findIndex(part => part.includes('flagged = '))]).toBe(expected);
+}
+
+test('a grounded allegation survives old clear wording and carries its original citation into an alert', async () => {
+  const unrelated = Array.from({ length: 5 }, (_, i) => ({
+    title: 'Routine academic news', link: `https://example.org/routine-${i}`,
+  }));
+  mockNews([...unrelated, allegation]);
+  modelNews('flag_for_review', [{ ...citedAllegation, sourceIndex: 6 }]);
+  const result = await screen();
+  expect(result.sources.news).toMatchObject({ analysisOutcome: 'flag_for_review', hasConcerns: true,
+    rawResults: [{ link: allegation.link }], error: null });
+  expect(result.sources.news.summary).toContain('Reported allegation: “was accused of diverting grant funds”');
+  expect(result.sources.news.summary).toContain('Identity evidence: “a materials scientist at Example University”');
+  expect(mockComplete.mock.calls[0][0].system).toContain('A shared name is insufficient.');
+  expect(mockComplete.mock.calls[0][0].messages[0].content).toContain('[6] Example University opens an inquiry');
+  expect(result.matchCount).toBe(1);
+  await expectAlertFlag(result, true);
+});
+
+test.each([
+  ['a namesake', 'Ada Example, a different person at Other College, faces a disciplinary inquiry.'],
+  ['routine academic news', 'Example University awarded a teaching prize to Ada Example.'],
+])('%s with a clear analysis has no findings alert', async (_label, snippet) => {
+  mockNews([{ ...allegation, snippet }]);
+  modelNews('clear');
+  const result = await screen();
+  expect(result.sources.news).toMatchObject({ analysisOutcome: 'clear', hasConcerns: false, error: null });
+  expect(integrityIncomplete(result)).toBe(false);
+  await expectAlertFlag(result, false);
+});
+
+test.each([
+  ['inconclusive identity', () => modelNews('inconclusive')],
+  ['contradictory clear output with findings', () => modelNews('clear', [citedAllegation])],
+  ['a name alone', () => modelNews('flag_for_review', [{ ...citedAllegation, identityEvidence: 'Ada Example' }])],
+  ['invented identity evidence', () => modelNews('flag_for_review', [{ ...citedAllegation, identityEvidence: 'a professor at Unrelated Institute' }])],
+  ['invented conduct evidence', () => modelNews('flag_for_review', [{ ...citedAllegation, conductEvidence: 'was convicted of fraud' }])],
+  ['a nonexistent citation', () => modelNews('flag_for_review', [{ ...citedAllegation, sourceIndex: 2 }])],
+  ['unexpected prose', () => mockComplete.mockResolvedValue({ text: 'Nothing of concern was identified.' })],
+])('%s is incomplete and produces no news finding', async (_label, response) => {
+  mockNews([allegation]);
+  response();
+  const result = await screen();
+  expect(result.sources.news).toMatchObject({ analysisOutcome: 'inconclusive', hasConcerns: false, error: expect.any(String) });
+  expect(integrityIncomplete(result)).toBe(true);
+  await expectAlertFlag(result, false);
+});
+
+test.each([strict, {}])('a search outage stays incomplete in either caller (%j)', async options => {
+  global.fetch.mockResolvedValue({ ok: false, status: 503 });
+  const result = await screen(options);
+  expect(result.sources.news).toMatchObject({ analysisOutcome: 'inconclusive', hasConcerns: false, error: expect.any(String) });
+  expect(mockComplete).not.toHaveBeenCalled();
+  await expectAlertFlag(result, false);
 });
 
 test('strict search requests carry a timeout; standalone requests are unchanged', async () => {

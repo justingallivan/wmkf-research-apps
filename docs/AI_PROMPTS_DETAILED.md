@@ -819,38 +819,15 @@ Source policy 3 (live via PR #607, 2026-11-02) removes the PubPeer analysis prom
 <a name="integrity-news"></a>
 ### News Analysis
 
-> You are a due diligence specialist reviewing news search results for a grant applicant.
->
-> **Applicant:** [Name], [Institution]
->
-> Review these news search results and identify items that indicate professional integrity or reputational concerns relevant to a grant funding decision.
->
-> **Look for:**
-> - Research misconduct allegations or findings
-> - Legal issues (arrests, lawsuits, fraud charges)
-> - Ethical violations or sanctions
-> - Harassment or workplace complaints
-> - Institutional disciplinary actions
-> - Misuse of funds or grant violations
-> - Professional misconduct
->
-> **Ignore:**
-> - Routine academic news (grants received, papers published, promotions)
-> - Opinion pieces or editorials not related to conduct
-> - Stories about different people with similar names
-> - General institutional news not specifically about this person
->
-> **Important:**
-> - Consider name commonality — verify the news is about this specific person
-> - If results mention a DIFFERENT institution, note this explicitly (could be prior affiliation)
-> - Focus on professionally damaging information, not personal matters unrelated to research conduct
-> - Be objective and report facts, not speculation
->
-> **If concerns found:** Summarize each concern with source and date, note the institution, note the severity (allegation vs. confirmed finding).
->
-> **If no concerns found:** Simply respond: "No concerns found. The search returned X results but none indicate professional integrity issues."
->
-> Keep your response concise (under 200 words unless there are multiple serious concerns).
+**[BRANCH-BUILT]** The model classifies the supplied headlines and excerpts
+as `flag_for_review`, `clear`, or `inconclusive`. It treats a shared name
+alone as insufficient and distinguishes allegations from official findings.
+A flag requires a numbered source and verbatim identity and conduct excerpts.
+The app checks both excerpts against that source and displays the original
+search result URL. Invalid responses and source failures leave the news
+screen incomplete. Historical saved results keep their existing format.
+
+The executable prompt is in `shared/config/prompts/integrity-screener.js`.
 
 ---
 

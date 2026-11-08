@@ -38,7 +38,11 @@ The Integrity page reads the job state alongside the existing screening
 history. Workbench requests alerts for its signed-in user, using the current
 Dataverse lead PD assignment and existing app grants. A latest automatic
 screen with findings remains visible until staff record an integrity review
-or a later screen supersedes it. A clear result does not produce an alert.
+or a later screen supersedes it. News contributes a flag only when the
+analysis returns `flag_for_review` with identity and conduct excerpts
+validated against the cited search result. Clear or inconclusive news
+does not create a findings alert. Inconclusive news remains visible as
+incomplete, and Retraction Watch can independently contribute a flag.
 PubPeer remains manual. The automation does not send emails.
 
 The table stores one bounded job row per target and request, with no person
