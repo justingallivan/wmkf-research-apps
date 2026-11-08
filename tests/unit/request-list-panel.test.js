@@ -64,6 +64,20 @@ beforeEach(() => {
   global.fetch = jest.fn();
 });
 
+test('shows J27 requests without the legacy Advancing controls', async () => {
+  global.fetch.mockResolvedValueOnce(response({
+    cycleCode: 'J27',
+    proposals: [row({ advancing: true })],
+    rollup: { total: 1, stages: { find: 1 } },
+  }));
+
+  renderPanel({ cycleCode: 'J27' });
+
+  expect(await screen.findByRole('link', { name: '#1001' })).toBeInTheDocument();
+  expect(screen.queryByRole('combobox', { name: 'Triage status for request 1001' })).not.toBeInTheDocument();
+  expect(screen.queryByText('Advancing')).not.toBeInTheDocument();
+});
+
 test('retains same-key rows while triage refresh is held, then accepts a successful empty response', async () => {
   let release;
   const held = new Promise((resolve) => { release = resolve; });
