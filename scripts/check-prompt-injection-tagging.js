@@ -543,6 +543,13 @@ const SURFACES = [
     promptFiles: ['shared/config/prompts/j27-fit-concerns.js'],
     callSiteFiles: ['lib/services/execute-prompt.js'],
   },
+  {
+    // P8 wraps the proposal, intake context, and literature evidence.
+    id: 'j27-field-analysis',
+    status: 'migrated',
+    promptFiles: ['shared/config/prompts/j27-field-analysis.js'],
+    callSiteFiles: ['lib/services/execute-prompt.js'],
+  },
 ];
 
 // Prompt-builder files known NOT to be untrusted-content surfaces (so the
