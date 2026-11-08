@@ -76,6 +76,7 @@ beforeEach(() => {
 afterAll(() => { global.fetch = originalFetch; });
 
 import { executePrompt } from '../../lib/services/execute-prompt';
+import * as J27ExecutiveSummary from '../../shared/config/prompts/j27-executive-summary';
 import { PROMPT_OUTPUT_SCHEMA as REVIEW_SYNTHESIS_OUTPUT_SCHEMA } from '../../shared/config/prompts/review-synthesis';
 import {
   PROMPT_OUTPUT_SCHEMA as PRE_SITE_OUTPUT_SCHEMA,
@@ -141,6 +142,63 @@ async function run(outputs, parsedOutput) {
 }
 
 const DEFAULT_GET_RECORD = async () => null;
+
+describe('J27 intake Executive Summary', () => {
+  const output = {
+    executive_summary: 'The team will test how fungal networks communicate during growth.',
+    open_questions: [{ type: 'missing_element', detail: 'Long-term impact is unclear.', page: null, section: '' }],
+    too_applied_hint: { raised: false, evidence: '', page: null, section: '' },
+    terms_defined: [],
+  };
+
+  function runExecutiveSummary({ existingSummary = null, response = output } = {}) {
+    promptRow = {
+      ...buildPromptRow([]),
+      wmkf_ai_promptname: J27ExecutiveSummary.PROMPT_NAME,
+      wmkf_ai_systemprompt: J27ExecutiveSummary.SYSTEM_PROMPT,
+      wmkf_ai_promptbody: J27ExecutiveSummary.USER_PROMPT_TEMPLATE,
+      wmkf_ai_promptvariables: JSON.stringify(J27ExecutiveSummary.PROMPT_VARIABLES),
+      wmkf_ai_promptoutputschema: JSON.stringify(J27ExecutiveSummary.PROMPT_OUTPUT_SCHEMA),
+    };
+    getRecordImpl = async (entitySet) => entitySet === 'akoya_requests'
+      ? { ...REQUEST_ROW, wmkf_ai_summary: existingSummary }
+      : null;
+    setClaudeJson(response);
+    return executePrompt({
+      promptName: J27ExecutiveSummary.PROMPT_NAME,
+      requestId: REQUEST_ROW.akoya_requestid,
+      runSource: 'Vercel Test',
+      overrideVariables: {
+        proposal_text: '[page 1] The proposal studies fungal communication.',
+        lay_abstract: 'Fungi communicate as their networks grow.',
+        summary_fields: 'Scientific Question: How do fungal networks communicate?',
+      },
+    });
+  }
+
+  test('saves only the paragraph and returns separate review signals', async () => {
+    const result = await runExecutiveSummary();
+    const providerCall = fetchedBodies.find(({ url }) => url.includes('/v1/messages'));
+    expect(JSON.parse(providerCall.body).messages[0].content.match(/\[\[WMKF-UNTRUSTED-CONTENT/g)).toHaveLength(3);
+    expect(result.parsed).toEqual(output);
+    expect(updateCalls).toHaveLength(1);
+    expect(updateCalls[0].payload).toEqual({ wmkf_ai_summary: output.executive_summary });
+    expect(updateCalls[0].opts.ifMatch).toBe(REQUEST_ROW._etag);
+  });
+
+  test('blocks automated generation when a summary already exists', async () => {
+    const result = await runExecutiveSummary({ existingSummary: 'A staff-edited summary.' });
+    expect(result.blocked).toBe(true);
+    expect(fetchedBodies.some(({ url }) => url.includes('/v1/messages'))).toBe(false);
+    expect(updateCalls).toHaveLength(0);
+  });
+
+  test('rejects an overlength paragraph before any request write', async () => {
+    const response = { ...output, executive_summary: 'word '.repeat(201) };
+    await expect(runExecutiveSummary({ response })).rejects.toThrow(/forbidden text pattern/);
+    expect(updateCalls).toHaveLength(0);
+  });
+});
 
 describe('persistOutputs — multi-output PATCH coalescing', () => {
   test('requireNoPersistence rejects a mutable prompt write target before the model call', async () => {

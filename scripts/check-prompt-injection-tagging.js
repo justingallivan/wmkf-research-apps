@@ -508,6 +508,13 @@ const SURFACES = [
     callSiteFiles: ['lib/services/execute-prompt.js'],
     requiredMarkers: ['untrusted: true', "source: { kind: 'override' }", "target: { kind: 'none' }"],
   },
+  {
+    // P2 uses the Executor's untrusted-input wrapper for all applicant inputs.
+    id: 'j27-executive-summary',
+    status: 'migrated',
+    promptFiles: ['shared/config/prompts/j27-executive-summary.js'],
+    callSiteFiles: ['lib/services/execute-prompt.js'],
+  },
 ];
 
 // Prompt-builder files known NOT to be untrusted-content surfaces (so the
