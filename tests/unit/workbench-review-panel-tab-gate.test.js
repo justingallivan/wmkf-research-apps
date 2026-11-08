@@ -176,7 +176,6 @@ test.each([
   ['site-visit', 'Deliberations', null],
   ['staff-deliberations', 'Deliberations', null],
   ['final-writeup', 'Final Assessment', null],
-  ['awardee', 'Overview', 'Awardee'],
 ])('J27 legacy %s selects its phase and section', async (tab, phase, section) => {
   mockAccess = { isSuperuser: false, hasAccess: () => true };
   mockQuery = { requestId: 'request-1', tab };
@@ -186,6 +185,29 @@ test.each([
   if (section) expect(screen.getByRole('button', { name: section, exact: true })).toHaveAttribute('aria-current', 'page');
 });
 
+
+test.each([
+  ['awardee', undefined],
+  ['overview', 'awardee'],
+])('J27 Awardee bookmarks open a separate tab only after an award (%s)', async (tab, section) => {
+  mockQuery = { requestId: 'request-1', tab, section };
+  const mockRequest = (statusClass) => {
+    global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({
+      success: true, requestId: 'request-1', cycleCode: 'J27', statusClass,
+    }) }));
+  };
+  mockRequest('IN_FLIGHT');
+  const { unmount } = render(<WorkbenchRequest staffReviewSummary />);
+  expect(await screen.findByTestId('overview-tab')).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'Awardee' })).toBeNull();
+  expect(screen.queryByRole('navigation', { name: 'Overview sections' })).toBeNull();
+  unmount();
+
+  mockRequest('DECIDED_AWARD');
+  render(<WorkbenchRequest staffReviewSummary />);
+  expect(await screen.findByRole('button', { name: 'Awardee' })).toHaveAttribute('aria-current', 'page');
+  expect(screen.queryByTestId('overview-tab')).toBeNull();
+});
 
 test('canonical phase links wait for request context and remain retryable on failure', async () => {
   mockQuery = { requestId: 'request-1', tab: 'peer-review', section: 'reports' };

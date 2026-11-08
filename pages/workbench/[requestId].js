@@ -102,18 +102,20 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
   // The redesigned shell follows the same sandbox boundary as the tested fields.
   const phaseLayout = staffReviewSummary && visibleContext?.cycleCode === 'J27';
   const showInitialRationale = phaseLayout && initialRationaleEnabled;
+  const showAwardee = phaseLayout && visibleContext.statusClass === 'DECIDED_AWARD';
   const phaseTabs = [
     { key: 'overview', label: 'Overview' },
     { key: 'initial-assessment', label: 'Initial Assessment' },
     { key: 'peer-review', label: 'Peer Review' },
     { key: 'deliberations', label: 'Deliberations' },
     { key: 'final-assessment', label: 'Final Assessment' },
+    ...(showAwardee ? [{ key: 'awardee', label: 'Awardee' }] : []),
   ];
   const visibleTabs = phaseLayout ? phaseTabs : visibleTabsFor(hasAccess);
   const visibleTabKeys = useMemo(() => new Set(visibleTabs.map((t) => t.key)), [visibleTabs]);
   const rawTabParam = typeof router.query.tab === 'string' ? router.query.tab : null;
   const phaseLinkPending = staffReviewSummary && !visibleContext
-    && ['initial-assessment', 'peer-review', 'deliberations', 'final-assessment'].includes(rawTabParam);
+    && ['initial-assessment', 'peer-review', 'deliberations', 'final-assessment', 'overview', 'awardee'].includes(rawTabParam);
   const tabParam = rawTabParam ? (LEGACY_TAB_ALIASES[rawTabParam] || rawTabParam) : null;
   const legacySections = {
     proposal: ['initial-assessment', 'proposal'],
@@ -124,10 +126,12 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
     'review-panel': ['peer-review', 'group-review'],
     'staff-deliberations': ['deliberations', null],
     'final-writeup': ['final-assessment', null],
-    awardee: ['overview', 'awardee'],
   };
   const legacy = phaseLayout ? legacySections[tabParam] : null;
-  const phase = legacy?.[0] || (tabParam && visibleTabKeys.has(tabParam) ? tabParam : 'overview');
+  // Preserve the former Overview/Awardee bookmark for requests with an award.
+  const awardeeBookmark = showAwardee && tabParam === 'overview' && router.query.section === 'awardee';
+  const phase = awardeeBookmark ? 'awardee'
+    : legacy?.[0] || (tabParam && visibleTabKeys.has(tabParam) ? tabParam : 'overview');
   const requestedSection = legacy?.[1] || (typeof router.query.section === 'string' ? router.query.section : null);
   const sections = !phaseLayout ? [] : phase === 'initial-assessment' ? [
     { key: 'proposal', label: showInitialRationale ? 'Assessment' : 'Proposal' },
@@ -136,14 +140,12 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
   ] : phase === 'peer-review' ? [
     { key: 'panel', label: 'Panel' }, { key: 'reports', label: 'Reports' },
     ...(hasAccess('review-panel') === true ? [{ key: 'group-review', label: 'Group review' }] : []),
-  ] : phase === 'overview' ? [
-    { key: 'summary', label: 'Summary' }, { key: 'awardee', label: 'Awardee' },
   ] : [];
   const section = sections.some((item) => item.key === requestedSection) ? requestedSection : sections[0]?.key;
   const phaseContent = {
     'initial-assessment': { proposal: 'proposal', integrity: 'integrity', assessment: 'initial-writeup' },
     'peer-review': { panel: 'reviewers', reports: 'reviews', 'group-review': 'review-panel' },
-    overview: { summary: 'overview', awardee: 'awardee' },
+    awardee: { default: 'awardee' },
     deliberations: { default: 'staff-deliberations' },
     'final-assessment': { default: 'final-writeup' },
   };
@@ -384,7 +386,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
         <>
           {visibleContext?.cycleCode === 'J27' && (
             <FirstCutCard
-              key={routeRequestId}
+              key={`first-cut:${routeRequestId}`}
               context={visibleContext}
               canManage={canManage && !previewReadOnly}
               refresh={() => {

@@ -73,17 +73,17 @@ afterEach(() => {
 test('keeps sandbox Preview editable and makes production or unknown Preview targets read-only', async () => {
   process.env.VERCEL_ENV = 'preview';
   process.env.DYNAMICS_URL = `https://${PRODUCTION_HOSTS[0]}`;
-  await expect(getServerSideProps()).resolves.toEqual({ props: { previewReadOnly: true } });
+  await expect(getServerSideProps()).resolves.toMatchObject({ props: { previewReadOnly: true, staffReviewSummary: false } });
 
   process.env.DYNAMICS_URL = `https://${SANDBOX_HOSTS[0]}`;
-  await expect(getServerSideProps()).resolves.toEqual({ props: { previewReadOnly: false } });
+  await expect(getServerSideProps()).resolves.toMatchObject({ props: { previewReadOnly: false, staffReviewSummary: true } });
 
   process.env.DYNAMICS_URL = 'https://unregistered-target.example';
-  await expect(getServerSideProps()).resolves.toEqual({ props: { previewReadOnly: true } });
+  await expect(getServerSideProps()).resolves.toMatchObject({ props: { previewReadOnly: true, staffReviewSummary: false } });
 
   process.env.VERCEL_ENV = 'production';
   process.env.DYNAMICS_URL = `https://${PRODUCTION_HOSTS[0]}`;
-  await expect(getServerSideProps()).resolves.toEqual({ props: { previewReadOnly: false } });
+  await expect(getServerSideProps()).resolves.toMatchObject({ props: { previewReadOnly: false, staffReviewSummary: false } });
 });
 
 test('shows the read-only contract and passes it through both reviewer request surfaces', () => {

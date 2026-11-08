@@ -1,55 +1,46 @@
 import { useEffect, useState } from 'react';
 import { FIRST_CUT_STATUS, isFirstCutEditable } from '../../config/j27FirstCut';
 import { requestEnvelope } from '../../utils/api-request';
-import { Card } from '../Layout';
 
 const terminalClasses = new Set(['DECIDED_AWARD', 'DECIDED_NO_AWARD', 'WITHDRAWN']);
-const reportTask = {
-  label: 'Open Reports', tab: 'reviews',
-};
-const deliberationTask = {
-  label: 'Open Deliberations', tab: 'staff-deliberations',
-};
-
 function memoPresent(record, field) {
   return typeof record[field] === 'string' ? Boolean(record[field].trim()) : null;
 }
 
 function nextAction(context, handoff, progress) {
   if (terminalClasses.has(context.statusClass)) {
-    return { heading: 'Request outcome recorded' };
+    return { heading: context.requestStatus || 'Request outcome recorded' };
   }
   if (context.phaseIStatus === FIRST_CUT_STATUS.no) {
     return { heading: 'First Cut marked Not Scored',
-      detail: 'Review the recorded decision and staff rationale.',
-      label: 'Open Initial Assessment', tab: 'initial-assessment' };
+      detail: 'The decision and staff rationale are in Initial Assessment.' };
   }
   if (handoff.visit) {
-    return { heading: 'Review the material for Final Assessment',
-      detail: 'The visit assessment is saved. You can read it in Final Assessment alongside any saved review summary and attendance.',
-      label: 'Open Final Assessment', tab: 'final-assessment' };
+    return { heading: 'Visit assessment saved',
+      detail: 'Use the visit assessment, review summary, and attendance in Final Assessment to prepare the Board recommendation.' };
   }
   if (handoff.presentation) {
-    return { ...deliberationTask, heading: 'Presentation record available',
-      detail: 'Check the presentation, attendance and staff assessment.' };
+    return { heading: 'Presentation record available',
+      detail: 'Check the presentation, attendance, and staff assessment in Deliberations.' };
   }
   if (handoff.review) {
-    return { ...reportTask, heading: 'Staff review summary saved',
-      detail: 'Review the saved summary and reports to decide what follows.' };
+    return { heading: 'Staff review summary saved',
+      detail: 'Review the summary and reports in Peer Review to decide what follows.' };
   }
   if (progress?.counts?.received > 0) {
-    return { ...reportTask, heading: 'Reviewer reports received',
-      detail: 'Read the reports and record the staff interpretation.' };
+    return { heading: 'Reviewer reports received',
+      detail: 'Read the reports and record the staff interpretation in Peer Review.' };
   }
   if (context.phaseIStatus !== FIRST_CUT_STATUS.yes) {
-    const canStartRationale = handoff.rationale === false && isFirstCutEditable(context.phaseIStatus);
-    return { heading: canStartRationale ? 'Staff rationale to record' : 'First Cut decision to review',
-      detail: canStartRationale ? 'Read the proposal and record the staff rationale.' : 'Check the current decision and assessment evidence.',
-      label: 'Open Initial Assessment', tab: 'initial-assessment' };
+    if (handoff.rationale === false && isFirstCutEditable(context.phaseIStatus)) {
+      return { heading: 'Initial assessment pending',
+        detail: 'Read the proposal and record the staff rationale in Initial Assessment.' };
+    }
+    return { heading: 'First Cut decision to review',
+      detail: 'Check the decision and supporting evidence in Initial Assessment.' };
   }
   return { heading: 'First Cut marked Scored',
-    detail: progress?.hint || 'Check the reviewer roster and progress.',
-    label: 'Open Panel', tab: 'reviewers' };
+    detail: 'Check the reviewer roster and progress in Peer Review.' };
 }
 
 function savedLabel(value) {
@@ -58,7 +49,7 @@ function savedLabel(value) {
   return value ? 'Saved' : 'No saved text';
 }
 
-export default function J27Overview({ context, requestId, reviewerProgress, onSelectTab,
+export default function J27Overview({ context, requestId, reviewerProgress,
   initialRationaleEnabled, meetingRosterEnabled }) {
   const [loaded, setLoaded] = useState(null);
   useEffect(() => {
@@ -95,52 +86,39 @@ export default function J27Overview({ context, requestId, reviewerProgress, onSe
   const terminal = terminalClasses.has(context.statusClass);
   const action = terminal || (handoff && reviewerProgress.status !== 'loading')
     ? nextAction(context, handoff, reviewerProgress.data) : null;
-  const firstCut = context.phaseIStatusLabel || (context.phaseIStatus == null ? 'Not set'
-    : context.phaseIStatus === FIRST_CUT_STATUS.yes ? 'Scored'
-      : context.phaseIStatus === FIRST_CUT_STATUS.no ? 'Not Scored' : 'Status recorded');
   const received = reviewerProgress.data?.counts?.received;
-  const reports = reviewerProgress.status === 'loading' ? 'Checking reports…'
-    : Number.isFinite(received) ? `${received} ${received === 1 ? 'report' : 'reports'} received`
-      : 'Couldn’t check reports';
+  const showPeerReview = Boolean(handoff && (
+    context.phaseIStatus === FIRST_CUT_STATUS.yes || handoff.review || received > 0
+  ));
+  const showDeliberations = Boolean(handoff && (handoff.presentation || handoff.visit));
 
   return (
-    <Card hover={false}>
-      <section aria-labelledby="j27-overview-heading">
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-          {terminal ? 'Request outcome' : 'Suggested next step'}
-        </p>
-        <h2 id="j27-overview-heading" className="mt-1 text-xl font-semibold text-gray-900">
-          {action?.heading || 'Checking what’s saved…'}
-        </h2>
-        {action?.detail && <p className="mt-2 text-sm text-gray-700">{action.detail}</p>}
-        {action?.tab && onSelectTab && (
-          <button type="button" onClick={() => onSelectTab(action.tab)}
-            className="mt-3 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700">
-            {action.label}
-          </button>
-        )}
-        <dl className="mt-5 flex flex-wrap gap-x-2 gap-y-1 border-t border-gray-200 pt-4 text-sm">
-          <dt className="text-gray-600">Recorded status in Dataverse</dt>
-          <dd className="font-medium text-gray-900">{context.requestStatus || 'Not set'}</dd>
-        </dl>
-        {handoff && (
-          <dl aria-label="Saved staff work" className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
-            <div><dt className="font-semibold">Initial Assessment</dt>
-              <dd className="text-gray-600">First Cut · {firstCut}</dd>
-              {initialRationaleEnabled && <dd className="text-gray-600">Staff rationale · {savedLabel(handoff.rationale)}</dd>}
-            </div>
-            <div><dt className="font-semibold">Peer Review</dt>
-              <dd className="text-gray-600">{reports}</dd>
+    <section aria-labelledby="j27-overview-heading" className="rounded-xl border border-gray-200 bg-white p-5 sm:p-6">
+      <h2 id="j27-overview-heading" className="text-xl font-semibold text-gray-900">
+        {action?.heading || 'Checking what’s saved…'}
+      </h2>
+      {action?.detail && <p className="mt-2 max-w-prose text-sm text-gray-700">{action.detail}</p>}
+      {(showPeerReview || showDeliberations) && (
+        <dl aria-label="Saved staff work" className="mt-4 grid gap-4 border-t border-gray-200 pt-4 text-sm sm:grid-cols-2">
+          {showPeerReview && (
+            <div>
+              <dt className="font-semibold">Peer Review</dt>
+              <dd className="text-gray-600">{Number.isFinite(received)
+                ? `${received} ${received === 1 ? 'report' : 'reports'} received`
+                : 'Couldn’t check reports'}</dd>
               <dd className="text-gray-600">Staff review summary · {savedLabel(handoff.review)}</dd>
             </div>
-            <div><dt className="font-semibold">Deliberations</dt>
+          )}
+          {showDeliberations && (
+            <div>
+              <dt className="font-semibold">Deliberations</dt>
               <dd className="text-gray-600">Visit assessment · {savedLabel(handoff.visit)}</dd>
               {meetingRosterEnabled && <dd className="text-gray-600">Attendance · {handoff.roster === true ? 'Confirmed'
                 : handoff.roster === false ? 'No current confirmation' : 'Couldn’t check'}</dd>}
             </div>
-          </dl>
-        )}
-      </section>
-    </Card>
+          )}
+        </dl>
+      )}
+    </section>
   );
 }

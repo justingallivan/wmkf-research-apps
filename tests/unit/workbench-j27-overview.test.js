@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import OverviewTab from '../../shared/components/workbench/OverviewTab';
 import { FIRST_CUT_STATUS } from '../../shared/config/j27FirstCut';
 
@@ -23,43 +23,53 @@ function renderOverview({ reads = {}, status = {} } = {}) {
     const body = { ...base, ...reads }[endpoint];
     return { ok: body != null, json: async () => body };
   });
-  const onSelectTab = jest.fn();
   render(<OverviewTab context={{ ...context, ...status }} requestId={context.requestId}
-    onSelectTab={onSelectTab} j27Handoffs initialRationaleEnabled meetingRosterEnabled />);
-  return onSelectTab;
+    j27Handoffs initialRationaleEnabled meetingRosterEnabled />);
 }
 
-test('a saved visit assessment opens the Final Assessment handoff while displaying recorded status', async () => {
-  const onSelectTab = renderOverview({ reads: {
+test('intake shows one instruction and keeps later-stage empty states out of the summary', async () => {
+  renderOverview({
+    status: { phaseIStatus: null, requestStatus: null },
+    reads: {
+      'reviewer-rollup': { success: true, counts: { received: 0 } },
+      'initial-assessment-rationale': { rationale: '' },
+      'staff-review-summary': { summary: '' },
+      'staff-visit-assessment': null,
+    },
+  });
+  expect(await screen.findByRole('heading', { name: 'Initial assessment pending' })).toBeVisible();
+  expect(screen.getByText('Read the proposal and record the staff rationale in Initial Assessment.')).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'Open Initial Assessment' })).toBeNull();
+  expect(screen.queryByText('0 reports received')).toBeNull();
+  expect(screen.queryByText(/Visit assessment ·/)).toBeNull();
+  expect(screen.getByText('Request details')).toBeVisible();
+});
+
+test('a saved visit points to the Board recommendation and preserves handoff evidence', async () => {
+  renderOverview({ reads: {
     'staff-visit-assessment': { assessment: 'Saved visit assessment' },
     'meeting-roster': { presentation: { id: 'visit' }, stale: false, roster: {} },
   } });
-  expect(await screen.findByRole('heading', { name: 'Review the material for Final Assessment' })).toBeVisible();
-  expect(screen.getByText('Suggested next step')).toBeVisible();
-  expect(screen.getByText(/The visit assessment is saved/)).toBeVisible();
-  const recordedStatus = screen.getByText('Recorded status in Dataverse').closest('dl');
-  expect(recordedStatus).toHaveTextContent('Phase I Pending');
-  expect(recordedStatus).not.toHaveTextContent('Final Assessment');
+  expect(await screen.findByRole('heading', { name: 'Visit assessment saved' })).toBeVisible();
+  expect(screen.getByText(/in Final Assessment to prepare the Board recommendation/)).toBeVisible();
+  expect(screen.getByText('Recorded request status').closest('dl')).toHaveTextContent('Phase I Pending');
   expect(screen.getByText('1 report received')).toBeVisible();
   expect(screen.getByText('Attendance · Confirmed')).toBeVisible();
-  fireEvent.click(screen.getByRole('button', { name: 'Open Final Assessment' }));
-  expect(onSelectTab).toHaveBeenCalledWith('final-assessment');
+  expect(screen.queryByRole('button', { name: 'Open Final Assessment' })).toBeNull();
   expect(global.fetch.mock.calls.filter(([url]) => url.includes('reviewer-rollup'))).toHaveLength(1);
 });
 
-test('saved review prose without a presentation points staff to Reports for the next decision', async () => {
-  const onSelectTab = renderOverview();
+test('saved review prose without a presentation points staff to Peer Review', async () => {
+  renderOverview();
   expect(await screen.findByRole('heading', { name: 'Staff review summary saved' })).toBeVisible();
-  fireEvent.click(screen.getByRole('button', { name: 'Open Reports' }));
-  expect(onSelectTab).toHaveBeenCalledWith('reviews');
-  expect(screen.queryByRole('button', { name: 'Open Final Assessment' })).toBeNull();
+  expect(screen.getByText(/summary and reports in Peer Review/)).toBeVisible();
+  expect(screen.queryByText(/Visit assessment ·/)).toBeNull();
 });
 
-test('First Cut Not Scored links to the decision without treating it as a formal outcome', async () => {
-  const onSelectTab = renderOverview({ status: { phaseIStatus: FIRST_CUT_STATUS.no } });
+test('First Cut Not Scored points to Initial Assessment without treating it as a formal outcome', async () => {
+  renderOverview({ status: { phaseIStatus: FIRST_CUT_STATUS.no } });
   expect(await screen.findByRole('heading', { name: 'First Cut marked Not Scored' })).toBeVisible();
-  fireEvent.click(screen.getByRole('button', { name: 'Open Initial Assessment' }));
-  expect(onSelectTab).toHaveBeenCalledWith('initial-assessment');
+  expect(screen.getByText('The decision and staff rationale are in Initial Assessment.')).toBeVisible();
   expect(screen.queryByText('Request outcome recorded')).toBeNull();
 });
 
@@ -69,13 +79,16 @@ test('a recorded outcome takes priority over the suggested handoff', async () =>
     reads: { 'staff-visit-assessment': { assessment: 'Saved visit assessment' } },
   });
   expect(await screen.findByText('Visit assessment · Saved')).toBeVisible();
-  expect(screen.getByRole('heading', { name: 'Request outcome recorded' })).toBeVisible();
-  expect(screen.queryByRole('button', { name: 'Open Final Assessment' })).toBeNull();
+  expect(screen.getByRole('heading', { name: 'Phase II Declined' })).toBeVisible();
+  expect(screen.queryByText(/prepare the Board recommendation/)).toBeNull();
 });
 
-test('a failed staff record read stays unknown while available evidence remains actionable', async () => {
-  renderOverview({ reads: { 'staff-visit-assessment': null, 'staff-review-summary': null } });
+test('a failed read stays unknown once that stage has relevant evidence', async () => {
+  renderOverview({ reads: {
+    'staff-visit-assessment': null, 'staff-review-summary': null,
+    'meeting-roster': { presentation: { id: 'visit' }, stale: false, roster: {} },
+  } });
   expect(await screen.findByText('Visit assessment · Couldn’t check')).toBeVisible();
   expect(screen.getByText('Staff review summary · Couldn’t check')).toBeVisible();
-  expect(screen.getByRole('button', { name: 'Open Reports' })).toBeVisible();
+  expect(screen.getByText(/staff assessment in Deliberations/)).toBeVisible();
 });

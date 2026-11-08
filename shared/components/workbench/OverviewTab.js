@@ -33,15 +33,16 @@ function Field({ label, children }) {
   );
 }
 
-function Section({ title, action, children }) {
+function Section({ title, action, children, embedded }) {
+  const Container = embedded ? 'section' : Card;
   return (
-    <Card hover={false}>
+    <Container {...(embedded ? {} : { hover: false })}>
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-base font-semibold text-gray-900">{title}</h2>
         {action}
       </div>
       {children}
-    </Card>
+    </Container>
   );
 }
 
@@ -101,7 +102,7 @@ function ReviewerProgress({ state, showHint }) {
 
   return (
     <div className="space-y-3">
-      <dl className="grid grid-cols-4 gap-4">
+      <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Field label="Candidates">{n(counts.candidates)}</Field>
         <Field label="Invited">{n(counts.invited)}</Field>
         <Field label="Accepted">{Number.isFinite(needed) ? `${n(counts.accepted)} / ${needed}` : n(counts.accepted)}</Field>
@@ -120,11 +121,12 @@ export default function OverviewTab({ context, requestId, onSelectTab, j27Handof
   const anyArtifact = artifacts.some((a) => a.present);
 
   const details = (
-    <div className="space-y-4">
+    <div className={j27Handoffs ? "space-y-5 divide-y divide-gray-200 [&>section+section]:pt-5" : "space-y-4"}>
       {/* Snapshot */}
       {context && <Section
         title="Request snapshot"
-        action={<TabLink onSelectTab={onSelectTab} tab="proposal">Open proposal →</TabLink>}
+        embedded={j27Handoffs}
+        action={!j27Handoffs && <TabLink onSelectTab={onSelectTab} tab="proposal">Open proposal →</TabLink>}
       >
         <dl className="grid sm:grid-cols-2 gap-4">
           <Field label="Principal Investigator">{info.pi}</Field>
@@ -134,7 +136,7 @@ export default function OverviewTab({ context, requestId, onSelectTab, j27Handof
           <Field label="Requested Amount">{money(info.requestedAmount)}</Field>
           <Field label="Total Project Budget">{money(info.totalProjectBudget)}</Field>
           <Field label="Program">{context.grantProgram}</Field>
-          <Field label="Status">
+          <Field label={j27Handoffs ? "Recorded request status" : "Status"}>
             {context.requestStatus ? (
               <span className="inline-flex items-center gap-2">
                 {context.requestStatus}
@@ -146,7 +148,7 @@ export default function OverviewTab({ context, requestId, onSelectTab, j27Handof
       </Section>}
 
       {/* AI artifacts */}
-      {context && <Section
+      {context && !j27Handoffs && <Section
         title="AI content"
         action={<TabLink onSelectTab={onSelectTab} tab="proposal">View / generate →</TabLink>}
       >
@@ -180,8 +182,9 @@ export default function OverviewTab({ context, requestId, onSelectTab, j27Handof
 
       {/* Reviewers */}
       <Section
-        title="Reviewers"
-        action={<TabLink onSelectTab={onSelectTab} tab="reviewers">Manage reviewers →</TabLink>}
+        title={j27Handoffs ? "Reviewer counts" : "Reviewers"}
+        embedded={j27Handoffs}
+        action={!j27Handoffs && <TabLink onSelectTab={onSelectTab} tab="reviewers">Manage reviewers →</TabLink>}
       >
         <ReviewerProgress state={reviewerProgress} showHint={!j27Handoffs} />
       </Section>
@@ -192,10 +195,10 @@ export default function OverviewTab({ context, requestId, onSelectTab, j27Handof
   return (
     <div className="space-y-4">
       <J27Overview key={requestId} context={context} requestId={requestId}
-        reviewerProgress={reviewerProgress} onSelectTab={onSelectTab}
+        reviewerProgress={reviewerProgress}
         initialRationaleEnabled={initialRationaleEnabled} meetingRosterEnabled={meetingRosterEnabled} />
       <details className="rounded-xl border border-gray-200 bg-white p-4">
-        <summary className="cursor-pointer text-sm font-semibold">Request details and reviewer counts</summary>
+        <summary className="cursor-pointer text-sm font-semibold">Request details</summary>
         <div className="mt-4">{details}</div>
       </details>
     </div>
