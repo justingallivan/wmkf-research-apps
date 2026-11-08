@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { Button, Card } from '../Layout';
+import { useRef, useState } from 'react';
+import { Card } from '../Layout';
 import { FIRST_CUT_STATUS, isFirstCutEditable } from '../../config/j27FirstCut';
 import { requestJson } from '../../utils/api-request';
 
 export default function FirstCutCard({ context, canManage, refresh }) {
-  const [decision, setDecision] = useState('');
+  const [pendingDecision, setPendingDecision] = useState('');
+  const saveInFlight = useRef(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
@@ -13,9 +14,11 @@ export default function FirstCutCard({ context, canManage, refresh }) {
     : phaseIStatus === FIRST_CUT_STATUS.no ? 'no' : '';
   const editable = isFirstCutEditable(phaseIStatus);
 
-  async function save(event) {
-    event.preventDefault();
-    if (saving || !decision || decision === current || !canManage || !editable || !requestVersion) return;
+  async function save(decision) {
+    if (saveInFlight.current || (decision !== 'yes' && decision !== 'no')
+      || decision === current || !canManage || !editable || !requestVersion) return;
+    saveInFlight.current = true;
+    setPendingDecision(decision);
     setSaving(true);
     setError('');
     setSaved(false);
@@ -27,13 +30,19 @@ export default function FirstCutCard({ context, canManage, refresh }) {
       });
       setSaved(true);
     } catch (failure) {
+      setPendingDecision('');
       setError(failure.status === 409
         ? 'The request changed. Review the refreshed status before saving again.'
         : failure.message);
     } finally {
-      await refresh();
-      setDecision('');
-      setSaving(false);
+      // Keep the selector locked until the refreshed request version is available.
+      try {
+        await refresh();
+      } finally {
+        setPendingDecision('');
+        setSaving(false);
+        saveInFlight.current = false;
+      }
     }
   }
 
@@ -44,30 +53,25 @@ export default function FirstCutCard({ context, canManage, refresh }) {
         Phase I status: {phaseIStatusLabel || (phaseIStatus === null ? 'Not set' : 'Unavailable')}
       </p>
       {canManage && editable && requestVersion ? (
-        <form onSubmit={save} className="mt-3 flex flex-wrap items-end gap-3">
-          <label className="flex flex-col gap-1 text-sm font-medium text-gray-900">
-            First Cut decision
-            <select
-              className="min-h-10 rounded-lg border border-gray-300 bg-white px-3"
-              value={decision || current}
-              disabled={saving}
-              onChange={(event) => {
-                setDecision(event.target.value);
-                setSaved(false);
-                setError('');
-              }}
-            >
-              <option value="" disabled>Select a decision</option>
-              <option value="yes">Yes — Scored</option>
-              <option value="no">No — Not Scored</option>
-            </select>
-          </label>
-          <Button type="submit" size="sm" loading={saving} disabled={!decision || decision === current}>
-            Save First Cut
-          </Button>
-        </form>
+        <label className="mt-3 flex w-fit flex-col gap-1 text-sm font-medium text-gray-900">
+          First Cut decision
+          <select
+            className="min-h-10 rounded-lg border border-gray-300 bg-white px-3"
+            value={pendingDecision || current}
+            disabled={saving}
+            onChange={(event) => save(event.target.value)}
+          >
+            <option value="" disabled>Select a decision</option>
+            <option value="yes">Yes — Scored</option>
+            <option value="no">No — Not Scored</option>
+          </select>
+        </label>
       ) : <p className="mt-2 text-sm text-gray-600">First Cut is read-only.</p>}
-      {saved && <p role="status" className="mt-2 text-sm text-gray-700">First Cut saved.</p>}
+      {(saving || saved) && (
+        <p role="status" className="mt-2 text-sm text-gray-700">
+          {saving ? 'Saving First Cut…' : 'First Cut saved.'}
+        </p>
+      )}
       {error && <p role="alert" className="mt-2 text-sm text-red-700">{error}</p>}
     </Card>
   );
