@@ -631,8 +631,7 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
 
       {candidates.length === 0 ? (
         <p className="text-sm text-gray-600">
-          No saved candidates yet. Use the <span className="font-medium">Find</span> tab to add applicant-recommended
-          reviewers and search for more, then invite them here.
+          No reviewers awaiting invitation.
         </p>
       ) : (
         <>
