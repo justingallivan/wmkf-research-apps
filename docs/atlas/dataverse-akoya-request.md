@@ -110,7 +110,7 @@ WMKF AI writeback fields (canonical: `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md` —
 - `wmkf_ai_keywords` (Memo, JSON array, 4000), `wmkf_ai_methodologies` (Memo, JSON array, 4000), `wmkf_ai_riskflags` (Memo, JSON array, 4000)
 - `wmkf_ai_teaminfo` (Memo, JSON object, 8000), `wmkf_ai_budgetsummary` (Memo, narrative, 8000), `wmkf_ai_timeline` (Memo, narrative, 8000)
 
-**J27 Intake fit comparison [VERIFIED in branch source; Dataverse provisioning planned].**
+**J27 Intake fit comparison [VERIFIED in branch source; sandbox column applied 2026-11-07 Pacific].**
 `wmkf_j27intakefitcomparison` is a dedicated 32,000-character Memo in
 `wave37-j27-intake-fit-comparison`. The trusted Workbench comparison service
 conditionally saves a versioned snapshot of the independent ternary baseline

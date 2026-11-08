@@ -38,12 +38,21 @@ Gray means missing evidence and counts separately from green.
 
 ## Sandbox handoff
 
+- **Nov. 7 sandbox readback:** P1–P6 were bootstrapped as v1 and the Intake
+  comparison column was applied. The prompt-only synthetic rehearsal checked
+  all six published prompt contracts and ran them through Anthropic. P5 failed
+  its paragraph validator on the first attempt and passed on a feedback retry
+  at 86 words. P6 returned six flags with two source-matched quotations.
+  Earlier stage text was passed in memory and request writes were disabled.
+- **Open sandbox blocker:** The Factory request create returned Dataverse
+  `0x80040265`. Exact readback confirmed no request, related email, payment,
+  or document location was created. The independent ternary prompt or receipt
+  remains unavailable, so a paired run and real D26 rehearsal are pending.
 - **Connor:** Confirm the deployed ternary flow, the run identifier it can
-  return, and the common intake materials version. Apply the additive
-  `wave37-j27-intake-fit-comparison` schema in sandbox, verify its permissions
-  and flow triggers, and coordinate a trusted invocation path for the
-  comparison service. Publish P6 through the governed seed after schema and
-  input readback. No Power Automate caller is connected yet.
+  return, and the common intake materials version. Verify sandbox permissions
+  and flow triggers for the comparison field and coordinate a trusted
+  invocation path for the comparison service. No Power Automate caller is
+  connected yet.
 - **Justin:** Verify that the staff Workbench displays the captured ternary
   assessment and all six concerns, that missing sources show Cannot assess,
   and that review evidence stays out of chair and applicant surfaces. Keep

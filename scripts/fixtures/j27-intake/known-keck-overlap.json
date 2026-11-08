@@ -1,7 +1,7 @@
 {
   "id": "known-keck-overlap",
   "materialsVersion": "j27-mock-known-keck-overlap-v1",
-  "applicantTitle": "TEST J27: How salt changes freezing on mineral surfaces",
+  "applicantTitle": "TEST: J27 How salt changes freezing on mineral surfaces",
   "layAbstract": "Ice often starts forming on a surface. We want to know how dissolved salt changes which places on a mineral freeze first. We will use a cold chamber to watch ice form on pieces of one mineral while varying the salt in the water.",
   "summaryFields": "Scientific Question: How does dissolved salt affect where ice first forms on a mineral surface?\nPotential Impact: Explain which surface sites start freezing. Clarify how salt changes the early stages of ice growth.\nRisks: Salt may accumulate unevenly.\nEnabling Advances: The team has demonstrated a chamber that images freezing as it happens.\nNew Area: Linking site-specific freezing to salt concentration.\nPeer Groups: Ice nucleation laboratories.\nPrior Support: No award addresses the role of salt.",
   "proposalText": "[page 1]\nProject Narrative\nThe project asks how salt changes where ice first forms on a mineral surface. It will compare freezing at surface sites across three salt concentrations.\n[page 2]\nApproach\nThe team has demonstrated a chamber that images freezing as it happens. It will add a controlled salt gradient. Salt may accumulate unevenly and obscure which sites are responsible for the effect.",
