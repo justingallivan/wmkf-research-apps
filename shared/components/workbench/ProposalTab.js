@@ -500,7 +500,7 @@ function DocumentsSection({ requestId, docs, error }) {
   );
 }
 
-export default function ProposalTab({ context, requestId: requestIdProp }) {
+export default function ProposalTab({ context, requestId: requestIdProp, onProposalHref }) {
   const requestId = requestIdProp || context?.requestId || null;
   const [docs, setDocs] = useState(null);
   const [docsError, setDocsError] = useState(null);
@@ -513,15 +513,24 @@ export default function ProposalTab({ context, requestId: requestIdProp }) {
     requestEnvelope(`/api/workbench/proposal-documents?requestId=${encodeURIComponent(requestId)}`, { tolerantBody: true })
       .then(({ ok: resOk, status: resStatus, data: body }) => {
         if (!resOk || body?.success !== true) throw new Error(body?.error || `Failed to load documents (${resStatus})`);
-        if (!cancelled) setDocs(body);
+        if (cancelled) return;
+        setDocs(body);
+        if (onProposalHref) {
+          const materials = Array.isArray(body.aiMaterials) ? body.aiMaterials : [];
+          const narrative = materials.find(file => file?.key === 'proposalNarrative' && file.found);
+          onProposalHref(narrative?.library && narrative.folder && narrative.name && isViewable(narrative)
+            ? docUrl(requestId, narrative, { inline: true })
+            : null);
+        }
       })
       .catch((e) => {
         if (!cancelled) setDocsError(e.message);
       });
     return () => {
       cancelled = true;
+      onProposalHref?.(null);
     };
-  }, [requestId]);
+  }, [requestId, onProposalHref]);
 
   const info = context?.proposalInfo || {};
   const ai = context?.aiContent || {};

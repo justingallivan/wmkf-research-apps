@@ -82,6 +82,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
   const routeKey = routeRequestId?.toLowerCase() || '';
   const [visitEditorRequestId, setVisitEditorRequestId] = useState(null);
   const [rationaleEditorRequestId, setRationaleEditorRequestId] = useState(null);
+  const [proposalLink, setProposalLink] = useState(null);
   const routeStateRef = useRef({ key: routeKey, generation: 0 });
   if (routeStateRef.current.key !== routeKey) {
     routeStateRef.current = {
@@ -150,6 +151,12 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
     : (tabParam && visibleTabKeys.has(tabParam) ? tabParam : 'overview');
   const reviewerSurfaceReadOnly = previewReadOnly && ['reviewers', 'reviews'].includes(activeTab);
   const editingInitialRationale = showInitialRationale && activeTab === 'proposal';
+  const updateProposalHref = useCallback((href) => {
+    if (routeStateRef.current.generation === routeGeneration) {
+      setProposalLink(href ? { href, generation: routeGeneration } : null);
+    }
+  }, [routeGeneration]);
+
 
   useEffect(() => {
     if (editingInitialRationale) setRationaleEditorRequestId(routeRequestId);
@@ -334,7 +341,8 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
 
       {showInitialRationale && (editingInitialRationale || rationaleEditorRequestId === routeRequestId) && (
         <div hidden={!editingInitialRationale}>
-          <InitialAssessmentRationale key={routeRequestId} requestId={routeRequestId} />
+          <InitialAssessmentRationale key={routeRequestId} requestId={routeRequestId}
+            proposalHref={proposalLink?.generation === routeGeneration ? proposalLink.href : null} />
         </div>
       )}
 
@@ -386,7 +394,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
               className="rounded-xl border bg-white p-5">
               <summary className="cursor-pointer font-semibold">Proposal and AI intake findings</summary>
               <div className="mt-4">
-                <ProposalTab context={visibleContext} requestId={routeRequestId} />
+                <ProposalTab context={visibleContext} requestId={routeRequestId} onProposalHref={updateProposalHref} />
               </div>
             </details>
           ) : (

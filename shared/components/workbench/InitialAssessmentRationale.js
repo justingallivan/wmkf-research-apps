@@ -6,7 +6,7 @@ const endpoint = '/api/workbench/initial-assessment-rationale';
 const read = requestId => requestJson(endpoint + '?requestId=' + encodeURIComponent(requestId));
 
 // The Workbench keys this editor by request ID.
-export default function InitialAssessmentRationale({ requestId }) {
+export default function InitialAssessmentRationale({ requestId, proposalHref = null }) {
   const [record, setRecord] = useState(null);
   const [draft, setDraft] = useState('');
   const [error, setError] = useState('');
@@ -74,7 +74,16 @@ export default function InitialAssessmentRationale({ requestId }) {
 
   return (
     <section className="mb-4 rounded-xl border bg-white p-5" aria-labelledby="initial-rationale-heading">
-      <h2 id="initial-rationale-heading" className="text-lg font-semibold">Staff rationale</h2>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <h2 id="initial-rationale-heading" className="text-lg font-semibold">Staff rationale</h2>
+        {proposalHref && (
+          <a href={proposalHref} target="_blank" rel="noopener noreferrer"
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50">
+            View proposal
+            <span className="sr-only"> (opens in a new tab)</span>
+          </a>
+        )}
+      </div>
       <p id="initial-rationale-guidance" className="mt-1 text-sm text-gray-600">
         Explain why you recommend triaging or advancing this proposal. For proposals you would advance,
         describe the strengths and any questions staff should carry forward.

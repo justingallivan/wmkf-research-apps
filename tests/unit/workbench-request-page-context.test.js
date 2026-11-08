@@ -30,7 +30,13 @@ jest.mock('../../shared/components/reviewers/ReviewersTab', () => function Revie
   return <div data-testid="reviewers" data-context={context?.requestId || ''} data-can-manage={String(canManage)} />;
 });
 jest.mock('../../shared/components/workbench/ReviewsTab', () => function TabStub() { return <div />; });
-jest.mock('../../shared/components/workbench/ProposalTab', () => function ProposalStub({ context }) { return <div data-testid="proposal" data-context={context?.requestId || ''} />; });
+jest.mock('../../shared/components/workbench/ProposalTab', () => function ProposalStub(props) {
+  if (props.onProposalHref) {
+    const Proposal = jest.requireActual('../../shared/components/workbench/ProposalTab').default;
+    return <Proposal {...props} />;
+  }
+  return <div data-testid="proposal" data-context={props.context?.requestId || ''} />;
+});
 jest.mock('../../shared/components/workbench/StatusTab', () => function StatusStub({ context }) { return <div data-testid="status" data-context={context?.requestId || ''} />; });
 jest.mock('../../shared/components/workbench/AwardeeTab', () => function AwardeeStub({ context }) { return <div data-testid="awardee" data-context={context?.requestId || ''} />; });
 jest.mock('../../shared/components/workbench/InitialAssessmentTab', () => function TabStub() { return <div />; });
@@ -244,7 +250,29 @@ test('J27 Initial Assessment keeps the rationale draft while staff open Word ass
 
   const editor = screen.getByRole('textbox', { name: 'Staff rationale' });
   expect(editor).toHaveValue('Saved rationale');
-  expect(screen.getByText('Proposal and AI intake findings')).toBeInTheDocument();
+  expect(screen.getByText('Proposal and AI intake findings').closest('details')).not.toHaveAttribute('open');
+  expect(screen.queryByRole('link', { name: /View proposal/ })).toBeNull();
+  await act(async () => {
+    pending.get('/api/workbench/proposal-documents?requestId=request-a')({
+      ok: true, json: async () => ({
+        success: true,
+        aiMaterials: [{
+          key: 'proposalNarrative', label: 'Proposal Narrative', found: true,
+          library: 'akoya_request', folder: 'request-a/AI Materials', name: 'Project-Narrative_1000369.pdf',
+        }],
+      }),
+    });
+  });
+  const link = screen.getByRole('link', { name: /View proposal/ });
+  expect(link.closest('section')).toBe(screen.getByRole('region', { name: 'Staff rationale' }));
+  expect(link).toHaveAttribute('target', '_blank');
+  const url = new URL(link.getAttribute('href'), 'https://example.test');
+  expect(url.pathname).toBe('/api/workbench/download-proposal-document');
+  expect(Object.fromEntries(url.searchParams)).toEqual({
+    requestId: 'request-a', library: 'akoya_request', folder: 'request-a/AI Materials',
+    filename: 'Project-Narrative_1000369.pdf', disposition: 'inline',
+  });
+  expect(screen.getByText('Proposal and AI intake findings').closest('details')).not.toHaveAttribute('open');
   fireEvent.change(editor, { target: { value: 'Unsaved rationale' } });
 
   tabName = 'initial-writeup';
