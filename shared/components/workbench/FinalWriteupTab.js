@@ -749,15 +749,29 @@ export default function FinalWriteupTab({ requestId }) {
                 </p>
               )}
             </div>
-            {status.canStart && (
-              <button
-                type="button"
-                disabled={starting}
-                onClick={() => setConfirming('group')}
-                className="min-h-11 shrink-0 rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                Ready for group review
-              </button>
+            {(status.canStart || (status.sourceFileHidden !== true && status.sourceFile?.webUrl)) && (
+              <div className="flex flex-wrap items-center gap-3 sm:max-w-xs">
+                {status.sourceFileHidden !== true && status.sourceFile?.webUrl && (
+                  <a
+                    href={status.sourceFile.webUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex min-h-11 items-center rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2"
+                  >
+                    Open draft in Word
+                  </a>
+                )}
+                {status.canStart && (
+                  <button
+                    type="button"
+                    disabled={starting}
+                    onClick={() => setConfirming('group')}
+                    className="min-h-11 shrink-0 rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    Ready for group review
+                  </button>
+                )}
+              </div>
             )}
           </div>
         ) : null}

@@ -118,6 +118,27 @@ test('hides the governed transition from a staff member who is not authorized', 
   expect(screen.queryByRole('button', { name: 'Ready for group review' })).not.toBeInTheDocument();
 });
 
+test('offers the authorized Word draft before group review even when the viewer cannot start review', async () => {
+  const webUrl = 'https://sharepoint.test/draft.docx';
+  global.fetch.mockResolvedValueOnce(response({ ...readyStatus(false), sourceFile: { name: 'Draft.docx', webUrl } }));
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+
+  const link = await screen.findByRole('link', { name: 'Open draft in Word' });
+  expect(link).toHaveAttribute('href', webUrl);
+  expect(link).toHaveAttribute('target', '_blank');
+  expect(screen.queryByRole('button', { name: 'Ready for group review' })).toBeNull();
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+  expect(global.fetch.mock.calls[0][1]?.method).toBe('GET');
+});
+
+test('keeps the Word draft link hidden when the status marks the draft private', async () => {
+  global.fetch.mockResolvedValueOnce(response({ ...readyStatus(false), sourceFileHidden: true, sourceFile: null }));
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+
+  expect(await screen.findByText(/Only the lead Program Director or a superuser/i)).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Open draft in Word' })).toBeNull();
+});
+
 test('contains keyboard focus inside the confirmation dialog', async () => {
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
 
