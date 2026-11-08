@@ -1,0 +1,14 @@
+{
+  "name": "akoya_request-j27-intake-fit-comparison",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "akoya_request",
+  "attributes": [
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_J27IntakeFitComparison",
+      "displayName": "J27 Intake Fit Comparison",
+      "description": "Staff-only JSON snapshot pairing the independent Intake overall fit result and six Intake fit concerns. First Cut and staff decisions use separate storage.",
+      "maxLength": 32000
+    }
+  ]
+}

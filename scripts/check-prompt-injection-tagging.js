@@ -536,6 +536,13 @@ const SURFACES = [
     promptFiles: ['shared/config/prompts/j27-intake-rationale.js'],
     callSiteFiles: ['lib/services/execute-prompt.js'],
   },
+  {
+    // P6 wraps application evidence, award records, and the P2 fit hint.
+    id: 'j27-fit-concerns',
+    status: 'migrated',
+    promptFiles: ['shared/config/prompts/j27-fit-concerns.js'],
+    callSiteFiles: ['lib/services/execute-prompt.js'],
+  },
 ];
 
 // Prompt-builder files known NOT to be untrusted-content surfaces (so the

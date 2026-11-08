@@ -17,6 +17,7 @@ import { requestEnvelope } from '../../utils/api-request';
 import { Card } from '../Layout';
 import { parseFieldPrimerEnvelope } from '../../utils/field-primer-envelope';
 import { expertProfileLinks, expertMetrics } from '../../utils/field-primer-display';
+import { J27_FIT_CONCERNS, J27_FIT_LEVELS, OVERALL_FIT_LABELS } from '../../config/j27FitComparison';
 
 const USD = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -70,6 +71,57 @@ function Field({ label, children }) {
       <dt className="text-xs uppercase tracking-wide text-gray-400">{label}</dt>
       <dd className="text-sm text-gray-900">{children ?? '—'}</dd>
     </div>
+  );
+}
+
+const FIT_LEVEL_CLASS = {
+  red: 'text-red-700',
+  yellow: 'text-amber-800',
+  green: 'text-green-700',
+  gray: 'text-gray-600',
+};
+
+function IntakeFitComparison({ ai }) {
+  const { state, comparison } = ai.fitComparison;
+  const assessment = comparison ? OVERALL_FIT_LABELS[comparison.ternary.assessment] : ai.fitAssessment;
+  const rationale = comparison ? comparison.ternary.rationale : ai.fitRationale;
+
+  return (
+    <dl className="grid gap-4 sm:grid-cols-2">
+      <div>
+        <dt className="text-xs uppercase tracking-wide text-gray-400">Overall Fit</dt>
+        <dd className="text-sm text-gray-900">
+          <p className="font-medium">{assessment || 'Not yet generated'}</p>
+          <p className="text-xs text-gray-600">{comparison ? 'Intake baseline' : 'Current request result'}</p>
+          {rationale && <p className="mt-1 whitespace-pre-wrap">{rationale}</p>}
+        </dd>
+      </div>
+      <div>
+        <dt className="text-xs uppercase tracking-wide text-gray-400">Six Fit Concerns</dt>
+        <dd className="text-sm text-gray-900">
+          {comparison ? (
+            <ul className="space-y-2">
+              {comparison.p6.flags.map(({ id, level, reason, evidence }) => (
+                <li key={id}>
+                  <span className="font-medium">{J27_FIT_CONCERNS[id]}</span>
+                  {' · '}<span className={FIT_LEVEL_CLASS[level]}>{J27_FIT_LEVELS[level]}</span>
+                  {reason && <p>{reason}</p>}
+                  {evidence.length > 0 && (
+                    <ul className="ml-3 text-gray-600">
+                      {evidence.map(({ quote, section, page }, index) => (
+                        <li key={index}>“{quote}” · {page == null ? section : `Page ${page}, ${section}`}</li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-gray-600">{state === 'unavailable' ? 'Intake comparison unavailable.' : 'Intake comparison pending.'}</p>
+          )}
+        </dd>
+      </div>
+    </dl>
   );
 }
 
@@ -558,12 +610,12 @@ export default function ProposalTab({ context, requestId: requestIdProp }) {
       {/* Bottom — AI content */}
       {context && <Section title="AI Content">
         <div className="space-y-4">
-          <div>
+          {ai.fitComparison ? <IntakeFitComparison ai={ai} /> : <div>
             <dt className="text-xs uppercase tracking-wide text-gray-400 mb-1">AI Fit Rationale</dt>
             <dd className="text-sm text-gray-700 whitespace-pre-wrap">
               {ai.fitRationale || <span className="text-gray-500">Not yet generated.</span>}
             </dd>
-          </div>
+          </div>}
           <div>
             <dt className="text-xs uppercase tracking-wide text-gray-400 mb-1">AI Summary</dt>
             <dd className="text-sm text-gray-700 whitespace-pre-wrap">

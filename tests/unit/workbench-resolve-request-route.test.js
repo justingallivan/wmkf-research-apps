@@ -45,6 +45,7 @@ const SELECT = [
   'wmkf_abstract',
   'akoya_request',
   'akoya_expenses',
+  'wmkf_ai_fitassessment',
   'wmkf_ai_fitrationale',
   'wmkf_ai_summary',
   'wmkf_ai_dataextract',
@@ -168,6 +169,23 @@ test('golden path by requestNumber: queries by exact number match', async () => 
   });
   expect(res.body.requestId).toBe(REQUEST_ID);
   expect(res.body.cycleCode).toBe('J26');
+});
+
+test('J27 retains overall fit when the optional comparison column is unavailable', async () => {
+  DynamicsService.getRecord.mockResolvedValueOnce({
+    ...RECORD,
+    wmkf_GrantCycle: { wmkf_cyclecode: 'J27' },
+    wmkf_ai_fitassessment: 682090002,
+    wmkf_ai_fitrationale: 'The fundamental question needs clarification.',
+  }).mockRejectedValueOnce(new Error('Column is unavailable'));
+  const res = mockRes();
+  await handler(reqOf({ requestId: REQUEST_ID }), res);
+  expect(res.statusCode).toBe(200);
+  expect(res.body.aiContent).toMatchObject({
+    fitAssessment: 'Unclear',
+    fitRationale: 'The fundamental question needs clarification.',
+    fitComparison: { state: 'unavailable' },
+  });
 });
 
 test('request not found by GUID → 404, no CoPI lookup attempted', async () => {

@@ -19,6 +19,30 @@ const unparseable = () => Promise.reject(new SyntaxError('Unexpected token <'));
 
 afterEach(() => jest.restoreAllMocks());
 
+test('Intake comparison displays the frozen overall fit beside the P6 flags', async () => {
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true, json: async () => ({ success: true, aiMaterials: [], reviewerMaterials: [], slots: [] }),
+  });
+  render(<ProposalTab context={{
+    ...context,
+    aiContent: {
+      fitAssessment: 'Not a Fit',
+      fitComparison: {
+        state: 'ready',
+        comparison: {
+          ternary: { assessment: 682090000, rationale: 'The Intake rationale.' },
+          p6: { flags: [{ id: 'funding_overlap', level: 'gray', reason: 'Other Support is unavailable.', evidence: [] }] },
+        },
+      },
+    },
+  }} />);
+  expect(await screen.findByText('Intake baseline')).toBeInTheDocument();
+  expect(screen.getByText('Fit')).toBeInTheDocument();
+  expect(screen.queryByText('Not a Fit')).not.toBeInTheDocument();
+  expect(screen.getByText('Six Fit Concerns')).toBeInTheDocument();
+  expect(screen.getByText('Cannot assess')).toBeInTheDocument();
+});
+
 test('proposal-documents: network rejection is never silent', async () => {
   global.fetch = jest.fn().mockRejectedValue(new Error('offline'));
   render(<ProposalTab requestId={REQUEST_ID} context={null} />);
