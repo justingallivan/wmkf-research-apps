@@ -39,7 +39,7 @@ jest.mock('../../shared/components/workbench/ProposalTab', () => function Propos
 });
 jest.mock('../../shared/components/workbench/StatusTab', () => function StatusStub({ context }) { return <div data-testid="status" data-context={context?.requestId || ''} />; });
 jest.mock('../../shared/components/workbench/AwardeeTab', () => function AwardeeStub({ context }) { return <div data-testid="awardee" data-context={context?.requestId || ''} />; });
-jest.mock('../../shared/components/workbench/InitialAssessmentTab', () => function TabStub() { return <div />; });
+jest.mock('../../shared/components/workbench/InitialAssessmentTab', () => function TabStub() { return <div data-testid="legacy-initial-assessment" />; });
 jest.mock('../../shared/components/workbench/StaffDeliberationsTab', () => function TabStub() { return <div />; });
 jest.mock('../../shared/components/workbench/ReviewPanelTab', () => function TabStub() { return <div />; });
 jest.mock('../../shared/components/workbench/FinalWriteupTab', () => function TabStub() { return <div />; });
@@ -234,7 +234,7 @@ test('Final Writeup reads the saved visit assessment while the Deliberations dra
   expect(screen.getByRole('textbox', { name: 'Staff assessment of the visit' })).toHaveValue('Unsaved assessment edit');
 });
 
-test('J27 Initial Assessment keeps the rationale draft while staff open Word assessment or Reports', async () => {
+test('J27 Initial Assessment hides the Word option and keeps the rationale draft across legacy links and Reports', async () => {
   tabName = 'initial-assessment';
   const view = render(<WorkbenchRequest staffReviewSummary initialRationaleEnabled />);
   await act(async () => {
@@ -250,6 +250,9 @@ test('J27 Initial Assessment keeps the rationale draft while staff open Word ass
 
   const editor = screen.getByRole('textbox', { name: 'Staff rationale' });
   expect(editor).toHaveValue('Saved rationale');
+  expect(screen.getAllByRole('button', { name: 'Assessment', exact: true })).toHaveLength(1);
+  expect(screen.queryByTestId('legacy-initial-assessment')).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Word assessment' })).toBeNull();
   expect(screen.getByText('Proposal and AI intake findings').closest('details')).not.toHaveAttribute('open');
   expect(screen.queryByRole('link', { name: /View proposal/ })).toBeNull();
   await act(async () => {
@@ -277,7 +280,9 @@ test('J27 Initial Assessment keeps the rationale draft while staff open Word ass
 
   tabName = 'initial-writeup';
   view.rerender(<WorkbenchRequest staffReviewSummary initialRationaleEnabled />);
-  expect(screen.getByRole('button', { name: 'Word assessment' })).toHaveAttribute('aria-current', 'page');
+  expect(screen.getByTestId('legacy-initial-assessment')).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Initial Assessment', exact: true })).toHaveAttribute('aria-current', 'page');
+  expect(screen.queryByRole('button', { name: 'Word assessment' })).toBeNull();
   expect(screen.queryByRole('textbox', { name: 'Staff rationale' })).toBeNull();
 
   tabName = 'reviews';

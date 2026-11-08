@@ -136,12 +136,14 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
   const sections = !phaseLayout ? [] : phase === 'initial-assessment' ? [
     { key: 'proposal', label: showInitialRationale ? 'Assessment' : 'Proposal' },
     ...(hasAccess('integrity-screener') === true ? [{ key: 'integrity', label: 'Integrity' }] : []),
-    { key: 'assessment', label: showInitialRationale ? 'Word assessment' : 'Assessment' },
+    // Keep the route for existing document links while staff use the in-app assessment.
+    { key: 'assessment', label: 'Assessment', legacyOnly: showInitialRationale },
   ] : phase === 'peer-review' ? [
     { key: 'panel', label: 'Panel' }, { key: 'reports', label: 'Reports' },
     ...(hasAccess('review-panel') === true ? [{ key: 'group-review', label: 'Group review' }] : []),
   ] : [];
   const section = sections.some((item) => item.key === requestedSection) ? requestedSection : sections[0]?.key;
+  const visibleSections = sections.filter((item) => !item.legacyOnly && item.key !== 'group-review');
   const phaseContent = {
     'initial-assessment': { proposal: 'proposal', integrity: 'integrity', assessment: 'initial-writeup' },
     'peer-review': { panel: 'reviewers', reports: 'reviews', 'group-review': 'review-panel' },
@@ -303,9 +305,9 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
         </nav>
       </div>
 
-      {sections.length > 0 && (
+      {visibleSections.length > 0 && (
         <nav className="flex flex-wrap gap-2 mb-6" aria-label={`${phaseTabs.find((item) => item.key === phase)?.label || 'Phase'} sections`}>
-          {sections.filter((item) => item.key !== 'group-review').map((item) => (
+          {visibleSections.map((item) => (
             <button key={item.key} type="button" onClick={() => selectTab(phase, item.key)}
               aria-current={(section === 'group-review' ? 'panel' : section) === item.key ? 'page' : undefined}
               className={`rounded-lg px-3 py-2 text-sm font-medium ${(section === 'group-review' ? 'panel' : section) === item.key ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
