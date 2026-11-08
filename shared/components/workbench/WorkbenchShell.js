@@ -210,7 +210,9 @@ export function WorkbenchShell({ previewReadOnly = false, j27IntegrityEnabled = 
               onChange={(e) => navigate({ cycleCode: e.target.value, uncycled: false }, { push: true })}
               className="w-48"
             >
-              {cyclesReady && !cycleCode && <option value="">Select a cycle…</option>}
+              {cyclesReady && !cycleCode && (
+                <option value="">{cycleOptions.length ? 'Select a cycle…' : 'No cycles available'}</option>
+              )}
               {cycleOptions.map((c) => (
                 <option key={c.code} value={c.code}>{c.label || c.code}</option>
               ))}
@@ -265,7 +267,9 @@ export function WorkbenchShell({ previewReadOnly = false, j27IntegrityEnabled = 
 
       {cyclesReady && !cycleCode ? (
         <div className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-600" role="status">
-          Select a grant cycle to view this workspace.
+          {cycleOptions.length
+            ? 'Select a grant cycle to view this workspace.'
+            : 'No grant cycles are available for this program. Use Find and open a request to look up an individual request.'}
         </div>
       ) : location.view === 'requests' ? (
         <RequestListPanel

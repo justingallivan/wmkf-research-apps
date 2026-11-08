@@ -152,6 +152,23 @@ test('an all-test program requires an explicit cycle choice', async () => {
   ]));
 });
 
+test('a program with no cycles explains the disabled picker and offers request lookup', async () => {
+  mockFetch({
+    '/api/workbench/dashboard': () => response({
+      success: true, programs, programId: 'p1', cycles: [], defaultCycleCode: null,
+    }),
+  });
+  render(<WorkbenchShell />);
+
+  expect(await screen.findByRole('option', { name: 'No cycles available' })).toBeInTheDocument();
+  expect(screen.getByLabelText('Grant cycle')).toBeDisabled();
+  expect(screen.queryByText('Select a grant cycle to view this workspace.')).toBeNull();
+  expect(screen.getByRole('status')).toHaveTextContent('No grant cycles are available for this program.');
+  fireEvent.click(screen.getByRole('button', { name: 'Find and open a request' }));
+  expect(screen.getByTestId('request-locator-mock')).toBeInTheDocument();
+  expect(rowFetches()).toEqual([]);
+});
+
 test('a deep-linked cycle the program lists is honored without rewriting the URL', async () => {
   routerState.query = { cycleCode: 'J26', scope: 'all', setAside: '1' };
   routerState.asPath = '/workbench?cycleCode=J26&scope=all&setAside=1';
