@@ -515,6 +515,13 @@ const SURFACES = [
     promptFiles: ['shared/config/prompts/j27-executive-summary.js'],
     callSiteFiles: ['lib/services/execute-prompt.js'],
   },
+  {
+    // P3 wraps both applicant inputs and the current request summary.
+    id: 'j27-methodology',
+    status: 'migrated',
+    promptFiles: ['shared/config/prompts/j27-methodology.js'],
+    callSiteFiles: ['lib/services/execute-prompt.js'],
+  },
 ];
 
 // Prompt-builder files known NOT to be untrusted-content surfaces (so the

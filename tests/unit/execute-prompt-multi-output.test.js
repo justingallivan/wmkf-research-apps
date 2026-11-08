@@ -77,6 +77,7 @@ afterAll(() => { global.fetch = originalFetch; });
 
 import { executePrompt } from '../../lib/services/execute-prompt';
 import * as J27ExecutiveSummary from '../../shared/config/prompts/j27-executive-summary';
+import * as J27Methodology from '../../shared/config/prompts/j27-methodology';
 import { PROMPT_OUTPUT_SCHEMA as REVIEW_SYNTHESIS_OUTPUT_SCHEMA } from '../../shared/config/prompts/review-synthesis';
 import {
   PROMPT_OUTPUT_SCHEMA as PRE_SITE_OUTPUT_SCHEMA,
@@ -197,6 +198,64 @@ describe('J27 intake Executive Summary', () => {
     const response = { ...output, executive_summary: 'word '.repeat(201) };
     await expect(runExecutiveSummary({ response })).rejects.toThrow(/forbidden text pattern/);
     expect(updateCalls).toHaveLength(0);
+  });
+});
+
+describe('J27 intake Methodology', () => {
+  const summary = 'Staff revised the summary to focus on electrical signaling.';
+  const output = {
+    methodology: 'The team has built a voltage sensor for fungal cells. It will pair the sensor with live microscopy.',
+    enabling_methods: [{ method: 'Voltage sensor', status: 'in_hand', page: 2, section: 'Preliminary data' }],
+    numbers_kept: [],
+    terms_defined: [],
+    open_questions: [{ type: 'status_unclear', detail: 'It is unclear whether the imaging setup works in soil.', page: 3, section: 'Approach' }],
+  };
+
+  function runMethodology({ currentSummary = summary, response = output } = {}) {
+    promptRow = {
+      ...buildPromptRow([]),
+      wmkf_ai_promptname: J27Methodology.PROMPT_NAME,
+      wmkf_ai_systemprompt: J27Methodology.SYSTEM_PROMPT,
+      wmkf_ai_promptbody: J27Methodology.USER_PROMPT_TEMPLATE,
+      wmkf_ai_promptvariables: JSON.stringify(J27Methodology.PROMPT_VARIABLES),
+      wmkf_ai_promptoutputschema: JSON.stringify(J27Methodology.PROMPT_OUTPUT_SCHEMA),
+    };
+    getRecordImpl = async (entitySet) => entitySet === 'akoya_requests'
+      ? { ...REQUEST_ROW, wmkf_ai_summary: currentSummary }
+      : null;
+    setClaudeJson(response);
+    return executePrompt({
+      promptName: J27Methodology.PROMPT_NAME,
+      requestId: REQUEST_ROW.akoya_requestid,
+      runSource: 'Vercel Test',
+      requireNoPersistence: true,
+      overrideVariables: {
+        proposal_text: '[page 2] We built a sensor to detect voltage changes in fungal cells.',
+        summary_fields: 'Enabling Advances: A voltage sensor for fungal cells.',
+        executive_summary: 'An outdated copy of the Executive Summary.',
+      },
+    });
+  }
+
+  test('uses the saved staff edit and returns separate outputs without a request write', async () => {
+    const result = await runMethodology();
+    const providerCall = fetchedBodies.find(({ url }) => url.includes('/v1/messages'));
+    const body = JSON.parse(providerCall.body).messages[0].content;
+    expect(body).toContain(summary);
+    expect(body).not.toContain('An outdated copy');
+    expect(body.match(/\[\[WMKF-UNTRUSTED-CONTENT/g)).toHaveLength(3);
+    expect(result.parsed).toEqual(output);
+    expect(updateCalls).toHaveLength(0);
+  });
+
+  test('fails before generation when the request has no Executive Summary', async () => {
+    await expect(runMethodology({ currentSummary: null })).rejects.toThrow(/Required dynamics variable "executive_summary" missing/);
+    expect(fetchedBodies.some(({ url }) => url.includes('/v1/messages'))).toBe(false);
+  });
+
+  test('rejects an unsupported method status', async () => {
+    const response = { ...output, enabling_methods: [{ ...output.enabling_methods[0], status: 'guessed' }] };
+    await expect(runMethodology({ response })).rejects.toThrow(/in_hand, to_build/);
   });
 });
 
