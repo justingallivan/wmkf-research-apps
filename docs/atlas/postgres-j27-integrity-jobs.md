@@ -48,9 +48,14 @@ PubPeer remains manual. The automation does not send emails.
 The table stores one bounded job row per target and request, with no person
 or evidence data in the job itself. Screening data remains in
 `integrity_screenings`. Fresh installations apply the numbered migrations.
-**[VERIFIED via sandbox Dataverse read-only metadata and workflow reads]**
-Both recommendation choices exist. The sandbox has an active classic
-decline-draft workflow registered on Phase I status updates. The query did
-not establish which recommendation choices create drafts. Verify those
-effects before turning on the Preview decision. Production admission and treatment of historical direct-triage No values
+**[VERIFIED via sandbox workflow definitions and conditional Dataverse
+writes]** The sandbox invite-draft condition is `Invited` (100000003), and
+the decline-draft condition is `Not Invited` (100000002). On synthetic J27
+Research requests #1000373 and #1000374, saving `Recommended Invite`
+(707510005) and `Recommended Do Not Invite` (707510006) respectively
+persisted both values. The request-linked background jobs completed and
+each request had zero email records after a 68-second observation. This
+test covered Dataverse in the sandbox. The Preview dropdown, screen
+dispatch, and Production workflow behavior require separate verification.
+Production admission and treatment of historical direct-triage No values
 require separate review. Real provider use requires explicit authorization.
