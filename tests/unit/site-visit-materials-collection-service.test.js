@@ -286,6 +286,8 @@ test('create refusals: no visit, already open, no recipient email, not schedulab
     ['invite', (d) => inviteMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org', preparedEmail: MATERIALS_PREPARED_EMAIL }, d)],
     ['remind', (d) => remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org', preparedEmail: MATERIALS_PREPARED_EMAIL }, d)],
     ['preview', (d) => previewMaterialsEmail({ requestId: REQUEST_ID, action: 'remind', actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d)],
+    ['waive', (d) => waiveMaterialsItem({ requestId: REQUEST_ID, key: 'presentation_source', waived: true }, d)],
+    ['ready', (d) => confirmMaterialsReady({ requestId: REQUEST_ID, actorId: ACTOR }, d)],
   ]) {
     const offramped = deps({ getRequest: jest.fn(async () => ({ ...request(), wmkf_phaseiistatus: 682090001 })) });
     offramped.__setStored(openMaterialsRow());
@@ -293,6 +295,8 @@ test('create refusals: no visit, already open, no recipient email, not schedulab
     expect(offramped.sendEmail).not.toHaveBeenCalled();
     expect(offramped.updateContacts).not.toHaveBeenCalled();
     expect(offramped.claimManualReminder).not.toHaveBeenCalled();
+    expect(offramped.updateChecklist).not.toHaveBeenCalled();
+    expect(offramped.markReady).not.toHaveBeenCalled();
     void name;
   }
   // A December meeting date without a Grant Cycle link is no cycle: create and its preview refuse.
