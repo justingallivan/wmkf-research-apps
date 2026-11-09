@@ -9,11 +9,16 @@ import { buildWorkbenchHref } from './workbench-location';
  * Pre-Site Visit drafts) sits between Reviewer follow-up and Final writeups
  * (owner, 2026-09-09). Initial assessments stays registered but hidden for
  * D26 (owner, 2026-09-05; reconfirmed 2026-09-09 after a brief unhide — for
- * D26 it lists only pilot test rows); in J27 an Initial Assessment precedes
- * reviewer identification, so it moves left of Request list then and a Find
- * reviewers view surfaces alongside it. That reorder is J27 work, not this.
+ * D26 it lists only pilot test rows). In J27 an Initial Assessment precedes
+ * reviewer identification, so Initial assessments leads the nav (owner,
+ * 2026-11-09); for D26 the hide rule below simply removes it, and Request
+ * list stays the default view.
  */
 export const VIEWS = {
+  'initial-assessments': {
+    label: 'Initial assessments',
+    description: 'Track governed Initial Assessments and their lifecycle for the selected cycle.',
+  },
   requests: {
     label: 'Request list',
     description: 'Triage requests and open reviewer work for the selected program and cycle.',
@@ -25,10 +30,6 @@ export const VIEWS = {
   'staff-deliberations': {
     label: 'Staff deliberations',
     description: 'Review research presentation schedules, proposal discussion briefs, and draft writeups for the selected program and cycle.',
-  },
-  'initial-assessments': {
-    label: 'Initial assessments',
-    description: 'Track governed Initial Assessments and their lifecycle for the selected cycle.',
   },
   'final-writeups': {
     label: 'Final writeups',
