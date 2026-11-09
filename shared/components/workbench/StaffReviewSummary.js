@@ -22,18 +22,21 @@ export default function StaffReviewSummary({ requestId, evidenceHash, reviewers 
       setRecord(result);
       setDraft(result.summary);
     }).catch(failure => {
-      if (generation.current === current) setError(failure.message);
+      if (generation.current !== current) return;
+      setError(failure.message);
+      onJ27Facts?.(requestId, { summaryStale: null }); // a failed read leaves freshness unknown (step E)
     });
     return () => { generation.current += 1; };
-  }, [requestId, readOnly]);
+  }, [requestId, readOnly]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Step E (plan C7): summary freshness for the page's stage, only when both the
   // saved and the current evidence hashes are known; unknown is never "current".
   useEffect(() => {
     if (!onJ27Facts || !record) return;
     const current = readOnly ? record.currentEvidenceHash : evidenceHash;
-    if (!record.summary || !record.evidenceHash || !current) return;
-    onJ27Facts(requestId, { summaryStale: record.evidenceHash !== current });
+    // A read that cannot establish freshness replaces any earlier value with unknown.
+    const known = Boolean(record.summary && record.evidenceHash && current);
+    onJ27Facts(requestId, { summaryStale: known ? record.evidenceHash !== current : null });
   }, [onJ27Facts, record, readOnly, evidenceHash, requestId]);
 
   async function save(event) {

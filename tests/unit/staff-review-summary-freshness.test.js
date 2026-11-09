@@ -9,7 +9,7 @@ import { requestJson } from '../../shared/utils/api-request';
 const REQ = '11111111-1111-4111-8111-111111111111';
 const A = 'a'.repeat(64); const B = 'b'.repeat(64);
 
-test('step E: the read-only panel reports summary freshness only when both evidence hashes are known', async () => {
+test('step E: the read-only panel reports summary freshness when both evidence hashes are known, and unknown otherwise', async () => {
   const onJ27Facts = jest.fn();
   requestJson.mockResolvedValueOnce({ summary: 'Saved.', evidenceHash: A, currentEvidenceHash: B, version: 'v', reviewerFacts: null });
   render(<StaffReviewSummary requestId={REQ} readOnly onJ27Facts={onJ27Facts} />);
@@ -24,7 +24,10 @@ test('step E: the read-only panel reports summary freshness only when both evide
   onJ27Facts.mockClear();
   requestJson.mockResolvedValueOnce({ summary: 'Saved.', evidenceHash: A, currentEvidenceHash: null, version: 'v' });
   render(<StaffReviewSummary requestId={REQ} readOnly onJ27Facts={onJ27Facts} />);
-  await waitFor(() => expect(requestJson).toHaveBeenCalledTimes(3));
-  await new Promise((r) => setTimeout(r, 0));
-  expect(onJ27Facts).not.toHaveBeenCalled();
+  await waitFor(() => expect(onJ27Facts).toHaveBeenCalledWith(REQ, { summaryStale: null }));
+
+  onJ27Facts.mockClear();
+  requestJson.mockRejectedValueOnce(new Error('read failed'));
+  render(<StaffReviewSummary requestId={REQ} readOnly onJ27Facts={onJ27Facts} />);
+  await waitFor(() => expect(onJ27Facts).toHaveBeenCalledWith(REQ, { summaryStale: null }));
 });

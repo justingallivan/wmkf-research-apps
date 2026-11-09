@@ -119,3 +119,156 @@ The program gate, undefined-memo preservation, and passive strip behavior can re
 
 Codex session ID: 01a1c19e-2f3c-7bd1-9671-82171c1dfa4d
 Resume in Codex: codex resume 01a1c19e-2f3c-7bd1-9671-82171c1dfa4d
+
+## Re-review (Codex, after the rework commit `4da4947ae`)
+
+**Verdict: NEEDS REWORK.** The rework fixes the destructive cross-request callback, Final Writeup propagation, legacy schedule mapping, and resolution budget. Summary freshness now reaches the page, but a later unknown result incorrectly retains the previous freshness value.
+
+## Review scope
+
+[VERIFIED via Git] Reviewed `4da4947ae` on `claude/j27-read-model`, after reading the brief, previous findings, and plan §8 in the requested order.
+
+- **Change surface:** page facts, tab callbacks, composition, passive strip, and resolution read budget.
+- **Entry points:** Workbench page, Overview, Final Writeup, and read-only StaffReviewSummary.
+- **Persistence:** new facts reside in React memory; existing services supply persisted evidence.
+- **Consumers:** page composer → `deriveJ27Stage` → `J27StageStrip`.
+- **Prior findings:** all five P2s from the previous review.
+
+Verification used actual modules transpiled in memory, React/jsdom, and mocked I/O boundaries. No files were edited, no commits or external writes were made, and Dataverse was not contacted. The pre-existing `package-lock.json` modification remains. Repository suites and gates were not run; their status is not independently certified.
+
+## Findings
+
+### 1. PASS with residual limitation — Destructive late callback and navigation reset
+
+[VERIFIED via source and in-memory page reproduction]
+
+Evidence: [request page:95](/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model/pages/workbench/[requestId].js:95).
+
+- Populated B with assessment facts so its strip showed **Deliberations**.
+- Invoked A’s saved callback with conflicting facts.
+- B remained **Deliberations**, with its facts preserved.
+- A→B→A reset A to its server-derived baseline.
+
+The new request-ID guard prevents the original destructive replacement; the route effect clears retained facts.
+
+**Residual risk:** ownership is by request ID, not visit generation. Invoking the first A visit’s saved callback after returning to A still changes the strip. This is a verified callback-boundary weakness, but normal producers have cancellation/generation checks and keyed remounts. I did **not** establish a normal producer path that triggers it, so I am not treating the synthetic callback alone as another P2.
+
+### 2. PASS — Final Writeup start, poll, and advance reach the page
+
+[VERIFIED via real page/component integration with mocked responses]
+
+Evidence: [reporting effect:329](/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model/shared/components/workbench/FinalWriteupTab.js:329), [poll/start/advance:397](/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model/shared/components/workbench/FinalWriteupTab.js:397).
+
+Observed at the page composer:
+
+| Path | Reported transition |
+|---|---|
+| Initial status | `ready` |
+| Successful direct start | `group-review` |
+| HTTP 202 followed by status polling | `group-review` |
+| Leadership advance after either start path | `leadership-review` |
+
+The strip initially offered **Start group review** and removed that task after the accepted transition. The centralized effect fixes the previously missing propagation.
+
+**Residual risk:** transitions were simulated; no actual transition, document operation, or notification occurred.
+
+### 3. PASS — Legacy schedule exceptions work without Overview
+
+[VERIFIED via real composer and derivation]
+
+Evidence: [schedule mapping:63](/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model/shared/utils/j27PageStage.js:63).
+
+Without an Overview meeting fact:
+
+- `unverified` + `legacy_review_schedule_unverified` preserved `legacyException: true` and enabled `start-group-review`.
+- `missing` + `legacy_complete_review_without_schedule` also enabled it.
+- Ordinary `unverified` and `not_checked` retained `ended: null`, did not enable the task, and did not manufacture a verified presentation end.
+
+**Residual risk:** none found in the requested mapping cases.
+
+### 4. FAIL — Unknown summary freshness retains an earlier known value
+
+[VERIFIED via real read-only panel, page state, composer, and rendered strip]
+
+Evidence: [summary reporting:32](/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model/shared/components/workbench/StaffReviewSummary.js:32), [page merge/reset:100](/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model/pages/workbench/[requestId].js:100), [composition:82](/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model/shared/utils/j27PageStage.js:82).
+
+The positive cases work: the existing `includeReviewerFacts=1` read supplies hashes, unequal hashes publish `true`, and matching hashes publish `false`.
+
+The sequential case fails:
+
+1. Open Deliberations and establish freshness.
+2. Leave the tab while retaining the same page/request.
+3. Reopen Deliberations with `currentEvidenceHash: null`.
+4. The panel emits no patch, so page state retains the previous Boolean.
+
+Reproduced results:
+
+| Previous evidence | Latest result | Actual composed state |
+|---|---|---|
+| Matching hashes | Current hash unavailable | `{status:'present', stale:false}` |
+| Different hashes | Current hash unavailable | `{status:'present', stale:true}` |
+
+In the second case, the strip continued claiming that reviewer reports had changed. This is a supported service response, not an invented malformed DTO: [handoff service:38](/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model/lib/services/workbench/staff-review-summary-service.js:38) returns a null current hash when reviewer evidence is unavailable.
+
+**Residual risk:** the page can present an obsolete stale judgment or preserve an unsupported current judgment after a newer read cannot establish freshness.
+
+### 5. PASS — Revised resolution budget matches service invocations
+
+[VERIFIED via real resolver, input assembly, and scope resolver with adapter counters]
+
+Evidence: [resolution:96](/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model/lib/services/workbench/resolve-request-service.js:96), [scope read:44](/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model/lib/services/workbench/program-scope-service.js:44), [regression assertion:218](/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model/tests/unit/workbench-resolve-request-service.test.js:218).
+
+| Case | Suggestion | Catalog | Integrity | `j27` |
+|---|---:|---:|---:|---|
+| J27 Research | 1 | 1 | 1 | Present |
+| J27 SoCal / null program | 1 | 1 | 1 | Absent |
+| Empty / failed catalog | 1 | 1 | 1 | Absent |
+| D26 | 0 | 0 | 0 | Absent |
+
+C7 and the resolver comment now describe **two incremental Dataverse reads plus one Postgres read**. The regression adds the catalog invocation assertion.
+
+**Residual risk:** these are logical service/adapter read counts. Suggestion retrieval uses paginated `queryAllRecords`; this does not certify an absolute live HTTP-request count or latency.
+
+### 6. PASS — Previously passing contracts remain intact
+
+[VERIFIED via source and in-memory probes]
+
+- Undefined handoffs preserve server memo keys; reviewer counts preserve `anySuggestion` and integrity.
+- Research is admitted; SoCal, null program, empty scope, catalog failure, and D26 are excluded as expected.
+- The strip has zero interactive descendants, hides `continue-decision-missing`, and renders nothing for `unclassified`.
+- The new freshness reporting uses the existing read-only panel request.
+
+Evidence: [composer:76](/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model/shared/utils/j27PageStage.js:76), [strip:55](/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model/shared/components/workbench/J27StageStrip.js:55).
+
+## New Issues
+
+- **P2 — Freshness is not invalidated when a subsequent read becomes unknown.** Required change: explicitly replace the previous freshness fact with an unknown state when the new read cannot establish it, including failure paths. Add same-page remount regressions for both `false → unknown` and `true → unknown`; isolated component renders do not cover retained page state.
+
+The generation-boundary limitation in finding 1 remains documented, without a second P2 claim.
+
+## Contract audits
+
+| Audit | Result |
+|---|---|
+| Whole-flow | Traced existing read → DTO → callback → page facts → composer → model → strip. |
+| Partial-success | Summary service preserves prose when evidence fails; page freshness mishandles that partial result. |
+| Async/stale-state | Cross-request replacement and navigation reset pass; known-to-unknown freshness fails. |
+| Helper extraction | Legacy compatibility and unknown timing preserved; undefined memo semantics preserved. |
+| Durable surface | No new schema, migration, route, or persistence write; N/A. |
+| Documentation | Current C7 budget agrees with implementation. §8’s “unknown is never current” claim is not fully satisfied. |
+| Consumer fan-out | Checked status setters, callback producers, freshness consumer, and strip use. |
+
+## Recommendation Evidence
+
+| Recommendation | Current prerequisite | Available at execution point | Evidence actually tested | Disconfirming check | Status |
+|---|---|---|---|---|---|
+| Replace obsolete freshness with explicit unknown | New panel result lacks a current hash | Yes, summary effect and read failure handler | Real page retained prior `true` and `false` across tab remounts | A matching later hash correctly clears `true`; a missing hash does not | VERIFIED |
+
+## Final Verdict
+
+**NEEDS REWORK**
+
+Required named change: complete summary-freshness invalidation and cover sequential known→unknown reads against retained page state.
+
+Codex session ID: 01a1c1a5-dce5-7da1-bea6-7349ac330b34
+Resume in Codex: codex resume 01a1c1a5-dce5-7da1-bea6-7349ac330b34

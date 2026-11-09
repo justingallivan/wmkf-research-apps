@@ -114,3 +114,20 @@ test('A → B → A starts A again from the server stage; nothing from the first
   const strip = await screen.findByLabelText('Where this request stands');
   expect(strip).toHaveTextContent('Next: Record an offramp decision');
 });
+
+test('a later unknown freshness result replaces an earlier known one on the same page (true → unknown, false → unknown)', async () => {
+  render(<WorkbenchRequest />);
+  const peerReview = { ...input, request: { ...input.request, requestStatus: 'Phase II Pending', phaseIStatus: 100000003, phaseIIStatus: 100000002 }, reviewSummary: { status: 'present' } };
+  await act(async () => {
+    pending.get('/api/workbench/resolve-request?requestId=request-a')({ ok: true, json: async () => ({ success: true, requestId: 'request-a', cycleCode: 'J27', j27: { phase: 'peer-review', input: peerReview } }) });
+  });
+  await screen.findByLabelText('Where this request stands');
+  await act(async () => { overviewFacts({ progress: { status: 'ready', data: { counts: { candidates: 3, invited: 3, accepted: 3, received: 1, completed: 0 } } }, summaryStale: true }); });
+  expect(screen.getByLabelText('Where this request stands')).toHaveTextContent('Reviewer reports changed');
+  await act(async () => { overviewFacts({ summaryStale: null }); });
+  expect(screen.getByLabelText('Where this request stands')).not.toHaveTextContent('Reviewer reports changed');
+  await act(async () => { overviewFacts({ summaryStale: false }); });
+  expect(screen.getByLabelText('Where this request stands')).not.toHaveTextContent('Reviewer reports changed');
+  await act(async () => { overviewFacts({ summaryStale: null }); });
+  expect(screen.getByLabelText('Where this request stands')).not.toHaveTextContent('Reviewer reports changed');
+});
