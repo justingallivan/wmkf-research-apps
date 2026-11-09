@@ -99,9 +99,9 @@ read-model strip smoke on `claude/j27-read-model`, a branch-scoped Preview
 and redeployed as `dpl_8kaj9FtYL6R9JkfAEjZjntE2hoSc`; the stable alias was moved
 to it, the owner signed in with the already-registered stable callback, and the
 Workbench resolved sandbox request 1000384 and rendered the strip. The interlock
-allows preview × sandbox without any read-authorization variable. Preview
-Postgres is not the sandbox's, so Postgres-backed facts (integrity screenings)
-read as unavailable on that venue. The alias was restored to
+allows preview × sandbox without any read-authorization variable. Memo-column
+facts read as unavailable there because the `J27_*_SCHEMA_READY` flags are not
+set for Preview; the integrity read failure seen on that run was not diagnosed. The alias was restored to
 `dpl_5wQcfshKGG4z8cyeTueXkt9L4sve` and re-inspected. Remove the branch-scoped
 `DYNAMICS_URL` when the branch retires. Evidence: plan §9 I8.
 
