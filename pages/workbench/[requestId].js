@@ -93,11 +93,16 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
   // Step E (plan C7): facts the tabs already load, keyed by request so a
   // navigation never carries one request's reads into another's stage.
   const [j27Facts, setJ27Facts] = useState({ requestId: null });
+  const j27RouteRef = useRef('');
+  j27RouteRef.current = routeKey;
+  // Only the request on the current route may report facts: a late callback from a
+  // previous request is dropped, never merged and never allowed to replace the set.
   const reportJ27Facts = useCallback((factsRequestId, patch) => {
     const key = String(factsRequestId || '').toLowerCase();
-    if (!key) return;
+    if (!key || key !== j27RouteRef.current) return;
     setJ27Facts((prev) => (prev.requestId === key ? { ...prev, ...patch } : { requestId: key, ...patch }));
   }, []);
+  useEffect(() => { setJ27Facts({ requestId: routeKey }); }, [routeKey]);
   const routeStateRef = useRef({ key: routeKey, generation: 0 });
   if (routeStateRef.current.key !== routeKey) {
     routeStateRef.current = {
@@ -455,7 +460,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
           mode={phaseLayout ? 'presentation' : 'legacy'}
           presentationContext={phaseLayout ? (
             <StaffReviewSummary key={routeRequestId} requestId={routeRequestId} readOnly
-              onOpenReports={() => selectTab('reviews')} />
+              onOpenReports={() => selectTab('reviews')} onJ27Facts={visibleContext?.j27 ? reportJ27Facts : null} />
           ) : null}
         />
       ) : activeTab === 'final-writeup' ? (

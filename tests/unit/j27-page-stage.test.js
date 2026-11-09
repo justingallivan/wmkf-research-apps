@@ -31,9 +31,12 @@ describe('label maps cover the read model vocabularies exactly', () => {
   test('phases', () => { expect(Object.keys(J27_PHASE_LABEL).sort()).toEqual([...J27_PHASES].sort()); });
   test('tasks', () => { expect(Object.keys(J27_TASK_LABEL).sort()).toEqual([...J27_TASK_KEYS].sort()); });
   test('blockers', () => { expect(Object.keys(J27_BLOCKER_LABEL).sort()).toEqual([...J27_BLOCKER_KEYS].sort()); });
-  test('presentation-only blockers are not shown; task blockers are', () => {
+  test('presentation-only blockers are not shown; task blockers show from their phase onward', () => {
     expect(visibleBlockerKeys(['continue-decision-missing'])).toEqual([]);
     expect(visibleBlockerKeys(['continue-decision-missing', 'integrity-unreviewed', 'phase-two-status-pending'])).toEqual(['integrity-unreviewed', 'phase-two-status-pending']);
+    expect(visibleBlockerKeys(['integrity-unreviewed', 'presentation-end-unverified'], 'initial-assessment')).toEqual([]);
+    expect(visibleBlockerKeys(['integrity-unreviewed', 'presentation-end-unverified'], 'peer-review')).toEqual(['integrity-unreviewed']);
+    expect(visibleBlockerKeys(['integrity-unreviewed', 'presentation-end-unverified'], 'final-assessment')).toEqual(['integrity-unreviewed', 'presentation-end-unverified']);
   });
 });
 
@@ -64,7 +67,12 @@ describe('fact mapping', () => {
       .toEqual({ ...existing, ended: false });
     expect(j27FinalWriteupInputs({ available: true, phase: 'ready', sourceArtifactId: 'a', presentationSchedule: 'missing', startCompatibilityReason: 'legacy_complete_review_without_schedule' }, existing).presentation)
       .toEqual({ ...existing, ended: null, legacyException: true });
-    expect(j27FinalWriteupInputs({ available: true, phase: 'ready', sourceArtifactId: 'a', presentationSchedule: 'not_checked' }, existing).presentation).toBeUndefined();
+    expect(j27FinalWriteupInputs({ available: true, phase: 'ready', sourceArtifactId: 'a', presentationSchedule: 'not_checked' }, existing).presentation).toEqual(existing);
+    // Without an Overview meeting read, the schedule check alone speaks: timing unknown, legacy exception kept.
+    expect(j27FinalWriteupInputs({ available: true, phase: 'ready', sourceArtifactId: 'a', presentationSchedule: 'unverified', startCompatibilityReason: 'legacy_review_schedule_unverified' }, null).presentation)
+      .toEqual({ status: 'present', exists: null, id: null, ended: null, legacyException: true });
+    expect(j27FinalWriteupInputs({ available: true, phase: 'ready', sourceArtifactId: 'a', presentationSchedule: 'not_checked' }, null).presentation)
+      .toEqual({ status: 'present', exists: null, id: null, ended: null, legacyException: false });
     expect(j27FinalWriteupInputs({ available: true, phase: 'group-review', sourceArtifactId: 'a' }, null)).toEqual({
       boardDraft: { status: 'present', exists: true }, transition: { status: 'present', phase: 'group-review' },
     });
@@ -114,6 +122,23 @@ describe('page recomputation', () => {
     });
     expect(stage.taskKeys).toContain('write-board-draft');
     expect(stage.basis).not.toBe('degraded');
+  });
+  test('an explicit legacy schedule exception permits start-group-review without an Overview meeting read', () => {
+    const input = serverInput({ requestStatus: 'Phase II Pending', phaseIStatus: PHASE_I_CHAIRS.invited, phaseIIStatus: 100000002 }, { rationale: PRESENT, reviewSummary: PRESENT, visitAssessment: PRESENT });
+    const stage = deriveJ27PageStage(input, {
+      progress: { status: 'ready', data: { counts: { candidates: 3, invited: 3, accepted: 3, received: 3, completed: 3 } } },
+      finalWriteup: { available: true, phase: 'ready', sourceArtifactId: 'a', presentationSchedule: 'unverified', startCompatibilityReason: 'legacy_review_schedule_unverified' },
+    });
+    expect(stage.taskKeys).toContain('start-group-review');
+    expect(stage.blockerKeys).not.toContain('presentation-end-unverified');
+  });
+  test('summary freshness reaches the model only when known, and only on a saved summary', () => {
+    const input = serverInput({ requestStatus: 'Phase II Pending', phaseIStatus: PHASE_I_CHAIRS.invited, phaseIIStatus: 100000002 }, { rationale: PRESENT, reviewSummary: PRESENT });
+    expect(composeJ27PageInput(input, {}).reviewSummary).toEqual(PRESENT);
+    expect(composeJ27PageInput(input, { summaryStale: true }).reviewSummary).toEqual({ status: 'present', stale: true });
+    expect(composeJ27PageInput(input, { summaryStale: false }).reviewSummary).toEqual({ status: 'present', stale: false });
+    expect(deriveJ27PageStage(input, { summaryStale: true }).blockerKeys).toContain('evidence-stale');
+    expect(composeJ27PageInput(serverInput(), { summaryStale: true }).reviewSummary).toEqual(ABSENT);
   });
   test('a failed rollup degrades the basis rather than hiding the row', () => {
     const stage = deriveJ27PageStage(serverInput(), { progress: { status: 'error', data: null } });

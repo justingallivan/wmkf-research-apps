@@ -304,7 +304,6 @@ export default function FinalWriteupTab({ requestId, renderBoardDraft = null, on
           if (activeController.current === controller) {
             setStatus(next);
             setNeedsBoardDraft(false);
-            onJ27Facts?.(requestId, { finalWriteup: next }); // step E (plan C7)
           }
         })
         .catch((loadError) => {
@@ -326,6 +325,12 @@ export default function FinalWriteupTab({ requestId, renderBoardDraft = null, on
       acknowledgementController.current?.abort();
     };
   }, [requestId, load, boardDraftAvailable, statusReload, onJ27Facts]);
+
+  // Step E (plan C7): every status this tab holds (initial load, polling, start,
+  // advance) reaches the page's stage through one place.
+  useEffect(() => {
+    if (status && requestId && onJ27Facts) onJ27Facts(requestId, { finalWriteup: status });
+  }, [status, requestId, onJ27Facts]);
 
   const acknowledgementArtifactId = IN_REVIEW_PHASES.has(status?.phase)
     ? status?.artifact?.artifactId || null

@@ -56,7 +56,8 @@ test('the strip renders from the resolve DTO and recomputes when the Overview re
   const strip = await screen.findByLabelText('Where this request stands');
   expect(strip).toHaveTextContent('Initial Assessment');
   expect(strip).toHaveTextContent('Next: Record an offramp decision');
-  expect(strip).toHaveTextContent('Chairs’ outcome');
+  // The Chairs blocker touches a Peer Review task, so it is not yet news in Initial Assessment.
+  expect(strip).not.toHaveTextContent('Chairs’ outcome');
   await act(async () => { overviewFacts({ progress: { status: 'ready', data: { counts: { candidates: 2, received: 0 } } } }); });
   expect(screen.getByLabelText('Where this request stands')).toHaveTextContent('Next: Identify reviewers');
 });
@@ -82,4 +83,34 @@ test('a pre-2027 request renders no strip and passes no callback', async () => {
   await waitFor(() => expect(screen.getByTestId('overview')).toBeInTheDocument());
   expect(screen.queryByLabelText('Where this request stands')).toBeNull();
   expect(overviewFacts).toBeNull();
+});
+
+test('a late callback from request A cannot erase request B\'s facts once B has them', async () => {
+  const view = render(<WorkbenchRequest />);
+  await act(async () => { pending.get('/api/workbench/resolve-request?requestId=request-a')(resolved('request-a')); });
+  await screen.findByLabelText('Where this request stands');
+  const reportForA = overviewFacts;
+  routeId = 'request-b';
+  view.rerender(<WorkbenchRequest />);
+  await act(async () => { pending.get('/api/workbench/resolve-request?requestId=request-b')(resolved('request-b')); });
+  await screen.findByLabelText('Where this request stands');
+  await act(async () => { overviewFacts({ progress: { status: 'ready', data: { counts: { candidates: 2 } } } }); });
+  expect(screen.getByLabelText('Where this request stands')).toHaveTextContent('Next: Identify reviewers');
+  await act(async () => { reportForA({ progress: { status: 'error', data: null } }); });
+  expect(screen.getByLabelText('Where this request stands')).toHaveTextContent('Next: Identify reviewers');
+  expect(screen.getByLabelText('Where this request stands')).not.toHaveTextContent('could not be read');
+});
+
+test('A → B → A starts A again from the server stage; nothing from the first visit is reused', async () => {
+  const view = render(<WorkbenchRequest />);
+  await act(async () => { pending.get('/api/workbench/resolve-request?requestId=request-a')(resolved('request-a')); });
+  await screen.findByLabelText('Where this request stands');
+  await act(async () => { overviewFacts({ progress: { status: 'ready', data: { counts: { candidates: 2 } } } }); });
+  expect(screen.getByLabelText('Where this request stands')).toHaveTextContent('Next: Identify reviewers');
+  routeId = 'request-b'; view.rerender(<WorkbenchRequest />);
+  pending.clear();
+  routeId = 'request-a'; view.rerender(<WorkbenchRequest />);
+  await act(async () => { pending.get('/api/workbench/resolve-request?requestId=request-a')(resolved('request-a')); });
+  const strip = await screen.findByLabelText('Where this request stands');
+  expect(strip).toHaveTextContent('Next: Record an offramp decision');
 });

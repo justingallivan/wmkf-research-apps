@@ -5,7 +5,7 @@
  * it fetches nothing and gates nothing. Label maps are pinned to the read
  * model's vocabularies in tests/unit/j27-page-stage.test.js.
  */
-import { J27_BLOCKERS, J27_TASK_KEYS } from '../../../lib/services/workbench/j27-read-model';
+import { J27_BLOCKERS, J27_PHASES, J27_TASKS } from '../../../lib/services/workbench/j27-read-model';
 
 export const J27_PHASE_LABEL = {
   'initial-assessment': 'Initial Assessment',
@@ -48,15 +48,21 @@ const BASIS_NOTE = {
   degraded: 'Some facts could not be read.',
 };
 
-/** Blockers that touch a task of this model; presentation-only blockers wait for the offramp decision (step I). */
-export function visibleBlockerKeys(blockerKeys) {
-  const tasks = new Set(J27_TASK_KEYS);
-  return (blockerKeys || []).filter((key) => (J27_BLOCKERS[key] || []).some((op) => tasks.has(op)));
+/**
+ * Blockers that touch a task of the current phase or an earlier one. A blocker on a
+ * later phase's task is not yet news; presentation-only blockers wait for step I.
+ */
+export function visibleBlockerKeys(blockerKeys, phase = null) {
+  const phaseIndex = J27_PHASES.indexOf(phase);
+  const reachable = new Set(J27_TASKS
+    .filter((task) => phaseIndex < 0 || J27_PHASES.indexOf(task.phase) <= phaseIndex)
+    .map((task) => task.key));
+  return (blockerKeys || []).filter((key) => (J27_BLOCKERS[key] || []).some((op) => reachable.has(op)));
 }
 
 export default function J27StageStrip({ stage }) {
   if (!stage || stage.phase === 'unclassified') return null;
-  const blockers = visibleBlockerKeys(stage.blockerKeys);
+  const blockers = visibleBlockerKeys(stage.blockerKeys, stage.phase);
   const note = BASIS_NOTE[stage.basis];
   return (
     <section aria-label="Where this request stands" className="mb-6 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800">

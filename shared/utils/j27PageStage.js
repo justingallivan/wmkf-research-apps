@@ -62,11 +62,13 @@ export function j27FinalWriteupInputs(status, presentation) {
   };
   const schedule = status.presentationSchedule;
   const legacyException = LEGACY_REASONS.has(status.startCompatibilityReason);
+  // Without an Overview meeting read, the schedule check still says something about
+  // the presentation; its timing stays unknown (`ended: null`) unless it says otherwise.
   const base = presentation?.status === 'present' ? presentation : { status: 'present', exists: null, id: null, ended: null, legacyException: false };
   if (schedule === 'ended') out.presentation = { ...base, exists: true, ended: true, legacyException };
   else if (schedule === 'upcoming') out.presentation = { ...base, exists: true, ended: false, legacyException };
   else if (schedule === 'missing') out.presentation = { ...base, exists: base.exists === true, ended: null, legacyException };
-  else if (presentation?.status === 'present' && legacyException) out.presentation = { ...base, legacyException: true };
+  else if (schedule === 'unverified' || schedule === 'not_checked') out.presentation = { ...base, ended: null, legacyException };
   return out;
 }
 
@@ -77,6 +79,10 @@ export function composeJ27PageInput(serverInput, facts = {}) {
   const counts = j27CountsInput(facts.progress);
   const merged = { ...serverInput, ...overview };
   if (counts) merged.reviewers = { ...(serverInput.reviewers || { status: 'unavailable' }), counts };
+  // Summary freshness arrives from the read-only summary panel once both evidence hashes are known.
+  if (typeof facts.summaryStale === 'boolean' && merged.reviewSummary?.status === 'present') {
+    merged.reviewSummary = { ...merged.reviewSummary, stale: facts.summaryStale };
+  }
   const presentation = merged.presentation?.status === 'not-loaded' ? null : merged.presentation;
   return { ...merged, ...j27FinalWriteupInputs(facts.finalWriteup, presentation) };
 }

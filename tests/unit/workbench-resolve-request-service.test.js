@@ -218,6 +218,8 @@ describe('J27 read model (plan C7)', () => {
     expect(existsAnySuggestionForRequests).toHaveBeenCalledTimes(1);
     expect(existsAnySuggestionForRequests).toHaveBeenCalledWith([REQ]);
     expect(readLatestIntegrityStates).toHaveBeenCalledTimes(1);
+    // Budget (plan C7 as built): two Dataverse reads (suggestions, program catalog) and one Postgres read.
+    expect(require('../../lib/services/workbench/program-scope-service').resolveDiscoveryScope).toHaveBeenCalledTimes(1);
     expect(getById).toHaveBeenCalledTimes(1);
     expect(body.meetingDate).toBe('2027-06-10');
     // Memo waves are off in this env, so their keys are unavailable and the basis is degraded (plan C1, C3).

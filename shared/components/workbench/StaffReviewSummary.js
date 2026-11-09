@@ -3,7 +3,7 @@ import { Button, Card } from '../Layout';
 import { requestJson } from '../../utils/api-request';
 import { composeReviewerFacts } from '../../utils/review-writeup-paragraphs';
 
-export default function StaffReviewSummary({ requestId, evidenceHash, reviewers = [], refreshReports, readOnly = false, onOpenReports = null }) {
+export default function StaffReviewSummary({ requestId, evidenceHash, reviewers = [], refreshReports, readOnly = false, onOpenReports = null, onJ27Facts = null }) {
   const [record, setRecord] = useState(null);
   const [draft, setDraft] = useState('');
   const [error, setError] = useState('');
@@ -26,6 +26,15 @@ export default function StaffReviewSummary({ requestId, evidenceHash, reviewers 
     });
     return () => { generation.current += 1; };
   }, [requestId, readOnly]);
+
+  // Step E (plan C7): summary freshness for the page's stage, only when both the
+  // saved and the current evidence hashes are known; unknown is never "current".
+  useEffect(() => {
+    if (!onJ27Facts || !record) return;
+    const current = readOnly ? record.currentEvidenceHash : evidenceHash;
+    if (!record.summary || !record.evidenceHash || !current) return;
+    onJ27Facts(requestId, { summaryStale: record.evidenceHash !== current });
+  }, [onJ27Facts, record, readOnly, evidenceHash, requestId]);
 
   async function save(event) {
     event.preventDefault();
