@@ -117,13 +117,14 @@ describe('C4 outcome', () => {
 describe('C8.1 Factory scenario end states (sandbox batch owner-j27-2026-11-09)', () => {
   // Request status as observed on the created rows (2026-11-09 UTC): Not Scored
   // and Scored read Phase I Pending; Intake, Rationale saved and both
-  // Semi-finalist rows read blank. Scenario 7 (1000386) stopped before its
-  // slate and readiness: the sandbox rule wrote `Proposal Invited` for Phase I
-  // Invited, and `Phase II Pending` follows only a proposal-received date the
-  // Factory never writes. `s7` is the intended end state D2's gate needs;
-  // `s7Observed` is the row as it exists.
+  // Semi-finalist rows read blank. Scenario 7 (1000386) completed 2026-11-09
+  // with Phase I Invited, Phase II Pending Committee Review, ready, two selected
+  // uninvited suggestions, and request status `Proposal Invited`: the sandbox's
+  // 2024 status rules never derive `Phase II Pending`, which production's rule
+  // derives from the Phase II option alone. `s7` is the production-shaped row
+  // D2's gate needs; `s7Observed` is the sandbox row as it exists.
   const s7 = { requestStatus: P2, phaseIStatus: PHASE_I_CHAIRS.invited, phaseIIStatus: 100000002 };
-  const s7Observed = { requestStatus: 'Proposal Invited', phaseIStatus: PHASE_I_CHAIRS.invited, phaseIIStatus: 100000002, readyForReview: false };
+  const s7Observed = { requestStatus: 'Proposal Invited', phaseIStatus: PHASE_I_CHAIRS.invited, phaseIIStatus: 100000002, readyForReview: true };
   test('S1 intake: nothing recorded', () => {
     expect(keys(deriveJ27Stage(tier1({ requestStatus: null })))).toEqual({ phase: 'initial-assessment', basis: 'partial', outcome: 'none', tasks: ['record-rationale', 'record-first-cut'], primary: 'record-rationale', blockers: ALWAYS });
     expect(keys(deriveJ27Stage(dashboard({ requestStatus: null })))).toEqual({ phase: 'initial-assessment', basis: 'partial', outcome: 'none', tasks: ['record-rationale', 'record-first-cut', 'identify-reviewers'], primary: 'record-rationale', blockers: ALWAYS });
@@ -162,8 +163,8 @@ describe('C8.1 Factory scenario end states (sandbox batch owner-j27-2026-11-09)'
     const onPage = deriveJ27Stage(page(s7, { rationale: PRESENT, reviewers: { status: 'present', anySuggestion: true, counts: counts({ candidates: 2 }) } }));
     expect(keys(onPage)).toEqual({ phase: 'peer-review', basis: 'full', outcome: 'none', tasks: ['identify-reviewers', 'send-invitations', 'record-offramp'], primary: 'send-invitations', blockers: [...ALWAYS, 'presentation-end-unverified'] });
   });
-  test('S7 as created (1000386): Invited, Proposal Invited, unready, no slate → Phase II status blocker, no invitations', () => {
-    const r = deriveJ27Stage(dashboard(s7Observed, { rationale: PRESENT }));
+  test('S7 in the sandbox (1000386): Invited, Proposal Invited, ready, two selected → Phase II status blocker withholds invitations', () => {
+    const r = deriveJ27Stage(dashboard(s7Observed, { rationale: PRESENT, reviewers: { status: 'present', anySuggestion: true, counts: counts({ candidates: 2 }) } }));
     expect(keys(r)).toEqual({ phase: 'peer-review', basis: 'partial', outcome: 'none', tasks: ['identify-reviewers', 'record-offramp'], primary: 'identify-reviewers', blockers: ['phase-two-status-pending', ...ALWAYS] });
     expect(r.recorded).toMatchObject({ chairsOutcome: 'invited', semiFinalist: 'inferred-yes' });
     expect(r.taskKeys).not.toContain('send-invitations');
