@@ -10,9 +10,19 @@
 
 const queryAllRequests = jest.fn();
 const listBoardDates = jest.fn();
+const getCycleDatesById = jest.fn();
 jest.mock('../../lib/dataverse/adapters/operations-grant-cycle.js', () => ({
   ...jest.requireActual('../../lib/dataverse/adapters/operations-grant-cycle.js'),
   listBoardDatesOrNone: (...a) => listBoardDates(...a),
+  getCycleDatesById: (...a) => getCycleDatesById(...a),
+}));
+const existsAnySuggestionForRequests = jest.fn(async () => new Set());
+jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
+  existsAnySuggestionForRequests: (...a) => existsAnySuggestionForRequests(...a),
+}));
+const readLatestIntegrityStates = jest.fn(async () => new Map());
+jest.mock('../../lib/services/workbench/j27-integrity-jobs', () => ({
+  readLatestIntegrityStates: (...a) => readLatestIntegrityStates(...a),
 }));
 const getLandingCycle = jest.fn(async () => ({ code: null, reason: null }));
 jest.mock('../../lib/services/landing-cycle-service.js', () => ({ getLandingCycle: (...a) => getLandingCycle(...a) }));
@@ -73,6 +83,9 @@ beforeEach(() => {
   jest.clearAllMocks();
   resolveByEmail.mockResolvedValue(PD);
   getUserRole.mockResolvedValue('read_only');
+  getCycleDatesById.mockResolvedValue({ wmkf_grantcycleid: 'cycle-j27', wmkf_cyclecode: 'J27', wmkf_researchofframpmeetingdate: '2027-03-15', wmkf_researchreviewsduedate: '2027-03-01' });
+  existsAnySuggestionForRequests.mockResolvedValue(new Set());
+  readLatestIntegrityStates.mockResolvedValue(new Map());
   queryAllRequests.mockResolvedValue({ records: [], capped: false });
   listBoardDates.mockResolvedValue(BOARD_DATES);
   fetchReviewerRollup.mockResolvedValue({});
@@ -453,4 +466,61 @@ test('a readiness change is reflected on the next request; a selected cycle can 
   expect((await loadDashboard(args({ cycleCode: 'J27' }))).proposals).toHaveLength(1);
   queryAllRequests.mockResolvedValue({ records: [{ ...record, wmkf_readyforreview: false }] });
   expect(await loadDashboard(args({ cycleCode: 'J27' }))).toMatchObject({ proposals: [], rollup: { total: 0 } });
+});
+
+describe('J27 read model on the proposal list (plan C7)', () => {
+  const j27 = (n, over = {}) => ({
+    akoya_requestid: `r-${n}`, akoya_requestnum: `10003${n}`, _wmkf_grantcycle_value: 'cycle-j27', wmkf_GrantCycle: { wmkf_cyclecode: 'J27' },
+    akoya_requeststatus: 'Phase I Pending', wmkf_readyforreview: true, _wmkf_programdirector_value: 'pd-1', ...over,
+  });
+  test('in-scope rows carry the slim stage; reads are batched once per page; pre-2027 rows are unchanged', async () => {
+    queryAllRequests.mockResolvedValue({ capped: false, records: [
+      j27(80), j27(85, { wmkf_phaseistatus: 707510005 }),
+      { akoya_requestid: 'r-d26', akoya_requestnum: '1002836', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, akoya_requeststatus: 'Phase II Pending', wmkf_triagestatus: 100000000, _wmkf_programdirector_value: 'pd-1' },
+    ] });
+    existsAnySuggestionForRequests.mockResolvedValue(new Set(['r-85']));
+    readLatestIntegrityStates.mockResolvedValue(new Map([['r-85', { status: 'present', latest: { flagged: true, reviewed: false, provenance: 'automated' } }]]));
+    fetchReviewerRollup.mockResolvedValue({ 'r-85': { candidates: 1, invited: 0, accepted: 0, declined: 0, held: 0, received: 0, completed: 0, progress: {} } });
+    const body = await loadDashboard(args({ cycleCode: 'J27', scope: 'all' }));
+    expect(queryAllRequests.mock.calls[0][0].select).toContain('_wmkf_grantcycle_value');
+    expect(queryAllRequests.mock.calls[0][0].select).toContain('wmkf_phaseiistatus');
+    expect(existsAnySuggestionForRequests).toHaveBeenCalledTimes(1);
+    expect(existsAnySuggestionForRequests).toHaveBeenCalledWith(['r-80', 'r-85']);
+    expect(readLatestIntegrityStates).toHaveBeenCalledTimes(1);
+    expect(getCycleDatesById).toHaveBeenCalledTimes(1);
+    expect(getCycleDatesById).toHaveBeenCalledWith('cycle-j27');
+    const byNumber = Object.fromEntries(body.proposals.map((p) => [p.requestNumber, p]));
+    expect(byNumber['1002836']).not.toHaveProperty('j27');
+    // Memo waves are off in this env, so their keys are unavailable and the basis is degraded (plan C1, C3).
+    expect(byNumber['1000380'].j27).toEqual({
+      phase: 'initial-assessment', basis: 'degraded', primaryTask: 'record-first-cut',
+      taskKeys: ['record-first-cut', 'identify-reviewers'], blockerKeys: ['continue-decision-missing'],
+      recorded: { firstCut: 'unset', semiFinalist: 'unset', chairsOutcome: 'pending', label: null, unmapped: false }, outcome: 'none',
+    });
+    expect(byNumber['1000385'].j27).toMatchObject({
+      phase: 'peer-review', primaryTask: 'review-integrity',
+      taskKeys: ['review-integrity', 'identify-reviewers', 'record-offramp'],
+      blockerKeys: ['chairs-outcome-pending', 'integrity-unreviewed', 'continue-decision-missing'],
+    });
+    expect(byNumber['1000385'].j27).not.toHaveProperty('input');
+    expect(byNumber['1000385'].reviewers.candidates).toBe(1);
+  });
+  test('a page with no in-scope rows makes none of the new reads', async () => {
+    queryAllRequests.mockResolvedValue({ capped: false, records: [
+      { akoya_requestid: 'r-d26', akoya_requestnum: '1002836', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, akoya_requeststatus: 'Phase II Pending', wmkf_triagestatus: 100000000, _wmkf_programdirector_value: 'pd-1' },
+    ] });
+    await loadDashboard(args({ cycleCode: 'D26', scope: 'all' }));
+    expect(existsAnySuggestionForRequests).not.toHaveBeenCalled();
+    expect(readLatestIntegrityStates).not.toHaveBeenCalled();
+    expect(getCycleDatesById).not.toHaveBeenCalled();
+  });
+  test('a failed batch read marks its key unavailable on every row and the list still renders', async () => {
+    queryAllRequests.mockResolvedValue({ capped: false, records: [j27(80), j27(81)] });
+    existsAnySuggestionForRequests.mockRejectedValue(new Error('dataverse 503'));
+    readLatestIntegrityStates.mockRejectedValue(new Error('no POSTGRES_URL'));
+    getCycleDatesById.mockRejectedValue(new Error('calendar 503'));
+    const body = await loadDashboard(args({ cycleCode: 'J27', scope: 'all' }));
+    expect(body.proposals).toHaveLength(2);
+    for (const proposal of body.proposals) expect(proposal.j27.basis).toBe('degraded');
+  });
 });

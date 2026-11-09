@@ -49,6 +49,11 @@ const SELECT = [
   'wmkf_ai_summary',
   'wmkf_ai_dataextract',
   'wmkf_ai_fieldprimer',
+  // J27 read model request fields (plan C7); memo columns join only when
+  // their schema helpers are on, which this test's env leaves off.
+  'wmkf_phaseiistatus',
+  'wmkf_readyforreview',
+  'wmkf_triagestatus',
 ].join(',');
 
 function mockRes() {

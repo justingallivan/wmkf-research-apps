@@ -171,7 +171,7 @@ describe('C8.2 fixtures as read 2026-11-08', () => {
     const r = deriveJ27Stage(page({ requestStatus: null, triageStatus: 100000000 }, {
       reviewSummary: PRESENT, reviewers: { status: 'present', anySuggestion: true, counts: counts({ candidates: 3, invited: 3, accepted: 3, received: 2 }) },
     }));
-    expect(keys(r)).toEqual({ phase: 'peer-review', basis: 'full', outcome: 'none', tasks: ['record-rationale', 'record-first-cut', 'identify-reviewers'], primary: 'identify-reviewers', blockers: [...ALWAYS, 'presentation-end-unverified'] });
+    expect(keys(r)).toEqual({ phase: 'peer-review', basis: 'full', outcome: 'none', tasks: ['record-rationale', 'record-first-cut', 'identify-reviewers'], primary: 'record-rationale', blockers: [...ALWAYS, 'presentation-end-unverified'] });
   });
   test('#1000369: Scored, one report, interpretation, visit assessment, roster, board draft, timing unverifiable', () => {
     const r = deriveJ27Stage(page({ requestStatus: P1, triageStatus: 100000000, phaseIStatus: FIRST_CUT_STATUS.yes }, {
@@ -199,7 +199,7 @@ describe('C8.3 combinations', () => {
       rationale: PRESENT, reviewers: { status: 'present', anySuggestion: true, counts: counts({ candidates: 3, invited: 3, accepted: 3, received: 1 }) },
       presentation: { status: 'present', exists: true, id: 'v', ended: false, legacyException: false },
     }));
-    expect(keys(r)).toEqual({ phase: 'deliberations', basis: 'full', outcome: 'none', tasks: ['identify-reviewers', 'read-reports', 'record-offramp'], primary: 'record-offramp', blockers: [...ALWAYS, 'presentation-not-ended'] });
+    expect(keys(r)).toEqual({ phase: 'deliberations', basis: 'full', outcome: 'none', tasks: ['identify-reviewers', 'read-reports', 'record-offramp'], primary: 'read-reports', blockers: [...ALWAYS, 'presentation-not-ended'] });
   });
   test('Site Visit read fails on a row with a draft: degraded, roster and group review blocked', () => {
     const r = deriveJ27Stage(page(invited, {

@@ -25,6 +25,15 @@ jest.mock('../../lib/dataverse/adapters/operations-grant-cycle', () => ({
   getCycleDatesById: (...a) => getCycleDatesById(...a),
 }));
 
+const existsAnySuggestionForRequests = jest.fn(async () => new Set());
+jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
+  existsAnySuggestionForRequests: (...a) => existsAnySuggestionForRequests(...a),
+}));
+const readLatestIntegrityStates = jest.fn(async () => new Map());
+jest.mock('../../lib/services/workbench/j27-integrity-jobs', () => ({
+  readLatestIntegrityStates: (...a) => readLatestIntegrityStates(...a),
+}));
+
 import { resolveWorkbenchRequest } from '../../lib/services/workbench/resolve-request-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 import { STATUS_CLASS } from '../../lib/services/dataverse-export/constants';
@@ -51,6 +60,8 @@ beforeEach(() => {
   findByRequestNumber.mockResolvedValue({ records: [RECORD] });
   fetchCoPIs.mockResolvedValue([]);
   getCycleDatesById.mockResolvedValue({ wmkf_grantcycleid: CYCLE_ID, wmkf_cyclecode: 'J26', wmkf_meetingdate: '2026-06-04' });
+  existsAnySuggestionForRequests.mockResolvedValue(new Set());
+  readLatestIntegrityStates.mockResolvedValue(new Map());
   // The link helpers check the wmkf_grantcycle restriction (covered in grant-cycle-link.test.js).
   jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {});
 });
@@ -169,4 +180,50 @@ test('statusClass: unmapped status → UNCLASSIFIED; null status → null', asyn
   const body2 = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
   expect(body2.statusClass).toBeNull();
   expect(body2.requestStatus).toBeNull();
+});
+
+describe('J27 read model (plan C7)', () => {
+  const j27Row = (over = {}) => processAnnotations({
+    ...RECORD, wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, akoya_requeststatus: 'Phase I Pending', wmkf_readyforreview: true, ...over,
+  });
+  test('a pre-2027 row carries no read model and makes neither new read', async () => {
+    const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
+    expect(body).not.toHaveProperty('j27');
+    expect(existsAnySuggestionForRequests).not.toHaveBeenCalled();
+    expect(readLatestIntegrityStates).not.toHaveBeenCalled();
+  });
+  test('a J27 row adds one suggestion read and one integrity read and carries the stage with its tier 1 input', async () => {
+    getById.mockResolvedValue(j27Row({ wmkf_phaseistatus: 707510005 }));
+    getCycleDatesById.mockResolvedValue({ wmkf_grantcycleid: CYCLE_ID, wmkf_cyclecode: 'J27', wmkf_meetingdate: '2027-06-10', wmkf_researchofframpmeetingdate: '2027-03-15', wmkf_researchreviewsduedate: '2027-03-01' });
+    existsAnySuggestionForRequests.mockResolvedValue(new Set([REQ]));
+    readLatestIntegrityStates.mockResolvedValue(new Map([[REQ, { status: 'present', latest: { flagged: true, reviewed: false, provenance: 'automated' } }]]));
+    const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '', today: new Date('2027-03-16T12:00:00Z') });
+    expect(existsAnySuggestionForRequests).toHaveBeenCalledTimes(1);
+    expect(existsAnySuggestionForRequests).toHaveBeenCalledWith([REQ]);
+    expect(readLatestIntegrityStates).toHaveBeenCalledTimes(1);
+    expect(getById).toHaveBeenCalledTimes(1);
+    expect(body.meetingDate).toBe('2027-06-10');
+    // Memo waves are off in this env, so their keys are unavailable and the basis is degraded (plan C1, C3).
+    expect(body.j27).toMatchObject({
+      phase: 'peer-review', basis: 'degraded', outcome: 'none',
+      recorded: { semiFinalist: 'yes', chairsOutcome: 'pending' },
+      blockerKeys: ['chairs-outcome-pending', 'integrity-unreviewed', 'continue-decision-missing'],
+    });
+    expect(body.j27.taskKeys).toEqual(['review-integrity', 'record-offramp']);
+    expect(body.j27.tasks[1].detail).toEqual({ received: null, pastOfframpDate: true });
+    expect(body.j27.input.reviewers).toEqual({ status: 'present', anySuggestion: true, counts: { status: 'not-loaded' } });
+    expect(body.j27.input.calendar).toEqual({ status: 'present', offrampMeetingDate: '2027-03-15', reviewsDueDate: '2027-03-01', today: '2027-03-16' });
+  });
+  test('failed new reads degrade the stage instead of failing resolution', async () => {
+    getById.mockResolvedValue(j27Row());
+    getCycleDatesById.mockRejectedValue(new Error('calendar 503'));
+    existsAnySuggestionForRequests.mockRejectedValue(new Error('dataverse 503'));
+    readLatestIntegrityStates.mockRejectedValue(new Error('no POSTGRES_URL'));
+    const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
+    expect(body.meetingDate).toBeNull();
+    expect(body.j27).toMatchObject({ phase: 'initial-assessment', basis: 'degraded' });
+    expect(body.j27.input.reviewers.status).toBe('unavailable');
+    expect(body.j27.input.integrity.status).toBe('unavailable');
+    expect(body.j27.input.calendar.status).toBe('unavailable');
+  });
 });

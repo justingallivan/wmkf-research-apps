@@ -99,7 +99,7 @@ A row's `basis` is `full` when every input a higher row consults, plus on a non-
 | write-board-draft | `visitAssessment.present`, `boardDraft.exists === false` | lead PD | final-assessment |
 | start-group-review | `boardDraft.exists === true`, `transition.phase === null`, and (`presentation.ended === true` or `presentation.legacyException === true`), no applicable blocker | lead PD / superuser | final-assessment |
 
-`primaryTask`: first task in table order whose phase equals the derived phase, skipping the two secondary keys unless nothing else qualifies; else first overall; else null. `tasksBasis` mirrors `basis`.
+`primaryTask`: first task in table order whose phase equals the derived phase that is not secondary; else the first non-secondary task overall; else a secondary task (in-phase first), so the two secondary keys lead only when nothing else qualifies anywhere; else null. `tasksBasis` mirrors `basis`.
 
 ### C6. Blockers and capability
 

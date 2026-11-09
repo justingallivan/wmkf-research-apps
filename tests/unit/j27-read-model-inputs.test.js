@@ -1,0 +1,159 @@
+/**
+ * @jest-environment node
+ *
+ * lib/services/workbench/j27-read-model-inputs — tier 1 assembly for the J27
+ * read model (plan C7): projection widening, memo presence, batch facts and
+ * their failure paths, calendar key, and the dashboard DTO.
+ */
+const existsAnySuggestionForRequests = jest.fn();
+jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
+  existsAnySuggestionForRequests: (...a) => existsAnySuggestionForRequests(...a),
+}));
+const readLatestIntegrityStates = jest.fn();
+jest.mock('../../lib/services/workbench/j27-integrity-jobs', () => ({
+  readLatestIntegrityStates: (...a) => readLatestIntegrityStates(...a),
+}));
+jest.mock('../../lib/services/workbench/staff-review-summary-service', () => ({
+  staffReviewSummaryEnabled: () => process.env.TEST_SUMMARY_WAVE === 'on',
+}));
+jest.mock('../../lib/utils/initial-assessment-rationale-readiness', () => ({
+  initialAssessmentRationaleEnabled: () => process.env.TEST_RATIONALE_WAVE === 'on',
+}));
+jest.mock('../../lib/utils/meeting-roster-readiness', () => ({
+  meetingRosterSchemaEnabled: () => process.env.TEST_ROSTER_WAVE === 'on',
+}));
+jest.mock('../../lib/utils/j27-integrity-readiness', () => ({
+  j27IntegrityTarget: () => process.env.TEST_INTEGRITY_TARGET || null,
+  j27SemiFinalistEnabled: () => process.env.TEST_SEMI === 'on',
+}));
+
+import {
+  withJ27ReadModelSelect, j27MemoAvailability, j27MemoInputs, j27RequestInput, loadJ27Facts,
+  j27CalendarInput, composeJ27Tier1, deriveJ27ForRow, j27DashboardDto, isoDate, J27_MEMO_COLUMNS,
+} from '../../lib/services/workbench/j27-read-model-inputs';
+
+const REQ = '11111111-1111-4111-8111-111111111111';
+const row = (over = {}) => ({
+  akoya_requestid: REQ, akoya_requeststatus: 'Phase I Pending', wmkf_GrantCycle: { wmkf_cyclecode: 'J27' },
+  wmkf_readyforreview: true, _wmkf_grantprogram_value: 'C247B11A-A7CB-EE11-9078-000D3A341E8F', ...over,
+});
+const facts = (over = {}) => ({ anySuggestion: new Set(), integrity: new Map(), ...over });
+const calendar = { status: 'present', offrampMeetingDate: '2027-03-15', reviewsDueDate: '2027-03-01', today: '2026-11-09' };
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  for (const key of ['TEST_SUMMARY_WAVE', 'TEST_RATIONALE_WAVE', 'TEST_ROSTER_WAVE', 'TEST_INTEGRITY_TARGET', 'TEST_SEMI']) delete process.env[key];
+  delete process.env.VERCEL_ENV;
+});
+
+describe('projection', () => {
+  test('adds the request fields and only the provisioned memo columns', () => {
+    expect(withJ27ReadModelSelect('akoya_requestid').split(',')).toEqual([
+      'akoya_requestid', 'akoya_requeststatus', 'wmkf_phaseistatus', 'wmkf_phaseiistatus', 'wmkf_readyforreview', 'wmkf_triagestatus', '_wmkf_grantprogram_value',
+    ]);
+    process.env.TEST_RATIONALE_WAVE = 'on';
+    process.env.TEST_SUMMARY_WAVE = 'on';
+    const select = withJ27ReadModelSelect('akoya_requestid,wmkf_phaseistatus');
+    expect(select.split(',').filter((f) => f === 'wmkf_phaseistatus')).toHaveLength(1);
+    expect(select).toContain(J27_MEMO_COLUMNS.rationale);
+    expect(select).toContain(J27_MEMO_COLUMNS.reviewSummary);
+    expect(select).toContain(J27_MEMO_COLUMNS.visitAssessment);
+    expect(select).not.toContain(J27_MEMO_COLUMNS.rosterMemo);
+  });
+  test('the visit assessment column shares the review-summary gate', () => {
+    process.env.TEST_SUMMARY_WAVE = 'on';
+    expect(j27MemoAvailability()).toEqual({ rationale: false, reviewSummary: true, visitAssessment: true, rosterMemo: false });
+  });
+  test('never adds the test-request marker', () => {
+    expect(withJ27ReadModelSelect('akoya_requestid')).not.toContain('wmkf_istestrequest');
+  });
+});
+
+describe('memo presence', () => {
+  test('unprovisioned waves are unavailable; provisioned read presence from the row, sparse rows read absent', () => {
+    process.env.TEST_RATIONALE_WAVE = 'on';
+    process.env.TEST_ROSTER_WAVE = 'on';
+    const memo = j27MemoInputs(row({ wmkf_initialassessmentrationale: 'Saved', wmkf_confirmedmeetingroster: '   ' }));
+    expect(memo).toEqual({
+      rationale: { status: 'present' }, reviewSummary: { status: 'unavailable' },
+      visitAssessment: { status: 'unavailable' }, rosterMemo: { status: 'absent' },
+    });
+    expect(j27MemoInputs(row()).rationale).toEqual({ status: 'absent' });
+  });
+});
+
+describe('request input', () => {
+  test('maps status class, lower-cases the program, and reads sparse fields as null or false', () => {
+    const input = j27RequestInput(row({ akoya_requeststatus: 'Approved', wmkf_phaseistatus: 100000004, wmkf_phaseistatus_formatted: 'Scored' }));
+    expect(input).toMatchObject({
+      status: 'present', requestStatus: 'Approved', statusClass: 'DECIDED_AWARD', phaseIStatus: 100000004, phaseIStatusLabel: 'Scored',
+      phaseIIStatus: null, readyForReview: true, cycleCode: 'J27', grantProgramId: 'c247b11a-a7cb-ee11-9078-000d3a341e8f', triageStatus: null, isTestRequest: false,
+    });
+    expect(j27RequestInput(row({ akoya_requeststatus: null })).statusClass).toBeNull();
+    expect(j27RequestInput(row({ akoya_requeststatus: 'Mystery' })).statusClass).toBe('UNCLASSIFIED');
+  });
+});
+
+describe('batch facts', () => {
+  test('one suggestion read and one integrity read for the id list, integrity keyed by the configured target', async () => {
+    process.env.TEST_INTEGRITY_TARGET = 'orgd9e66399.crm.dynamics.com';
+    existsAnySuggestionForRequests.mockResolvedValue(new Set([REQ]));
+    readLatestIntegrityStates.mockResolvedValue(new Map());
+    const loaded = await loadJ27Facts([REQ, 'other']);
+    expect(existsAnySuggestionForRequests).toHaveBeenCalledTimes(1);
+    expect(existsAnySuggestionForRequests).toHaveBeenCalledWith([REQ, 'other']);
+    expect(readLatestIntegrityStates).toHaveBeenCalledWith('orgd9e66399.crm.dynamics.com', [REQ, 'other']);
+    expect(loaded.anySuggestion.has(REQ)).toBe(true);
+  });
+  test('each failed read yields null independently', async () => {
+    existsAnySuggestionForRequests.mockRejectedValue(new Error('dataverse down'));
+    readLatestIntegrityStates.mockResolvedValue(new Map([[REQ, { status: 'present', latest: null }]]));
+    const loaded = await loadJ27Facts([REQ]);
+    expect(loaded.anySuggestion).toBeNull();
+    expect(loaded.integrity.get(REQ)).toEqual({ status: 'present', latest: null });
+    existsAnySuggestionForRequests.mockResolvedValue(new Set());
+    readLatestIntegrityStates.mockRejectedValue(new Error('no POSTGRES_URL'));
+    const again = await loadJ27Facts([REQ]);
+    expect(again.anySuggestion).toEqual(new Set());
+    expect(again.integrity).toBeNull();
+  });
+});
+
+describe('composition', () => {
+  test('a null fact marks its key unavailable on the row; counts default to not-loaded', () => {
+    const input = composeJ27Tier1(row(), { anySuggestion: null, integrity: null }, { calendar });
+    expect(input.reviewers).toEqual({ status: 'unavailable', counts: { status: 'not-loaded' } });
+    expect(input.integrity).toEqual({ status: 'unavailable' });
+    expect(input.presentation).toEqual({ status: 'not-loaded' });
+  });
+  test('loaded facts, counts and capability flow through', () => {
+    process.env.TEST_SEMI = 'on';
+    const input = composeJ27Tier1(row(), facts({ anySuggestion: new Set([REQ]), integrity: new Map([[REQ, { status: 'present', latest: { flagged: true, reviewed: false, provenance: 'automated' } }]]) }), {
+      calendar, counts: { candidates: 1, invited: 0, accepted: 0, received: 0, completed: 0 }, env: { VERCEL_ENV: 'preview', DYNAMICS_URL: 'https://wmkf.crm.dynamics.com' },
+    });
+    expect(input.reviewers).toEqual({ status: 'present', anySuggestion: true, counts: { status: 'present', candidates: 1, invited: 0, accepted: 0, received: 0, completed: 0 } });
+    expect(input.integrity.latest.flagged).toBe(true);
+    expect(input.capabilities).toEqual({ status: 'present', readOnly: true });
+    expect(input.features).toEqual({ status: 'present', semiFinalistEnabled: true });
+  });
+  test('a request with no screening reads integrity present with latest null', () => {
+    expect(composeJ27Tier1(row(), facts(), { calendar }).integrity).toEqual({ status: 'present', latest: null });
+  });
+  test('calendar key from the cycle row, unavailable when the read failed', () => {
+    expect(j27CalendarInput({ wmkf_researchofframpmeetingdate: '2027-03-15', wmkf_researchreviewsduedate: null }, '2026-11-09'))
+      .toEqual({ status: 'present', offrampMeetingDate: '2027-03-15', reviewsDueDate: null, today: '2026-11-09' });
+    expect(j27CalendarInput(null, '2026-11-09')).toEqual({ status: 'unavailable' });
+    expect(isoDate(new Date('2026-11-09T23:59:00Z'))).toBe('2026-11-09');
+  });
+  test('deriveJ27ForRow returns null off scope and a stage with its input in scope', () => {
+    expect(deriveJ27ForRow(row({ wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } }), facts(), { calendar })).toBeNull();
+    expect(deriveJ27ForRow(row({ wmkf_GrantCycle: null }), facts(), { calendar })).toBeNull();
+    const stage = deriveJ27ForRow(row(), facts(), { calendar });
+    expect(stage.phase).toBe('initial-assessment');
+    expect(stage.input.request.cycleCode).toBe('J27');
+    expect(j27DashboardDto(stage)).toEqual({
+      phase: 'initial-assessment', basis: 'degraded', primaryTask: 'record-first-cut', taskKeys: ['record-first-cut'],
+      blockerKeys: ['continue-decision-missing'], recorded: stage.recorded, outcome: 'none',
+    });
+  });
+});
