@@ -1,8 +1,8 @@
 /** @jest-environment jsdom */
 import { render, screen } from '@testing-library/react';
 import { composeJ27PageInput, deriveJ27PageStage, j27CountsInput, j27OverviewInputs, j27FinalWriteupInputs } from '../../shared/utils/j27PageStage';
-import J27StageStrip, { J27_PHASE_LABEL, J27_TASK_LABEL, J27_BLOCKER_LABEL, visibleBlockerKeys } from '../../shared/components/workbench/J27StageStrip';
-import { J27_PHASES, J27_TASK_KEYS, J27_BLOCKER_KEYS, PHASE_I_CHAIRS } from '../../lib/services/workbench/j27-read-model';
+import J27StageStrip, { J27_PHASE_LABEL, J27_TASK_LABEL, J27_BLOCKER_LABEL, J27_OUTCOME_LABEL, visibleBlockerKeys } from '../../shared/components/workbench/J27StageStrip';
+import { J27_PHASES, J27_TASK_KEYS, J27_BLOCKER_KEYS, J27_OUTCOMES, PHASE_I_CHAIRS } from '../../lib/services/workbench/j27-read-model';
 import { SEMI_FINALIST_STATUS } from '../../shared/config/j27FirstCut';
 
 const RESEARCH = '94cab30b-958f-ee11-8179-000d3a341e8f';
@@ -31,9 +31,10 @@ describe('label maps cover the read model vocabularies exactly', () => {
   test('phases', () => { expect(Object.keys(J27_PHASE_LABEL).sort()).toEqual([...J27_PHASES].sort()); });
   test('tasks', () => { expect(Object.keys(J27_TASK_LABEL).sort()).toEqual([...J27_TASK_KEYS].sort()); });
   test('blockers', () => { expect(Object.keys(J27_BLOCKER_LABEL).sort()).toEqual([...J27_BLOCKER_KEYS].sort()); });
+  test('outcomes', () => { expect(Object.keys(J27_OUTCOME_LABEL).sort()).toEqual([...J27_OUTCOMES].sort()); });
   test('presentation-only blockers are not shown; task blockers show from their phase onward', () => {
-    expect(visibleBlockerKeys(['continue-decision-missing'])).toEqual([]);
-    expect(visibleBlockerKeys(['continue-decision-missing', 'integrity-unreviewed', 'phase-two-status-pending'])).toEqual(['integrity-unreviewed', 'phase-two-status-pending']);
+    expect(visibleBlockerKeys(['offramped'], 'initial-assessment')).toEqual([]);
+    expect(visibleBlockerKeys(['offramped', 'integrity-unreviewed', 'phase-two-status-pending'], 'peer-review')).toEqual(['offramped', 'integrity-unreviewed', 'phase-two-status-pending']);
     expect(visibleBlockerKeys(['integrity-unreviewed', 'presentation-end-unverified'], 'initial-assessment')).toEqual([]);
     expect(visibleBlockerKeys(['integrity-unreviewed', 'presentation-end-unverified'], 'peer-review')).toEqual(['integrity-unreviewed']);
     expect(visibleBlockerKeys(['integrity-unreviewed', 'presentation-end-unverified'], 'final-assessment')).toEqual(['integrity-unreviewed', 'presentation-end-unverified']);
@@ -148,20 +149,27 @@ describe('page recomputation', () => {
 
 describe('strip', () => {
   test('shows the phase, the next task, and task blockers; hides presentation-only blockers', () => {
-    render(<J27StageStrip stage={{ phase: 'peer-review', basis: 'partial', primaryTask: 'identify-reviewers', taskKeys: ['identify-reviewers'], blockerKeys: ['phase-two-status-pending', 'continue-decision-missing'] }} />);
+    render(<J27StageStrip stage={{ phase: 'peer-review', basis: 'partial', primaryTask: 'identify-reviewers', taskKeys: ['identify-reviewers'], blockerKeys: ['phase-two-status-pending', 'presentation-end-unverified'] }} />);
     const strip = screen.getByLabelText('Where this request stands');
     expect(strip).toHaveTextContent('Peer Review');
     expect(strip).toHaveTextContent('Next: Identify reviewers');
     expect(strip).toHaveTextContent('Some facts load as you open tabs.');
     expect(strip).toHaveTextContent('Pending Committee Review');
-    expect(strip).not.toHaveTextContent('continue decision');
+    expect(strip).not.toHaveTextContent('end has not been verified');
   });
   test('renders nothing for an unclassified or missing stage', () => {
     const { container } = render(<J27StageStrip stage={{ phase: 'unclassified', blockerKeys: [] }} />);
     expect(container).toBeEmptyDOMElement();
   });
+  test('an offramped row shows the outcome badge and no next task', () => {
+    render(<J27StageStrip stage={{ phase: 'peer-review', basis: 'full', outcome: 'offramped', primaryTask: null, taskKeys: [], blockerKeys: ['offramped'] }} />);
+    const strip = screen.getByLabelText('Where this request stands');
+    expect(strip).toHaveTextContent('Offramped');
+    expect(strip).toHaveTextContent('took the offramp');
+    expect(strip).not.toHaveTextContent('Nothing is waiting');
+  });
   test('a decided row shows the phase alone', () => {
-    render(<J27StageStrip stage={{ phase: 'decided', basis: 'full', primaryTask: null, taskKeys: [], blockerKeys: ['continue-decision-missing'] }} />);
+    render(<J27StageStrip stage={{ phase: 'decided', basis: 'full', primaryTask: null, taskKeys: [], blockerKeys: [] }} />);
     const strip = screen.getByLabelText('Where this request stands');
     expect(strip).toHaveTextContent('Decided');
     expect(strip).not.toHaveTextContent('Nothing is waiting');

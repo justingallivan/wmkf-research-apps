@@ -162,7 +162,7 @@ describe('composition', () => {
     expect(stage.input.request.cycleCode).toBe('J27');
     expect(j27DashboardDto(stage)).toEqual({
       phase: 'initial-assessment', basis: 'degraded', primaryTask: 'record-first-cut', taskKeys: ['record-first-cut'],
-      blockerKeys: ['continue-decision-missing'], recorded: stage.recorded, outcome: 'none',
+      blockerKeys: [], recorded: stage.recorded, outcome: 'none',
     });
   });
 });

@@ -5,7 +5,7 @@
  * it fetches nothing and gates nothing. Label maps are pinned to the read
  * model's vocabularies in tests/unit/j27-page-stage.test.js.
  */
-import { J27_BLOCKERS, J27_PHASES, J27_TASKS } from '../../../lib/services/workbench/j27-read-model';
+import { J27_BLOCKERS, J27_OUTCOMES, J27_PHASES, J27_TASKS } from '../../../lib/services/workbench/j27-read-model';
 
 export const J27_PHASE_LABEL = {
   'initial-assessment': 'Initial Assessment',
@@ -35,13 +35,25 @@ export const J27_BLOCKER_LABEL = {
   'chairs-outcome-pending': 'Reviewer invitations wait for the Chairs’ outcome',
   'phase-two-status-pending': 'Reviewer invitations open once the Phase II status is Pending Committee Review',
   'integrity-unreviewed': 'Integrity findings need a Program Director’s review before invitations or scheduling',
-  'continue-decision-missing': 'Presentation steps wait for the continue decision',
+  offramped: 'This request took the offramp; it is not invited or presented',
   'presentation-not-ended': 'Group review starts after the presentation ends',
   'presentation-end-unverified': 'The presentation’s end has not been verified yet',
   'presentation-schedule-unavailable': 'The presentation schedule could not be read',
   'evidence-stale': 'Reviewer reports changed after the staff summary was saved',
   'roster-stale': 'The confirmed attendance no longer matches the presentation',
 };
+
+export const J27_OUTCOME_LABEL = {
+  none: null,
+  'not-scored': 'First Cut: Not Scored',
+  triaged: 'Semi-finalist recommendation: No',
+  'not-invited': 'Chairs: not invited',
+  offramped: 'Offramped',
+  'decided-award': 'Awarded',
+  'decided-no-award': 'Not awarded',
+  withdrawn: 'Withdrawn',
+};
+export { J27_OUTCOMES };
 
 const BASIS_NOTE = {
   partial: 'Some facts load as you open tabs.',
@@ -68,9 +80,12 @@ export default function J27StageStrip({ stage }) {
     <section aria-label="Where this request stands" className="mb-6 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="font-semibold text-gray-900">{J27_PHASE_LABEL[stage.phase] || stage.phase}</span>
+        {stage.outcome && stage.outcome !== 'none' && J27_OUTCOME_LABEL[stage.outcome] && (
+          <span className="rounded-md bg-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-800">{J27_OUTCOME_LABEL[stage.outcome]}</span>
+        )}
         {stage.primaryTask ? (
           <span>Next: {J27_TASK_LABEL[stage.primaryTask] || stage.primaryTask}</span>
-        ) : stage.phase === 'decided' ? null : (
+        ) : (stage.phase === 'decided' || (stage.outcome && stage.outcome !== 'none')) ? null : (
           <span className="text-gray-600">Nothing is waiting on staff right now.</span>
         )}
         {note && <span className="text-gray-500">{note}</span>}

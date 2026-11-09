@@ -226,7 +226,7 @@ describe('J27 read model (plan C7)', () => {
     expect(body.j27).toMatchObject({
       phase: 'peer-review', basis: 'degraded', outcome: 'none',
       recorded: { semiFinalist: 'yes', chairsOutcome: 'pending' },
-      blockerKeys: ['chairs-outcome-pending', 'integrity-unreviewed', 'continue-decision-missing'],
+      blockerKeys: ['chairs-outcome-pending', 'integrity-unreviewed'],
     });
     expect(body.j27.taskKeys).toEqual(['review-integrity', 'record-offramp']);
     expect(body.j27.tasks[1].detail).toEqual({ received: null, pastOfframpDate: true });

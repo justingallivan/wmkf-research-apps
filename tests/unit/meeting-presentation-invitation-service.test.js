@@ -111,6 +111,9 @@ test('the frozen snapshot holds the linked cycle code; a December meeting date w
  const f=fixture();await prepared(f);expect(f.row().snapshot.request.cycle).toBe('D30');
  const g=fixture();const row=await g.d.request();g.d.request.mockResolvedValue({...row,wmkf_meetingdate:'2030-12-01',wmkf_GrantCycle:null});
  await expect(prepared(g)).rejects.toMatchObject({code:'presentation_invitation_request_changed'});expect(g.d.store.create).not.toHaveBeenCalled();
+ // D7: an Offramped request never presents.
+ const h=fixture();const live=await h.d.request();h.d.request.mockResolvedValue({...live,wmkf_phaseiistatus:682090001});
+ await expect(prepared(h)).rejects.toMatchObject({code:'presentation_invitation_request_offramped'});expect(h.d.store.create).not.toHaveBeenCalled();
 });
 
 test('a changed Grant Cycle link stales a prepared preview before any email creation',async()=>{

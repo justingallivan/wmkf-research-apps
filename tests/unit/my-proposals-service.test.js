@@ -228,7 +228,7 @@ function phaseQueryRecords(records, filter) {
     || (String(r._wmkf_grantprogram_value || '').toLowerCase() === RESEARCH_PROGRAM && r.wmkf_readyforreview === true));
 }
 
-const PHASE_II_OPTIONS = [100000000, 100000001, 100000002, 100000003, 100000004, 100000005, 707510001, 707510002, 999999999];
+const PHASE_II_OPTIONS = [100000000, 100000001, 100000002, 100000003, 100000004, 100000005, 707510001, 707510002, 682090001, 999999999]; // 682090001 = Phase II Offramped (D7)
 
 test.each([
   ['J25', ['null']], ['D26', ['null']],

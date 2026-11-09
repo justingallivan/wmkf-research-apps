@@ -1,7 +1,7 @@
 import {
   deriveJ27Stage, deriveRecorded, deriveOutcome, isJ27ScopeCycle,
   J27_TASKS, J27_TASK_KEYS, J27_BLOCKERS, J27_RECORDING_TASK_KEYS, J27_PRESENTATION_OPERATIONS,
-  J27_PHASES, J27_OUTCOMES, PHASE_I_CHAIRS,
+  J27_PHASES, J27_OUTCOMES, PHASE_I_CHAIRS, PHASE_II_OFFRAMPED,
 } from '../../lib/services/workbench/j27-read-model';
 import { FIRST_CUT_STATUS, SEMI_FINALIST_STATUS } from '../../shared/config/j27FirstCut';
 
@@ -16,7 +16,7 @@ const ABSENT = { status: 'absent' };
 const PRESENT = { status: 'present' };
 const UNAVAILABLE = { status: 'unavailable' };
 const counts = (over = {}) => ({ status: 'present', candidates: 0, invited: 0, accepted: 0, received: 0, completed: 0, ...over });
-const ALWAYS = ['continue-decision-missing'];
+const ALWAYS = []; // D7 closed: no always-on blocker
 
 /**
  * Tier 1 present, reviewer counts and tier 2 not loaded: the request page
@@ -387,13 +387,22 @@ describe('C8.6 invariants', () => {
     for (const task of J27_TASKS) expect(J27_PHASES).toContain(task.phase);
     expect(new Set(J27_TASK_KEYS).size).toBe(J27_TASK_KEYS.length);
   });
-  test('start-group-review is present while continue-decision-missing is active', () => {
-    const r = deriveJ27Stage(page({ requestStatus: P2, phaseIStatus: PHASE_I_CHAIRS.invited }, {
-      rationale: PRESENT, visitAssessment: PRESENT, roster: { status: 'present', stale: false },
-      boardDraft: { status: 'present', exists: true }, presentation: { status: 'present', exists: true, id: 'v', ended: true, legacyException: false },
+  test('an Offramped row (D7) is terminal: no tasks, the offramped blocker, no presentation-only blocker', () => {
+    const r = deriveJ27Stage(page({ requestStatus: P2, phaseIStatus: PHASE_I_CHAIRS.invited, phaseIIStatus: PHASE_II_OFFRAMPED }, {
+      rationale: PRESENT, reviewSummary: PRESENT, reviewers: { status: 'present', anySuggestion: true, counts: counts({ candidates: 3, invited: 3, received: 3, completed: 3 }) },
     }));
-    expect(r.blockerKeys).toContain('continue-decision-missing');
-    expect(r.taskKeys).toContain('start-group-review');
+    expect(keys(r)).toEqual({ phase: 'peer-review', basis: 'full', outcome: 'offramped', tasks: [], primary: null, blockers: ['offramped', 'presentation-end-unverified'] });
+    expect(r.blockers.find((b) => b.key === 'offramped').blocks).toEqual([...J27_PRESENTATION_OPERATIONS, 'send-invitations']);
+    // With a presentation record it stays in deliberations, still with no tasks.
+    const d = deriveJ27Stage(page({ requestStatus: P2, phaseIStatus: PHASE_I_CHAIRS.invited, phaseIIStatus: PHASE_II_OFFRAMPED }, {
+      rationale: PRESENT, presentation: { status: 'present', exists: true, id: 'v', ended: true, legacyException: false },
+    }));
+    expect(keys(d).phase).toBe('deliberations');
+    expect(d.taskKeys).toEqual([]);
+    // A decided award wins over the offramp value.
+    expect(deriveOutcome('DECIDED_AWARD', { firstCut: 'unset', semiFinalist: 'unset', chairsOutcome: 'pending' }, PHASE_II_OFFRAMPED)).toBe('decided-award');
+    // Intake rows carry no offramp blocker.
+    expect(deriveJ27Stage(tier1()).blockerKeys).not.toContain('offramped');
   });
   test.each([
     ['2027-03-15', '2027-03-14', false], ['2027-03-15', '2027-03-15', false], ['2027-03-15', '2027-03-16', true],
