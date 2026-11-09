@@ -272,3 +272,112 @@ Required named change: complete summary-freshness invalidation and cover sequent
 
 Codex session ID: 01a1c1a5-dce5-7da1-bea6-7349ac330b34
 Resume in Codex: codex resume 01a1c1a5-dce5-7da1-bea6-7349ac330b34
+
+## Final check (Codex, after `9d7f6aee1`)
+
+## /contract-reconcile — Mode A
+
+**Change surface:** Final verification of J27 step E’s summary-freshness invalidation.
+
+**[VERIFIED via Git]** Reviewed `9d7f6aee1974c5a106e30298e5916aa716533fcc` on `claude/j27-read-model`.
+
+- **Entry points:** read-only StaffReviewSummary and Workbench request page.
+- **Persistence:** React memory; existing persisted evidence supplied through mocked reads.
+- **Consumers:** page facts → composer → stage model → passive strip.
+- **Prior findings:** the six findings in the previous re-review.
+
+Verification transpiled actual modules in memory and rendered React/jsdom with mocked I/O. No files were edited, commits made, or Dataverse contacted. The existing `package-lock.json` modification was left untouched. Repository suites and gates were not run.
+
+## Findings
+
+1. **PASS — Cross-request isolation and navigation reset remain intact.**
+
+   [VERIFIED via source and Git comparison] The page rejects callbacks for another request and resets facts when the route changes. This implementation is unchanged from the reviewed rework.
+
+   Evidence: [request page:95](/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model/pages/workbench/[requestId].js:95).
+
+   **Residual risk:** the previously documented request-ID-versus-visit-generation limitation remains; this commit does not resolve it or introduce a new triggering path.
+
+2. **PASS — Final Writeup propagation remains intact.**
+
+   [VERIFIED via source and Git comparison] Initial load, polling, start, and leadership advance still update status through the centralized reporting effect. These paths are unchanged.
+
+   Evidence: [reporting effect:329](/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model/shared/components/workbench/FinalWriteupTab.js:329), [transition paths:400](/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model/shared/components/workbench/FinalWriteupTab.js:400).
+
+   **Residual risk:** transition simulations from the previous review were not rerun.
+
+3. **PASS — Legacy schedule mapping remains intact.**
+
+   [VERIFIED via source and Git comparison] Both explicit legacy compatibility reasons remain independent of Overview. Ordinary `unverified` and `not_checked` preserve unknown timing.
+
+   Evidence: [schedule mapping:63](/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model/shared/utils/j27PageStage.js:63).
+
+   **Residual risk:** none newly identified.
+
+4. **PASS — The remaining P2 is fixed: unknown freshness replaces earlier known freshness.**
+
+   [VERIFIED via actual components and in-memory reproduction] Unknown evidence emits `summaryStale: null`; a failed read emits the same patch under the generation guard. The page replaces the earlier Boolean, and composition no longer carries its `stale` property.
+
+   Evidence: [summary reporting:18](/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model/shared/components/workbench/StaffReviewSummary.js:18), [page merge:100](/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model/pages/workbench/[requestId].js:100), [composition:76](/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model/shared/utils/j27PageStage.js:76).
+
+   Reproduced by leaving and reopening Deliberations while retaining the same real page:
+
+   | Later read | Earlier `true` | Earlier `false` |
+   |---|---|---|
+   | Current hash unknown | Cleared | Cleared |
+   | Read rejected | Cleared | Cleared |
+   | Saved hash missing | Cleared | Cleared |
+   | Summary empty | Cleared | Cleared |
+
+   All eight cases produced `{status:'present'}` without `stale`; the obsolete warning disappeared. Sixteen mocked GETs occurred, with no external I/O.
+
+   [VERIFIED via test source] The added page regression exercises both requested transitions on one mounted page.
+
+   Evidence: [same-page regression:118](/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model/tests/unit/workbench-request-page-j27-strip.test.js:118).
+
+   **Residual risk:** its false→unknown assertion checks warning absence, which alone cannot distinguish retained `false` from unknown. The independent reproduction above explicitly checked the composed value and verified clearing.
+
+5. **PASS — Resolution read budget has not regressed.**
+
+   [VERIFIED via source and Git comparison] Resolution orchestration is unchanged: the J27 path retains the suggestion, catalog, and integrity reads. Summary reporting reuses the existing panel GET.
+
+   Evidence: [resolver:96](/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model/lib/services/workbench/resolve-request-service.js:96), [panel GET:15](/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model/shared/components/workbench/StaffReviewSummary.js:15).
+
+   **Residual risk:** logical read counts do not certify live pagination or latency; adapter-counter experiments were not rerun.
+
+6. **PASS — Previously passing contracts remain intact.**
+
+   [VERIFIED via source and Git comparison] Undefined memo handoffs preserve server values; reviewer counts preserve sibling facts; the Research gate remains fail-closed; and the strip remains passive, hides presentation-only blockers, and suppresses `unclassified`. These implementations are unchanged.
+
+   Evidence: [composer:28](/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model/shared/utils/j27PageStage.js:28), [program gate:147](/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model/lib/services/workbench/j27-read-model-inputs.js:147), [strip:55](/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model/shared/components/workbench/J27StageStrip.js:55).
+
+   **Residual risk:** no live catalog or browser visual verification performed.
+
+## New Issues
+
+None identified. The test-assertion limitation and existing generation-boundary limitation above are nonblocking.
+
+## Contract Audits
+
+| Audit | Result |
+|---|---|
+| Whole-flow | Verified existing GET → response → panel callback → page merge → composer → model → strip. Auth and service boundaries are unchanged. |
+| Partial-success | Preserved summary prose with unavailable evidence now clears freshness. Rejected reads also clear it. |
+| Async/stale-state | Read success and failure use generation checks; page ownership/reset remains unchanged. |
+| Helper extraction | No new extraction; existing mapping distinctions remain intact. |
+| Durable surface | N/A: no new schema, route, or persistence write. |
+| Documentation | Latest fix description agrees with reproduced behavior. No documentation reconciliation edits performed. |
+| Symbol-consumer fan-out | Traced `summaryStale`, composed `reviewSummary.stale`, and `evidence-stale` rendering. |
+
+## Recommendation Evidence
+
+N/A — no further implementation change recommended.
+
+## Final Verdict
+
+**READY TO IMPLEMENT — the Mode A approval category; the reviewed fix is already implemented and passes this final check.**
+
+**Required named changes: none.** The remaining P2 is resolved, with no regression identified in the other five re-review findings.
+
+Codex session ID: 01a1c1ad-6b19-7b61-b7e0-bb3fb74cb8c8
+Resume in Codex: codex resume 01a1c1ad-6b19-7b61-b7e0-bb3fb74cb8c8
