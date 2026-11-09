@@ -526,3 +526,32 @@ describe('J27 read model on the proposal list (plan C7)', () => {
     for (const proposal of body.proposals) expect(proposal.j27.basis).toBe('degraded');
   });
 });
+
+describe('plan F2: discovery contract on the real queries', () => {
+  const { assertDiscoveryQuery } = jest.requireActual('../../shared/config/workbenchVisibility.js');
+  const RESEARCH_ID = '94cab30b-958f-ee11-8179-000d3a341e8f';
+  const readySetAside = { akoya_requestid: 'r-sa', akoya_requestnum: '1000390', akoya_requeststatus: 'Phase I Pending', wmkf_triagestatus: 100000001,
+    _wmkf_grantprogram_value: RESEARCH_ID, wmkf_readyforreview: true, _wmkf_grantcycle_value: 'cycle-j27', wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, _wmkf_programdirector_value: 'pd-1' };
+  test('cycle list and proposal list send the discovery projection with the linked-cycle expansion', async () => {
+    queryAllRequests.mockResolvedValue({ records: [readySetAside], capped: false });
+    await loadDashboard(args());
+    assertDiscoveryQuery(queryAllRequests.mock.calls[0][0]);
+    await loadDashboard(args({ cycleCode: 'J27', scope: 'all' }));
+    assertDiscoveryQuery(queryAllRequests.mock.calls[1][0]);
+  });
+  test('a ready J27 Research Set-aside row counts as active in the cycle list and appears in the default proposal list', async () => {
+    queryAllRequests.mockResolvedValue({ records: [readySetAside], capped: false });
+    const cycles = await loadDashboard(args());
+    expect(cycles.cycles.map((c) => [c.code, c.count, c.setAsideCount, c.myCount, c.mySetAsideCount])).toEqual([['J27', 1, 0, 1, 0]]);
+    const list = await loadDashboard(args({ cycleCode: 'J27', scope: 'all' }));
+    expect(list.proposals.map((p) => p.requestNumber)).toEqual(['1000390']);
+  });
+  test('a D26 Set-aside row still counts as Set aside and stays out of the default list', async () => {
+    const d26 = { ...readySetAside, akoya_requestid: 'r-d26sa', akoya_requestnum: '1002999', akoya_requeststatus: 'Phase II Pending', _wmkf_grantcycle_value: 'cycle-d26', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } };
+    queryAllRequests.mockResolvedValue({ records: [d26], capped: false });
+    const cycles = await loadDashboard(args());
+    expect(cycles.cycles.map((c) => [c.code, c.count, c.setAsideCount])).toEqual([['D26', 0, 1]]);
+    const list = await loadDashboard(args({ cycleCode: 'D26', scope: 'all' }));
+    expect(list.proposals).toEqual([]);
+  });
+});

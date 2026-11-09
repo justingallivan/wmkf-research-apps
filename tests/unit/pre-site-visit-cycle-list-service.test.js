@@ -523,3 +523,12 @@ it('J27 readiness gates the request-first list before document and schedule read
   expect(requestDocumentAdapter.findByRequests.mock.calls.some(([ids]) => ids.includes(R2))).toBe(true);
   expect(grantRequestAdapter.queryAllRequests.mock.calls[0][0].select).toContain('wmkf_readyforreview');
 });
+
+it('plan F2: the request query carries the discovery projection and the scoped discovery filter', async () => {
+  const { assertDiscoveryQuery, buildDiscoveryFilter } = jest.requireActual('../../shared/config/workbenchVisibility.js');
+  resolveWorkbenchProgramScope.mockResolvedValue({ programId: PROGRAM, programName: 'Research', discoveryScope: { readinessOnlyProgramIds: [PROGRAM] } });
+  await list({ scope: 'all', callerSystemId: PD_A });
+  const query = grantRequestAdapter.queryAllRequests.mock.calls[0][0];
+  assertDiscoveryQuery(query);
+  expect(query.filter).toContain(buildDiscoveryFilter(false, { readinessOnlyProgramIds: [PROGRAM] }));
+});

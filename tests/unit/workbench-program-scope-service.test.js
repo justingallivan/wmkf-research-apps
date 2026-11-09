@@ -1,9 +1,17 @@
 /** @jest-environment node */
 
 import {
+  assignmentQueryOptions,
   buildProgramScopeFilter,
+  readinessOnlyProgramIds,
   resolveWorkbenchProgramScope,
 } from '../../lib/services/workbench/program-scope-service.js';
+import { assertDiscoveryQuery } from '../../shared/config/workbenchVisibility.js';
+
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle.js', () => ({
+  ...jest.requireActual('../../lib/dataverse/adapters/operations-grant-cycle.js'),
+  linkedCycleExpand: () => 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+}));
 
 const RESEARCH = '11111111-1111-4111-8111-111111111111';
 const SOCAL = '22222222-2222-4222-8222-222222222222';
@@ -97,4 +105,15 @@ test('unready J27 assignments do not displace the earlier-cycle program default'
   expect((await resolveWorkbenchProgramScope({ callerSystemId: PD, dependencies })).defaultProgramId).toBe(SOCAL);
   later.wmkf_readyforreview = true;
   expect((await resolveWorkbenchProgramScope({ callerSystemId: PD, dependencies })).defaultProgramId).toBe(RESEARCH);
+});
+
+test('plan F2: the assignment discovery query carries the discovery projection, and the scope resolves one Research program', async () => {
+  assertDiscoveryQuery(assignmentQueryOptions('filter'));
+  expect(readinessOnlyProgramIds([{ wmkf_grantprogramid: RESEARCH, wmkf_name: 'Research' }, { wmkf_grantprogramid: SOCAL, wmkf_name: 'Southern California' }])).toEqual([RESEARCH]);
+  expect(readinessOnlyProgramIds([{ programId: RESEARCH, name: 'Research' }])).toEqual([RESEARCH]);
+  expect(readinessOnlyProgramIds([{ wmkf_grantprogramid: RESEARCH, wmkf_name: 'Research' }, { wmkf_grantprogramid: OTHER, wmkf_name: 'research' }])).toEqual([]);
+  const dependencies = deps([{ wmkf_grantprogramid: RESEARCH, wmkf_name: 'Research' }], [RESEARCH]);
+  const scope = await resolveWorkbenchProgramScope({ callerSystemId: PD, dependencies });
+  expect(scope.discoveryScope).toEqual({ readinessOnlyProgramIds: [RESEARCH] });
+  expect(dependencies.queryAssignedRequests.mock.calls[0][0]).toContain(`_wmkf_grantprogram_value eq ${RESEARCH}) and wmkf_readyforreview eq true`);
 });

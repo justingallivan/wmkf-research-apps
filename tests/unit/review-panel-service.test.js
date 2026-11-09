@@ -616,3 +616,17 @@ test('panel roster hides unready J27 and retains D26 before readiness', async ()
     select: expect.stringContaining('wmkf_readyforreview'), expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
   });
 });
+
+test('plan F2: the roster query carries the discovery projection and passes the discovery scope to the filter helper', async () => {
+  const { assertDiscoveryQuery } = jest.requireActual('../../shared/config/workbenchVisibility.js');
+  const { resolveWorkbenchProgramScope } = require('../../lib/services/workbench/program-scope-service');
+  resolveWorkbenchProgramScope.mockResolvedValueOnce({ programId: 'program-1', discoveryScope: { readinessOnlyProgramIds: ['94cab30b-958f-ee11-8179-000d3a341e8f'] } });
+  requests.queryAllRequests.mockResolvedValue({ records: [
+    { ...rosterRecord(REQ_B, 'ready-sa'), akoya_requeststatus: 'Phase I Pending', wmkf_triagestatus: 100000001, _wmkf_grantprogram_value: '94cab30b-958f-ee11-8179-000d3a341e8f', wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, wmkf_readyforreview: true },
+    { ...rosterRecord(REQ_A, 'd26-sa'), wmkf_triagestatus: 100000001, _wmkf_grantprogram_value: '94cab30b-958f-ee11-8179-000d3a341e8f' },
+  ] });
+  const { loadReviewPanelRoster } = require('../../lib/services/review-panel-service');
+  expect((await loadReviewPanelRoster()).map((r) => r.requestNumber)).toEqual(['ready-sa']);
+  assertDiscoveryQuery(requests.queryAllRequests.mock.calls[0][0]);
+  expect(rollout.buildReviewPanelRosterFilter).toHaveBeenCalledWith('program-1', { readinessOnlyProgramIds: ['94cab30b-958f-ee11-8179-000d3a341e8f'] });
+});

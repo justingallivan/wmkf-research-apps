@@ -163,3 +163,15 @@ test('J27 briefing excludes unready rows before any artifact or sentiment reads'
   deps.queryRequests.mockResolvedValue({ records: [make(1, false)] });
   expect(await load({ profileId: 7 })).toMatchObject({ cycles: [], defaultCycleCode: null });
 });
+
+test('plan F2: the briefing query carries the discovery projection, keeps SE/MR membership, and admits a ready J27 Research intake row', async () => {
+  const { assertDiscoveryQuery } = jest.requireActual('../../shared/config/workbenchVisibility.js');
+  const j27 = { ...request(3), akoya_requeststatus: 'Phase I Pending', _wmkf_grantprogram_value: '94cab30b-958f-ee11-8179-000d3a341e8f', wmkf_readyforreview: true, wmkf_GrantCycle: { wmkf_cyclecode: 'J27' } };
+  deps.queryRequests.mockResolvedValue({ records: [j27], capped: false });
+  const body = await load({ cycleCode: 'J27', profileId: 7 });
+  const query = deps.queryRequests.mock.calls[0][0];
+  assertDiscoveryQuery(query);
+  expect(query.filter).toContain('_akoya_programid_value');
+  expect(query.filter).toContain('_wmkf_grantprogram_value eq 94cab30b-958f-ee11-8179-000d3a341e8f) and wmkf_readyforreview eq true');
+  expect(body.groups.flatMap((g) => g.proposals.map((p) => p.requestNumber))).toEqual(['1003']);
+});

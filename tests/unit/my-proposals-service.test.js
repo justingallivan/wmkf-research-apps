@@ -273,3 +273,15 @@ test.each(['D26', 'J27'])('%s status=all retains its prior phase-unrestricted qu
   expect((await getMyProposals({ azureEmail: EMAIL, cycleCode, status: 'all' })).proposals).toHaveLength(records.length);
   expect(queryAllRequests.mock.calls[0][0].filter).toBe(`_wmkf_programdirector_value eq pd-1 and wmkf_GrantCycle/wmkf_cyclecode eq '${cycleCode}' and ${ADMISSION}`);
 });
+
+test('plan F2: the proposal query carries the discovery projection; a ready J27 Research intake row shows in both modes', async () => {
+  const { assertDiscoveryQuery } = jest.requireActual('../../shared/config/workbenchVisibility');
+  queryAllRequests.mockResolvedValue({ records: [{
+    akoya_requestid: 'intake', akoya_requestnum: 'intake', akoya_requeststatus: 'Phase I Pending', wmkf_phaseiistatus: null,
+    _wmkf_grantprogram_value: RESEARCH_PROGRAM, wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, wmkf_readyforreview: true,
+  }] });
+  for (const status of ['actionable', 'all']) {
+    expect((await getMyProposals({ azureEmail: EMAIL, cycleCode: 'J27', status })).proposals.map((p) => p.requestId)).toEqual(['intake']);
+  }
+  assertDiscoveryQuery(queryAllRequests.mock.calls[0][0]);
+});
