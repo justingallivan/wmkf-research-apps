@@ -93,4 +93,16 @@ selection, and action controls remained absent. No Preview write acknowledgement
 or rehearsal grant was added. Remove both the exact branch callback and the
 branch-scoped read variable when this UAT branch is retired.
 
+**VERIFIED 2026-11-09:** a sandbox-backed Preview is the third venue. For the J27
+read-model strip smoke on `claude/j27-read-model`, a branch-scoped Preview
+`DYNAMICS_URL` pointing at sandbox `orgd9e66399` was added with `vercel env add`
+and redeployed as `dpl_8kaj9FtYL6R9JkfAEjZjntE2hoSc`; the stable alias was moved
+to it, the owner signed in with the already-registered stable callback, and the
+Workbench resolved sandbox request 1000384 and rendered the strip. The interlock
+allows preview × sandbox without any read-authorization variable. Preview
+Postgres is not the sandbox's, so Postgres-backed facts (integrity screenings)
+read as unavailable on that venue. The alias was restored to
+`dpl_5wQcfshKGG4z8cyeTueXkt9L4sve` and re-inspected. Remove the branch-scoped
+`DYNAMICS_URL` when the branch retires. Evidence: plan §9 I8.
+
 Related: [[project-vercel-sensitive-env-pull-empty]], [[project-dev-environment]], [[project-local-dev-auth-setup]], [[project-branded-domains]].
