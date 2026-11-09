@@ -19,7 +19,7 @@ jest.mock('../../lib/services/test-requests/status-change-runner.js', () => ({
 import { withDalContext } from '../../lib/dataverse/core/context.js';
 import { createReadinessJournal } from '../../lib/services/test-requests/readiness-journal.js';
 import { createRunLedger, assertLedgerReceipt } from '../../lib/services/test-requests/run-ledger.js';
-const { SCENARIOS, MEMO, digest, deterministicId, assertSandboxOrigin, sandboxFetch, completeList, readScenarioMetadata, assertDraftEmails, assertSyntheticReviewer, assertSuggestion, candidateBodies, scenarioClient, assertScenarioRow, finalizeScenario, previewScenario, validateScenarioEffects } = require('../../lib/services/test-requests/j27-sandbox-scenarios.js');
+const { SCENARIOS, MEMO, PROPOSAL_RECEIVED, digest, deterministicId, assertSandboxOrigin, sandboxFetch, completeList, readScenarioMetadata, assertDraftEmails, assertSyntheticReviewer, assertSuggestion, candidateBodies, scenarioClient, assertScenarioRow, finalizeScenario, previewScenario, validateScenarioEffects } = require('../../lib/services/test-requests/j27-sandbox-scenarios.js');
 const ORIGIN='https://orgd9e66399.crm.dynamics.com';
 const id = n => `${String(n).padStart(8,'0')}-1111-4111-8111-111111111111`;
 const actor='cli:'+ 'a'.repeat(16);
@@ -30,10 +30,11 @@ function fixture(n=1) {
   const scenario=SCENARIOS[n-1]; const resources=[]; const suggestions=new Map(); let stamp=null; let version=1;
   const manifest={bundle:{sandboxScenarioSource:true,source:{dataverseHost:new URL(ORIGIN).hostname}},values:{j27Scenario:n,cycleCode:'J27',runId:id(1),requestId:id(2),grantCycleId:id(3),programDirectorId:id(4),grantProgramId:id(5)},source:{bundleSha256:'b'.repeat(64)},createBodySha256:'c'.repeat(64)};
   const run={runId:id(1),destinationRequestId:id(2),sourceRequestId:id(9),destinationEnvironment:'sandbox',sourceDataverseHost:new URL(ORIGIN).hostname,destinationDataverseHost:new URL(ORIGIN).hostname,status:'ready',actorId:actor,createBodySha256:manifest.createBodySha256,bundleSha256:manifest.source.bundleSha256};
-  const row={akoya_requestid:id(2),wmkf_istestrequest:true,wmkf_testcreationrunid:id(1),_wmkf_grantcycle_value:id(3),_wmkf_programdirector_value:id(4),_wmkf_grantprogram_value:id(5),wmkf_respondreminderenabled:false,wmkf_reviewduereminderenabled:false,akoya_title:'TEST: J27',wmkf_readyforreview:false,wmkf_phaseistatus:null,wmkf_phaseiistatus:null,[MEMO]:null,'@odata.etag':'W/"1"'};
+  const row={akoya_requestid:id(2),wmkf_istestrequest:true,wmkf_testcreationrunid:id(1),_wmkf_grantcycle_value:id(3),_wmkf_programdirector_value:id(4),_wmkf_grantprogram_value:id(5),wmkf_respondreminderenabled:false,wmkf_reviewduereminderenabled:false,akoya_title:'TEST: J27',wmkf_readyforreview:false,wmkf_phaseistatus:null,wmkf_phaseiistatus:null,[PROPOSAL_RECEIVED]:null,[MEMO]:null,'@odata.etag':'W/"1"'};
   const emails=[]; const payments=[]; const jobs=[]; const tracking=[];
   const attributes=[{LogicalName:'wmkf_readyforreview',AttributeType:'Boolean',IsValidForUpdate:true},{LogicalName:MEMO,AttributeType:'Memo',IsValidForUpdate:true}];
   const client={baseUrl:ORIGIN+'/api/data/v9.2',get:jest.fn(async path => {
+    if(path.includes('DateTimeAttributeMetadata')) return {ok:true,body:{AttributeType:'DateTime',IsValidForUpdate:true,DateTimeBehavior:{Value:'DateOnly'},Format:'DateOnly'}};
     if(path.includes("LogicalName='email'")) return {ok:true,body:{OptionSet:{Options:[{Value:path.includes('statecode')?0:1,State:0,Label:{UserLocalizedLabel:{Label:'Draft'}}}]}}};
     const value=path.includes('/Attributes?')?attributes:path.startsWith('/emails?')?emails:path.startsWith('/akoya_requestpayments?')?payments:path.startsWith('/asyncoperations?')?jobs:path.startsWith('/akoya_goapplystatustrackings?')?tracking:null;
     return {ok:true,body:value?{value}: {...row}};
@@ -45,7 +46,7 @@ function fixture(n=1) {
   const person=personId=>({wmkf_potentialreviewersid:personId,wmkf_issyntheticreviewer:true,statecode:0,_wmkf_contact_value:null});
   const deps={getPersonById:jest.fn(async personId=>person(personId)),listSuggestionsByRequest:jest.fn(async()=>[...suggestions.keys()]),getSuggestionById:jest.fn(async key=>suggestions.get(key)||null),
     createSuggestion:jest.fn(async body=>{const key=body.wmkf_appreviewersuggestionid; suggestions.set(key,{wmkf_appreviewersuggestionid:key,_wmkf_potentialreviewer_value:/\(([^)]+)\)/.exec(body['wmkf_PotentialReviewer@odata.bind'])[1],_wmkf_request_value:id(2),wmkf_grantcyclecode:'J27',wmkf_selected:true,wmkf_applicantdisposition:body.wmkf_applicantdisposition,statecode:0,wmkf_invited:false,wmkf_emailsentat:null,wmkf_accepted:false,wmkf_declined:false,wmkf_externaltokenhash:null,wmkf_externaltokenissued:null,wmkf_externaltokenexpires:null,wmkf_responsetype:null,wmkf_reviewstatus:null});}),
-    runChangeset:jest.fn(async ops=>{Object.assign(row,ops[0].body);row['@odata.etag']=`W/"${++version}"`;if(row.wmkf_phaseiistatus===100000002)row.akoya_requeststatus='Phase II Pending';return {ok:true,operations:[{status:204}]};})};
+    runChangeset:jest.fn(async ops=>{Object.assign(row,ops[0].body);row['@odata.etag']=`W/"${++version}"`;if(row.wmkf_phaseiistatus===100000002 && row[PROPOSAL_RECEIVED] != null)row.akoya_requeststatus='Phase II Pending';return {ok:true,operations:[{status:204}]};})};
   const journal={get:jest.fn(async()=>stamp),plan:jest.fn(async(_id,etag,before)=>stamp={status:'planned',attempt:1,etag_before:etag,ready_before:before}),dispatch:jest.fn(async()=>{if(stamp.status!=='planned')return null;stamp={...stamp,status:'dispatched',dispatched_at:new Date().toISOString()};return stamp;}),applied:jest.fn(async()=>stamp={...stamp,status:'applied'}),complete:jest.fn(async()=>stamp={...stamp,status:'complete'})};
   return {client,ledger,journal,manifest,actorId:actor,reviewerIds:n===7?[id(6),id(7)]:[],deps,row,run,resources,suggestions,attributes,emails,payments,jobs,tracking,scenario,metadata:{memo:true,emailOptions:{statecode:0,statuscode:1}}};
 }
@@ -85,7 +86,7 @@ test('readiness SQL defaults production and explicitly opts into sandbox',async(
 test('readiness false/null prior only; true is an actual rejected input',async()=>{const db={transaction:jest.fn()};await expect(createReadinessJournal(db,{environment:'sandbox'}).plan(id(1),'W/"1"',true)).rejects.toThrow();expect(db.transaction).not.toHaveBeenCalled();});
 test('concurrent advisory lock loser never enters invocation',async()=>{const fn=jest.fn();const db={transaction:cb=>cb({query:async()=>({rows:[{locked:false}]})})};await expect(createRunLedger(db).withJ27RunLock(id(1),actor,fn)).rejects.toThrow('Another J27 invocation');expect(fn).not.toHaveBeenCalled();});
 
-test('ready-run resource SQL commits intent and one dispatch, then fences escaped scope',async()=>{
+test.each(['j27_memo','j27_proposal_received'])('ready-run %s SQL commits intent and one dispatch, then fences escaped scope',async kind=>{
   let stored=null; let scope; const queries=[];
   const db={transaction:async fn=>fn({query:async(sql,args=[])=>{
     queries.push({sql,args});
@@ -94,11 +95,11 @@ test('ready-run resource SQL commits intent and one dispatch, then fences escape
     if(sql.includes('SELECT * FROM test_request_runs'))return{rows:[{destination_request_id:id(2)}]};
     if(sql.includes('SELECT * FROM test_request_run_resources'))return{rows:stored?[stored]:[]};
     if(sql.includes('INSERT INTO test_request_run_resources')){stored={resource_id:1,run_id:id(1),planned_identity:JSON.parse(args[2]),source_provenance:JSON.parse(args[3]),outcome:'planned'};return{rows:[stored]};}
-    if(sql.includes("SET outcome='dispatched'")){expect(sql).toContain("outcome='planned' AND dispatched_at IS NULL");if(stored.outcome!=='planned')return{rows:[]};stored={...stored,outcome:'dispatched'};return{rows:[stored]};}
+    if(sql.includes("SET outcome='dispatched'")){expect(sql).toContain("'"+kind+"'");expect(sql).toContain("outcome='planned' AND dispatched_at IS NULL");if(stored.outcome!=='planned')return{rows:[]};stored={...stored,outcome:'dispatched'};return{rows:[stored]};}
     throw Error('unexpected SQL');
   }})};
   await createRunLedger(db).withJ27RunLock(id(1),actor,async ledger=>{
-    scope=ledger; const spec={kind:'j27_memo',index:2,plannedIdentity:{requestId:id(2),field:MEMO,contentHash:digest('synthetic'),inputFingerprint:digest('plan'),eTagBefore:'W/"1"'},sourceProvenance:{contentHash:digest(null)}};
+    scope=ledger; const spec={kind,index:2,plannedIdentity:{requestId:id(2),field:MEMO,contentHash:digest('synthetic'),inputFingerprint:digest('plan'),eTagBefore:'W/"1"'},sourceProvenance:{contentHash:digest(null)}};
     const first=await ledger.planJ27Resource(spec);const again=await ledger.planJ27Resource(spec);expect(again.resourceId).toBe(first.resourceId);
     expect(await ledger.dispatchJ27Resource(first.resourceId)).toMatchObject({outcome:'dispatched'});expect(await ledger.dispatchJ27Resource(first.resourceId)).toBeNull();
     await expect(ledger.planJ27Resource({...spec,plannedIdentity:{...spec.plannedIdentity,contentHash:digest('changed unsafe memo')}})).rejects.toThrow('intent changed');
@@ -186,3 +187,72 @@ test('CLI partial batch retains success, failed identity and unattempted remaind
 });
 
 test('unset DAL enforcement uses the nonproduction resolver',()=>{delete process.env.DATAVERSE_DAL_ENFORCEMENT; expect(process.env.NODE_ENV).not.toBe('production'); expect(assertSandboxOrigin(ORIGIN)).toBe(ORIGIN);});
+
+
+test.each(SCENARIOS)('scenario $id proposal write is previewed only for 7', async scenario => {
+  const f = fixture(scenario.id);
+  const p = await trusted(() => previewScenario(f));
+  const writes = p.plan.writes.filter(w => w.field === PROPOSAL_RECEIVED);
+  expect(writes).toHaveLength(scenario.id === 7 ? 1 : 0);
+  if (scenario.id === 7) {
+    expect(writes[0]).toMatchObject({ before:null, after:'finalize_time', format:'date-only', action:'journaled_patch' });
+    expect(p.digest).not.toBe(digest({ ...p.plan, writes:p.plan.writes.filter(w => w.field !== PROPOSAL_RECEIVED) }));
+  }
+  expect(f.client.get.mock.calls.some(([path]) => path.includes('$select=') && path.includes(PROPOSAL_RECEIVED))).toBe(true);
+});
+test('completed proposal receipt is skipped on resume on a later date', async () => {
+  const f = fixture(7);
+  await confirmed(f);
+  const entry = f.resources.find(r => r.plannedIdentity.kind === 'j27_proposal_received');
+  expect(entry.outcome).toBe('verified');
+  const value = entry.plannedIdentity.expectedValue;
+  expect(f.row[PROPOSAL_RECEIVED]).toBe(value);
+  const sends = f.deps.runChangeset.mock.calls.length;
+  jest.useFakeTimers({now:new Date('2030-01-01T00:00:00Z')});
+  try { await confirmed(f); } finally { jest.useRealTimers(); }
+  expect(f.deps.runChangeset).toHaveBeenCalledTimes(sends);
+  expect(f.row[PROPOSAL_RECEIVED]).toBe(value);
+});
+test.each([true,false])('ambiguous proposal landed=%s never redispatches', async landed => {
+  const f = fixture(7);
+  const original = f.deps.runChangeset.getMockImplementation();
+  f.deps.runChangeset.mockImplementation(async ops => {
+    if (Object.hasOwn(ops[0].body, PROPOSAL_RECEIVED)) {
+      if (landed) await original(ops);
+      throw Error('reply lost');
+    }
+    return original(ops);
+  });
+  await expect(confirmed(f)).rejects.toThrow('needs inspection; never resend');
+  f.deps.runChangeset.mockImplementation(original);
+  if (landed) await confirmed(f);
+  else await expect(confirmed(f)).rejects.toThrow('needs inspection; never resend');
+  expect(f.deps.runChangeset.mock.calls.filter(([ops]) => Object.hasOwn(ops[0].body, PROPOSAL_RECEIVED))).toHaveLength(1);
+});
+test.each(['UserLocal','TimeZoneIndependent'])('metadata %s chooses ISO datetime', async behavior => {
+  const f = fixture(7);
+  const original = f.client.get.getMockImplementation();
+  f.client.get.mockImplementation(async path => path.includes('DateTimeAttributeMetadata')
+    ? {ok:true,body:{AttributeType:'DateTime',IsValidForUpdate:true,DateTimeBehavior:{Value:behavior},Format:'DateAndTime'}} : original(path));
+  const preview = await trusted(() => previewScenario(f));
+  expect(preview.plan.writes.find(w => w.field === PROPOSAL_RECEIVED).format).toBe('datetime');
+  await confirmed(f);
+  expect(f.row[PROPOSAL_RECEIVED]).toMatch(/^\d{4}-\d{2}-\d{2}T.*Z$/);
+});
+test.each([{}, {AttributeType:'String',IsValidForUpdate:true,DateTimeBehavior:{Value:'DateOnly'}}, {AttributeType:'DateTime',IsValidForUpdate:false,DateTimeBehavior:{Value:'DateOnly'}}])('invalid proposal metadata blocks %j', async body => {
+  const f = fixture(7); const original = f.client.get.getMockImplementation();
+  f.client.get.mockImplementation(async path => path.includes('DateTimeAttributeMetadata') ? {ok:true,body} : original(path));
+  await expect(confirmed(f)).rejects.toThrow('metadata needs inspection');
+  expect(f.deps.runChangeset).not.toHaveBeenCalled();
+});
+test.each([1,2,3,4,5,6,8])('scenario %i refuses non-null proposal received', async n => {
+  const f = fixture(n); f.row[PROPOSAL_RECEIVED] = '2026-11-09';
+  await expect(confirmed(f)).rejects.toThrow('unexpected proposal received');
+  expect(f.deps.runChangeset).not.toHaveBeenCalled();
+});
+test('late proposal removal blocks final verification and readiness resume', async () => {
+  const f = fixture(7); const original = f.journal.complete.getMockImplementation();
+  f.journal.complete.mockImplementation(async () => { f.row[PROPOSAL_RECEIVED] = null; return original(); });
+  await expect(confirmed(f)).rejects.toThrow('final scenario state drift');
+  await expect(confirmed(f)).rejects.toThrow('no repair');
+});

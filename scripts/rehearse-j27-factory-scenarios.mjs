@@ -21,7 +21,7 @@ import { readSourceBundle } from '../lib/services/test-requests/source-bundle.js
 import { assertBundleFresh } from '../lib/services/test-requests/bundle-file-copy.js';
 import { advanceRun } from '../lib/services/test-requests/run-runner.js';
 import { buildGraphContext } from './rehearse-test-request-sandbox.mjs';
-import { SCENARIOS, assertSandboxOrigin, sandboxFetch, completeList, assertSyntheticReviewer, readScenarioMetadata, deterministicId, digest, finalizeScenario, previewScenario, scenarioFor, candidateBodies } from '../lib/services/test-requests/j27-sandbox-scenarios.js';
+import { SCENARIOS, PROPOSAL_RECEIVED_TIME, assertSandboxOrigin, sandboxFetch, completeList, assertSyntheticReviewer, readScenarioMetadata, deterministicId, digest, finalizeScenario, previewScenario, scenarioFor, candidateBodies } from '../lib/services/test-requests/j27-sandbox-scenarios.js';
 
 export function parseArgs(argv) {
   const result = {};
@@ -104,7 +104,7 @@ export async function main(argv = process.argv.slice(2)) {
       });
       if (pd) report.programDirectorId = pd.systemuserid;
       for (const id of args.reviewerIds) await probe(`reviewer_${id}`, async () => assertSyntheticReviewer(await deps.getPersonById(id, { select:['wmkf_potentialreviewersid','wmkf_issyntheticreviewer','statecode','_wmkf_contact_value'] }), id));
-      const metadata = await probe('scenario_metadata', () => readScenarioMetadata(client));
+      const metadata = await probe('scenario_metadata', () => readScenarioMetadata(client, { proposalReceived: args.scenarios.some(s => s.id === 7) }));
       if (args['run-id'] && db && pd && metadata && args['manifest-dir']) {
         const ledger = createRunLedger(db);
         const run = await ledger.getRun(args['run-id']);
@@ -146,7 +146,7 @@ export async function main(argv = process.argv.slice(2)) {
       const manifests = [];
       for (const scenario of args.scenarios) {
         if (!preflight || !cycle || report.diagnostics.length) {
-          report.scenarios.push({ scenario:scenario.id, status:'BLOCKED_PREREQUISITES', intended:{ phase1:scenario.phase1 ?? 'preserve clone', phase2:scenario.phase2, readiness:scenario.ready ? true : 'false/null; no write', memo:scenario.memo, reviewers:scenario.reviewers }, futureIds:'unknown until prerequisites pass', written:false });
+          report.scenarios.push({ scenario:scenario.id, status:'BLOCKED_PREREQUISITES', intended:{ phase1:scenario.phase1 ?? 'preserve clone', phase2:scenario.phase2, proposalReceived:scenario.id === 7 ? PROPOSAL_RECEIVED_TIME : null, readiness:scenario.ready ? true : 'false/null; no write', memo:scenario.memo, reviewers:scenario.reviewers }, futureIds:'unknown until prerequisites pass', written:false });
           continue;
         }
         const ids = Object.fromEntries(['runId','requestId','locationId'].map(slot => [slot,deterministicId(args['batch-key'],scenario.id,slot)]));
@@ -160,7 +160,7 @@ export async function main(argv = process.argv.slice(2)) {
         if (args['run-id'] && !run) throw Error('Named run not found; refusing adoption');
         if (run && run.actorId !== report.actorId) throw Error('Run actor mismatch');
         const entry = run?.status === 'ready' ? await finalizeScenario({ client, ledger, manifest, actorId:report.actorId, reviewerIds:scenario.reviewers ? args.reviewerIds : [], deps, journal:createReadinessJournal(db,{environment:'sandbox'}) })
-          : { scenario:scenario.id, status:run?.status || 'not_reserved', runId:ids.runId, requestId:ids.requestId, createBody:manifest.createBody, createBodySha256:manifest.createBodySha256, reservation:reservePlan(manifest), bundleSha256:manifest.source.bundleSha256, candidates:scenario.reviewers ? candidateBodies(ids.runId,ids.requestId,args.reviewerIds) : [], finalizer:{ ...scenario, etag:'unknown until clone readback', memoPresent:metadata.memo }, expectedDerivedStatus:scenario.id === 7 ? 'Phase II Pending' : 'observe_only', effects:{ drafts:[5,6,7].includes(scenario.id), tracking:scenario.id === 7 }, written:false };
+          : { scenario:scenario.id, status:run?.status || 'not_reserved', runId:ids.runId, requestId:ids.requestId, createBody:manifest.createBody, createBodySha256:manifest.createBodySha256, reservation:reservePlan(manifest), bundleSha256:manifest.source.bundleSha256, candidates:scenario.reviewers ? candidateBodies(ids.runId,ids.requestId,args.reviewerIds) : [], finalizer:{ ...scenario, proposalReceived:scenario.id === 7 ? { value:PROPOSAL_RECEIVED_TIME, format:metadata.proposalReceivedFormat } : null, etag:'unknown until clone readback', memoPresent:metadata.memo }, expectedDerivedStatus:scenario.id === 7 ? 'Phase II Pending' : 'observe_only', effects:{ drafts:[5,6,7].includes(scenario.id), tracking:scenario.id === 7 }, written:false };
         report.scenarios.push(entry);
         manifests.push({ manifest, manifestPath, scenario });
       }
