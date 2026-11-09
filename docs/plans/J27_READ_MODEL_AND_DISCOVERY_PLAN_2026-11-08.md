@@ -105,7 +105,8 @@ A row's `basis` is `full` when every input a higher row consults, plus on a non-
 
 | Key | Condition | Blocks |
 |---|---|---|
-| chairs-outcome-pending | `semiFinalist === 'yes'` and `chairsOutcome === 'pending'`; or `chairsOutcome === 'invited'` and `requestStatus !== 'Phase II Pending'` | send-invitations |
+| chairs-outcome-pending | `semiFinalist === 'yes'` and `chairsOutcome === 'pending'` (Recommended to Chairs, outcome not yet recorded) | send-invitations |
+| proposal-pending | `chairsOutcome === 'invited'` and `requestStatus !== 'Phase II Pending'` (Chairs' outcome recorded; the platform derives `Phase II Pending` only once `wmkf_proposalreceived` is set, so the full proposal has not arrived) | send-invitations |
 | integrity-unreviewed | `integrity.latest.flagged && !reviewed` | send-invitations, schedule-presentation (D6 as recorded) |
 | continue-decision-missing | always until D7 | schedule-presentation, presentation-materials, presentation-invitation-email, presentation-transcription |
 | presentation-not-ended | `presentation.ended === false` (confirmed future or in-progress presentation, `transition-schedule.js:41-44`) | start-group-review |
@@ -200,7 +201,7 @@ Unchanged, with a one-line comment naming the reason:
 
 ## 4. Named dependencies outside this plan
 
-- Step G: invitation send guard gains `chairs-outcome-pending` and `integrity-unreviewed`; D5 editability widening in `j27FirstCut.js` and `first-cut-service.js:49` plus the Record button; D6 scheduling refusal in `site-visit/logistics-service.js` reading `readLatestIntegrityStates`.
+- Step G: invitation send guard gains `chairs-outcome-pending`, `proposal-pending`, and `integrity-unreviewed`; D5 editability widening in `j27FirstCut.js` and `first-cut-service.js:49` plus the Record button; D6 scheduling refusal in `site-visit/logistics-service.js` reading `readLatestIntegrityStates`.
 - Step I (after D7): the offramp field and memo, the "continue" value, and server enforcement in the four presentation services.
 
 ## 5. Sequence and gates

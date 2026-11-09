@@ -162,9 +162,9 @@ describe('C8.1 Factory scenario end states (sandbox batch owner-j27-2026-11-09)'
     const onPage = deriveJ27Stage(page(s7, { rationale: PRESENT, reviewers: { status: 'present', anySuggestion: true, counts: counts({ candidates: 2 }) } }));
     expect(keys(onPage)).toEqual({ phase: 'peer-review', basis: 'full', outcome: 'none', tasks: ['identify-reviewers', 'send-invitations', 'record-offramp'], primary: 'send-invitations', blockers: [...ALWAYS, 'presentation-end-unverified'] });
   });
-  test('S7 as created (1000386): Invited, Proposal Invited, unready, no slate → Chairs blocker, no invitations', () => {
+  test('S7 as created (1000386): Invited, Proposal Invited, unready, no slate → proposal blocker, no invitations', () => {
     const r = deriveJ27Stage(dashboard(s7Observed, { rationale: PRESENT }));
-    expect(keys(r)).toEqual({ phase: 'peer-review', basis: 'partial', outcome: 'none', tasks: ['identify-reviewers', 'record-offramp'], primary: 'identify-reviewers', blockers: ['chairs-outcome-pending', ...ALWAYS] });
+    expect(keys(r)).toEqual({ phase: 'peer-review', basis: 'partial', outcome: 'none', tasks: ['identify-reviewers', 'record-offramp'], primary: 'identify-reviewers', blockers: ['proposal-pending', ...ALWAYS] });
     expect(r.recorded).toMatchObject({ chairsOutcome: 'invited', semiFinalist: 'inferred-yes' });
     expect(r.taskKeys).not.toContain('send-invitations');
   });
@@ -227,8 +227,8 @@ describe('C8.3 combinations', () => {
     const r = deriveJ27Stage(page({ requestStatus: 'Approved', statusClass: 'DECIDED_AWARD', phaseIStatus: PHASE_I_CHAIRS.invited }, {
       presentation: { status: 'present', exists: true, id: 'v', ended: true, legacyException: false }, roster: ABSENT,
     }));
-    // C6 is literal: Invited without Phase II Pending raises the Chairs blocker even on a closed row; it blocks nothing here.
-    expect(keys(r)).toEqual({ phase: 'decided', basis: 'full', outcome: 'decided-award', tasks: [], primary: null, blockers: ['chairs-outcome-pending', ...ALWAYS] });
+    // C6 is literal: Invited without Phase II Pending raises the proposal blocker even on a closed row; it blocks nothing here.
+    expect(keys(r)).toEqual({ phase: 'decided', basis: 'full', outcome: 'decided-award', tasks: [], primary: null, blockers: ['proposal-pending', ...ALWAYS] });
   });
   test.each([
     ['Phase I Declined', 'DECIDED_NO_AWARD', 'decided-no-award'],
@@ -251,11 +251,11 @@ describe('C8.3 combinations', () => {
     expect(r.recorded).toEqual({ firstCut: 'unset', semiFinalist: 'unset', chairsOutcome: 'pending', label: 'Something Else', unmapped: true });
     expect(r.taskKeys).toEqual(['record-rationale', 'record-first-cut']);
   });
-  test('Invited without Phase II Pending raises the Chairs blocker and withholds invitations', () => {
+  test('Invited without Phase II Pending raises the proposal blocker and withholds invitations', () => {
     const r = deriveJ27Stage(page({ requestStatus: P1, phaseIStatus: PHASE_I_CHAIRS.invited }, {
       rationale: PRESENT, reviewers: { status: 'present', anySuggestion: true, counts: counts({ candidates: 2 }) },
     }));
-    expect(r.blockerKeys).toEqual(['chairs-outcome-pending', ...ALWAYS, 'presentation-end-unverified']);
+    expect(r.blockerKeys).toEqual(['proposal-pending', ...ALWAYS, 'presentation-end-unverified']);
     expect(r.taskKeys).toEqual(['identify-reviewers', 'record-offramp']);
   });
   test('unselected-only suggestions place the row in peer review', () => {
