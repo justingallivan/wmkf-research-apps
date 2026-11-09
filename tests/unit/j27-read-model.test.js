@@ -117,9 +117,13 @@ describe('C4 outcome', () => {
 describe('C8.1 Factory scenario end states (sandbox batch owner-j27-2026-11-09)', () => {
   // Request status as observed on the created rows (2026-11-09 UTC): Not Scored
   // and Scored read Phase I Pending; Intake, Rationale saved and both
-  // Semi-finalist rows read blank; Chairs approved reads Phase II Pending after
-  // its Phase II write. Only the Chairs blocker and send-invitations read it.
+  // Semi-finalist rows read blank. Scenario 7 (1000386) stopped before its
+  // slate and readiness: the sandbox rule wrote `Proposal Invited` for Phase I
+  // Invited, and `Phase II Pending` follows only a proposal-received date the
+  // Factory never writes. `s7` is the intended end state D2's gate needs;
+  // `s7Observed` is the row as it exists.
   const s7 = { requestStatus: P2, phaseIStatus: PHASE_I_CHAIRS.invited, phaseIIStatus: 100000002 };
+  const s7Observed = { requestStatus: 'Proposal Invited', phaseIStatus: PHASE_I_CHAIRS.invited, phaseIIStatus: 100000002, readyForReview: false };
   test('S1 intake: nothing recorded', () => {
     expect(keys(deriveJ27Stage(tier1({ requestStatus: null })))).toEqual({ phase: 'initial-assessment', basis: 'partial', outcome: 'none', tasks: ['record-rationale', 'record-first-cut'], primary: 'record-rationale', blockers: ALWAYS });
     expect(keys(deriveJ27Stage(dashboard({ requestStatus: null })))).toEqual({ phase: 'initial-assessment', basis: 'partial', outcome: 'none', tasks: ['record-rationale', 'record-first-cut', 'identify-reviewers'], primary: 'record-rationale', blockers: ALWAYS });
@@ -157,6 +161,12 @@ describe('C8.1 Factory scenario end states (sandbox batch owner-j27-2026-11-09)'
     expect(keys(dash)).toEqual({ phase: 'peer-review', basis: 'partial', outcome: 'none', tasks: ['identify-reviewers', 'send-invitations', 'record-offramp'], primary: 'send-invitations', blockers: ALWAYS });
     const onPage = deriveJ27Stage(page(s7, { rationale: PRESENT, reviewers: { status: 'present', anySuggestion: true, counts: counts({ candidates: 2 }) } }));
     expect(keys(onPage)).toEqual({ phase: 'peer-review', basis: 'full', outcome: 'none', tasks: ['identify-reviewers', 'send-invitations', 'record-offramp'], primary: 'send-invitations', blockers: [...ALWAYS, 'presentation-end-unverified'] });
+  });
+  test('S7 as created (1000386): Invited, Proposal Invited, unready, no slate → Chairs blocker, no invitations', () => {
+    const r = deriveJ27Stage(dashboard(s7Observed, { rationale: PRESENT }));
+    expect(keys(r)).toEqual({ phase: 'peer-review', basis: 'partial', outcome: 'none', tasks: ['identify-reviewers', 'record-offramp'], primary: 'identify-reviewers', blockers: ['chairs-outcome-pending', ...ALWAYS] });
+    expect(r.recorded).toMatchObject({ chairsOutcome: 'invited', semiFinalist: 'inferred-yes' });
+    expect(r.taskKeys).not.toContain('send-invitations');
   });
   test('S8 unready row still derives initial-assessment when resolved directly', () => {
     expect(keys(deriveJ27Stage(tier1({ readyForReview: false })))).toEqual({ phase: 'initial-assessment', basis: 'partial', outcome: 'none', tasks: ['record-rationale', 'record-first-cut'], primary: 'record-rationale', blockers: ALWAYS });
