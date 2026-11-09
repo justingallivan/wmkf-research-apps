@@ -62,6 +62,7 @@ import {
   hydrateTestRequestSourceDocument,
 } from '../lib/services/test-requests/admin-preview-service.js';
 import {
+  buildSourceBundle,
   exportTestRequestSourceBundle,
   summarizeSourceBundle,
 } from '../lib/services/test-requests/source-bundle.js';
@@ -85,6 +86,8 @@ const require = createRequire(import.meta.url);
 const { getAccessToken, createClient } = require('../lib/dataverse/client.js');
 const SOURCE_BUNDLE_DEPENDENCIES = createStrictTestRequestSourceDependencies();
 
+import { SANDBOX_URL } from '../lib/services/test-requests/basic-clone-steps.js';
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCE_SELECT = [
   'akoya_requestid', 'akoya_requestnum', 'akoya_requesttype', 'akoya_purpose',
@@ -93,12 +96,14 @@ const SOURCE_SELECT = [
 
 export function parseArgs(argv) {
   const parsed = {
-    sourceRequestNumber: null, out: null, help: false,
+    sourceRequestNumber: null, out: null, help: false, target: null, sandboxScenarioSource: false,
     withReviewers: false, sourceMarkerColumn: null, withPreSite: false,
   };
   for (const arg of argv) {
     if (arg.startsWith('--source-request-number=')) parsed.sourceRequestNumber = arg.slice('--source-request-number='.length);
     else if (arg.startsWith('--out=')) parsed.out = arg.slice('--out='.length);
+    else if (arg.startsWith('--target=')) parsed.target = arg.slice('--target='.length);
+    else if (arg === '--sandbox-scenario-source') parsed.sandboxScenarioSource = true;
     else if (arg === '--with-reviewers') parsed.withReviewers = true;
     else if (arg.startsWith('--source-marker-column=')) parsed.sourceMarkerColumn = arg.slice('--source-marker-column='.length);
     else if (arg === '--with-pre-site') parsed.withPreSite = true;
@@ -130,6 +135,11 @@ export function parseArgs(argv) {
   // stands alone (buildSourceBundle enforces this again, defensively).
   if (parsed.withPreSite && !parsed.withReviewers) {
     throw new Error('--with-pre-site requires --with-reviewers.');
+  }
+  if (parsed.target !== null || parsed.sandboxScenarioSource) {
+    if (parsed.target !== 'sandbox' || !parsed.sandboxScenarioSource || parsed.withReviewers || parsed.withPreSite || parsed.sourceMarkerColumn !== null) {
+      throw new Error('Sandbox export requires --target=sandbox --sandbox-scenario-source without reviewer or Pre-Site options.');
+    }
   }
   return parsed;
 }
@@ -310,16 +320,55 @@ export function buildPreSiteDependencies(args, { client }) {
   };
 }
 
+/** Sandbox-only, document-free source export. The supplied transport exposes GET only. */
+export async function exportSandboxScenarioSource({ client, resourceUrl, sourceRequestNumber, exportedAt = new Date() }) {
+  const { assertSandboxOrigin } = await import('../lib/services/test-requests/j27-sandbox-scenarios.js');
+  assertSandboxOrigin(resourceUrl);
+  if (new URL(client.baseUrl).origin !== resourceUrl) throw new Error('Sandbox source client target mismatch.');
+  if (!/^\d{1,10}$/.test(sourceRequestNumber || '')) throw new Error('Invalid sandbox source Request number.');
+  const sourceRow = await readSourceRow(client, sourceRequestNumber);
+  if (!Object.hasOwn(sourceRow, 'wmkf_abstract')) throw new Error('Sandbox source applicant abstract was not returned.');
+  const bundle = buildSourceBundle({ sourceRow, documents: [], dataverseHost: new URL(resourceUrl).hostname,
+    exportedAt, applicantAbstract: sourceRow.wmkf_abstract, sandboxScenarioSource: true });
+  if (await readSourceRevision(client, sourceRow.akoya_requestid) !== String(sourceRow.versionnumber)) {
+    throw new Error('Sandbox source revision changed during export.');
+  }
+  return bundle;
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
     console.log('Usage: DATAVERSE_ALLOW_PROD_READS=yes node --env-file=/abs/.env.local '
       + 'scripts/export-test-request-source-bundle.mjs --source-request-number=<n> --out=/abs/bundle.json '
       + '[--with-reviewers --source-marker-column=present|absent]');
+    console.log('  --target=sandbox --sandbox-scenario-source: GET-only sandbox applicant source, no documents or reviewer content.');
     console.log('  This export writes a v5 bundle with the applicant abstract.');
     console.log('  --with-reviewers: include the confidential reviewers[] section. Off by default.');
     console.log('  --source-marker-column=present|absent: required with --with-reviewers, no default. Whether the PRODUCTION host has wave30\'s wmkf_issyntheticreviewer column -- NOT read from SYNTHETIC_REVIEWER_ISOLATION (that switch governs the app\'s own reads on whatever host this process points at; the exporter reads production while a later sandbox seeder may run against a sandbox with different schema state).');
     console.log('  --with-pre-site: include the preSiteVisit section. Requires --with-reviewers. Off by default.');
+    return;
+  }
+  if (args.sandboxScenarioSource) {
+    const { assertSandboxOrigin, sandboxFetch } = await import('../lib/services/test-requests/j27-sandbox-scenarios.js');
+    assertSandboxOrigin(SANDBOX_URL);
+    const originalFetch = globalThis.fetch;
+    const guardedFetch = sandboxFetch(originalFetch, SANDBOX_URL);
+    globalThis.fetch = (input, options = {}) => {
+      const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
+      const method = (options.method || input?.method || 'GET').toUpperCase();
+      if (url.origin === SANDBOX_URL && method !== 'GET') throw new Error('Sandbox scenario export permits GET only.');
+      return guardedFetch(input, options);
+    };
+    try {
+      const client = createClient({ resourceUrl: SANDBOX_URL, token: await getAccessToken(SANDBOX_URL) });
+      const bundle = await withDalContext('export-sandbox-scenario-source', () => exportSandboxScenarioSource({
+        client, resourceUrl: SANDBOX_URL, sourceRequestNumber: args.sourceRequestNumber,
+      }));
+      fs.mkdirSync(path.dirname(args.out), { recursive: true });
+      fs.writeFileSync(args.out, `${JSON.stringify(bundle, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
+      console.log(JSON.stringify({ written: args.out, sandboxScenarioSource: true, ...summarizeSourceBundle(bundle) }, null, 2));
+    } finally { globalThis.fetch = originalFetch; }
     return;
   }
   const hostname = productionHost();

@@ -402,3 +402,12 @@ attempt history remains part of the retained audit trail.
 The checked-in fingerprint includes 094 and both managed ledgers match it as of 2026-11-03. Justin authorized application before promotion and accepted the temporary interruption of the old Factory. Compatible code subsequently shipped in PR #617; that interruption is closed. Request 1003456 completed journaled readiness finalization and the later bounded reviewer rehearsal; see [receipt](../plans/evidence/test-request-factory/j27-reviewer-rehearsal-proof-2026-11-03.md). The fresh-install bootstrap executes the
 numbered migration through the existing migration runner. No API route, recipe
 step or new readiness-editing web capability is introduced.
+
+## J27 sandbox scenario journal reuse (local build, 2026-11-08)
+
+[VERIFIED via local source and unit tests; no confirmed scenario run]
+`j27-sandbox-scenarios.js`, reached only through `scripts/rehearse-j27-factory-scenarios.mjs`, reuses the status, readiness and resource tables without migrations or fingerprint changes. Status/readiness environment admission defaults to Production; this service explicitly selects sandbox.
+
+`run-ledger.js` owns `withJ27RunLock` and the ready-run resource operations. A dedicated connection holds a per-run advisory transaction lock; each resource mutation checks that connection and locks the sandbox ready parent with the exact CLI actor. Planned-to-dispatched CAS commits before transport; ambiguous/dispatched operations do not resend. No fake provisioning lease or ready-to-creating transition is introduced. `j27_scenario`, `j27_memo`, `j27_memo_skip`, `j27_reviewer` and `j27_complete` are receipt-kind values under the existing grammar, not SQL enum additions.
+
+Memo prior/desired/readback values are typed SHA-256 digests (`source_provenance.contentHash`, `planned_identity.contentHash`, `readback.contentHash`), with exact request, field and ETags. The parent run supplies actor attribution. No rationale text enters Postgres. Confirmed metadata absence is an undispatched verified receipt with `exists=false` and `outcome=memo_absent`. Preview does not reserve or journal. Two selected reviewer suggestions use existing resource kinds and preallocated GUIDs. Production prepared readiness and all schemas remain unchanged.

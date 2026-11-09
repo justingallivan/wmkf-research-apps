@@ -347,3 +347,12 @@ Stays as the system of record. WMKF AI fields and lifecycle additions are merged
 
 - **~25,561 rows** (not "5,000" — that is the OData `$count` cap; see header). Many vendor-only fields not in our scope. Don't accidentally touch fields outside the WMKF-owned set.
 - The 5-slot `wmkf_copi1..5` and `wmkf_potentialreviewer1..5` patterns are vendor-conceived but feel artificial — they're being phased out via child entities (`wmkf_apprequestperson` extended per 2026-05-14 schema review for roster, `wmkf_appreviewersuggestion` for reviewer state). Code that reads slots directly should be flagged for migration.
+
+## J27 Factory sandbox scenario ownership (local build, 2026-11-08)
+
+[VERIFIED via local source and unit tests; not confirmed live]
+The owner CLI `scripts/rehearse-j27-factory-scenarios.mjs` uses an explicitly classified sandbox client. J27 basic manifests opt into metadata-verified Research `wmkf_grantprogram` and caller-PD `wmkf_programdirector` lookup bindings, hashed into the create body and verified on readback. The Foundation organization and disabled reminder flags remain the existing clone defaults; sandbox cast bindings remain refused.
+
+The sole new scenario service `lib/services/test-requests/j27-sandbox-scenarios.js` writes fixed synthetic `wmkf_initialassessmentrationale` only when a verified updateable Memo exists, numeric Phase I/II values through the existing status runner, and `wmkf_readyforreview=true` last through its true-only fence. It never writes triage, `akoya_requeststatus`, null phases or false readiness. Scenario 7 observes the derived string `Phase II Pending`; failure blocks rather than directly setting it. Scenario 8 requires false/null readiness and makes no readiness write.
+
+Two selected, uninvited synthetic suggestions belong to scenario 7; all other scenarios require no roster. Request/test/run identity, cycle, program, PD, reminders, concrete ETag and the exact final state are checked. Complete bounded effect censuses reject pagination, unsafe email status, payments and unsettled jobs. Passive drafts/tracking are tolerated only for scenarios whose effects permit them; no sender or explicit workflow dispatch is added. These local fixture semantics do not establish live Workbench visibility.

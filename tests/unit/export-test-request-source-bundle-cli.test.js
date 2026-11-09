@@ -9,7 +9,7 @@
  * helpers can be exercised directly.
  */
 import {
-  parseArgs, buildReviewerDependencies, buildPreSiteDependencies,
+  parseArgs, buildReviewerDependencies, buildPreSiteDependencies, exportSandboxScenarioSource,
 } from '../../scripts/export-test-request-source-bundle.mjs';
 import {
   REQUEST_DOCUMENT_ARTIFACT_TYPE,
@@ -263,5 +263,40 @@ describe('exporter personnel read (Slice 4c: PI present/missing, Co-PI order)', 
     ];
     const { draft } = await readDraft({ projectLeaderFormatted: 'Dr. Ada Lovelace', coPiRecords });
     expect(draft.personnel.coPrincipalInvestigators).toEqual(['Beau CoPI']);
+  });
+});
+
+
+describe('sandbox scenario exporter', () => {
+  const origin = 'https://orgd9e66399.crm.dynamics.com';
+  const row = { akoya_requestid:'11111111-1111-4111-8111-111111111111', akoya_requestnum:'1000372', akoya_requesttype:100000000,
+    wmkf_abstract:'Synthetic applicant abstract', versionnumber:42, wmkf_istestrequest:true };
+  const setup = () => ({ baseUrl:origin+'/api/data/v9.2', get:jest.fn(async url => ({ok:true,body:url.includes('$top=2')?{value:[row]}:{versionnumber:42}})) });
+  beforeEach(() => { process.env.DATAVERSE_TARGET_INTERLOCK='on'; process.env.DATAVERSE_DAL_ENFORCEMENT='on'; });
+  test('explicit sandbox flags produce a v5 document-free bundle through GET only',async()=>{
+    const args=parseArgs(baseArgv(['--target=sandbox','--sandbox-scenario-source']));
+    expect(args.sandboxScenarioSource).toBe(true);
+    const client=setup();
+    const bundle=await exportSandboxScenarioSource({client,resourceUrl:origin,sourceRequestNumber:'1000372'});
+    expect(bundle).toMatchObject({version:5,sandboxScenarioSource:true,abstract:row.wmkf_abstract,documents:[],source:{dataverseHost:new URL(origin).hostname}});
+    expect(bundle).not.toHaveProperty('reviewers'); expect(client.get).toHaveBeenCalledTimes(2);
+    expect(client.get.mock.calls[0][0]).toContain('wmkf_abstract');
+  });
+  test.each([['--target=production','--sandbox-scenario-source'],['--target=sandbox'],['--sandbox-scenario-source'],['--target=sandbox','--sandbox-scenario-source','--with-reviewers','--source-marker-column=present']])('rejects unsafe branch options %j',(...flags)=>{
+    expect(()=>parseArgs(baseArgv(flags))).toThrow();
+  });
+  test('production origin is refused before any GET',async()=>{
+    const client=setup();
+    await expect(exportSandboxScenarioSource({client,resourceUrl:'https://wmkf.crm.dynamics.com',sourceRequestNumber:'1000372'})).rejects.toThrow('sandbox');
+    expect(client.get).not.toHaveBeenCalled();
+  });
+  test('production client is refused even with a sandbox resource',async()=>{
+    const client={...setup(),baseUrl:'https://wmkf.crm.dynamics.com/api/data/v9.2'};
+    await expect(exportSandboxScenarioSource({client,resourceUrl:origin,sourceRequestNumber:'1000372'})).rejects.toThrow('target mismatch');
+    expect(client.get).not.toHaveBeenCalled();
+  });
+  test('source revision drift refuses the bundle',async()=>{
+    const client=setup();client.get.mockResolvedValueOnce({ok:true,body:{value:[row]}}).mockResolvedValueOnce({ok:true,body:{versionnumber:43}});
+    await expect(exportSandboxScenarioSource({client,resourceUrl:origin,sourceRequestNumber:'1000372'})).rejects.toThrow('revision changed');
   });
 });

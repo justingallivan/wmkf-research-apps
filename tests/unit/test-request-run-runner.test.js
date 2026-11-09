@@ -689,6 +689,19 @@ describe('advanceRun: production runs write only through the fence (MVP slice 2)
       expect(getResources().map((row) => [row.step, row.resourceKind])).toEqual([['fence_source', 'foundation_transition']]);
     });
 
+    test('sandbox preflight requires an explicit J27 option, ignoring an ambient transport sentinel', async () => {
+      process.env.DYNAMICS_CLIENT_ID = APP_USER_ID.replace(/./, '0');
+      const setup = fixture({ step:'fence_source', account:()=>foundation() });
+      const client = {...setup.client, baseUrl:'https://orgd9e66399.crm.dynamics.com/api/data/v9.2', j27Scenario:true};
+      const ordinary = await runPreflight(client, fakeGraph(), SP_TARGET);
+      expect(ordinary.grantProgram).toBeUndefined();
+      expect(ordinary.metadata.fields.wmkf_programdirector).toBeUndefined();
+      const explicit = await runPreflight(client, fakeGraph(), SP_TARGET, {j27Scenario:true});
+      expect(explicit.grantProgram).toBeDefined();
+      expect(explicit.metadata.fields.wmkf_programdirector).toMatchObject({type:'Lookup'});
+      expect(explicit.metadata.fields.wmkf_grantprogram).toMatchObject({type:'Lookup'});
+    });
+
     test('a production preflight refuses a cast lookup whose live relationship is not exactly one to contact (slice B)', async () => {
       process.env.DYNAMICS_CLIENT_ID = APP_USER_ID.replace(/./, '0');
       const setup = fixture({ step: 'fence_source', account: () => foundation() });

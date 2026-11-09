@@ -241,3 +241,37 @@ With the form off, the run list, run detail and artifacts download still work.
 - **First lookup refused once.** The first lookup of source 1002988 (Preview) and of source 1002860 (Production) was refused with "changed while its bytes were being verified" and passed on retry; the production log named an XLSX **[RUN]**. A later lookup of 1002988 passed first time. Cause not established. Retry the lookup. Since S564 the refusal log line names each comparison that failed with its before → after values (metadata eTag/versionId/size, the download's metadata size, the content length) and the cTag, which moves only when the bytes change; read it from the function log (`admin test-request run refusal: 409 test_request_preview_source_changed …`) at the next occurrence.
 - **XLSX verification** is characterized for one SharePoint rewrite (`docProps/custom.xml`). A spreadsheet rewritten in another way, or one over the package limits, stops at `copy_file` after upload and cannot continue.
 - **Not checked in a browser:** long-label wrapping, the selected-row tint, a narrow window.
+
+## J27 sandbox Initial Assessment scenarios (local owner CLI)
+
+[VERIFIED via local source and unit tests, 2026-11-08; not deployed or confirmed live]
+`scripts/rehearse-j27-factory-scenarios.mjs` implements eight basic-clone scenarios through `j27-sandbox-scenarios.js`. This is separate from the Production prepared-fixture flow above. It requires literal `DATAVERSE_TARGET_INTERLOCK=on`, `DATAVERSE_DAL_ENFORCEMENT=on`, registered sandbox authentication, and `TEST_REQUEST_SANDBOX_LEDGER_URL` matching the existing ledger fingerprint. No schema application is performed.
+
+```text
+node --import ./scripts/lib/use-extensionless.mjs scripts/rehearse-j27-factory-scenarios.mjs --target=sandbox --all --batch-key=<key> --source-request-number=<number> --director=<sign-in-email> --reviewers=<synthetic-guid-1>,<synthetic-guid-2> --bundle=<private-sandbox-bundle.json> --manifest-dir=<absolute-private-directory>
+```
+
+Default mode reads only and prints intended creates, changes, no-ops/skips, identities, ETags, effects and a confirmation digest. Missing prerequisites are reported per scenario without reservation or filesystem writes. A source bundle is required by the existing bounded clone runner; sandbox basic bundles explicitly carry `sandboxScenarioSource: true`. Produce that input first with the exporter’s explicit sandbox branch (GETs only, applicant abstract, no documents):
+
+```bash
+node --env-file=.env.local --import ./scripts/lib/use-extensionless.mjs scripts/export-test-request-source-bundle.mjs --target=sandbox --sandbox-scenario-source --source-request-number=<number> --out=<absolute-private-sandbox-bundle.json>
+```
+
+The branch refuses production targets and never invokes production export dependencies. Keep bundles/manifests private, outside the repository. The PD email must resolve unambiguously to an enabled sandbox user; reviewer GUIDs are reread and must be active synthetic people without Contact bindings.
+
+| Scenario | Phase I | Readiness | Memo / roster |
+|---|---|---|---|
+| 1 Intake | Retain unset or Pending Committee Review | true | Empty; no roster |
+| 2 Rationale saved | Retain unset or Pending Committee Review | true | Fixed synthetic rationale |
+| 3 First Cut No | Not Scored | true | Fixed synthetic rationale |
+| 4 First Cut Yes | Scored | true | Fixed synthetic rationale |
+| 5 Semi-finalist No | Recommended Do Not Invite | true | Fixed synthetic rationale |
+| 6 Semi-finalist Yes | Recommended Invite | true | Fixed synthetic rationale; no roster |
+| 7 Chairs approved | Invited | true | Phase II Pending Committee Review, derived Phase II Pending, two selected uninvited suggestions |
+| 8 Unready control | Retain unset or Pending Committee Review | false/null, never written | Empty; no roster |
+
+Only a separately authorized `--confirm=<exact-preview-digest>` can create/resume/finalize. One confirmation authorizes provisioning **and finalization of every selected scenario**. After provisioning, the CLI computes a fresh finalizer preview with the actual ETag and internally confirms its digest. Each result includes that `finalizerPreview`, including when finalization fails after the preview; later scenarios remain unattempted. **The 2026-11-08 build authorization permits preview only; do not confirm before owner code review and separate authorization.** For one existing scenario use `--scenario=N --run-id=<guid>` with its private manifest directory. Same actor, exact manifest, destination/test/run markers, Research, J27, PD and disabled reminders are reverified. Ready-run operations serialize through a dedicated database lock; dispatch CAS is committed before the remote write. Ambiguous writes reconcile by exact identity/readback and never resend. A failed scenario stops the batch with per-scenario identities; there is no rollback, deletion or readiness reset.
+
+Confirmed absence of the rationale Memo attribute records an undispatched `memo_absent` receipt. Metadata errors or wrong types block. Ledger memo values are typed hashes, never rationale text. Readiness is stamped last and only true; already-true without this operation's journal blocks. Passive Draft emails and expected tracking are censused, not generated by this CLI. Draft status and its associated state come from sandbox metadata; sent/unknown states, payments, incomplete census and unsettled jobs block completion. No email send, screening, AI generation or workflow dispatch exists in the scenario service.
+
+Accepted fidelity limits: the Foundation organization is reused, no PI/cast contacts are created, and retained Phase I values are reported rather than cleared. Workbench visibility remains an integration check for the owner-approved Workbench build; the Factory never sets triage to compensate. A successful observation cannot guarantee later external automation stays unchanged.
