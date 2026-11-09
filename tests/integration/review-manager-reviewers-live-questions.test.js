@@ -246,6 +246,7 @@ test('GET success returns the full proposal + reviewer envelope', async () => {
         currentRunId: null,
         currentCompletedAt: null,
       },
+      staffReviewEvidenceHash: expect.any(String),
       statusSummary: { review_received: 1 },
       noResponseHistory: [],
       reviewers: [{
