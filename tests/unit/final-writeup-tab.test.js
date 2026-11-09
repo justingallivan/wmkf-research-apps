@@ -776,3 +776,13 @@ test('J27 distinguishes the draft link from an unverified schedule and a blocked
   expect(screen.getByText('Waiting for a verified presentation end.')).toBeVisible();
   expect(screen.queryByRole('button', { name: 'Ready for group review' })).toBeNull();
 });
+
+test('step E: reports the loaded state, or the coded failure, to the page', async () => {
+  const onJ27Facts = jest.fn();
+  render(<FinalWriteupTab requestId={REQUEST_ID} onJ27Facts={onJ27Facts} />);
+  await waitFor(() => expect(onJ27Facts).toHaveBeenCalledWith(REQUEST_ID, { finalWriteup: expect.objectContaining({ available: true, phase: 'ready', sourceArtifactId: SOURCE_ID }) }));
+  onJ27Facts.mockClear();
+  global.fetch.mockReset().mockResolvedValueOnce(response({ error: 'No source document.', code: 'final_writeup_source_missing' }, 409));
+  render(<FinalWriteupTab requestId={FINAL_ID} onJ27Facts={onJ27Facts} />);
+  await waitFor(() => expect(onJ27Facts).toHaveBeenCalledWith(FINAL_ID, { finalWriteup: { error: true, code: 'final_writeup_source_missing' } }));
+});

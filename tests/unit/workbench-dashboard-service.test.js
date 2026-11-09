@@ -555,3 +555,13 @@ describe('plan F2: discovery contract on the real queries', () => {
     expect(list.proposals).toEqual([]);
   });
 });
+
+test('plan F1 program gate: a J27 row outside the Research scope lists without a read model', async () => {
+  queryAllRequests.mockResolvedValue({ capped: false, records: [{
+    akoya_requestid: 'r-socal', akoya_requestnum: '1000399', akoya_requeststatus: 'Phase II Pending', _wmkf_grantcycle_value: 'cycle-j27',
+    wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, wmkf_readyforreview: true, _wmkf_programdirector_value: 'pd-1', _wmkf_grantprogram_value: '8dcab30b-958f-ee11-8179-000d3a341e8f',
+  }] });
+  const body = await loadDashboard(args({ cycleCode: 'J27', scope: 'all' }));
+  expect(body.proposals.map((p) => p.requestNumber)).toEqual(['1000399']);
+  expect(body.proposals[0]).not.toHaveProperty('j27');
+});

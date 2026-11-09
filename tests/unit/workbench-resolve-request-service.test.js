@@ -30,6 +30,9 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   existsAnySuggestionForRequests: (...a) => existsAnySuggestionForRequests(...a),
 }));
 const readLatestIntegrityStates = jest.fn(async () => new Map());
+jest.mock('../../lib/services/workbench/program-scope-service', () => ({
+  resolveDiscoveryScope: jest.fn(async () => ({ readinessOnlyProgramIds: ['94cab30b-958f-ee11-8179-000d3a341e8f'] })),
+}));
 jest.mock('../../lib/services/workbench/j27-integrity-jobs', () => ({
   readLatestIntegrityStates: (...a) => readLatestIntegrityStates(...a),
 }));
@@ -184,7 +187,21 @@ test('statusClass: unmapped status → UNCLASSIFIED; null status → null', asyn
 
 describe('J27 read model (plan C7)', () => {
   const j27Row = (over = {}) => processAnnotations({
-    ...RECORD, wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, akoya_requeststatus: 'Phase I Pending', wmkf_readyforreview: true, ...over,
+    ...RECORD, wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, akoya_requeststatus: 'Phase I Pending', wmkf_readyforreview: true,
+    _wmkf_grantprogram_value: '94cab30b-958f-ee11-8179-000d3a341e8f', ...over,
+  });
+  test('a J27 row outside the Research scope carries no read model (plan F1 program gate)', async () => {
+    getById.mockResolvedValue(j27Row({ _wmkf_grantprogram_value: '8dcab30b-958f-ee11-8179-000d3a341e8f' }));
+    const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
+    expect(body).not.toHaveProperty('j27');
+  });
+  test('a failed catalog read yields no read model rather than a wrong one', async () => {
+    const { resolveDiscoveryScope } = require('../../lib/services/workbench/program-scope-service');
+    resolveDiscoveryScope.mockRejectedValueOnce(new Error('catalog down'));
+    getById.mockResolvedValue(j27Row());
+    const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
+    expect(body.success).toBe(true);
+    expect(body).not.toHaveProperty('j27');
   });
   test('a pre-2027 row carries no read model and makes neither new read', async () => {
     const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });

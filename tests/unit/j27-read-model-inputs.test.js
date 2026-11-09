@@ -150,9 +150,14 @@ describe('composition', () => {
     expect(isoDate(new Date('2026-11-09T23:59:00Z'))).toBe('2026-11-09');
   });
   test('deriveJ27ForRow returns null off scope and a stage with its input in scope', () => {
-    expect(deriveJ27ForRow(row({ wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } }), facts(), { calendar })).toBeNull();
-    expect(deriveJ27ForRow(row({ wmkf_GrantCycle: null }), facts(), { calendar })).toBeNull();
-    const stage = deriveJ27ForRow(row(), facts(), { calendar });
+    const scope = { readinessOnlyProgramIds: ['c247b11a-a7cb-ee11-9078-000d3a341e8f'] };
+    expect(deriveJ27ForRow(row({ wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } }), facts(), { calendar, scope })).toBeNull();
+    expect(deriveJ27ForRow(row({ wmkf_GrantCycle: null }), facts(), { calendar, scope })).toBeNull();
+    // Program gate: a J27 row outside the readiness-only (Research) scope, or an empty scope, carries no stage.
+    expect(deriveJ27ForRow(row({ _wmkf_grantprogram_value: '8dcab30b-958f-ee11-8179-000d3a341e8f' }), facts(), { calendar, scope })).toBeNull();
+    expect(deriveJ27ForRow(row(), facts(), { calendar, scope: { readinessOnlyProgramIds: [] } })).toBeNull();
+    expect(deriveJ27ForRow(row(), facts(), { calendar })).toBeNull();
+    const stage = deriveJ27ForRow(row(), facts(), { calendar, scope });
     expect(stage.phase).toBe('initial-assessment');
     expect(stage.input.request.cycleCode).toBe('J27');
     expect(j27DashboardDto(stage)).toEqual({

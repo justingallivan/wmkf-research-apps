@@ -72,6 +72,8 @@ describe('fact mapping', () => {
       boardDraft: { status: 'present', exists: false }, transition: { status: 'present', phase: null },
     });
     expect(j27FinalWriteupInputs({ error: true }, null)).toEqual({ boardDraft: { status: 'unavailable' }, transition: { status: 'unavailable' } });
+    expect(j27FinalWriteupInputs({ error: true, code: 'final_writeup_source_missing' }, null)).toEqual({ boardDraft: { status: 'present', exists: false }, transition: { status: 'present', phase: null } });
+    expect(j27FinalWriteupInputs({ error: true, code: 'final_writeup_source_ineligible' }, null)).toEqual({ boardDraft: { status: 'unavailable' }, transition: { status: 'unavailable' } });
     expect(j27FinalWriteupInputs({ available: false, phase: 'unavailable' }, null)).toEqual({ boardDraft: { status: 'unavailable' }, transition: { status: 'unavailable' } });
   });
 });
@@ -102,6 +104,16 @@ describe('page recomputation', () => {
     expect(stage.basis).toBe('full');
     expect(stage.taskKeys).toContain('start-group-review');
     expect(stage.blockerKeys).not.toContain('presentation-end-unverified');
+  });
+  test('no Board draft yet surfaces write-board-draft once the visit assessment is saved', () => {
+    const input = serverInput({ requestStatus: 'Phase II Pending', phaseIStatus: PHASE_I_CHAIRS.invited, phaseIIStatus: 100000002 }, { rationale: PRESENT, reviewSummary: PRESENT, visitAssessment: PRESENT });
+    const stage = deriveJ27PageStage(input, {
+      progress: { status: 'ready', data: { counts: { candidates: 3, invited: 3, accepted: 3, received: 3, completed: 3 } } },
+      overview: { rationale: true, review: true, visit: true, meeting: { presentation: true, presentationId: 'v1', roster: true, rosterStale: false } },
+      finalWriteup: { error: true, code: 'final_writeup_source_missing' },
+    });
+    expect(stage.taskKeys).toContain('write-board-draft');
+    expect(stage.basis).not.toBe('degraded');
   });
   test('a failed rollup degrades the basis rather than hiding the row', () => {
     const stage = deriveJ27PageStage(serverInput(), { progress: { status: 'error', data: null } });

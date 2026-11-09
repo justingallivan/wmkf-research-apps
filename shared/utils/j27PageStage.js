@@ -49,6 +49,10 @@ export function j27OverviewInputs(loaded) {
 /** Board draft, transition, and the presentation's end from the Final Writeup state. */
 export function j27FinalWriteupInputs(status, presentation) {
   if (!status) return {};
+  // "No Board draft yet" is a known state, not a failure: the tab offers the draft editor there.
+  if (status.error && status.code === 'final_writeup_source_missing') {
+    return { boardDraft: { status: 'present', exists: false }, transition: { status: 'present', phase: null } };
+  }
   if (status.error || status.available !== true) {
     return { boardDraft: { status: 'unavailable' }, transition: { status: 'unavailable' } };
   }

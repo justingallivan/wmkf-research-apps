@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import OverviewTab from '../../shared/components/workbench/OverviewTab';
 import { FIRST_CUT_STATUS, SEMI_FINALIST_STATUS } from '../../shared/config/j27FirstCut';
 
@@ -16,7 +16,7 @@ const base = {
   'meeting-roster': { presentation: null },
 };
 
-function renderOverview({ reads = {}, status = {}, onSelectTab } = {}) {
+function renderOverview({ reads = {}, status = {}, onSelectTab, onJ27Facts } = {}) {
   global.fetch = jest.fn(async (url, options) => {
     const endpoint = String(url).split('?')[0].split('/').at(-1);
     if (options?.method && options.method !== 'GET') throw new Error('Overview must be read-only');
@@ -24,7 +24,7 @@ function renderOverview({ reads = {}, status = {}, onSelectTab } = {}) {
     return { ok: body != null, json: async () => body };
   });
   render(<OverviewTab context={{ ...context, ...status }} requestId={context.requestId}
-    j27Handoffs initialRationaleEnabled meetingRosterEnabled onSelectTab={onSelectTab} />);
+    j27Handoffs initialRationaleEnabled meetingRosterEnabled onSelectTab={onSelectTab} onJ27Facts={onJ27Facts} />);
 }
 
 test('intake shows one instruction and keeps later-stage empty states out of the summary', async () => {
@@ -107,4 +107,16 @@ test.each([
   expect(checkpoint).toHaveTextContent(decision);
   expect(checkpoint).toHaveTextContent(`Staff rationale · ${rationaleStatus}`);
   if (phaseIStatus === SEMI_FINALIST_STATUS.yes) expect(checkpoint).not.toHaveTextContent('First Cut');
+});
+
+test('step E: reports the reviewer rollup and the handoff reads to the page with the meeting-roster projection', async () => {
+  const onJ27Facts = jest.fn();
+  renderOverview({ onJ27Facts, reads: { 'meeting-roster': { presentation: { id: 'visit' }, stale: true, roster: { wmkf: [] } }, 'staff-visit-assessment': { assessment: null } } });
+  await waitFor(() => expect(onJ27Facts.mock.calls.some(([, patch]) => patch.overview)).toBe(true));
+  await waitFor(() => expect(onJ27Facts.mock.calls.some(([, patch]) => patch.progress)).toBe(true));
+  const calls = onJ27Facts.mock.calls.filter(([id]) => id === context.requestId);
+  const progress = calls.find(([, patch]) => patch.progress)?.[1].progress;
+  const overview = calls.find(([, patch]) => patch.overview)?.[1].overview;
+  expect(progress).toMatchObject({ status: 'ready', data: { counts: { received: 1 } } });
+  expect(overview).toEqual({ rationale: true, review: true, visit: null, meeting: { presentation: true, presentationId: 'visit', roster: true, rosterStale: true } });
 });
