@@ -184,3 +184,23 @@ All seven required named changes are incorporated. No unresolved design permissi
 One additional source dependency was discovered: `source-bundle.js` only accepted production-origin bundles, while the bounded clone runner requires a bundle and this task prohibits production access. A narrowly explicit `sandboxScenarioSource: true` discriminator now permits only a registered sandbox basic source (no reviewer/pre-site sections). Default bundle validation still requires a production source, and Production clone construction explicitly refuses sandbox-origin bundles. No bundle version, migration, fingerprint or SQL schema changed. The CLI requires a private local `--bundle`; it never calls the production exporter or fabricates source documents. Missing bundle input is a preview prerequisite diagnostic.
 
 The CLI additionally accepts `--source-request-number`, `--reviewers=<guid,guid>`, `--bundle=<private path>` and `--manifest-dir=<absolute private directory>`. Deterministic identities and actual candidate bodies enter the preview digest. A named ready run can reconcile its saved manifest without expiring its completed copy on the source export TTL. Effect metadata resolves the Draft status reason and its associated email state; it does not assume the state label itself is Draft.
+
+## Scenario 7 addendum: proposal-received write (2026-11-09, PLANNED, awaiting owner review)
+
+Step 4's assumption failed in the live batch: run `2c708127` (request 1000386) stopped at "scenario 7 derived status mismatch" with `akoya_requeststatus='Proposal Invited'`. The sandbox business rule `WMKF_Set Phase II Request Status` derives `Phase II Pending Committee Review` only when `wmkf_proposalreceived`, `wmkf_phaseiistatus` and `akoya_requeststatus` are set and `akoya_grant` is empty. [VERIFIED via the rule's clientdata, probed 2026-11-09] The Factory never writes `wmkf_proposalreceived`, so the string cannot derive.
+
+Decision (owner accepted the recommendation 2026-11-09): add the proposal-received write rather than relax the check. Scenario 7 exists to produce the state where reviewer invitations are open, and the Workbench read model gates that on `Phase II Pending`. Relaxing the check would produce a different fixture (Invited, proposal not yet received), which the read model already tests from the observed 1000386 row.
+
+Planned change, one step inserted between steps 3 and 4:
+
+- 3a. PATCH `wmkf_proposalreceived` to the run date (ISO date at finalize time) as one journaled resource, following the memo write's receipt → dispatch → verify → finish pattern in `j27-sandbox-scenarios.js`. The Factory still never writes `akoya_requeststatus`; the platform derives it.
+- Step 4 adds `wmkf_proposalreceived` non-null to the readback, and the final-state check keeps `Phase II Pending`.
+- The preview digest must cover the new write, so the rerun starts from a fresh preview.
+
+Checks completed before the build (all sandbox `orgd9e66399`, probed 2026-11-09):
+
+- `akoya_grant` is the award lookup, distinct from `wmkf_grantprogram`, which the Factory binds. The derivation will fire once the date is set. [VERIFIED via rule attributes]
+- No active sandbox process is triggered by an update to `wmkf_proposalreceived`; the only references are the Phase II rule itself and the on-demand `WMKF_Rsrch Phase I Withdrawal` workflow. Zero active cloud flows exist. [VERIFIED via `workflows` query over 62 active `akoya_request` definitions]
+- Run `2c708127` is still `status='ready'`, `current_step='verify'`, with no needs-attention reason. The CLI re-enters `finalizeScenario` for ready runs and skips journaled status changes already complete, so a rerun with the same batch key completes 1000386 in place. No ninth request. [VERIFIED via ledger row and `scripts/rehearse-j27-factory-scenarios.mjs:162`]
+
+Not built. Build after owner review of this addendum; the confirm needs the owner's GoVerify bypass authorization only if a new request is created, which this path avoids.
