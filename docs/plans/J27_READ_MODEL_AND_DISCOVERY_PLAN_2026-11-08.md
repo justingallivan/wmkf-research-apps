@@ -12,7 +12,7 @@ Revision 3 resolves the six round-2 named changes: F1 projection contract, stric
 - **D4** (closed 2026-11-08): no coverage threshold; `record-offramp` available from Recommended Invite onward, never blocked; received count and dates are information.
 - **D5**: lead PD or superuser may change First Cut or Semi-finalist at any time. Not existing behavior (`first-cut-service.js:49`; `j27FirstCut.js:3,14`). Step G item.
 - **D6**: a flagged screen without PD review blocks reviewer invitations and presentation scheduling. This plan blocks exactly `send-invitations` and `schedule-presentation`; widening to materials, invitation email, or transcription would be a new owner decision and is not assumed.
-- **D7** open: no offramp state; `continue-decision-missing` blocks the four presentation operations (scheduling, materials, invitation email, transcription). Server enforcement of D7 is a step I item, listed in §4.
+- **D7** closed 2026-11-09 (Connor, Sarah; confirmed in production metadata): the offramp is recorded as `wmkf_phaseiistatus = 682090001` "Phase II Offramped". Until step I is built, `continue-decision-missing` still blocks the four presentation operations; step I replaces it (§9).
 - **D8** (2026-11-09): the J27 read model and its surfaces are Research-only by design. The program gate (`deriveJ27ForRow` requires the F1 readiness-only scope) stays. Owner: "The more we do on the app for the research program, the harder it will be to make it directly compatible with SoCal. I'm actually fine with that as their business practices differ." A Southern California suite, if ever wanted, would be built as its own app, sharing code and lessons, not by widening this model.
 
 ## 1. Branch and worktree
@@ -203,7 +203,7 @@ Unchanged, with a one-line comment naming the reason:
 ## 4. Named dependencies outside this plan
 
 - Step G: invitation send guard gains `chairs-outcome-pending`, `phase-two-status-pending`, and `integrity-unreviewed`; D5 editability widening in `j27FirstCut.js` and `first-cut-service.js:49` plus the Record button; D6 scheduling refusal in `site-visit/logistics-service.js` reading `readLatestIntegrityStates`.
-- Step I (after D7): the offramp field and memo, the "continue" value, and server enforcement in the four presentation services.
+- Step I (D7 closed 2026-11-09): read the Offramped status as a terminal outcome, retire `continue-decision-missing`, and refuse the four presentation operations for an Offramped row (§9). The written justification's home is still open.
 
 ## 5. Sequence and gates
 
@@ -243,3 +243,40 @@ Owner decision (2026-11-09): step E ships with a minimal visible surface, a read
 - Tests: `tests/unit/j27-page-stage.test.js` (mapping, label parity, recomputation to `full` basis, strip rendering) and `tests/unit/workbench-request-page-j27-strip.test.js` (strip from the DTO, recomputation on report, no cross-request leakage, no strip and no callback for pre-2027 rows). Existing page and tab suites unchanged and green.
 - Two corrections after the advisor pass, commit `65ae8d088`: (a) **program gate.** The C1 scope guard classified by cycle year only, so once the strip made the stage visible, J27 Southern California rows would have shown Research tasks. `deriveJ27ForRow` now also requires `isReadinessOnlyRow(row, scope)` (the F1 Research scope by catalog name); the resolve service reads the scope once per request and a failed catalog read yields no stage; the dashboard passes `programScope.discoveryScope`. A J27 SoCal row carries no `j27` key anywhere. (b) **No Board draft yet** (`final_writeup_source_missing`) maps to `boardDraft: present, exists: false` and `transition: present, phase: null`, so `write-board-draft` can surface; other failures stay `unavailable`.
 - Codex review of step E (record: `docs/plans/J27_STEP_E_REVIEW_2026-11-09.md`): NEEDS REWORK, five P2s. Resolved in the rework commit: (1) facts are owned by the current route (a callback for any other request is dropped, and facts reset on navigation; tests cover late A after B is populated and A→B→A); (2) the Final Writeup tab publishes every status write through one effect, so polling, start and advance reach the page; (3) the schedule check alone yields a present presentation with unknown timing and keeps both legacy compatibility reasons, so an explicit legacy exception permits `start-group-review` without an Overview meeting read; (4) summary freshness comes from the read-only summary panel on the Deliberations surface once both evidence hashes are known (no new read; unknown is never "current"); (5) C7's budget now reads two Dataverse reads plus one Postgres read on resolution, with a read-count regression. Strip blockers are shown from the phase of the task they block onward. Re-review: NEEDS REWORK on one point, summary freshness was retained when a later read could not establish it; fixed in the following commit (the panel now reports `summaryStale: null` on an unknown or failed read, and the page replaces the earlier value; same-page regressions for true → unknown and false → unknown). Finding 1's residual limitation (facts are keyed by request id, not route generation; a same-request re-navigation reuses nothing because facts reset on every route change) is accepted as documented. Final Codex check after `9d7f6aee1`: READY (approval), all six findings closed; one noted test weakness, the page's false → unknown assertion checks label absence only, while the reviewer's own reproduction verified the composed value clears.
+
+## 9. Step I plan: the offramp as a Phase II status (2026-11-09, PLANNED, awaiting owner review)
+
+Decision input. Connor (2026-11-09): "adding a new phase II status choice is the way to go … Phase II Offramped #682090001 … the name can be changed later with no downstream consequences." [VERIFIED via production option-set metadata, owner-authorized read 2026-11-09] `wmkf_phaseiistatus` on `wmkf.crm.dynamics.com` carries `682090001` "Phase II Offramped"; the sandbox does not yet. D50 stands: staff decide the offramp after reviews, with a short written justification, and the Chairs do not approve it. D36 stands: the formal status is set in Dataverse; the apps read it.
+
+What the production request-status rule does with it [VERIFIED 2026-11-09]: `WMKF_Set Request Status Program Phase II` has no branch for `682090001`, so recording Offramped leaves `akoya_requeststatus` as it was (normally `Phase II Pending`). The apps must key on the Phase II status value, never on the request status string, for this outcome.
+
+### I1. Read model (pure)
+
+- `PHASE_II_OFFRAMPED = 682090001` beside `PHASE_I_CHAIRS`.
+- `J27_OUTCOMES` gains `offramped`; `deriveOutcome` returns it when `request.phaseIIStatus === PHASE_II_OFFRAMPED`, after the request-status classes and before the Phase I outcomes. Terminal: no forward tasks, phase derived from evidence as today (an Offramped row that presented stays in deliberations with no tasks).
+- `continue-decision-missing` is removed from `J27_BLOCKERS`. A new blocker `offramped` blocks the four `J27_PRESENTATION_OPERATIONS` and `send-invitations`; it fires only when the outcome is `offramped`. Presentation operations are therefore open by default for a live row, closed by the recorded offramp. The C6 invariant holds (recording keys never blocked).
+- `record-offramp` keeps its D4 contract (available from Recommended Invite onward, never blocked) and gains `detail.recordedAs`: the Phase II status label, so the strip can say how the decision is recorded. The task disappears once the outcome is terminal, as every task does.
+- Label maps: outcome has no label map today; the strip shows `J27_PHASE_LABEL` plus, for a terminal outcome, one line "Offramped" (strip change, not a model change).
+- Dashboard DTO unchanged in shape; `outcome: 'offramped'` flows through `j27DashboardDto`.
+
+### I2. Server enforcement (the four presentation services)
+
+Each gate keeps its legacy visibility check and adds one refusal: when the request's `wmkf_phaseiistatus === PHASE_II_OFFRAMPED`, refuse with a service-specific code (`site_visit_logistics_request_offramped`, `site_visit_materials_request_offramped`, `presentation_invitation_request_offramped`, `meeting_transcription_request_offramped`) and a plain sentence ("This request took the offramp; presentations are not scheduled for it."). [VERIFIED 2026-11-09] None of the four request reads selects `wmkf_phaseiistatus` today (`logistics-service.js`, `collection-service.js`, `invitation-service.js`, `binding.js`); each gains the field in its request projection. UI gates mirror the server (feedback-ui-gates-must-mirror-server-guards): the scheduling, materials, invitation and transcription controls disable with the same sentence when the resolve DTO's outcome is `offramped`.
+
+### I3. Discovery and lists
+
+- Discovery is unchanged: an Offramped row stays discoverable (readiness alone for J27 Research), so the record is never lost (owner principle).
+- Reviewer Finder: `actionable` already hides a row with a post-review Phase II disposition; `682090001` is one, so Offramped rows leave the actionable list and remain in `all`. No code change; one test row.
+- The dashboard list shows the outcome through the existing `j27.outcome` key once step E's list consumer exists; the strip shows it now.
+
+### I4. Open after this step
+
+- **Written justification (D50(2)).** Connor's answer covers the status only. Candidates: a new memo column on `akoya_request` (sandbox-first, like the other J27 memos), or the existing visit-assessment memo. Not assumed here; the strip will say "Offramped" without the reason until decided.
+- **Who sets the status.** D36 says staff set it in Dataverse. If the Workbench should record it (a lead PD action next to First Cut and Semi-finalist), that is a step G-style write with the D5 editability rule and belongs in a later addendum.
+- **Alignment log.** D36/D50 said the field was open; row D51 below records Connor's answer.
+
+### I5. Tests and gates
+
+Pure-model rows: Offramped at each phase (initial, peer review with reviews received, deliberations with a presentation record) → outcome `offramped`, tasks empty, blocker `offramped` present, `continue-decision-missing` absent everywhere; Offramped plus decided award → `decided-award` wins. Service tests: each of the four gates refuses an Offramped row and still admits a live Phase II Pending row; projection includes the field. Reviewer Finder: Offramped hidden in actionable, shown in all. Gates: status-enum-parity (label maps), types, route-service-boundary, trust-boundary-guid, api-routes if any route body changes (none planned).
+
+Sequence: I1 with tests → I2 with tests → strip line → Codex review → owner go. No merge.
