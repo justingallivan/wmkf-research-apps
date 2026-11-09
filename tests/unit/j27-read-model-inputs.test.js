@@ -136,6 +136,10 @@ describe('composition', () => {
     expect(input.capabilities).toEqual({ status: 'present', readOnly: true });
     expect(input.features).toEqual({ status: 'present', semiFinalistEnabled: true });
   });
+  test('a per-partition read failure reaches the row as unavailable', () => {
+    const input = composeJ27Tier1(row(), facts({ integrity: new Map([[REQ, { status: 'unavailable', detail: 'read-failed' }]]) }), { calendar });
+    expect(input.integrity).toEqual({ status: 'unavailable', detail: 'read-failed' });
+  });
   test('a request with no screening reads integrity present with latest null', () => {
     expect(composeJ27Tier1(row(), facts(), { calendar }).integrity).toEqual({ status: 'present', latest: null });
   });

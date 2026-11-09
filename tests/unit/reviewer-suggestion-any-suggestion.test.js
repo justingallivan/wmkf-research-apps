@@ -36,6 +36,13 @@ test('chunks at 25 and skips the query for an empty list', async () => {
   expect(queryAllRecords).not.toHaveBeenCalled();
 });
 
+test('a capped or paged batch is refused rather than read as absence', async () => {
+  queryAllRecords.mockResolvedValue({ records: [{ _wmkf_request_value: id(1) }], capped: true });
+  await expect(existsAnySuggestionForRequests([id(1), id(2)])).rejects.toThrow('incomplete');
+  queryAllRecords.mockResolvedValue({ records: [], hasMore: true });
+  await expect(existsAnySuggestionForRequests([id(1)])).rejects.toThrow('incomplete');
+});
+
 test('the rollup query is untouched: it still restricts to selected or declined rows', async () => {
   await findForRollup(`_wmkf_request_value eq ${id(1)}`);
   expect(queryAllRecords.mock.calls[0][1].filter).toContain('wmkf_selected eq true or wmkf_declined eq true');

@@ -309,11 +309,16 @@ describe('C8.3 combinations', () => {
 
 describe('C8.4 basis', () => {
   const invitedPage = () => page({ requestStatus: P2, phaseIStatus: PHASE_I_CHAIRS.invited }, { rationale: PRESENT });
-  test.each(['reviewSummary', 'visitAssessment', 'rosterMemo', 'reviewers', 'integrity', 'calendar', 'presentation', 'roster', 'boardDraft', 'transition'])(
-    'tier key %s unavailable', (key) => {
-      const r = deriveJ27Stage(tier1({}, { [key]: UNAVAILABLE, roster: UNAVAILABLE, presentation: UNAVAILABLE, boardDraft: UNAVAILABLE, transition: UNAVAILABLE }));
+  test('rosterMemo unavailable degrades only while the roster itself is not loaded', () => {
+    expect(deriveJ27Stage(tier1({}, { rosterMemo: UNAVAILABLE })).basis).toBe('degraded');
+    expect(deriveJ27Stage(page({}, { rosterMemo: UNAVAILABLE })).basis).toBe('full');
+  });
+  test.each(['rationale', 'reviewSummary', 'visitAssessment', 'reviewers', 'integrity', 'calendar', 'features', 'presentation', 'roster', 'boardDraft', 'transition'])(
+    'key %s unavailable alone degrades a live page row', (key) => {
+      const r = deriveJ27Stage(page({}, { [key]: UNAVAILABLE }));
       expect(r.basis).toBe('degraded');
       expect(r.tasksBasis).toBe('degraded');
+      expect(deriveJ27Stage(page()).basis).toBe('full');
     },
   );
   test('rationale unavailable withholds the task and degrades the basis', () => {
