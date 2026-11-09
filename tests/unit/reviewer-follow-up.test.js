@@ -782,7 +782,7 @@ describe('reviewer follow-up preview safety', () => {
     process.env.DYNAMICS_URL = `https://${PRODUCTION_HOSTS[0]}`;
 
     await expect(getServerSideProps()).resolves.toEqual({
-      props: { previewReadOnly: true },
+      props: { previewReadOnly: true, j27IntegrityEnabled: false },
     });
   });
 
@@ -790,13 +790,13 @@ describe('reviewer follow-up preview safety', () => {
     process.env.VERCEL_ENV = 'preview';
     process.env.DYNAMICS_URL = `https://${SANDBOX_HOSTS[0]}`;
     await expect(getServerSideProps()).resolves.toEqual({
-      props: { previewReadOnly: false },
+      props: { previewReadOnly: false, j27IntegrityEnabled: false },
     });
 
     process.env.VERCEL_ENV = 'production';
     process.env.DYNAMICS_URL = `https://${PRODUCTION_HOSTS[0]}`;
     await expect(getServerSideProps()).resolves.toEqual({
-      props: { previewReadOnly: false },
+      props: { previewReadOnly: false, j27IntegrityEnabled: false },
     });
   });
 
@@ -814,7 +814,7 @@ describe('reviewer follow-up preview safety', () => {
     process.env.DYNAMICS_URL = 'https://unregistered-target.example';
 
     await expect(getServerSideProps()).resolves.toEqual({
-      props: { previewReadOnly: true },
+      props: { previewReadOnly: true, j27IntegrityEnabled: false },
     });
   });
 });
