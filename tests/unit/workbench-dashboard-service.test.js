@@ -29,6 +29,7 @@ jest.mock('../../lib/services/landing-cycle-service.js', () => ({ getLandingCycl
 jest.mock('../../lib/services/workbench/program-scope-service.js', () => ({
   resolveWorkbenchProgramScope: jest.fn(async () => ({
     programs: [{ programId: '94cab30b-958f-ee11-8179-000d3a341e8f', name: 'Research' }],
+    discoveryScope: { readinessOnlyProgramIds: ['94cab30b-958f-ee11-8179-000d3a341e8f'] },
     defaultProgramId: '94cab30b-958f-ee11-8179-000d3a341e8f',
     programId: '94cab30b-958f-ee11-8179-000d3a341e8f',
     programName: 'Research',
@@ -119,14 +120,14 @@ test('invalid cycleCode → ServiceHttpError 400', async () => {
 test('cycle-list mode: lists organization-wide eligible cycles with honest active/set-aside counts', async () => {
   queryAllRequests.mockResolvedValue({
     records: [
-      { wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' }, _wmkf_programdirector_value: 'pd-1' },
-      { wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, _wmkf_programdirector_value: 'pd-2' },
-      { wmkf_meetingdate: '2026-12-12', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, _wmkf_programdirector_value: 'pd-1', wmkf_triagestatus: 100000001 },
+      { akoya_requeststatus: 'Phase II Pending', wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' }, _wmkf_programdirector_value: 'pd-1' },
+      { akoya_requeststatus: 'Phase II Pending', wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, _wmkf_programdirector_value: 'pd-2' },
+      { akoya_requeststatus: 'Phase II Pending', wmkf_meetingdate: '2026-12-12', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, _wmkf_programdirector_value: 'pd-1', wmkf_triagestatus: 100000001 },
       { wmkf_meetingdate: null }, // no link → skipped
       // A December meeting date with no Grant Cycle link has no cycle.
       { wmkf_meetingdate: '2025-12-11', _wmkf_programdirector_value: 'pd-1' },
       // A historical (non-J/D) linked code has no cycle either.
-      { wmkf_meetingdate: '2016-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'R16' }, _wmkf_programdirector_value: 'pd-1' },
+      { akoya_requeststatus: 'Phase II Pending', wmkf_meetingdate: '2016-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'R16' }, _wmkf_programdirector_value: 'pd-1' },
     ],
     capped: false,
   });
@@ -143,7 +144,7 @@ test('cycle-list mode: lists organization-wide eligible cycles with honest activ
   expect(queryAllRequests).toHaveBeenCalledWith({
     select: 'akoya_requestid,akoya_requeststatus,_wmkf_grantprogram_value,_wmkf_programdirector_value,wmkf_triagestatus,wmkf_readyforreview',
     expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
-    filter: "_wmkf_grantcycle_value ne null and (_akoya_programid_value eq 8dcab30b-958f-ee11-8179-000d3a341e8f or _akoya_programid_value eq 94cab30b-958f-ee11-8179-000d3a341e8f) and (akoya_requeststatus eq 'Phase II Pending' or wmkf_triagestatus eq 100000000 or wmkf_triagestatus eq 100000001)",
+    filter: "_wmkf_grantcycle_value ne null and (_akoya_programid_value eq 8dcab30b-958f-ee11-8179-000d3a341e8f or _akoya_programid_value eq 94cab30b-958f-ee11-8179-000d3a341e8f) and (((akoya_requeststatus eq 'Phase II Pending' or wmkf_triagestatus eq 100000000 or wmkf_triagestatus eq 100000001)) or ((_wmkf_grantprogram_value eq 94cab30b-958f-ee11-8179-000d3a341e8f) and wmkf_readyforreview eq true))",
     orderby: 'akoya_requestnum desc',
   });
   expect(listBoardDates).toHaveBeenCalledTimes(1);
@@ -152,7 +153,7 @@ test('cycle-list mode: lists organization-wide eligible cycles with honest activ
 test('cycle-list mode: a cycle the calendar has no date for is listed code-only and resolves by month', async () => {
   listBoardDates.mockResolvedValue([]);
   queryAllRequests.mockResolvedValue({
-    records: [{ wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, _wmkf_programdirector_value: 'pd-1' }],
+    records: [{ akoya_requeststatus: 'Phase II Pending', wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, _wmkf_programdirector_value: 'pd-1' }],
     capped: false,
   });
   const body = await loadDashboard(args());
@@ -162,7 +163,7 @@ test('cycle-list mode: a cycle the calendar has no date for is listed code-only 
 
 test('cycle-list mode: the calendar alone never adds a cycle', async () => {
   queryAllRequests.mockResolvedValue({
-    records: [{ wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' }, _wmkf_programdirector_value: 'pd-1' }],
+    records: [{ akoya_requeststatus: 'Phase II Pending', wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' }, _wmkf_programdirector_value: 'pd-1' }],
     capped: false,
   });
   const body = await loadDashboard(args());
@@ -177,11 +178,11 @@ test('cycle-list mode: a calendar read failure fails the cycle list', async () =
 test('Stage 1d: cycle discovery keeps test requests but leaves them out of counts', async () => {
   process.env.TEST_REQUEST_ISOLATION = 'on';
   const testRow = {
-    akoya_requestid: 'r-test', wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, _wmkf_programdirector_value: 'pd-1',
+    akoya_requeststatus: 'Phase II Pending', akoya_requestid: 'r-test', wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, _wmkf_programdirector_value: 'pd-1',
     wmkf_istestrequest: true, wmkf_testcreationrunid: '22222222-2222-4222-8222-222222222222',
   };
   const ordinaryRow = {
-    akoya_requestid: 'r-1', wmkf_meetingdate: '2027-06-11', wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, wmkf_readyforreview: true, _wmkf_programdirector_value: 'pd-1',
+    akoya_requeststatus: 'Phase II Pending', akoya_requestid: 'r-1', wmkf_meetingdate: '2027-06-11', wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, wmkf_readyforreview: true, _wmkf_programdirector_value: 'pd-1',
     wmkf_istestrequest: null, wmkf_testcreationrunid: null,
   };
   queryAllRequests.mockResolvedValue({ records: [testRow, ordinaryRow], capped: false });
@@ -200,8 +201,8 @@ test('Stage 1d: an all-test program lists its cycles without choosing a default'
   queryAllRequests.mockResolvedValue({
     capped: false,
     records: [
-      { akoya_requestid: 'r-t1', wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' }, wmkf_istestrequest: true, wmkf_testcreationrunid: run },
-      { akoya_requestid: 'r-t2', wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, wmkf_istestrequest: true, wmkf_testcreationrunid: run },
+      { akoya_requeststatus: 'Phase II Pending', akoya_requestid: 'r-t1', wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' }, wmkf_istestrequest: true, wmkf_testcreationrunid: run },
+      { akoya_requeststatus: 'Phase II Pending', akoya_requestid: 'r-t2', wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, wmkf_istestrequest: true, wmkf_testcreationrunid: run },
     ],
   });
   const body = await loadDashboard(args());
@@ -217,8 +218,8 @@ test('Stage 1d: a test request in a mixed cycle does not change its calendar dat
   queryAllRequests.mockResolvedValue({
     capped: false,
     records: [
-      { akoya_requestid: 'r-1', wmkf_meetingdate: '2026-12-04', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, wmkf_istestrequest: null, wmkf_testcreationrunid: null },
-      { akoya_requestid: 'r-t', wmkf_meetingdate: '2026-12-18', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, wmkf_istestrequest: true, wmkf_testcreationrunid: run },
+      { akoya_requeststatus: 'Phase II Pending', akoya_requestid: 'r-1', wmkf_meetingdate: '2026-12-04', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, wmkf_istestrequest: null, wmkf_testcreationrunid: null },
+      { akoya_requeststatus: 'Phase II Pending', akoya_requestid: 'r-t', wmkf_meetingdate: '2026-12-18', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, wmkf_istestrequest: true, wmkf_testcreationrunid: run },
     ],
   });
   const body = await loadDashboard(args());
@@ -227,8 +228,8 @@ test('Stage 1d: a test request in a mixed cycle does not change its calendar dat
 
 test('cycle-list mode: the default cycle is the same for every caller regardless of assignments or visibility', async () => {
   const records = [
-    { wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, _wmkf_programdirector_value: 'pd-2', wmkf_triagestatus: 100000001 },
-    { wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' }, _wmkf_programdirector_value: 'pd-1' },
+    { akoya_requeststatus: 'Phase II Pending', wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, _wmkf_programdirector_value: 'pd-2', wmkf_triagestatus: 100000001 },
+    { akoya_requeststatus: 'Phase II Pending', wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' }, _wmkf_programdirector_value: 'pd-1' },
   ];
   queryAllRequests.mockResolvedValue({ records, capped: false });
   const pd1 = await loadDashboard(args({ callerSystemId: 'pd-1' }));
@@ -249,7 +250,7 @@ test('cycle-list mode: the default is per Grant Program — a caller whose defau
     programName: 'SoCal',
   });
   buildProgramScopeFilter.mockImplementationOnce((programId) => `_wmkf_grantprogram_value eq ${programId}`);
-  queryAllRequests.mockResolvedValue({ records: [{ wmkf_meetingdate: '2027-06-10', wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, wmkf_readyforreview: true, _wmkf_programdirector_value: 'pd-9' }], capped: false });
+  queryAllRequests.mockResolvedValue({ records: [{ akoya_requeststatus: 'Phase II Pending', wmkf_meetingdate: '2027-06-10', wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, wmkf_readyforreview: true, _wmkf_programdirector_value: 'pd-9' }], capped: false });
   const body = await loadDashboard(args({ callerSystemId: 'pd-9' }));
   expect(queryAllRequests).toHaveBeenCalledWith(expect.objectContaining({
     filter: expect.stringContaining(`_wmkf_grantprogram_value eq ${otherProgram}`),
@@ -260,8 +261,8 @@ test('cycle-list mode: the default is per Grant Program — a caller whose defau
 
 test('cycle-list mode: the default flips the day after the working meeting, and falls back to the newest cycle once all have passed', async () => {
   const records = [
-    { wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, _wmkf_programdirector_value: 'pd-1' },
-    { wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' }, _wmkf_programdirector_value: 'pd-1' },
+    { akoya_requeststatus: 'Phase II Pending', wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, _wmkf_programdirector_value: 'pd-1' },
+    { akoya_requeststatus: 'Phase II Pending', wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' }, _wmkf_programdirector_value: 'pd-1' },
   ];
   queryAllRequests.mockResolvedValue({ records, capped: false });
   await expect(loadDashboard(args({ today: new Date('2026-12-11T23:00:00Z') })))
@@ -284,7 +285,7 @@ test('proposal mode: superuser gets canManage on rows they do not lead; rollup s
     records: [{
       akoya_requestid: 'r-1',
       akoya_requestnum: '1002836',
-      wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
+      akoya_requeststatus: 'Phase II Pending', wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
       akoya_requeststatus: 'Phase II Pending',
       wmkf_triagestatus: 100000000,
       _wmkf_programdirector_value: 'someone-else',
@@ -320,7 +321,7 @@ test('proposal mode: non-lead non-superuser rows project canManage false', async
     records: [{
       akoya_requestid: 'r-1',
       akoya_requestnum: '1002836',
-      wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
+      akoya_requeststatus: 'Phase II Pending', wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
       _wmkf_programdirector_value: 'someone-else',
     }],
   });
@@ -333,7 +334,7 @@ test('proposal mode: canonical session actor is case-insensitive and missing act
     records: [{
       akoya_requestid: 'r-1',
       akoya_requestnum: '1002836',
-      wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
+      akoya_requeststatus: 'Phase II Pending', wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
       _wmkf_programdirector_value: 'PD-1',
     }],
   });
@@ -348,7 +349,7 @@ test('Tracker selection matches Workbench visibility and metadata without readin
   const records = [{
     akoya_requestid: 'r-1',
     akoya_requestnum: '1002836',
-    wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
+    akoya_requeststatus: 'Phase II Pending', wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
     _akoya_applicantid_value_formatted: 'Caltech',
     _wmkf_projectleader_value_formatted: 'Pat One',
     _wmkf_programdirector_value_formatted: 'Dr. PD One',
@@ -394,7 +395,7 @@ test('Stage 1d: on mode badges test rows but excludes them from rollup totals', 
   process.env.TEST_REQUEST_ISOLATION = 'on';
   queryAllRequests.mockResolvedValue({
     records: [{
-      akoya_requestid: 'r-test', akoya_requestnum: '1009999', wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
+      akoya_requeststatus: 'Phase II Pending', akoya_requestid: 'r-test', akoya_requestnum: '1009999', wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
       wmkf_istestrequest: true, wmkf_testcreationrunid: '22222222-2222-4222-8222-222222222222',
     }],
   });
@@ -410,8 +411,8 @@ describe('landing cycle (docs/plans/LANDING_CYCLE_PLAN_2026-10-29.md)', () => {
   beforeEach(() => {
     queryAllRequests.mockResolvedValue({
       records: [
-        { wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' }, _wmkf_programdirector_value: 'pd-1' },
-        { wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, _wmkf_programdirector_value: 'pd-2' },
+        { akoya_requeststatus: 'Phase II Pending', wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' }, _wmkf_programdirector_value: 'pd-1' },
+        { akoya_requeststatus: 'Phase II Pending', wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, _wmkf_programdirector_value: 'pd-2' },
       ],
       capped: false,
     });
@@ -461,7 +462,7 @@ test.each([{ capped: true }, { hasMore: true }, { records: null }])('incomplete 
 });
 
 test('a readiness change is reflected on the next request; a selected cycle can become empty', async () => {
-  const record = { akoya_requestid: 'ready', akoya_requestnum: '1', wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, wmkf_readyforreview: true };
+  const record = { akoya_requeststatus: 'Phase II Pending', akoya_requestid: 'ready', akoya_requestnum: '1', wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, wmkf_readyforreview: true };
   queryAllRequests.mockResolvedValue({ records: [record] });
   expect((await loadDashboard(args({ cycleCode: 'J27' }))).proposals).toHaveLength(1);
   queryAllRequests.mockResolvedValue({ records: [{ ...record, wmkf_readyforreview: false }] });
@@ -471,7 +472,8 @@ test('a readiness change is reflected on the next request; a selected cycle can 
 describe('J27 read model on the proposal list (plan C7)', () => {
   const j27 = (n, over = {}) => ({
     akoya_requestid: `r-${n}`, akoya_requestnum: `10003${n}`, _wmkf_grantcycle_value: 'cycle-j27', wmkf_GrantCycle: { wmkf_cyclecode: 'J27' },
-    akoya_requeststatus: 'Phase I Pending', wmkf_readyforreview: true, _wmkf_programdirector_value: 'pd-1', ...over,
+    // A J27 Research row is discoverable by readiness alone (plan F1 / D1): not Phase II Pending, not triaged.
+    akoya_requeststatus: 'Phase I Pending', wmkf_readyforreview: true, _wmkf_programdirector_value: 'pd-1', _wmkf_grantprogram_value: '94cab30b-958f-ee11-8179-000d3a341e8f', ...over,
   });
   test('in-scope rows carry the slim stage; reads are batched once per page; pre-2027 rows are unchanged', async () => {
     queryAllRequests.mockResolvedValue({ capped: false, records: [

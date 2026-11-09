@@ -492,6 +492,7 @@ async function main() {
   if (!actorResponse.ok) throw new Error(`Pinned sandbox actor lookup returned HTTP ${actorResponse.status}.`);
   const actors = actorResponse.body?.value || [];
 
+  // Plan F2 (J27 discovery): deliberately unchanged — legacy cohort script; the readiness probe is the F1 exception.
   const requestFilter = `wmkf_meetingdate ne null and wmkf_istestrequest ne true and ${buildVisibilityFilter(false)}`;
   const requestResponse = await client.get(
     `/akoya_requests?$select=akoya_requestid,akoya_requestnum,akoya_requeststatus,wmkf_triagestatus,wmkf_meetingdate,_wmkf_projectleader_value,_wmkf_researchleader_value,wmkf_istestrequest&$filter=${encodeURIComponent(requestFilter)}&$orderby=wmkf_meetingdate desc&$top=5`,

@@ -15,6 +15,13 @@ jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
   __esModule: true,
   queryAllRequests: jest.fn(),
 }));
+// The live program catalog names exactly one Research program (plan F2: discovery scope by name).
+const RESEARCH_PROGRAM = '94cab30b-958f-ee11-8179-000d3a341e8f';
+jest.mock('../../lib/dataverse/adapters/grant-program', () => ({
+  __esModule: true,
+  listActive: jest.fn(async () => ({ records: [{ wmkf_grantprogramid: '94cab30b-958f-ee11-8179-000d3a341e8f', wmkf_name: 'Research' }] })),
+}));
+const ADMISSION = `(((_wmkf_grantprogram_value eq ${RESEARCH_PROGRAM}) and wmkf_readyforreview eq true) or (akoya_requeststatus eq 'Phase II Pending'))`;
 // Grant Cycle link helpers: real strings and the real row reader, without the
 // restriction context the adapter-mocked service never establishes.
 jest.mock('../../lib/dataverse/adapters/operations-grant-cycle', () => ({
@@ -94,21 +101,23 @@ test('cycle-list mode dedupes linked Grant Cycle codes with counts, newest first
   });
 });
 
-test('actionable (default) status requires Phase II Pending AND null wmkf_phaseiistatus in the filter', async () => {
+test('the admission filter is the ready-Research branch OR the Phase II Pending gate; the actionable phase rule is a post-filter', async () => {
   await getMyProposals({ azureEmail: EMAIL, cycleCode: 'J26' });
   const { filter } = queryAllRequests.mock.calls[0][0];
-  expect(filter).toBe(
-    "_wmkf_programdirector_value eq pd-1 and wmkf_GrantCycle/wmkf_cyclecode eq 'J26' and "
-      + "akoya_requeststatus eq 'Phase II Pending' and wmkf_phaseiistatus eq null",
-  );
+  expect(filter).toBe(`_wmkf_programdirector_value eq pd-1 and wmkf_GrantCycle/wmkf_cyclecode eq 'J26' and ${ADMISSION}`);
+  expect(filter).not.toContain('wmkf_phaseiistatus');
 });
 
-test("status='all' drops only the phaseiistatus clause; unknown statuses fall back to actionable", async () => {
-  await getMyProposals({ azureEmail: EMAIL, cycleCode: 'J26', status: 'all' });
-  expect(queryAllRequests.mock.calls[0][0].filter).not.toContain('wmkf_phaseiistatus eq null');
-
-  await getMyProposals({ azureEmail: EMAIL, cycleCode: 'J26', status: 'bogus' });
-  expect(queryAllRequests.mock.calls[1][0].filter).toContain('wmkf_phaseiistatus eq null');
+test("status='all' and actionable send the same admission filter; unknown statuses fall back to actionable", async () => {
+  queryAllRequests.mockResolvedValue({ records: [
+    { akoya_requestid: 'open', akoya_requestnum: 'open', akoya_requeststatus: 'Phase II Pending', wmkf_phaseiistatus: null, wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } },
+    { akoya_requestid: 'declined', akoya_requestnum: 'declined', akoya_requeststatus: 'Phase II Pending', wmkf_phaseiistatus: 100000001, wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } },
+  ] });
+  const all = await getMyProposals({ azureEmail: EMAIL, cycleCode: 'J26', status: 'all' });
+  expect(all.proposals.map((p) => p.requestId)).toEqual(['open', 'declined']);
+  const bogus = await getMyProposals({ azureEmail: EMAIL, cycleCode: 'J26', status: 'bogus' });
+  expect(bogus.proposals.map((p) => p.requestId)).toEqual(['open']);
+  expect(queryAllRequests.mock.calls[0][0].filter).toBe(queryAllRequests.mock.calls[1][0].filter);
 });
 
 test('proposals-in-cycle projects slots, counts all four lifecycle buckets, and uppercases the cycle code', async () => {
@@ -148,7 +157,7 @@ test('proposals-in-cycle projects slots, counts all four lifecycle buckets, and 
 
 test('a request with no suggestion rows gets 0/0/0/0 counts', async () => {
   queryAllRequests.mockResolvedValue({
-    records: [{ akoya_requestid: 'r1', akoya_requestnum: 'REQ-1', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' }, wmkf_meetingdate: '2026-06-15' }],
+    records: [{ akoya_requestid: 'r1', akoya_requestnum: 'REQ-1', akoya_requeststatus: 'Phase II Pending', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' }, wmkf_meetingdate: '2026-06-15' }],
   });
   const out = await getMyProposals({ azureEmail: EMAIL, cycleCode: 'J26' });
   expect(out.proposals[0]).toMatchObject({
@@ -160,7 +169,7 @@ test('reviewer-count aggregation chunks the OR-chain at 25 request ids per query
   const ids = Array.from({ length: 30 }, (_, i) => `r${i}`);
   queryAllRequests.mockResolvedValue({
     records: ids.map((id) => ({
-      akoya_requestid: id, akoya_requestnum: `REQ-${id}`, wmkf_GrantCycle: { wmkf_cyclecode: 'J26' }, wmkf_meetingdate: '2026-06-15',
+      akoya_requestid: id, akoya_requestnum: `REQ-${id}`, akoya_requeststatus: 'Phase II Pending', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' }, wmkf_meetingdate: '2026-06-15',
     })),
   });
 
@@ -183,14 +192,14 @@ test('reviewer-count aggregation chunks the OR-chain at 25 request ids per query
 
 test('a suggestion-count chunk failure propagates untyped (clean 500 beats an undercount)', async () => {
   queryAllRequests.mockResolvedValue({
-    records: [{ akoya_requestid: 'r1', akoya_requestnum: 'REQ-1', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' }, wmkf_meetingdate: '2026-06-15' }],
+    records: [{ akoya_requestid: 'r1', akoya_requestnum: 'REQ-1', akoya_requeststatus: 'Phase II Pending', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' }, wmkf_meetingdate: '2026-06-15' }],
   });
   queryAllSuggestions.mockRejectedValue(new Error('Dataverse unavailable'));
   await expect(getMyProposals({ azureEmail: EMAIL, cycleCode: 'J26' })).rejects.toThrow('Dataverse unavailable');
 });
 
 test.each(['all', 'actionable'])('readiness gates %s and cycle counts before suggestion reads', async (status) => {
-  const make = (id, code, ready) => ({ akoya_requestid: id, akoya_requestnum: id, wmkf_GrantCycle: { wmkf_cyclecode: code }, wmkf_readyforreview: ready });
+  const make = (id, code, ready) => ({ akoya_requestid: id, akoya_requestnum: id, akoya_requeststatus: 'Phase II Pending', wmkf_GrantCycle: { wmkf_cyclecode: code }, wmkf_readyforreview: ready });
   queryAllRequests.mockResolvedValue({ records: [make('legacy', 'D26', false), make('hidden', 'J27', false), make('ready', 'J27', true)] });
   const cycles = await getMyProposals({ azureEmail: EMAIL });
   expect(cycles.cycles.map((c) => [c.code, c.count])).toEqual([['J27', 1], ['D26', 1]]);
@@ -212,10 +221,11 @@ test.each([undefined, 'J27'])('refuses incomplete %s discovery rather than retur
 // Interpret the two emitted phase predicates against real-shaped rows. The
 // expected set below is independent of the service's cutover calculation.
 function phaseQueryRecords(records, filter) {
-  const expanded = filter.includes('(wmkf_phaseiistatus eq null or wmkf_phaseiistatus eq 100000002)');
-  const nullOnly = filter.includes('and wmkf_phaseiistatus eq null');
+  // The emitted filter admits by status gate or ready Research row; the phase rule is applied in code.
+  expect(filter).toContain(ADMISSION);
+  expect(filter).not.toContain('wmkf_phaseiistatus');
   return records.filter((r) => r.akoya_requeststatus === 'Phase II Pending'
-    && (!expanded && !nullOnly || r.wmkf_phaseiistatus == null || expanded && r.wmkf_phaseiistatus === 100000002));
+    || (String(r._wmkf_grantprogram_value || '').toLowerCase() === RESEARCH_PROGRAM && r.wmkf_readyforreview === true));
 }
 
 const PHASE_II_OPTIONS = [100000000, 100000001, 100000002, 100000003, 100000004, 100000005, 707510001, 707510002, 999999999];
@@ -239,10 +249,7 @@ test.each([
   const result = await getMyProposals({ azureEmail: EMAIL, cycleCode });
   expect(result.proposals.map((r) => r.requestId)).toEqual(expected);
   const { filter } = queryAllRequests.mock.calls[0][0];
-  const expectedPhase = expected.length === 2
-    ? '(wmkf_phaseiistatus eq null or wmkf_phaseiistatus eq 100000002)'
-    : 'wmkf_phaseiistatus eq null';
-  expect(filter).toBe(`_wmkf_programdirector_value eq pd-1 and wmkf_GrantCycle/wmkf_cyclecode eq '${cycleCode.toUpperCase()}' and akoya_requeststatus eq 'Phase II Pending' and ${expectedPhase}`);
+  expect(filter).toBe(`_wmkf_programdirector_value eq pd-1 and wmkf_GrantCycle/wmkf_cyclecode eq '${cycleCode.toUpperCase()}' and ${ADMISSION}`);
   if (expected.length === 2) expect(result.proposals[1].phaseIIStatus).toBe('Phase II Pending Committee Review');
 });
 
@@ -264,5 +271,5 @@ test.each(['D26', 'J27'])('%s status=all retains its prior phase-unrestricted qu
   }));
   queryAllRequests.mockImplementation(async ({ filter }) => ({ records: phaseQueryRecords(records, filter) }));
   expect((await getMyProposals({ azureEmail: EMAIL, cycleCode, status: 'all' })).proposals).toHaveLength(records.length);
-  expect(queryAllRequests.mock.calls[0][0].filter).toBe(`_wmkf_programdirector_value eq pd-1 and wmkf_GrantCycle/wmkf_cyclecode eq '${cycleCode}' and akoya_requeststatus eq 'Phase II Pending'`);
+  expect(queryAllRequests.mock.calls[0][0].filter).toBe(`_wmkf_programdirector_value eq pd-1 and wmkf_GrantCycle/wmkf_cyclecode eq '${cycleCode}' and ${ADMISSION}`);
 });

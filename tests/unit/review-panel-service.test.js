@@ -10,7 +10,7 @@
  */
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({ queryAllRequests: jest.fn() }));
 jest.mock('../../lib/services/workbench/program-scope-service', () => ({
-  resolveWorkbenchProgramScope: jest.fn(async () => ({ programId: 'program-1' })),
+  resolveWorkbenchProgramScope: jest.fn(async () => ({ programId: 'program-1', discoveryScope: { readinessOnlyProgramIds: [] } })),
 }));
 jest.mock('../../lib/services/review-panel-input', () => ({ prepareReviewPanelInput: jest.fn() }));
 jest.mock('../../lib/services/review-panel-generation', () => {
@@ -74,7 +74,7 @@ const ENTRY_ID = '55555555-5555-4555-8555-555555555555';
 
 function rosterRecord(requestId, requestNumber) {
   return {
-    wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
+    wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, akoya_requeststatus: 'Phase II Pending',
     akoya_requestid: requestId, akoya_requestnum: requestNumber, akoya_title: 'Title',
     _akoya_applicantid_value_formatted: 'Inst', _wmkf_projectleader_value_formatted: 'PI', _wmkf_programdirector_value_formatted: 'PD',
   };

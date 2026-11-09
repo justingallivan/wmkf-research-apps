@@ -59,6 +59,7 @@ async function main() {
   const cycleFilter = linkedCycleFilter(cycle);
   const { records } = await DynamicsService.queryAllRecords('akoya_requests', {
     select: 'akoya_requestid,akoya_requestnum,wmkf_triagestatus,akoya_requeststatus,_wmkf_programdirector_value',
+    // Plan F2 (J27 discovery): deliberately unchanged — legacy cohort scripts; the readiness probe is the F1 exception.
     filter: `${cycleFilter} and ${buildVisibilityFilter(false)}`,
     orderby: 'akoya_requestnum asc',
   });

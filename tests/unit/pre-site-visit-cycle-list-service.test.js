@@ -46,6 +46,7 @@ const labels = { draft: 'AI draft ready', shared: 'Shared', visit: 'Visit', fina
 function req(id, overrides = {}) {
   return {
     akoya_requestid: id,
+    akoya_requeststatus: 'Phase II Pending',
     wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
     akoya_requestnum: id === R1 ? '1002959' : '1003001',
     akoya_title: 'Proposal title',

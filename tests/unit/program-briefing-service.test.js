@@ -10,7 +10,7 @@ import { REQUEST_DOCUMENT_ARTIFACT_TYPE as TYPE, REQUEST_DOCUMENT_OPERATION_STAT
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
 
 const id = (n) => `${String(n).padStart(8, '0')}-1111-4111-8111-111111111111`;
-const request = (n, program = 0) => ({ akoya_requestid: id(n), akoya_requestnum: String(1000 + n), akoya_title: `Proposal ${n}`, _akoya_programid_value: RESEARCH_PROGRAM_IDS[program], _akoya_applicantid_value_formatted: `Institution ${n}`, wmkf_meetingdate: '2026-12-03T00:00:00Z', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } });
+const request = (n, program = 0) => ({ akoya_requestid: id(n), akoya_requeststatus: 'Phase II Pending', akoya_requestnum: String(1000 + n), akoya_title: `Proposal ${n}`, _akoya_programid_value: RESEARCH_PROGRAM_IDS[program], _akoya_applicantid_value_formatted: `Institution ${n}`, wmkf_meetingdate: '2026-12-03T00:00:00Z', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } });
 const J26 = { wmkf_meetingdate: '2026-06-03T00:00:00Z', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } };
 const document = (n, type = TYPE.TRANSCRIPT_SUMMARY) => ({ _wmkf_request_value: id(n), wmkf_requestdocumentid: id(n + type), wmkf_artifacttype: type, wmkf_operationstatus: OP.READY, wmkf_sharepointdriveid: 'drive', wmkf_sharepointitemid: 'item', createdon: '2026-10-19T00:00:00Z' });
 let deps;
@@ -22,6 +22,7 @@ beforeEach(() => {
     readText: jest.fn(async () => ({ ok: true, text: 'What was presented\n\nA novel approach to imaging.\n\nQuestions and answers\nMore detail.', item: { stale: false, publishedAt: '2026-10-19' } })),
     readSentiments: jest.fn(async () => ({ [id(1)]: { status: 'current', sentiment: { headline: 'Support with reservations.' } }, [id(2)]: { status: 'none', sentiment: null } })),
     listBoardDates: jest.fn(async () => [{ wmkf_cyclecode: 'J26', wmkf_meetingdate: '2026-06-04' }, { wmkf_cyclecode: 'D26', wmkf_meetingdate: '2026-12-10' }]),
+    listPrograms: jest.fn(async () => ({ records: [{ wmkf_grantprogramid: '94cab30b-958f-ee11-8179-000d3a341e8f', wmkf_name: 'Research' }] })),
     now: () => new Date('2026-10-19T12:00:00Z'),
   };
   // The link helpers check the wmkf_grantcycle restriction (covered in grant-cycle-link.test.js).

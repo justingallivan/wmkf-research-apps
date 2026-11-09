@@ -86,6 +86,14 @@ export function assertDiscoveryQuery({ select, expand } = {}) {
   if (!LINKED_CYCLE_EXPANSION.test(String(expand || ''))) throw new Error('Discovery query must expand the linked Grant Cycle code.');
 }
 
+/** A J27-or-later row in a readiness-only program: discoverable by readiness alone. */
+export function isReadinessOnlyRow(row, scope) {
+  const code = row?.wmkf_GrantCycle?.wmkf_cyclecode;
+  const strict = typeof code === 'string' && /^[JD]\d{2}$/.test(code);
+  const program = String(row?._wmkf_grantprogram_value || '').toLowerCase();
+  return strict && parseCycleCode(code).year >= 2027 && readinessOnlyIds(scope).includes(program);
+}
+
 /**
  * Exact row predicate. Strict cycle grammar on the raw value, as
  * `isRequestReadyForStaff` applies it: a malformed or missing code, a cycle
@@ -94,11 +102,7 @@ export function assertDiscoveryQuery({ select, expand } = {}) {
  * post-filter exactly as callers do today.
  */
 export function isDiscoverableRequestRow(row, includeSetAside, scope) {
-  const code = row?.wmkf_GrantCycle?.wmkf_cyclecode;
-  const strict = typeof code === 'string' && /^[JD]\d{2}$/.test(code);
-  const program = String(row?._wmkf_grantprogram_value || '').toLowerCase();
-  const researchJ27 = strict && parseCycleCode(code).year >= 2027 && readinessOnlyIds(scope).includes(program);
-  return researchJ27
+  return isReadinessOnlyRow(row, scope)
     ? row.wmkf_readyforreview === true
     : isVisibleRequestRow(row, includeSetAside) && isRequestReadyForStaff(row);
 }

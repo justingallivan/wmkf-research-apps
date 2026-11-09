@@ -13,7 +13,7 @@ const PD = '44444444-4444-4444-8444-444444444444';
 function deps(records, assigned = []) {
   return {
     listPrograms: jest.fn(async () => ({ records })),
-    queryAssignedRequests: jest.fn(async () => ({ records: assigned.map((id) => ({ _wmkf_grantprogram_value: id, wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } })) })),
+    queryAssignedRequests: jest.fn(async () => ({ records: assigned.map((id) => ({ _wmkf_grantprogram_value: id, akoya_requeststatus: 'Phase II Pending', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } })) })),
   };
 }
 
@@ -48,8 +48,8 @@ test('uses only the newest visible Workbench cycle for the PD default', async ()
   ]);
   dependencies.queryAssignedRequests.mockResolvedValue({
     records: [
-      { _wmkf_grantprogram_value: SOCAL, wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } },
-      { _wmkf_grantprogram_value: RESEARCH, wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } },
+      { akoya_requeststatus: 'Phase II Pending', _wmkf_grantprogram_value: SOCAL, wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } },
+      { akoya_requeststatus: 'Phase II Pending', _wmkf_grantprogram_value: RESEARCH, wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } },
     ],
   });
   await expect(resolveWorkbenchProgramScope({ callerSystemId: PD, dependencies })).resolves.toMatchObject({
@@ -65,7 +65,7 @@ test('the newest cycle is the newest Grant Cycle link, never a meeting date', as
   ]);
   dependencies.queryAssignedRequests.mockResolvedValue({
     records: [
-      { _wmkf_grantprogram_value: SOCAL, wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } },
+      { akoya_requeststatus: 'Phase II Pending', _wmkf_grantprogram_value: SOCAL, wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } },
       // A later December meeting date with no link has no cycle and cannot be newest.
       { _wmkf_grantprogram_value: RESEARCH, wmkf_meetingdate: '2026-12-11' },
     ],
@@ -90,9 +90,9 @@ test('unready J27 assignments do not displace the earlier-cycle program default'
     { wmkf_grantprogramid: RESEARCH, wmkf_name: 'Research' },
     { wmkf_grantprogramid: SOCAL, wmkf_name: 'Southern California' },
   ]);
-  const later = { _wmkf_grantprogram_value: RESEARCH, wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, wmkf_readyforreview: false };
+  const later = { akoya_requeststatus: 'Phase II Pending', _wmkf_grantprogram_value: RESEARCH, wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, wmkf_readyforreview: false };
   dependencies.queryAssignedRequests.mockResolvedValue({ records: [
-    { _wmkf_grantprogram_value: SOCAL, wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } }, later,
+    { akoya_requeststatus: 'Phase II Pending', _wmkf_grantprogram_value: SOCAL, wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } }, later,
   ] });
   expect((await resolveWorkbenchProgramScope({ callerSystemId: PD, dependencies })).defaultProgramId).toBe(SOCAL);
   later.wmkf_readyforreview = true;
