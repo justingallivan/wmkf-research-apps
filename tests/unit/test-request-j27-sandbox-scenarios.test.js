@@ -161,10 +161,17 @@ test('status runner keeps production default and refuses unlocked sandbox invoca
 test('CLI closed parser rejects actual unsafe flags before accessing environment',()=>{
   const {execFileSync}=require('node:child_process');
   const base=['--target=sandbox','--all','--batch-key=test','--source-request-number=1000372','--director=test@example.org',`--reviewers=${id(6)},${id(7)}`];
-  const unsafe=[base.map(x=>x==='--target=sandbox'?'--target=production':x),[...base,'--wmkf_triagestatus=100000000'],[...base,'--confirm=yes'],[...base,`--run-id=${id(1)}`],base.map(x=>x==='--all'?'--scenario':x),[...base,'--director=other@example.org']];
+  const unsafe=[base.map(x=>x==='--target=sandbox'?'--target=production':x),[...base,'--wmkf_triagestatus=100000000'],[...base,'--confirm=yes'],[...base,`--run-id=${id(1)}`],base.map(x=>x==='--all'?'--scenario':x),[...base,'--director=other@example.org'],[...base,'--bypass-goverify=yes']];
   const code=`import {parseArgs} from './scripts/rehearse-j27-factory-scenarios.mjs'; const bad=${JSON.stringify(unsafe)}; console.log(JSON.stringify(bad.map(args=>{try{parseArgs(args);return false}catch{return true}})));`;
   const output=execFileSync(process.execPath,['--import','./scripts/lib/use-extensionless.mjs','--input-type=module','-e',code],{encoding:'utf8',stdio:['ignore','pipe','pipe']});
   expect(JSON.parse(output.trim())).toEqual(unsafe.map(()=>true));
+});
+test('CLI GoVerify bypass is off by default and only a bare flag enables it',()=>{
+  const {execFileSync}=require('node:child_process');
+  const base=['--target=sandbox','--all','--batch-key=test','--source-request-number=1000372','--director=test@example.org',`--reviewers=${id(6)},${id(7)}`];
+  const code=`import {parseArgs} from './scripts/rehearse-j27-factory-scenarios.mjs'; console.log(JSON.stringify([parseArgs(${JSON.stringify(base)}).bypassGoverify, parseArgs(${JSON.stringify([...base,'--bypass-goverify'])}).bypassGoverify]));`;
+  const output=execFileSync(process.execPath,['--import','./scripts/lib/use-extensionless.mjs','--input-type=module','-e',code],{encoding:'utf8',stdio:['ignore','pipe','pipe']});
+  expect(JSON.parse(output.trim())).toEqual([false,true]);
 });
 test('unready control retains null without readiness write',async()=>{const f=fixture(8);f.row.wmkf_readyforreview=null;await confirmed(f);expect(f.row.wmkf_readyforreview).toBeNull();expect(f.journal.plan).not.toHaveBeenCalled();});
 test('ambiguous non-landed suggestion is never posted again',async()=>{const f=fixture(7);f.deps.createSuggestion.mockRejectedValue(Error('POST lost before response'));await expect(confirmed(f)).rejects.toThrow('POST lost');await expect(confirmed(f)).rejects.toThrow('projection incomplete');expect(f.deps.createSuggestion).toHaveBeenCalledTimes(1);});

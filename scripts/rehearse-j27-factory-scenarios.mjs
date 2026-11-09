@@ -25,7 +25,7 @@ import { SCENARIOS, assertSandboxOrigin, sandboxFetch, completeList, assertSynth
 
 export function parseArgs(argv) {
   const result = {};
-  const allowed = new Set(['target','all','scenario','batch-key','director','reviewers','source-request-number','bundle','manifest-dir','run-id','confirm']);
+  const allowed = new Set(['target','all','scenario','batch-key','director','reviewers','source-request-number','bundle','manifest-dir','run-id','confirm','bypass-goverify']);
   for (const arg of argv) {
     const match = /^--([a-z-]+)(?:=(.+))?$/.exec(arg);
     if (!match || !allowed.has(match[1]) || Object.hasOwn(result,match[1])) throw Error('Unknown, duplicate or malformed CLI argument');
@@ -43,6 +43,11 @@ export function parseArgs(argv) {
   if (result['run-id'] && (result.scenarios.length !== 1 || !/^[0-9a-f-]{36}$/i.test(result['run-id']))) throw Error('--run-id requires one scenario and a GUID');
   if (result.confirm && !/^[0-9a-f]{64}$/.test(result.confirm)) throw Error('--confirm must be the exact preview digest');
   if (result['manifest-dir'] && !path.isAbsolute(result['manifest-dir'])) throw Error('--manifest-dir must be absolute');
+  if (result['bypass-goverify'] !== undefined && result['bypass-goverify'] !== true) throw Error('--bypass-goverify takes no value');
+  // Sandbox-only, journaled, restore-guarded deactivation of the synchronous GoVerify
+  // workflow around each Request POST (stepCreateRequest). Off by default; the
+  // runner refuses it on any production target.
+  result.bypassGoverify = result['bypass-goverify'] === true;
   return result;
 }
 export async function runScenarioBatch(items, execute) {
@@ -71,7 +76,7 @@ export async function main(argv = process.argv.slice(2)) {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = sandboxFetch(originalFetch, SANDBOX_URL);
   let db;
-  const report = { mode:args.confirm ? 'J27_CONFIRMED' : 'READ_ONLY_J27_PREVIEW', target:SANDBOX_URL, actorId:cliActorId(os.userInfo().username), written:false, diagnostics:[], prerequisites:{}, scenarios:[] };
+  const report = { mode:args.confirm ? 'J27_CONFIRMED' : 'READ_ONLY_J27_PREVIEW', target:SANDBOX_URL, actorId:cliActorId(os.userInfo().username), bypassGoverify:args.bypassGoverify, written:false, diagnostics:[], prerequisites:{}, scenarios:[] };
   const probe = async (name, fn) => {
     try { const result = await fn(); report.prerequisites[name] = 'VERIFIED'; return result; }
     catch (error) { report.prerequisites[name] = 'REFUSED'; report.diagnostics.push({ prerequisite:name, diagnostic:error.message }); return null; }
@@ -111,7 +116,7 @@ export async function main(argv = process.argv.slice(2)) {
           if (report.diagnostics.length) return report;
           const input = {client,ledger,manifest,actorId:report.actorId,reviewerIds:args.scenarios[0].reviewers ? args.reviewerIds : [],deps,journal:createReadinessJournal(db,{environment:'sandbox'})};
           const preview = await finalizeScenario(input);
-          report.scenarios = [preview]; report.digest = digest({target:report.target,actorId:report.actorId,scenarios:report.scenarios});
+          report.scenarios = [preview]; report.digest = digest({target:report.target,actorId:report.actorId,bypassGoverify:report.bypassGoverify,scenarios:report.scenarios});
           if (args.confirm) {
             if (args.confirm !== report.digest) throw Error('Confirmation does not match current preview');
             report.scenarios = await runScenarioBatch([{scenario:args.scenarios[0],manifest}], async (_item,evidence) => {
@@ -159,7 +164,7 @@ export async function main(argv = process.argv.slice(2)) {
         report.scenarios.push(entry);
         manifests.push({ manifest, manifestPath, scenario });
       }
-      if (!report.diagnostics.length) report.digest = digest({ target:report.target, actorId:report.actorId, scenarios:report.scenarios });
+      if (!report.diagnostics.length) report.digest = digest({ target:report.target, actorId:report.actorId, bypassGoverify:report.bypassGoverify, scenarios:report.scenarios });
       if (!args.confirm) return report;
       if (!report.digest || args.confirm !== report.digest) throw Error('Confirmation does not match current preview');
       if (!args['manifest-dir']) throw Error('--manifest-dir is required before confirmation; preview writes no files');
@@ -169,7 +174,7 @@ export async function main(argv = process.argv.slice(2)) {
           for (let step = 0; step < 60; step++) {
             const run = await ledger.getRun(manifest.values.runId);
             if (run.status === 'ready') break;
-            const advanced = await advanceRun({ runId:run.runId, ledger, manifest, bundle, deps:{client,...context}, options:{ bypassGoverify:false } });
+            const advanced = await advanceRun({ runId:run.runId, ledger, manifest, bundle, deps:{client,...context}, options:{ bypassGoverify:args.bypassGoverify } });
             if (advanced.outcome === 'ready') break;
             if (advanced.outcome !== 'advanced') throw Error(advanced.errorMessage || `Clone stopped: ${advanced.outcome}`);
           }
