@@ -257,7 +257,7 @@ function ReviewerInitial({ reviewer }) {
   );
 }
 
-export default function FinalWriteupTab({ requestId, renderBoardDraft = null }) {
+export default function FinalWriteupTab({ requestId, renderBoardDraft = null, onJ27Facts = null }) {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -304,10 +304,12 @@ export default function FinalWriteupTab({ requestId, renderBoardDraft = null }) 
           if (activeController.current === controller) {
             setStatus(next);
             setNeedsBoardDraft(false);
+            onJ27Facts?.(requestId, { finalWriteup: next }); // step E (plan C7)
           }
         })
         .catch((loadError) => {
           if (activeController.current === controller && loadError?.name !== 'AbortError') {
+            onJ27Facts?.(requestId, { finalWriteup: { error: true, code: loadError?.code || null } }); // step E
             const draftNeeded = boardDraftAvailable && (
               loadError.code === 'final_writeup_source_missing' || loadError.code === 'final_writeup_source_ineligible'
             );
@@ -323,7 +325,7 @@ export default function FinalWriteupTab({ requestId, renderBoardDraft = null }) 
       controller.abort();
       acknowledgementController.current?.abort();
     };
-  }, [requestId, load, boardDraftAvailable, statusReload]);
+  }, [requestId, load, boardDraftAvailable, statusReload, onJ27Facts]);
 
   const acknowledgementArtifactId = IN_REVIEW_PHASES.has(status?.phase)
     ? status?.artifact?.artifactId || null

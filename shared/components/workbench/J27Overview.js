@@ -71,7 +71,7 @@ function savedLabel(value) {
 }
 
 export default function J27Overview({ context, requestId, reviewerProgress,
-  initialRationaleEnabled, semiFinalistEnabled, meetingRosterEnabled, onOpenReports }) {
+  initialRationaleEnabled, semiFinalistEnabled, meetingRosterEnabled, onOpenReports, onJ27Facts = null }) {
   const [loaded, setLoaded] = useState(null);
   useEffect(() => {
     const controller = new AbortController();
@@ -90,7 +90,7 @@ export default function J27Overview({ context, requestId, reviewerProgress,
       meetingRosterEnabled ? read('meeting-roster', r => (
         r.presentation === null ? { presentation: false, roster: false }
           : r.presentation?.id && typeof r.stale === 'boolean'
-            ? { presentation: true, roster: Boolean(r.roster) && !r.stale }
+            ? { presentation: true, roster: Boolean(r.roster) && !r.stale, presentationId: r.presentation.id, rosterPresent: Boolean(r.roster), rosterStale: r.stale }
             : null
       )) : undefined,
     ];
@@ -99,6 +99,9 @@ export default function J27Overview({ context, requestId, reviewerProgress,
       const [rationale, review, visit, meeting] = results.map(r => r.status === 'fulfilled' ? r.value : null);
       setLoaded({ requestId, rationale, review, visit,
         presentation: meeting?.presentation ?? meeting, roster: meeting?.roster ?? meeting });
+      // Step E: the page recomputes the J27 stage from the same reads (plan C7).
+      onJ27Facts?.(requestId, { overview: { rationale, review, visit,
+        meeting: meeting ? { presentation: meeting.presentation, presentationId: meeting.presentationId || null, roster: meeting.rosterPresent === true, rosterStale: meeting.rosterStale === true } : meeting } });
     });
     return () => controller.abort();
   }, [requestId, initialRationaleEnabled, meetingRosterEnabled]);

@@ -113,8 +113,12 @@ function ReviewerProgress({ state, showHint }) {
   );
 }
 
-export default function OverviewTab({ context, requestId, onSelectTab, j27Handoffs, initialRationaleEnabled, semiFinalistEnabled, meetingRosterEnabled }) {
+export default function OverviewTab({ context, requestId, onSelectTab, j27Handoffs, initialRationaleEnabled, semiFinalistEnabled, meetingRosterEnabled, onJ27Facts = null }) {
   const reviewerProgress = useReviewerProgress(requestId);
+  // Step E: the page recomputes the J27 stage once the rollup settles (plan C7).
+  useEffect(() => {
+    if (onJ27Facts && requestId && reviewerProgress.status !== 'loading') onJ27Facts(requestId, { progress: reviewerProgress });
+  }, [onJ27Facts, requestId, reviewerProgress]);
   const info = context?.proposalInfo || {};
   const coPIs = Array.isArray(info.coPIs) ? info.coPIs : [];
   const artifacts = aiArtifacts(context?.aiContent);
@@ -195,7 +199,7 @@ export default function OverviewTab({ context, requestId, onSelectTab, j27Handof
   return (
     <div className="space-y-4">
       <J27Overview key={requestId} context={context} requestId={requestId}
-        reviewerProgress={reviewerProgress}
+        reviewerProgress={reviewerProgress} onJ27Facts={onJ27Facts}
         onOpenReports={onSelectTab ? () => onSelectTab('reviews') : null}
         initialRationaleEnabled={initialRationaleEnabled} semiFinalistEnabled={semiFinalistEnabled} meetingRosterEnabled={meetingRosterEnabled} />
       <details className="rounded-xl border border-gray-200 bg-white p-4">

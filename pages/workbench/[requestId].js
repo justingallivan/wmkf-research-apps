@@ -20,6 +20,8 @@ import Link from 'next/link';
 import Layout, { Card } from '../../shared/components/Layout';
 import RequireAppAccess from '../../shared/components/RequireAppAccess';
 import TestRequestBadge from '../../shared/components/TestRequestBadge';
+import J27StageStrip from '../../shared/components/workbench/J27StageStrip';
+import { deriveJ27PageStage } from '../../shared/utils/j27PageStage';
 import { useAppAccess } from '../../shared/context/AppAccessContext';
 import { useProfile } from '../../shared/context/ProfileContext';
 import { readEmailSignaturePreference } from '../../shared/config/reviewerFinderPreferences';
@@ -88,6 +90,14 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
   const [visitEditorRequestId, setVisitEditorRequestId] = useState(null);
   const [rationaleEditorRequestId, setRationaleEditorRequestId] = useState(null);
   const [proposalLink, setProposalLink] = useState(null);
+  // Step E (plan C7): facts the tabs already load, keyed by request so a
+  // navigation never carries one request's reads into another's stage.
+  const [j27Facts, setJ27Facts] = useState({ requestId: null });
+  const reportJ27Facts = useCallback((factsRequestId, patch) => {
+    const key = String(factsRequestId || '').toLowerCase();
+    if (!key) return;
+    setJ27Facts((prev) => (prev.requestId === key ? { ...prev, ...patch } : { requestId: key, ...patch }));
+  }, []);
   const routeStateRef = useRef({ key: routeKey, generation: 0 });
   if (routeStateRef.current.key !== routeKey) {
     routeStateRef.current = {
@@ -100,6 +110,9 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
     && typeof ctx?.requestId === 'string'
     && ctx.requestId.toLowerCase() === routeRequestId.toLowerCase();
   const visibleContext = contextMatchesRoute && ctxOwnerGeneration === routeGeneration ? ctx : null;
+  const j27Stage = useMemo(() => (visibleContext?.j27?.input
+    ? deriveJ27PageStage(visibleContext.j27.input, j27Facts.requestId === routeKey ? j27Facts : {})
+    : null), [visibleContext, j27Facts, routeKey]);
   const visibleError = error && errorRequestId?.toLowerCase() === routeRequestId?.toLowerCase()
     ? error
     : null;
@@ -293,6 +306,8 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
         {visibleError && <p className="text-sm text-amber-600 mt-1">Couldn’t load request details: {visibleError}</p>}
       </div>
 
+      {j27Stage && <J27StageStrip stage={j27Stage} />}
+
       {reviewerSurfaceReadOnly && (
         <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950" role="status">
           <span className="font-semibold">Preview is read-only for reviewer work.</span>{' '}
@@ -358,6 +373,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
           initialRationaleEnabled={initialRationaleEnabled}
           semiFinalistEnabled={showSemiFinalist}
           meetingRosterEnabled={meetingRosterEnabled}
+          onJ27Facts={visibleContext?.j27 ? reportJ27Facts : null}
         />
       ) : activeTab === 'reviewers' ? (
         <ReviewersTab
@@ -447,6 +463,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
           <FinalWriteupTab
             key={routeRequestId || ''}
             requestId={routeRequestId || ''}
+            onJ27Facts={visibleContext?.j27 ? reportJ27Facts : null}
             renderBoardDraft={phaseLayout ? (props) => (
               <StaffDeliberationsTab
                 requestId={routeRequestId}
