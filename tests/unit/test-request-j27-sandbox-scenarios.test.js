@@ -256,3 +256,13 @@ test('late proposal removal blocks final verification and readiness resume', asy
   await expect(confirmed(f)).rejects.toThrow('final scenario state drift');
   await expect(confirmed(f)).rejects.toThrow('no repair');
 });
+
+test('bundle freshness is waived only when every selected run is already ready', async () => {
+  const { isFinalizeOnlyRerun } = await import('../../scripts/rehearse-j27-factory-scenarios.mjs');
+  expect(isFinalizeOnlyRerun([{ status:'ready' }])).toBe(true);
+  expect(isFinalizeOnlyRerun([{ status:'ready' }, { status:'ready' }])).toBe(true);
+  expect(isFinalizeOnlyRerun([{ status:'ready' }, null])).toBe(false);
+  expect(isFinalizeOnlyRerun([{ status:'creating' }])).toBe(false);
+  expect(isFinalizeOnlyRerun([{ status:'needs_attention' }])).toBe(false);
+  expect(isFinalizeOnlyRerun([])).toBe(false);
+});

@@ -23,6 +23,11 @@ import { advanceRun } from '../lib/services/test-requests/run-runner.js';
 import { buildGraphContext } from './rehearse-test-request-sandbox.mjs';
 import { SCENARIOS, PROPOSAL_RECEIVED_TIME, assertSandboxOrigin, sandboxFetch, completeList, assertSyntheticReviewer, readScenarioMetadata, deterministicId, digest, finalizeScenario, previewScenario, scenarioFor, candidateBodies } from '../lib/services/test-requests/j27-sandbox-scenarios.js';
 
+/** True only when every selected scenario already has a reserved run in 'ready' state. */
+export function isFinalizeOnlyRerun(runs) {
+  return Array.isArray(runs) && runs.length > 0 && runs.every(run => run?.status === 'ready');
+}
+
 export function parseArgs(argv) {
   const result = {};
   const allowed = new Set(['target','all','scenario','batch-key','director','reviewers','source-request-number','bundle','manifest-dir','run-id','confirm','bypass-goverify']);
@@ -129,10 +134,18 @@ export async function main(argv = process.argv.slice(2)) {
           return report;
         }
       }
+      // Bundle age guards the clone. When every selected run is already reserved and ready,
+      // no clone can occur, so the batch's original bundle stays valid for a finalize-only rerun.
+      const finalizeOnly = db ? await probe('finalize_only_rerun', async () => {
+        const ledger = createRunLedger(db);
+        const runs = await Promise.all(args.scenarios.map(s => ledger.getRun(args['run-id'] || deterministicId(args['batch-key'], s.id, 'runId'))));
+        return isFinalizeOnlyRerun(runs);
+      }) : false;
+      if (finalizeOnly) report.bundleFreshnessWaived = 'all selected runs already ready; no clone can occur';
       const bundle = await probe('sandbox_source_bundle', async () => {
         if (!args.bundle) throw Error('Missing --bundle: the existing bounded clone runner requires a private v4 manifest built from a source bundle. No production exporter or source fallback was invoked.');
         const saved = readSourceBundle(JSON.parse(fs.readFileSync(args.bundle,'utf8')));
-        assertBundleFresh(saved);
+        if (!finalizeOnly) assertBundleFresh(saved);
         if (saved.source.dataverseHost !== new URL(SANDBOX_URL).hostname || saved.source.request.akoya_requestnum !== args['source-request-number']) throw Error('Bundle must identify the exact sandbox source request');
         return saved;
       });
