@@ -281,6 +281,20 @@ test('create refusals: no visit, already open, no recipient email, not schedulab
   // D7: an Offramped request never presents.
   await expect(createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, deps({ getRequest: jest.fn(async () => ({ ...request(), wmkf_phaseiistatus: 682090001 })) })))
     .rejects.toMatchObject({ code: 'site_visit_materials_request_offramped' });
+  // Step I rework: invite, remind and preview refuse on the same open collection before any dispatch.
+  for (const [name, run] of [
+    ['invite', (d) => inviteMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org', preparedEmail: MATERIALS_PREPARED_EMAIL }, d)],
+    ['remind', (d) => remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org', preparedEmail: MATERIALS_PREPARED_EMAIL }, d)],
+    ['preview', (d) => previewMaterialsEmail({ requestId: REQUEST_ID, action: 'remind', actorId: ACTOR, profileId: 7, fromEmail: 'pc@wmkeck.org' }, d)],
+  ]) {
+    const offramped = deps({ getRequest: jest.fn(async () => ({ ...request(), wmkf_phaseiistatus: 682090001 })) });
+    offramped.__setStored(openMaterialsRow());
+    await expect(run(offramped)).rejects.toMatchObject({ code: 'site_visit_materials_request_offramped' });
+    expect(offramped.sendEmail).not.toHaveBeenCalled();
+    expect(offramped.updateContacts).not.toHaveBeenCalled();
+    expect(offramped.claimManualReminder).not.toHaveBeenCalled();
+    void name;
+  }
   // A December meeting date without a Grant Cycle link is no cycle: create and its preview refuse.
   const unlinked = () => deps({ getRequest: jest.fn(async () => ({ ...request(), wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: null })) });
   const unlinkedCreate = unlinked();
