@@ -280,3 +280,11 @@ Each gate keeps its legacy visibility check and adds one refusal: when the reque
 Pure-model rows: Offramped at each phase (initial, peer review with reviews received, deliberations with a presentation record) → outcome `offramped`, tasks empty, blocker `offramped` present, `continue-decision-missing` absent everywhere; Offramped plus decided award → `decided-award` wins. Service tests: each of the four gates refuses an Offramped row and still admits a live Phase II Pending row; projection includes the field. Reviewer Finder: Offramped hidden in actionable, shown in all. Gates: status-enum-parity (label maps), types, route-service-boundary, trust-boundary-guid, api-routes if any route body changes (none planned).
 
 Sequence: I1 with tests → I2 with tests → strip line → Codex review → owner go. No merge.
+
+## 10. Merge rehearsal (2026-11-09, read-only, throwaway worktrees removed)
+
+Ancestry: `claude/j27-read-model` is built on `codex/j27-workbench-reports` (31 commits not on `main`); `codex/j27-factory-scenarios` is on `main`; `codex/j27-semi-finalist` (one commit, 2026-11-06, pushed 2026-11-09 for preservation) is on `main`.
+
+- Reports → read-model → Factory merge cleanly in sequence; on that combined tree types, status-enum-parity, api-routes, atlas, doc-symbol-refs and fact-consistency are green.
+- `codex/j27-semi-finalist` conflicts with the reports line in six First Cut files in every order. It is an earlier version of the reports line's 2026-11-07 semifinalist commit, which carries strictly more (integrity rehearsal, test-request isolation, the screen check). Its one unique piece, `tests/unit/workbench-first-cut-route.test.js`, is ported to this branch. Recommendation: park the branch; do not merge it.
+- Four unit suites are red on the combined tree and green on `main`, so the reports line introduced them: `awardee-tab` (date-dependent), `reviewer-engagement-census` (recorded caller list lacks `staff-review-summary-service.js`), `reviewer-follow-up` (page props gained `j27IntegrityEnabled`), `workbench-read-coalescing-stage2-characterization` (`staffReviewEvidenceHash` on the reviewers DTO). They block a merge and belong to the reports line's surfaces.
