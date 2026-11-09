@@ -204,3 +204,13 @@ Checks completed before the build (all sandbox `orgd9e66399`, probed 2026-11-09)
 - Run `2c708127` is still `status='ready'`, `current_step='verify'`, with no needs-attention reason. The CLI re-enters `finalizeScenario` for ready runs and skips journaled status changes already complete, so a rerun with the same batch key completes 1000386 in place. No ninth request. [VERIFIED via ledger row and `scripts/rehearse-j27-factory-scenarios.mjs:162`]
 
 Not built. Build after owner review of this addendum; the confirm needs the owner's GoVerify bypass authorization only if a new request is created, which this path avoids.
+
+### Result of the 2026-11-09 rerun (confirmed, stopped)
+
+Built at `fe7f2fe5d` (Codex) with the finalize-only bundle waiver at `32942f6fd`. Preview was clean; the confirm journaled and verified the proposal-received write on 1000386 (`wmkf_proposalreceived = 2026-11-09T17:26:40Z`, receipt `j27_proposal_received` verified), then stopped again at "scenario 7 derived status mismatch". Request status stayed `Proposal Invited`; the run stays `ready`; readiness and the reviewer slate were not written. Nothing was rolled back.
+
+Cause [VERIFIED via the rule's clientdata, scope 4 = entity]: `WMKF_Set Phase II Request Status` has four branches, all requiring `wmkf_proposalreceived` set: Phase II status **empty** and grant empty → `Phase II Pending Committee Review`; `100000001` → `Phase II Declined`; `100000000` and grant empty → `Phase II Deferred`; `100000003` → `Approved`. There is no branch for `100000002` (Pending Committee Review), so a row whose Phase II status is already set derives nothing. And the string the sandbox rule writes is `Phase II Pending Committee Review`, not `Phase II Pending`.
+
+The production status census (`lib/services/dataverse-export/constants.js`, provenance `probe`) contains `Phase II Pending` and not `Phase II Pending Committee Review`. So the sandbox rule and production data disagree. The order of the two writes also matters: the date must land while Phase II status is empty.
+
+Open for the owner: (a) whether production's rule text differs from the sandbox copy (needs an owner-authorized production read of the rule); (b) whether scenario 7 should write the date before the Phase II status and accept the string the rule actually writes, or whether the sandbox rule itself is stale. No further confirm runs until decided.
