@@ -112,24 +112,24 @@ test('the exact dropdown rehearsal is admitted only in sandbox Preview with scre
     ...process.env,
     VERCEL_ENV: 'preview',
     DYNAMICS_URL: `https://${SANDBOX_HOSTS[0]}`,
-    J27_SEMI_FINALIST_ENABLED: 'on',
+    J27_CHAIRS_RECOMMENDATION_ENABLED: 'on',
     J27_INITIAL_RATIONALE_SCHEMA_READY: 'on',
     TEST_REQUEST_ISOLATION: 'on',
     J27_AUTOMATIC_INTEGRITY: 'off',
-    J27_SEMI_FINALIST_REHEARSAL_REQUEST_ID: id.toUpperCase(),
+    J27_CHAIRS_RECOMMENDATION_REHEARSAL_REQUEST_ID: id.toUpperCase(),
   });
   try {
     await expect(getServerSideProps()).resolves.toMatchObject({ props: {
-      semiFinalistEnabled: true, semiFinalistRehearsalRequestId: id, automaticIntegrityEnabled: false,
+      chairsRecommendationEnabled: true, chairsRecommendationRehearsalRequestId: id, automaticIntegrityEnabled: false,
     } });
     process.env.J27_AUTOMATIC_INTEGRITY = 'on';
     await expect(getServerSideProps()).resolves.toMatchObject({ props: {
-      semiFinalistRehearsalRequestId: null, automaticIntegrityEnabled: true,
+      chairsRecommendationRehearsalRequestId: null, automaticIntegrityEnabled: true,
     } });
     process.env.J27_AUTOMATIC_INTEGRITY = 'off';
     process.env.VERCEL_ENV = 'production';
     await expect(getServerSideProps()).resolves.toMatchObject({ props: {
-      semiFinalistEnabled: false, semiFinalistRehearsalRequestId: null, automaticIntegrityEnabled: false,
+      chairsRecommendationEnabled: false, chairsRecommendationRehearsalRequestId: null, automaticIntegrityEnabled: false,
     } });
   } finally {
     env.restore();

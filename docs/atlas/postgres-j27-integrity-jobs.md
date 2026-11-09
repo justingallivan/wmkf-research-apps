@@ -6,15 +6,16 @@ is implied by the source.
 
 ## Write and read paths
 
-The J27 Initial Assessment dropdown calls `POST /api/workbench/first-cut` with
-stage `semi-finalist`, authenticated lead PD or superuser authority, and the
-current Dataverse ETag. The decision replaces First Cut in the same
+The J27 Initial Assessment dropdown calls `POST /api/workbench/scoring` with
+stage `chairs-recommendation` (renamed 2026-11-09 from `first-cut` and
+`semi-finalist`), authenticated lead PD or superuser authority, and the
+current Dataverse ETag. The decision replaces the scoring decision in the same
 `akoya_request.wmkf_phaseistatus` field. There is no separate decision field.
 A ready factory run must bind the test request, run ID, and sandbox hostname
 before the save. This protects the shared screening history from copied
-Production request GUIDs. `J27_SEMI_FINALIST_ENABLED=on` also requires the
+Production request GUIDs. `J27_CHAIRS_RECOMMENDATION_ENABLED=on` also requires the
 existing rationale and test-isolation gates. For a dropdown-only Preview,
-`J27_SEMI_FINALIST_REHEARSAL_REQUEST_ID` admits exactly the designated sandbox
+`J27_CHAIRS_RECOMMENDATION_REHEARSAL_REQUEST_ID` admits exactly the designated sandbox
 request while `J27_AUTOMATIC_INTEGRITY` is explicitly `off`. This path does
 not reach the Factory lookup or screen queue. The automatic path still
 needs a verified connection to the separate sandbox Factory ledger.

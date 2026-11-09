@@ -1,5 +1,7 @@
 # J27 read model and discovery predicate: build plan (steps C and F), revision 5
 
+**Terminology (owner, 2026-11-09; alignment log D52).** The terms "First Cut" and "Semi-finalist" are retired. The steps are "Scoring" and "Recommendation to Chairs"; staff-facing labels are the Dataverse choice names, with "Recommended to Chairs" and "Not Recommended" on the stage strip. Identifiers, task keys, the route and the settings in this plan were renamed to match in the same change (`record-scoring`, `record-chairs-recommendation`, `recorded.scoring`, `recorded.chairsRecommendation`, outcome `not-recommended`, `/api/workbench/scoring`, `J27_CHAIRS_RECOMMENDATION_ENABLED`). Narrative and review history below still uses the old words where it describes what was said or done at the time.
+
 Author: Claude Fable 5.1 for Justin Gallivan, 2026-11-08. Status: **steps C and D BUILT** on `claude/j27-read-model` at `0fd5dbe45` (owner authorization 2026-11-09 UTC; Codex build review READY WITH NAMED CHANGES, resolved in `6f3bd34b7`, record in `J27_READ_MODEL_BUILD_REVIEW_2026-11-09.md`); page-side recomputation deferred to step E; **step F BUILT** 2026-11-09 (owner authorization; commits `f75704137`, `62855a91b`; Codex review READY WITH NAMED CHANGES, both resolved at `406727a74`, record in `J27_DISCOVERY_BUILD_REVIEW_2026-11-09.md`); **step E BUILT** at `9469c47b5`, reworked through `9d7f6aee1` after two Codex rounds, final check READY (§8). Baseline: `codex/j27-workbench-reports` at `97f696faf`.
 
 Revision 3 resolves the six round-2 named changes: F1 projection contract, strict cycle grammar, outer grouping, paging, independent probe; Final Writeups unchanged and Reviewer Finder given its own predicate; Review Panel projection and post-filter; rollup population preserved; C7 orchestration restated as tier 1 on the server and tier 2 composed on the request page (budget stated in C7); integrity state defined over screenings, not jobs; phase, task, and blocker contradictions removed; citations corrected; fixtures and scenario end states inlined.
@@ -10,7 +12,7 @@ Revision 3 resolves the six round-2 named changes: F1 projection contract, stric
 - **D2** gates: reviewer identification ungated; invitations need Phase I Invited and request status Phase II Pending; presentation operations keep the legacy predicate until D7.
 - **D3**: Semi-finalist No and First Cut Not Scored are terminal; Semi-finalist Yes is "Recommended to Chairs, awaiting outcome".
 - **D4** (closed 2026-11-08): no coverage threshold; `record-offramp` available from Recommended Invite onward, never blocked; received count and dates are information.
-- **D5**: lead PD or superuser may change First Cut or Semi-finalist at any time. Not existing behavior (`first-cut-service.js:49`; `j27FirstCut.js:3,14`). Step G item.
+- **D5**: lead PD or superuser may change First Cut or Semi-finalist at any time. Not existing behavior (`scoring-service.js:49`; `j27Scoring.js:3,14`). Step G item.
 - **D6**: a flagged screen without PD review blocks reviewer invitations and presentation scheduling. This plan blocks exactly `send-invitations` and `schedule-presentation`; widening to materials, invitation email, or transcription would be a new owner decision and is not assumed.
 - **D7** closed 2026-11-09 (Connor, Sarah; confirmed in production metadata): the offramp is recorded as `wmkf_phaseiistatus = 682090001` "Phase II Offramped". Until step I is built, `continue-decision-missing` still blocks the four presentation operations; step I replaces it (§9).
 - **D8** (2026-11-09): the J27 read model and its surfaces are Research-only by design. The program gate (`deriveJ27ForRow` requires the F1 readiness-only scope) stays. Owner: "The more we do on the app for the research program, the harder it will be to make it directly compatible with SoCal. I'm actually fine with that as their business practices differ." A Southern California suite, if ever wanted, would be built as its own app, sharing code and lessons, not by widening this model.
@@ -36,10 +38,10 @@ Tier 1 (server, both callers):
 | `request` | `requestStatus, statusClass, phaseIStatus, phaseIStatusLabel, phaseIIStatus, readyForReview, cycleCode, grantProgramId, triageStatus, isTestRequest` | `resolve-request-service.js:26` SELECT + `wmkf_phaseiistatus, wmkf_readyforreview, wmkf_triagestatus`; `dashboard-service.js:64` `PROPOSAL_SELECT` + `wmkf_phaseistatus` (formatted value gives the label). `statusClass` via `classifyStatus` (`dataverse-export/constants.js:133`, exported `:388`). |
 | `rationale`, `reviewSummary`, `visitAssessment`, `rosterMemo` | presence only | memo columns `wmkf_initialassessmentrationale`, `wmkf_staffreviewsummary`, `wmkf_staffvisitassessment`, `wmkf_confirmedmeetingroster` added to both SELECTs only when the matching schema-ready helper says the wave is provisioned (`lib/utils/initial-assessment-rationale-readiness.js`, `lib/utils/j27-integrity-readiness.js` pattern, and the roster/visit helpers of waves 37 to 39); otherwise `unavailable`. `rosterMemo.present` means the JSON is non-empty; it says nothing about the current visit (see C3). |
 | `reviewers` | `{ candidates, invited, accepted, received, completed, anySuggestion }` | Dashboard: `fetchReviewerRollup` (`reviewer-rollup.js:67`), already loaded per page. Request page: counts are tier 2, from the per-request rollup the Overview tab already fetches (`OverviewTab.js:68-82`, `useReviewerProgress`); resolution does not fetch the rollup and will not start to. `anySuggestion` is tier 1 on both callers (its own query, below) and is carried as a separate field so the later arrival of counts merges into `reviewers.counts` without overwriting it. `anySuggestion` comes from a **second, separate** adapter query `existsAnySuggestionForRequests(ids)` (`reviewer-suggestion.js`, beside `findForRollup :444`) with filter `(<or-chain>) and <notExcludedFilter()>` and `$select=_wmkf_request_value`; `findForRollup` and every existing count and progress bucket (`reviewer-rollup.js:79-112`) are untouched, pinned by a test that unselected non-declined rows change `anySuggestion` only. |
-| `integrity` | `{ latest: null \| { flagged, reviewed, provenance: 'automated' \| 'manual-unverified-target' } }` | New Postgres reader `readLatestIntegrityStates(targetHost, requestIds[])` in `j27-integrity-jobs.js`. Candidate rows: `integrity_screenings` for each `request_id`, LEFT JOIN `j27_integrity_jobs` on `screening_id`. A row with a job is `automated` and is eligible only when `job.target_host = targetHost`; a row without a job is `manual-unverified-target` (both writers store `screening_type = 'workbench'`, `j27-integrity-jobs.js:139`, `integrity-service.js:533`, so provenance comes from the job association, never the type). Winner per request: the globally latest screening for the request, `ORDER BY created_at DESC, id DESC`, exactly as `getLatestRequestIntegrityRun` (`integrity-service.js:151-157`) and the disposition endpoint's `getCurrentRequestScreeningRow` (`:554`, rejected as `screening_not_latest` at `:592` when a review targets an older screening) select it. Target filtering is applied **after** selection, not before: if the winner is an automated screening whose job `target_host` differs from the current target, the key is `unavailable` with detail `other-target-latest` and no review task is raised, because a review of any older local screening would be refused by the endpoint. `flagged` uses the writer's own predicate, any result with `hasConcerns === true` or `matchCount > 0` (`j27-integrity-jobs.js:126`), evaluated over `results`, not `match_count` alone. `reviewed = EXISTS integrity_screening_reviews for the winner`. Accepted limitation, owner-visible: `integrity_screenings` has no target column (`setup-database.js:137`) and Preview can share Postgres with Production, so manual evidence cannot be bound to a target; it is accepted for the same request GUID and labeled `manual-unverified-target`, matching the existing GUID-only latest read at `integrity-service.js:151` (the `first-cut-service.js:52` fence is about Factory rehearsal provenance and is not the precedent). D6 blocking applies to both provenances. A failed query marks the key `unavailable`; a null `j27IntegrityTarget()` does not. Tests: concerns with zero matches; equal timestamps; latest manual superseding automated; reviewed winner; older local flagged screening plus newer other-target screening → `unavailable`, no task; manual evidence without provenance (included, labeled). |
+| `integrity` | `{ latest: null \| { flagged, reviewed, provenance: 'automated' \| 'manual-unverified-target' } }` | New Postgres reader `readLatestIntegrityStates(targetHost, requestIds[])` in `j27-integrity-jobs.js`. Candidate rows: `integrity_screenings` for each `request_id`, LEFT JOIN `j27_integrity_jobs` on `screening_id`. A row with a job is `automated` and is eligible only when `job.target_host = targetHost`; a row without a job is `manual-unverified-target` (both writers store `screening_type = 'workbench'`, `j27-integrity-jobs.js:139`, `integrity-service.js:533`, so provenance comes from the job association, never the type). Winner per request: the globally latest screening for the request, `ORDER BY created_at DESC, id DESC`, exactly as `getLatestRequestIntegrityRun` (`integrity-service.js:151-157`) and the disposition endpoint's `getCurrentRequestScreeningRow` (`:554`, rejected as `screening_not_latest` at `:592` when a review targets an older screening) select it. Target filtering is applied **after** selection, not before: if the winner is an automated screening whose job `target_host` differs from the current target, the key is `unavailable` with detail `other-target-latest` and no review task is raised, because a review of any older local screening would be refused by the endpoint. `flagged` uses the writer's own predicate, any result with `hasConcerns === true` or `matchCount > 0` (`j27-integrity-jobs.js:126`), evaluated over `results`, not `match_count` alone. `reviewed = EXISTS integrity_screening_reviews for the winner`. Accepted limitation, owner-visible: `integrity_screenings` has no target column (`setup-database.js:137`) and Preview can share Postgres with Production, so manual evidence cannot be bound to a target; it is accepted for the same request GUID and labeled `manual-unverified-target`, matching the existing GUID-only latest read at `integrity-service.js:151` (the `scoring-service.js:52` fence is about Factory rehearsal provenance and is not the precedent). D6 blocking applies to both provenances. A failed query marks the key `unavailable`; a null `j27IntegrityTarget()` does not. Tests: concerns with zero matches; equal timestamps; latest manual superseding automated; reviewed winner; older local flagged screening plus newer other-target screening → `unavailable`, no task; manual evidence without provenance (included, labeled). |
 | `calendar` | `{ offrampMeetingDate, reviewsDueDate, today }` | Columns `wmkf_researchofframpmeetingdate`, `wmkf_researchreviewsduedate` (`shared/config/cycleCalendar.js:18-19`). Request page: the calendar read already at `resolve-request-service.js:90` keeps these two. Dashboard proposal-list mode (`listProposals`, `dashboard-service.js:234`) adds one read of the selected cycle's calendar row through the same throwing adapter the request page uses; a throw marks `calendar.unavailable` for the page of rows. Cycle-list mode keeps `listBoardDatesOrNone` (`operations-grant-cycle.js:294`) and does not compute the read model. `today` injected. |
 | `capabilities` | `{ readOnly }` | `resolvePreviewReadOnly` (`preview-read-only.js:11`), as `pages/workbench/[requestId].js:495` computes it. Not a blocker; see C6. |
-| `features` | `{ semiFinalistEnabled }` | existing helper for `J27_SEMI_FINALIST_ENABLED` |
+| `features` | `{ chairsRecommendationEnabled }` | existing helper for `J27_CHAIRS_RECOMMENDATION_ENABLED` |
 
 Tier 2 (request page only; the dashboard passes `not-loaded`):
 
@@ -52,14 +54,14 @@ Tier 2 (request page only; the dashboard passes `not-loaded`):
 
 ### C2. Recorded decisions and Chairs outcome
 
-From `wmkf_phaseistatus` only. Values: `FIRST_CUT_STATUS`, `SEMI_FINALIST_STATUS` (`j27FirstCut.js:1,8`), Invited 100000003, Not Invited 100000002 (`docs/atlas/dataverse-akoya-request.md:202`).
+From `wmkf_phaseistatus` only. Values: `SCORING_STATUS`, `CHAIRS_RECOMMENDATION_STATUS` (`j27Scoring.js:1,8`), Invited 100000003, Not Invited 100000002 (`docs/atlas/dataverse-akoya-request.md:202`).
 
-| Phase I | `firstCut` | `semiFinalist` | `chairsOutcome` | Label |
+| Phase I | `scoring` | `chairsRecommendation` | `chairsOutcome` | Label |
 |---|---|---|---|---|
 | unset / Pending Committee Review | unset | unset | pending | none |
 | Scored | scored | unset | pending | Scored |
 | Not Scored | not-scored | unset | pending | Not Scored (terminal) |
-| Recommended Do Not Invite | inferred-scored | no | pending | Triaged (terminal) |
+| Recommended Do Not Invite | inferred-scored | no | pending | Not Recommended (terminal) |
 | Recommended Invite | inferred-scored | yes | pending | Recommended to Chairs, awaiting outcome |
 | Invited | inferred-scored | inferred-yes | invited | Invited for peer review |
 | Not Invited | inferred-scored | inferred-yes | not-invited | Not invited (terminal) |
@@ -81,20 +83,20 @@ A row's `basis` is `full` when every input a higher row consults, plus on a non-
 
 ### C4. Outcome
 
-`outcome ∈ none | not-scored | triaged | not-invited | offramped | decided-award | decided-no-award | withdrawn`. Terminal outcome → no forward tasks. `offramped` (`wmkf_phaseiistatus = 682090001`) was added by step I (§9); before D7 closed, this row read "No offramp outcome" and that text is historical.
+`outcome ∈ none | not-scored | not-recommended | not-invited | offramped | decided-award | decided-no-award | withdrawn`. Terminal outcome → no forward tasks. `offramped` (`wmkf_phaseiistatus = 682090001`) was added by step I (§9); before D7 closed, this row read "No offramp outcome" and that text is historical.
 
 ### C5. Tasks (display order)
 
 | Key | Present when (all operands confirmed, never `not-loaded`/`unavailable`) | Owner | Phase |
 |---|---|---|---|
 | record-rationale | `rationale.absent`, no terminal outcome | existing edit rule | initial-assessment |
-| record-first-cut | `firstCut === 'unset'` | lead PD / superuser | initial-assessment |
-| record-semi-finalist | `firstCut === 'scored'`, `semiFinalist === 'unset'`, `semiFinalistEnabled` | lead PD / superuser | initial-assessment |
+| record-scoring | `scoring === 'unset'` | lead PD / superuser | initial-assessment |
+| record-chairs-recommendation | `scoring === 'scored'`, `chairsRecommendation === 'unset'`, `chairsRecommendationEnabled` | lead PD / superuser | initial-assessment |
 | review-integrity | `integrity.latest.flagged && !reviewed` | lead PD | initial-assessment |
 | identify-reviewers | no terminal outcome, `completed < 3` | lead PD | peer-review; secondary, quiet link on the landing list |
 | send-invitations | `chairsOutcome === 'invited'`, `requestStatus === 'Phase II Pending'`, `candidates > invited` | lead PD | peer-review |
 | read-reports | `received > 0` and (`reviewSummary.absent` or `.stale === true`) | any staff | peer-review |
-| record-offramp | `semiFinalist ∈ {yes, inferred-yes}`, no terminal outcome; detail `received`, `pastOfframpDate` (null without a date) | lead PD | deliberations; secondary |
+| record-offramp | `chairsRecommendation ∈ {yes, inferred-yes}`, no terminal outcome; detail `received`, `pastOfframpDate` (null without a date) | lead PD | deliberations; secondary |
 | confirm-roster | `presentation.ended === true` and (`roster.absent` or `.stale`) | any staff | deliberations |
 | write-visit-assessment | `presentation.ended === true`, `visitAssessment.absent` | any staff | deliberations |
 | write-board-draft | `visitAssessment.present`, `boardDraft.exists === false` | lead PD | final-assessment |
@@ -106,7 +108,7 @@ A row's `basis` is `full` when every input a higher row consults, plus on a non-
 
 | Key | Condition | Blocks |
 |---|---|---|
-| chairs-outcome-pending | `semiFinalist === 'yes'` and `chairsOutcome === 'pending'` (Recommended to Chairs, outcome not yet recorded) | send-invitations |
+| chairs-outcome-pending | `chairsRecommendation === 'yes'` and `chairsOutcome === 'pending'` (Recommended to Chairs, outcome not yet recorded) | send-invitations |
 | phase-two-status-pending | `chairsOutcome === 'invited'` and `requestStatus !== 'Phase II Pending'` (Chairs' outcome recorded; production derives `Phase II Pending` from `wmkf_phaseiistatus` Pending Committee Review or Recommended, read 2026-11-09, so Phase II status is not yet set) | send-invitations |
 | integrity-unreviewed | `integrity.latest.flagged && !reviewed` | send-invitations, schedule-presentation (D6 as recorded) |
 | offramped | `outcome === 'offramped'` (step I, §9; replaced the pre-D7 `continue-decision-missing` blocker, which fired unconditionally) | send-invitations, schedule-presentation, presentation-materials, presentation-invitation-email, presentation-transcription |
@@ -116,7 +118,7 @@ A row's `basis` is `full` when every input a higher row consults, plus on a non-
 | evidence-stale | `reviewSummary.stale` | read-reports re-raised |
 | roster-stale | `roster.stale` | confirm-roster re-raised |
 
-`capabilities.readOnly` is returned separately as `readOnly: true`; surfaces disable every mutation on it. It is not a blocker, so the invariant holds: `record-rationale`, `record-first-cut`, `record-semi-finalist`, `identify-reviewers`, `record-offramp` never appear in any `blocks` set (asserted by test over the table). "No applicable blocker" for `start-group-review` means no blocker whose `blocks` contains that key.
+`capabilities.readOnly` is returned separately as `readOnly: true`; surfaces disable every mutation on it. It is not a blocker, so the invariant holds: `record-rationale`, `record-scoring`, `record-chairs-recommendation`, `identify-reviewers`, `record-offramp` never appear in any `blocks` set (asserted by test over the table). "No applicable blocker" for `start-group-review` means no blocker whose `blocks` contains that key.
 
 ### C7. Orchestration and read budget
 
@@ -202,7 +204,7 @@ Unchanged, with a one-line comment naming the reason:
 
 ## 4. Named dependencies outside this plan
 
-- Step G: invitation send guard gains `chairs-outcome-pending`, `phase-two-status-pending`, and `integrity-unreviewed`; D5 editability widening in `j27FirstCut.js` and `first-cut-service.js:49` plus the Record button; D6 scheduling refusal in `site-visit/logistics-service.js` reading `readLatestIntegrityStates`.
+- Step G: invitation send guard gains `chairs-outcome-pending`, `phase-two-status-pending`, and `integrity-unreviewed`; D5 editability widening in `j27Scoring.js` and `scoring-service.js:49` plus the Record button; D6 scheduling refusal in `site-visit/logistics-service.js` reading `readLatestIntegrityStates`.
 - Step I (D7 closed 2026-11-09): read the Offramped status as a terminal outcome, retire `continue-decision-missing`, and refuse the four presentation operations for an Offramped row (§9). The written justification's home is still open.
 
 ## 5. Sequence and gates

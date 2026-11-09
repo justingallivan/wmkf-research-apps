@@ -24,7 +24,7 @@ jest.mock('../../lib/utils/meeting-roster-readiness', () => ({
 }));
 jest.mock('../../lib/utils/j27-integrity-readiness', () => ({
   j27IntegrityTarget: () => process.env.TEST_INTEGRITY_TARGET || null,
-  j27SemiFinalistEnabled: () => process.env.TEST_SEMI === 'on',
+  j27ChairsRecommendationEnabled: () => process.env.TEST_SEMI === 'on',
 }));
 
 import {
@@ -134,7 +134,7 @@ describe('composition', () => {
     expect(input.reviewers).toEqual({ status: 'present', anySuggestion: true, counts: { status: 'present', candidates: 1, invited: 0, accepted: 0, received: 0, completed: 0 } });
     expect(input.integrity.latest.flagged).toBe(true);
     expect(input.capabilities).toEqual({ status: 'present', readOnly: true });
-    expect(input.features).toEqual({ status: 'present', semiFinalistEnabled: true });
+    expect(input.features).toEqual({ status: 'present', chairsRecommendationEnabled: true });
   });
   test('a per-partition read failure reaches the row as unavailable', () => {
     const input = composeJ27Tier1(row(), facts({ integrity: new Map([[REQ, { status: 'unavailable', detail: 'read-failed' }]]) }), { calendar });
@@ -161,7 +161,7 @@ describe('composition', () => {
     expect(stage.phase).toBe('initial-assessment');
     expect(stage.input.request.cycleCode).toBe('J27');
     expect(j27DashboardDto(stage)).toEqual({
-      phase: 'initial-assessment', basis: 'degraded', primaryTask: 'record-first-cut', taskKeys: ['record-first-cut'],
+      phase: 'initial-assessment', basis: 'degraded', primaryTask: 'record-scoring', taskKeys: ['record-scoring'],
       blockerKeys: [], recorded: stage.recorded, outcome: 'none',
     });
   });

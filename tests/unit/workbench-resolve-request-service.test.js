@@ -225,7 +225,7 @@ describe('J27 read model (plan C7)', () => {
     // Memo waves are off in this env, so their keys are unavailable and the basis is degraded (plan C1, C3).
     expect(body.j27).toMatchObject({
       phase: 'peer-review', basis: 'degraded', outcome: 'none',
-      recorded: { semiFinalist: 'yes', chairsOutcome: 'pending' },
+      recorded: { chairsRecommendation: 'yes', chairsOutcome: 'pending' },
       blockerKeys: ['chairs-outcome-pending', 'integrity-unreviewed'],
     });
     expect(body.j27.taskKeys).toEqual(['review-integrity', 'record-offramp']);

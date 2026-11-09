@@ -3,7 +3,7 @@ import {
   J27_TASKS, J27_TASK_KEYS, J27_BLOCKERS, J27_RECORDING_TASK_KEYS, J27_PRESENTATION_OPERATIONS,
   J27_PHASES, J27_OUTCOMES, PHASE_I_CHAIRS, PHASE_II_OFFRAMPED,
 } from '../../lib/services/workbench/j27-read-model';
-import { FIRST_CUT_STATUS, SEMI_FINALIST_STATUS } from '../../shared/config/j27FirstCut';
+import { SCORING_STATUS, CHAIRS_RECOMMENDATION_STATUS } from '../../shared/config/j27Scoring';
 
 // Plan: docs/plans/J27_READ_MODEL_AND_DISCOVERY_PLAN_2026-11-08.md §C8.
 // Expected rows are hand-derived from C2 to C6, not from the implementation.
@@ -35,7 +35,7 @@ function tier1(request = {}, over = {}) {
     integrity: { status: 'present', latest: null },
     calendar: { status: 'present', offrampMeetingDate: '2027-03-15', reviewsDueDate: '2027-03-01', today: '2026-11-09' },
     capabilities: { status: 'present', readOnly: false },
-    features: { status: 'present', semiFinalistEnabled: true },
+    features: { status: 'present', chairsRecommendationEnabled: true },
     presentation: NL, roster: NL, boardDraft: NL, transition: NL,
     ...over,
   };
@@ -67,7 +67,7 @@ describe('scope guard', () => {
   test('D26 intake row is unclassified even when ready', () => {
     const r = deriveJ27Stage(tier1({ cycleCode: 'D26' }));
     expect(keys(r).phase).toBe('unclassified');
-    expect(r.recorded.firstCut).toBe('unset');
+    expect(r.recorded.scoring).toBe('unset');
   });
   test('lowercase or padded cycle code is out of scope', () => {
     expect(deriveJ27Stage(tier1({ cycleCode: 'j27' })).basis).toBe('out-of-scope');
@@ -83,15 +83,15 @@ describe('C2 recorded decisions', () => {
   test.each([
     [null, 'unset', 'unset', 'pending', null, false],
     [100000000, 'unset', 'unset', 'pending', null, false],
-    [FIRST_CUT_STATUS.yes, 'scored', 'unset', 'pending', 'Scored', false],
-    [FIRST_CUT_STATUS.no, 'not-scored', 'unset', 'pending', 'Not Scored', false],
-    [SEMI_FINALIST_STATUS.no, 'inferred-scored', 'no', 'pending', 'Triaged', false],
-    [SEMI_FINALIST_STATUS.yes, 'inferred-scored', 'yes', 'pending', 'Recommended to Chairs, awaiting outcome', false],
-    [PHASE_I_CHAIRS.invited, 'inferred-scored', 'inferred-yes', 'invited', 'Invited for peer review', false],
-    [PHASE_I_CHAIRS.notInvited, 'inferred-scored', 'inferred-yes', 'not-invited', 'Not invited', false],
+    [SCORING_STATUS.yes, 'scored', 'unset', 'pending', 'Scored', false],
+    [SCORING_STATUS.no, 'not-scored', 'unset', 'pending', 'Not Scored', false],
+    [CHAIRS_RECOMMENDATION_STATUS.no, 'inferred-scored', 'no', 'pending', 'Not Recommended', false],
+    [CHAIRS_RECOMMENDATION_STATUS.yes, 'inferred-scored', 'yes', 'pending', 'Recommended to Chairs', false],
+    [PHASE_I_CHAIRS.invited, 'inferred-scored', 'inferred-yes', 'invited', 'Invited', false],
+    [PHASE_I_CHAIRS.notInvited, 'inferred-scored', 'inferred-yes', 'not-invited', 'Not Invited', false],
     [100000001, 'unset', 'unset', 'pending', 'Raw label', true],
-  ])('phase I %p', (value, firstCut, semiFinalist, chairsOutcome, label, unmapped) => {
-    expect(deriveRecorded(value, 'Raw label')).toEqual({ firstCut, semiFinalist, chairsOutcome, label, unmapped });
+  ])('phase I %p', (value, scoring, chairsRecommendation, chairsOutcome, label, unmapped) => {
+    expect(deriveRecorded(value, 'Raw label')).toEqual({ scoring, chairsRecommendation, chairsOutcome, label, unmapped });
   });
   test('unmapped without a formatted label yields null label', () => {
     expect(deriveRecorded(100000001).label).toBeNull();
@@ -102,9 +102,9 @@ describe('C4 outcome', () => {
   test.each([
     ['DECIDED_AWARD', null, 'decided-award'],
     ['DECIDED_NO_AWARD', null, 'decided-no-award'],
-    ['WITHDRAWN', SEMI_FINALIST_STATUS.yes, 'withdrawn'],
-    ['IN_FLIGHT', FIRST_CUT_STATUS.no, 'not-scored'],
-    ['IN_FLIGHT', SEMI_FINALIST_STATUS.no, 'triaged'],
+    ['WITHDRAWN', CHAIRS_RECOMMENDATION_STATUS.yes, 'withdrawn'],
+    ['IN_FLIGHT', SCORING_STATUS.no, 'not-scored'],
+    ['IN_FLIGHT', CHAIRS_RECOMMENDATION_STATUS.no, 'not-recommended'],
     ['IN_FLIGHT', PHASE_I_CHAIRS.notInvited, 'not-invited'],
     ['IN_FLIGHT', PHASE_I_CHAIRS.invited, 'none'],
     ['UNCLASSIFIED', null, 'none'],
@@ -117,7 +117,7 @@ describe('C4 outcome', () => {
 describe('C8.1 Factory scenario end states (sandbox batch owner-j27-2026-11-09)', () => {
   // Request status as observed on the created rows (2026-11-09 UTC): Not Scored
   // and Scored read Phase I Pending; Intake, Rationale saved and both
-  // Semi-finalist rows read blank. Scenario 7 (1000386) completed 2026-11-09
+  // Recommendation rows read blank. Scenario 7 (1000386) completed 2026-11-09
   // with Phase I Invited, Phase II Pending Committee Review, ready, two selected
   // uninvited suggestions, and request status `Proposal Invited`: the sandbox's
   // 2024 status rules never derive `Phase II Pending`, which production's rule
@@ -126,32 +126,32 @@ describe('C8.1 Factory scenario end states (sandbox batch owner-j27-2026-11-09)'
   const s7 = { requestStatus: P2, phaseIStatus: PHASE_I_CHAIRS.invited, phaseIIStatus: 100000002 };
   const s7Observed = { requestStatus: 'Proposal Invited', phaseIStatus: PHASE_I_CHAIRS.invited, phaseIIStatus: 100000002, readyForReview: true };
   test('S1 intake: nothing recorded', () => {
-    expect(keys(deriveJ27Stage(tier1({ requestStatus: null })))).toEqual({ phase: 'initial-assessment', basis: 'partial', outcome: 'none', tasks: ['record-rationale', 'record-first-cut'], primary: 'record-rationale', blockers: ALWAYS });
-    expect(keys(deriveJ27Stage(dashboard({ requestStatus: null })))).toEqual({ phase: 'initial-assessment', basis: 'partial', outcome: 'none', tasks: ['record-rationale', 'record-first-cut', 'identify-reviewers'], primary: 'record-rationale', blockers: ALWAYS });
+    expect(keys(deriveJ27Stage(tier1({ requestStatus: null })))).toEqual({ phase: 'initial-assessment', basis: 'partial', outcome: 'none', tasks: ['record-rationale', 'record-scoring'], primary: 'record-rationale', blockers: ALWAYS });
+    expect(keys(deriveJ27Stage(dashboard({ requestStatus: null })))).toEqual({ phase: 'initial-assessment', basis: 'partial', outcome: 'none', tasks: ['record-rationale', 'record-scoring', 'identify-reviewers'], primary: 'record-rationale', blockers: ALWAYS });
   });
   test('S2 rationale saved', () => {
-    expect(keys(deriveJ27Stage(tier1({}, { rationale: PRESENT })))).toEqual({ phase: 'initial-assessment', basis: 'partial', outcome: 'none', tasks: ['record-first-cut'], primary: 'record-first-cut', blockers: ALWAYS });
+    expect(keys(deriveJ27Stage(tier1({}, { rationale: PRESENT })))).toEqual({ phase: 'initial-assessment', basis: 'partial', outcome: 'none', tasks: ['record-scoring'], primary: 'record-scoring', blockers: ALWAYS });
   });
-  test('S3 First Cut Not Scored is terminal', () => {
-    const r = deriveJ27Stage(tier1({ phaseIStatus: FIRST_CUT_STATUS.no }, { rationale: PRESENT }));
+  test('S3 Not Scored is terminal', () => {
+    const r = deriveJ27Stage(tier1({ phaseIStatus: SCORING_STATUS.no }, { rationale: PRESENT }));
     expect(keys(r)).toEqual({ phase: 'initial-assessment', basis: 'partial', outcome: 'not-scored', tasks: [], primary: null, blockers: ALWAYS });
     expect(r.recorded.label).toBe('Not Scored');
   });
-  test('S4 Scored, Semi-finalist unset', () => {
-    expect(keys(deriveJ27Stage(tier1({ phaseIStatus: FIRST_CUT_STATUS.yes }, { rationale: PRESENT })))).toEqual({ phase: 'initial-assessment', basis: 'partial', outcome: 'none', tasks: ['record-semi-finalist'], primary: 'record-semi-finalist', blockers: ALWAYS });
+  test('S4 Scored, recommendation unset', () => {
+    expect(keys(deriveJ27Stage(tier1({ phaseIStatus: SCORING_STATUS.yes }, { rationale: PRESENT })))).toEqual({ phase: 'initial-assessment', basis: 'partial', outcome: 'none', tasks: ['record-chairs-recommendation'], primary: 'record-chairs-recommendation', blockers: ALWAYS });
   });
-  test('S4 with the semi-finalist feature off shows no recording task', () => {
-    const r = deriveJ27Stage(tier1({ phaseIStatus: FIRST_CUT_STATUS.yes }, { rationale: PRESENT, features: { status: 'present', semiFinalistEnabled: false } }));
+  test('S4 with the recommendation feature off shows no recording task', () => {
+    const r = deriveJ27Stage(tier1({ phaseIStatus: SCORING_STATUS.yes }, { rationale: PRESENT, features: { status: 'present', chairsRecommendationEnabled: false } }));
     expect(r.taskKeys).toEqual([]);
   });
   test('S5 Recommended Do Not Invite is terminal', () => {
-    expect(keys(deriveJ27Stage(tier1({ phaseIStatus: SEMI_FINALIST_STATUS.no }, { rationale: PRESENT })))).toEqual({ phase: 'initial-assessment', basis: 'partial', outcome: 'triaged', tasks: [], primary: null, blockers: ALWAYS });
+    expect(keys(deriveJ27Stage(tier1({ phaseIStatus: CHAIRS_RECOMMENDATION_STATUS.no }, { rationale: PRESENT })))).toEqual({ phase: 'initial-assessment', basis: 'partial', outcome: 'not-recommended', tasks: [], primary: null, blockers: ALWAYS });
   });
   test('S6 Recommended Invite: awaiting Chairs, offramp available, no reviewers', () => {
-    const r = deriveJ27Stage(tier1({ requestStatus: null, phaseIStatus: SEMI_FINALIST_STATUS.yes }, { rationale: PRESENT }));
+    const r = deriveJ27Stage(tier1({ requestStatus: null, phaseIStatus: CHAIRS_RECOMMENDATION_STATUS.yes }, { rationale: PRESENT }));
     expect(keys(r)).toEqual({ phase: 'initial-assessment', basis: 'partial', outcome: 'none', tasks: ['record-offramp'], primary: 'record-offramp', blockers: ['chairs-outcome-pending', ...ALWAYS] });
     expect(r.tasks[0].detail).toEqual({ received: null, pastOfframpDate: false });
-    const dash = deriveJ27Stage(dashboard({ requestStatus: null, phaseIStatus: SEMI_FINALIST_STATUS.yes }, { rationale: PRESENT }));
+    const dash = deriveJ27Stage(dashboard({ requestStatus: null, phaseIStatus: CHAIRS_RECOMMENDATION_STATUS.yes }, { rationale: PRESENT }));
     expect(dash.taskKeys).toEqual(['identify-reviewers', 'record-offramp']);
     expect(dash.tasks.find((t) => t.key === 'record-offramp').detail.received).toBe(0);
   });
@@ -166,36 +166,36 @@ describe('C8.1 Factory scenario end states (sandbox batch owner-j27-2026-11-09)'
   test('S7 in the sandbox (1000386): Invited, Proposal Invited, ready, two selected → Phase II status blocker withholds invitations', () => {
     const r = deriveJ27Stage(dashboard(s7Observed, { rationale: PRESENT, reviewers: { status: 'present', anySuggestion: true, counts: counts({ candidates: 2 }) } }));
     expect(keys(r)).toEqual({ phase: 'peer-review', basis: 'partial', outcome: 'none', tasks: ['identify-reviewers', 'record-offramp'], primary: 'identify-reviewers', blockers: ['phase-two-status-pending', ...ALWAYS] });
-    expect(r.recorded).toMatchObject({ chairsOutcome: 'invited', semiFinalist: 'inferred-yes' });
+    expect(r.recorded).toMatchObject({ chairsOutcome: 'invited', chairsRecommendation: 'inferred-yes' });
     expect(r.taskKeys).not.toContain('send-invitations');
   });
   test('S8 unready row still derives initial-assessment when resolved directly', () => {
-    expect(keys(deriveJ27Stage(tier1({ readyForReview: false })))).toEqual({ phase: 'initial-assessment', basis: 'partial', outcome: 'none', tasks: ['record-rationale', 'record-first-cut'], primary: 'record-rationale', blockers: ALWAYS });
+    expect(keys(deriveJ27Stage(tier1({ readyForReview: false })))).toEqual({ phase: 'initial-assessment', basis: 'partial', outcome: 'none', tasks: ['record-rationale', 'record-scoring'], primary: 'record-rationale', blockers: ALWAYS });
   });
 });
 
 describe('C8.2 fixtures as read 2026-11-08', () => {
   test('#1000372: Phase I Pending, Advancing, ready, nothing saved', () => {
-    expect(keys(deriveJ27Stage(page({ requestStatus: P1, triageStatus: 100000000 })))).toEqual({ phase: 'initial-assessment', basis: 'full', outcome: 'none', tasks: ['record-rationale', 'record-first-cut', 'identify-reviewers'], primary: 'record-rationale', blockers: [...ALWAYS, 'presentation-end-unverified'] });
+    expect(keys(deriveJ27Stage(page({ requestStatus: P1, triageStatus: 100000000 })))).toEqual({ phase: 'initial-assessment', basis: 'full', outcome: 'none', tasks: ['record-rationale', 'record-scoring', 'identify-reviewers'], primary: 'record-rationale', blockers: [...ALWAYS, 'presentation-end-unverified'] });
   });
-  test('#1000370: request status null, two received reports, interpretation saved, First Cut unset', () => {
+  test('#1000370: request status null, two received reports, interpretation saved, scoring unset', () => {
     const r = deriveJ27Stage(page({ requestStatus: null, triageStatus: 100000000 }, {
       reviewSummary: PRESENT, reviewers: { status: 'present', anySuggestion: true, counts: counts({ candidates: 3, invited: 3, accepted: 3, received: 2 }) },
     }));
-    expect(keys(r)).toEqual({ phase: 'peer-review', basis: 'full', outcome: 'none', tasks: ['record-rationale', 'record-first-cut', 'identify-reviewers'], primary: 'record-rationale', blockers: [...ALWAYS, 'presentation-end-unverified'] });
+    expect(keys(r)).toEqual({ phase: 'peer-review', basis: 'full', outcome: 'none', tasks: ['record-rationale', 'record-scoring', 'identify-reviewers'], primary: 'record-rationale', blockers: [...ALWAYS, 'presentation-end-unverified'] });
   });
   test('#1000369: Scored, one report, interpretation, visit assessment, roster, board draft, timing unverifiable', () => {
-    const r = deriveJ27Stage(page({ requestStatus: P1, triageStatus: 100000000, phaseIStatus: FIRST_CUT_STATUS.yes }, {
+    const r = deriveJ27Stage(page({ requestStatus: P1, triageStatus: 100000000, phaseIStatus: SCORING_STATUS.yes }, {
       rationale: PRESENT, reviewSummary: PRESENT, visitAssessment: PRESENT, rosterMemo: PRESENT,
       reviewers: { status: 'present', anySuggestion: true, counts: counts({ candidates: 3, invited: 3, accepted: 3, received: 1 }) },
       presentation: { status: 'present', exists: true, id: 'visit-1', ended: null, legacyException: false },
       roster: { status: 'present', stale: false }, boardDraft: { status: 'present', exists: true },
     }));
-    expect(keys(r)).toEqual({ phase: 'final-assessment', basis: 'full', outcome: 'none', tasks: ['record-semi-finalist', 'identify-reviewers'], primary: 'record-semi-finalist', blockers: [...ALWAYS, 'presentation-end-unverified'] });
+    expect(keys(r)).toEqual({ phase: 'final-assessment', basis: 'full', outcome: 'none', tasks: ['record-chairs-recommendation', 'identify-reviewers'], primary: 'record-chairs-recommendation', blockers: [...ALWAYS, 'presentation-end-unverified'] });
     expect(r.taskKeys).not.toContain('start-group-review');
   });
   test('#1000376: Recommended Invite, unready, flagged unreviewed screen, no reviewers', () => {
-    const r = deriveJ27Stage(page({ requestStatus: P1, readyForReview: false, phaseIStatus: SEMI_FINALIST_STATUS.yes }, {
+    const r = deriveJ27Stage(page({ requestStatus: P1, readyForReview: false, phaseIStatus: CHAIRS_RECOMMENDATION_STATUS.yes }, {
       integrity: { status: 'present', latest: { flagged: true, reviewed: false, provenance: 'automated' } },
     }));
     expect(keys(r)).toEqual({ phase: 'initial-assessment', basis: 'full', outcome: 'none', tasks: ['record-rationale', 'review-integrity', 'identify-reviewers', 'record-offramp'], primary: 'record-rationale', blockers: ['chairs-outcome-pending', 'integrity-unreviewed', ...ALWAYS, 'presentation-end-unverified'] });
@@ -240,7 +240,7 @@ describe('C8.3 combinations', () => {
   });
   test('Invited reached without Recommended Invite still infers the recommendation', () => {
     const r = deriveJ27Stage(tier1(invited));
-    expect(r.recorded).toEqual({ firstCut: 'inferred-scored', semiFinalist: 'inferred-yes', chairsOutcome: 'invited', label: 'Invited for peer review', unmapped: false });
+    expect(r.recorded).toEqual({ scoring: 'inferred-scored', chairsRecommendation: 'inferred-yes', chairsOutcome: 'invited', label: 'Invited', unmapped: false });
     expect(r.phase).toBe('peer-review');
   });
   test('Not Invited is terminal with no forward tasks', () => {
@@ -249,8 +249,8 @@ describe('C8.3 combinations', () => {
   });
   test('unmapped Phase I keeps the raw label and records nothing', () => {
     const r = deriveJ27Stage(tier1({ phaseIStatus: 100000001, phaseIStatusLabel: 'Something Else' }));
-    expect(r.recorded).toEqual({ firstCut: 'unset', semiFinalist: 'unset', chairsOutcome: 'pending', label: 'Something Else', unmapped: true });
-    expect(r.taskKeys).toEqual(['record-rationale', 'record-first-cut']);
+    expect(r.recorded).toEqual({ scoring: 'unset', chairsRecommendation: 'unset', chairsOutcome: 'pending', label: 'Something Else', unmapped: true });
+    expect(r.taskKeys).toEqual(['record-rationale', 'record-scoring']);
   });
   test('Invited without Phase II Pending raises the Phase II status blocker and withholds invitations', () => {
     const r = deriveJ27Stage(page({ requestStatus: P1, phaseIStatus: PHASE_I_CHAIRS.invited }, {
@@ -400,7 +400,7 @@ describe('C8.6 invariants', () => {
     expect(keys(d).phase).toBe('deliberations');
     expect(d.taskKeys).toEqual([]);
     // A decided award wins over the offramp value.
-    expect(deriveOutcome('DECIDED_AWARD', { firstCut: 'unset', semiFinalist: 'unset', chairsOutcome: 'pending' }, PHASE_II_OFFRAMPED)).toBe('decided-award');
+    expect(deriveOutcome('DECIDED_AWARD', { scoring: 'unset', chairsRecommendation: 'unset', chairsOutcome: 'pending' }, PHASE_II_OFFRAMPED)).toBe('decided-award');
     // Intake rows carry no offramp blocker.
     expect(deriveJ27Stage(tier1()).blockerKeys).not.toContain('offramped');
   });
@@ -408,11 +408,11 @@ describe('C8.6 invariants', () => {
     ['2027-03-15', '2027-03-14', false], ['2027-03-15', '2027-03-15', false], ['2027-03-15', '2027-03-16', true],
     ['2027-03-15T00:00:00Z', '2027-03-16', true], [null, '2027-03-16', null], ['2027-03-15', null, null],
   ])('pastOfframpDate for offramp %p on %p is %p', (offrampMeetingDate, today, expected) => {
-    const r = deriveJ27Stage(tier1({ phaseIStatus: SEMI_FINALIST_STATUS.yes }, { calendar: { status: 'present', offrampMeetingDate, reviewsDueDate: null, today } }));
+    const r = deriveJ27Stage(tier1({ phaseIStatus: CHAIRS_RECOMMENDATION_STATUS.yes }, { calendar: { status: 'present', offrampMeetingDate, reviewsDueDate: null, today } }));
     expect(r.tasks.find((t) => t.key === 'record-offramp').detail.pastOfframpDate).toBe(expected);
   });
   test('calendar unavailable leaves pastOfframpDate null and degrades the basis', () => {
-    const r = deriveJ27Stage(tier1({ phaseIStatus: SEMI_FINALIST_STATUS.yes }, { calendar: UNAVAILABLE }));
+    const r = deriveJ27Stage(tier1({ phaseIStatus: CHAIRS_RECOMMENDATION_STATUS.yes }, { calendar: UNAVAILABLE }));
     expect(r.tasks.find((t) => t.key === 'record-offramp').detail.pastOfframpDate).toBeNull();
     expect(r.basis).toBe('degraded');
   });
@@ -420,7 +420,7 @@ describe('C8.6 invariants', () => {
     const r = deriveJ27Stage(tier1({}, { capabilities: { status: 'present', readOnly: true } }));
     expect(r.readOnly).toBe(true);
     expect(r.blockerKeys).toEqual(ALWAYS);
-    expect(r.taskKeys).toEqual(['record-rationale', 'record-first-cut']);
+    expect(r.taskKeys).toEqual(['record-rationale', 'record-scoring']);
   });
   test('reviewer counts arriving later keep anySuggestion', () => {
     const before = deriveJ27Stage(tier1({}, { reviewers: { status: 'present', anySuggestion: true, counts: NL } }));

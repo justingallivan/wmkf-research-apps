@@ -113,7 +113,7 @@ function ReviewerProgress({ state, showHint }) {
   );
 }
 
-export default function OverviewTab({ context, requestId, onSelectTab, j27Handoffs, initialRationaleEnabled, semiFinalistEnabled, meetingRosterEnabled, onJ27Facts = null }) {
+export default function OverviewTab({ context, requestId, onSelectTab, j27Handoffs, initialRationaleEnabled, chairsRecommendationEnabled, meetingRosterEnabled, onJ27Facts = null }) {
   const reviewerProgress = useReviewerProgress(requestId);
   // Step E: the page recomputes the J27 stage once the rollup settles (plan C7).
   useEffect(() => {
@@ -201,7 +201,7 @@ export default function OverviewTab({ context, requestId, onSelectTab, j27Handof
       <J27Overview key={requestId} context={context} requestId={requestId}
         reviewerProgress={reviewerProgress} onJ27Facts={onJ27Facts}
         onOpenReports={onSelectTab ? () => onSelectTab('reviews') : null}
-        initialRationaleEnabled={initialRationaleEnabled} semiFinalistEnabled={semiFinalistEnabled} meetingRosterEnabled={meetingRosterEnabled} />
+        initialRationaleEnabled={initialRationaleEnabled} chairsRecommendationEnabled={chairsRecommendationEnabled} meetingRosterEnabled={meetingRosterEnabled} />
       <details className="rounded-xl border border-gray-200 bg-white p-4">
         <summary className="cursor-pointer text-sm font-semibold">Request details</summary>
         <div className="mt-4">{details}</div>

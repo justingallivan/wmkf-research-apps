@@ -31,16 +31,16 @@ for (const name of ['ReviewsTab', 'ProposalTab', 'StatusTab', 'AwardeeTab', 'Ini
 }
 
 import { WorkbenchRequest } from '../../pages/workbench/[requestId]';
-import { SEMI_FINALIST_STATUS } from '../../shared/config/j27FirstCut';
+import { CHAIRS_RECOMMENDATION_STATUS } from '../../shared/config/j27Scoring';
 
 const RESEARCH = '94cab30b-958f-ee11-8179-000d3a341e8f';
 const NL = { status: 'not-loaded' };
 const input = {
-  request: { status: 'present', requestStatus: 'Phase I Pending', statusClass: 'IN_FLIGHT', phaseIStatus: SEMI_FINALIST_STATUS.yes, phaseIStatusLabel: null, phaseIIStatus: null, readyForReview: true, cycleCode: 'J27', grantProgramId: RESEARCH, triageStatus: null, isTestRequest: false },
+  request: { status: 'present', requestStatus: 'Phase I Pending', statusClass: 'IN_FLIGHT', phaseIStatus: CHAIRS_RECOMMENDATION_STATUS.yes, phaseIStatusLabel: null, phaseIIStatus: null, readyForReview: true, cycleCode: 'J27', grantProgramId: RESEARCH, triageStatus: null, isTestRequest: false },
   rationale: { status: 'present' }, reviewSummary: { status: 'absent' }, visitAssessment: { status: 'absent' }, rosterMemo: { status: 'absent' },
   reviewers: { status: 'present', anySuggestion: false, counts: NL }, integrity: { status: 'present', latest: null },
   calendar: { status: 'present', offrampMeetingDate: '2027-03-15', reviewsDueDate: '2027-03-01', today: '2026-11-09' },
-  capabilities: { status: 'present', readOnly: false }, features: { status: 'present', semiFinalistEnabled: true },
+  capabilities: { status: 'present', readOnly: false }, features: { status: 'present', chairsRecommendationEnabled: true },
   presentation: NL, roster: NL, boardDraft: NL, transition: NL,
 };
 const resolved = (id, j27 = true) => ({ ok: true, json: async () => ({ success: true, requestId: id, requestNumber: '1000384', cycleCode: 'J27', ...(j27 ? { j27: { phase: 'initial-assessment', input } } : {}) }) });

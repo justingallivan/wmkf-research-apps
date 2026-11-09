@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FIRST_CUT_STATUS, isFirstCutEditable, SEMI_FINALIST_STATUS } from '../../config/j27FirstCut';
+import { SCORING_STATUS, isScoringEditable, CHAIRS_RECOMMENDATION_STATUS } from '../../config/j27Scoring';
 import { requestEnvelope } from '../../utils/api-request';
 
 const terminalClasses = new Set(['DECIDED_AWARD', 'DECIDED_NO_AWARD', 'WITHDRAWN']);
@@ -7,16 +7,16 @@ function memoPresent(record, field) {
   return typeof record[field] === 'string' ? Boolean(record[field].trim()) : null;
 }
 
-function nextAction(context, handoff, progress, semiFinalistEnabled) {
+function nextAction(context, handoff, progress, chairsRecommendationEnabled) {
   if (terminalClasses.has(context.statusClass)) {
     return { heading: context.requestStatus || 'Request outcome recorded' };
   }
-  if (context.phaseIStatus === FIRST_CUT_STATUS.no) {
-    return { heading: 'First Cut marked Not Scored',
+  if (context.phaseIStatus === SCORING_STATUS.no) {
+    return { heading: 'Marked Not Scored',
       detail: 'The decision and staff rationale are in Initial Assessment.' };
   }
-  if (context.phaseIStatus === SEMI_FINALIST_STATUS.no) {
-    return { heading: 'Semi-finalist recommendation recorded as No',
+  if (context.phaseIStatus === CHAIRS_RECOMMENDATION_STATUS.no) {
+    return { heading: 'Not recommended to Chairs',
       detail: 'The recommendation is in Initial Assessment.' };
   }
   if (handoff.visit) {
@@ -35,31 +35,31 @@ function nextAction(context, handoff, progress, semiFinalistEnabled) {
     return { heading: 'Reviewer reports received',
       detail: 'Read the reports and record the staff interpretation.', reports: true };
   }
-  if (context.phaseIStatus === SEMI_FINALIST_STATUS.yes) {
-    return { heading: 'Semi-finalist recommendation recorded as Yes',
+  if (context.phaseIStatus === CHAIRS_RECOMMENDATION_STATUS.yes) {
+    return { heading: 'Recommended to Chairs',
       detail: 'Check Initial Assessment for the recommendation and integrity findings.' };
   }
-  if (context.phaseIStatus !== FIRST_CUT_STATUS.yes) {
-    if (handoff.rationale === false && isFirstCutEditable(context.phaseIStatus)) {
+  if (context.phaseIStatus !== SCORING_STATUS.yes) {
+    if (handoff.rationale === false && isScoringEditable(context.phaseIStatus)) {
       return { heading: 'Initial assessment pending',
         detail: 'Read the proposal and record the staff rationale in Initial Assessment.' };
     }
-    return { heading: 'First Cut decision to review',
+    return { heading: 'Scoring decision to review',
       detail: 'Check the decision and supporting evidence in Initial Assessment.' };
   }
-  return { heading: 'First Cut marked Scored',
-    detail: semiFinalistEnabled ? 'Record the semi-finalist recommendation in Initial Assessment.'
+  return { heading: 'Marked Scored',
+    detail: chairsRecommendationEnabled ? 'Record the recommendation to Chairs in Initial Assessment.'
       : 'Check the reviewer roster and progress in Peer Review.' };
 }
 
 function initialAssessmentDecision(context) {
   switch (context.phaseIStatus) {
-    case FIRST_CUT_STATUS.yes: return 'First Cut · Scored';
-    case FIRST_CUT_STATUS.no: return 'First Cut · Not Scored';
-    case SEMI_FINALIST_STATUS.yes: return 'Semi-finalist · Yes';
-    case SEMI_FINALIST_STATUS.no: return 'Semi-finalist · No';
+    case SCORING_STATUS.yes: return 'Scored';
+    case SCORING_STATUS.no: return 'Not Scored';
+    case CHAIRS_RECOMMENDATION_STATUS.yes: return 'Recommended to Chairs';
+    case CHAIRS_RECOMMENDATION_STATUS.no: return 'Not Recommended';
     default:
-      if (isFirstCutEditable(context.phaseIStatus)) return 'No decision recorded';
+      if (isScoringEditable(context.phaseIStatus)) return 'No decision recorded';
       return context.phaseIStatusLabel ? `Phase I status · ${context.phaseIStatusLabel}` : 'Couldn’t check the decision';
   }
 }
@@ -71,7 +71,7 @@ function savedLabel(value) {
 }
 
 export default function J27Overview({ context, requestId, reviewerProgress,
-  initialRationaleEnabled, semiFinalistEnabled, meetingRosterEnabled, onOpenReports, onJ27Facts = null }) {
+  initialRationaleEnabled, chairsRecommendationEnabled, meetingRosterEnabled, onOpenReports, onJ27Facts = null }) {
   const [loaded, setLoaded] = useState(null);
   useEffect(() => {
     const controller = new AbortController();
@@ -109,10 +109,10 @@ export default function J27Overview({ context, requestId, reviewerProgress,
   const handoff = loaded?.requestId === requestId ? loaded : null;
   const terminal = terminalClasses.has(context.statusClass);
   const action = terminal || (handoff && reviewerProgress.status !== 'loading')
-    ? nextAction(context, handoff, reviewerProgress.data, semiFinalistEnabled) : null;
+    ? nextAction(context, handoff, reviewerProgress.data, chairsRecommendationEnabled) : null;
   const received = reviewerProgress.data?.counts?.received;
   const showPeerReview = Boolean(handoff && (
-    handoff.review || received > 0 || (!semiFinalistEnabled && context.phaseIStatus === FIRST_CUT_STATUS.yes)
+    handoff.review || received > 0 || (!chairsRecommendationEnabled && context.phaseIStatus === SCORING_STATUS.yes)
   ));
   const showDeliberations = Boolean(handoff && (handoff.presentation || handoff.visit));
 

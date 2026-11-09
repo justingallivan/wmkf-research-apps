@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { composeJ27PageInput, deriveJ27PageStage, j27CountsInput, j27OverviewInputs, j27FinalWriteupInputs } from '../../shared/utils/j27PageStage';
 import J27StageStrip, { J27_PHASE_LABEL, J27_TASK_LABEL, J27_BLOCKER_LABEL, J27_OUTCOME_LABEL, visibleBlockerKeys } from '../../shared/components/workbench/J27StageStrip';
 import { J27_PHASES, J27_TASK_KEYS, J27_BLOCKER_KEYS, J27_OUTCOMES, PHASE_I_CHAIRS } from '../../lib/services/workbench/j27-read-model';
-import { SEMI_FINALIST_STATUS } from '../../shared/config/j27FirstCut';
+import { CHAIRS_RECOMMENDATION_STATUS } from '../../shared/config/j27Scoring';
 
 const RESEARCH = '94cab30b-958f-ee11-8179-000d3a341e8f';
 const NL = { status: 'not-loaded' };
@@ -21,7 +21,7 @@ function serverInput(request = {}, over = {}) {
     integrity: { status: 'present', latest: null },
     calendar: { status: 'present', offrampMeetingDate: '2027-03-15', reviewsDueDate: '2027-03-01', today: '2026-11-09' },
     capabilities: { status: 'present', readOnly: false },
-    features: { status: 'present', semiFinalistEnabled: true },
+    features: { status: 'present', chairsRecommendationEnabled: true },
     presentation: NL, roster: NL, boardDraft: NL, transition: NL,
     ...over,
   };
@@ -94,7 +94,7 @@ describe('page recomputation', () => {
     expect(deriveJ27PageStage(input, {}).basis).toBe('partial');
   });
   test('the rollup landing moves a Recommended Invite row from awaiting counts to the dashboard shape', () => {
-    const input = serverInput({ phaseIStatus: SEMI_FINALIST_STATUS.yes }, { rationale: PRESENT });
+    const input = serverInput({ phaseIStatus: CHAIRS_RECOMMENDATION_STATUS.yes }, { rationale: PRESENT });
     const before = deriveJ27PageStage(input, {});
     const after = deriveJ27PageStage(input, { progress: { status: 'ready', data: { counts: { candidates: 0 } } } });
     expect(before.taskKeys).toEqual(['record-offramp']);

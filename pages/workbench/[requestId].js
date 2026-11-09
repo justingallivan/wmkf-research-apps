@@ -6,7 +6,7 @@
  * phase `section` navigation.
  */
 
-import { j27IntegrityTarget, j27SemiFinalistEnabled, j27SemiFinalistRehearsalRequestId, j27IntegritySimulationRequestIds } from '../../lib/utils/j27-integrity-readiness';
+import { j27IntegrityTarget, j27ChairsRecommendationEnabled, j27ChairsRecommendationRehearsalRequestId, j27IntegritySimulationRequestIds } from '../../lib/utils/j27-integrity-readiness';
 import { initialAssessmentRationaleEnabled } from '../../lib/utils/initial-assessment-rationale-readiness';
 import InitialAssessmentRationale from '../../shared/components/workbench/InitialAssessmentRationale';
 import { meetingRosterSchemaEnabled } from '../../lib/utils/meeting-roster-readiness';
@@ -27,8 +27,8 @@ import { useProfile } from '../../shared/context/ProfileContext';
 import { readEmailSignaturePreference } from '../../shared/config/reviewerFinderPreferences';
 import ReviewersTab from '../../shared/components/reviewers/ReviewersTab';
 import ReviewsTab from '../../shared/components/workbench/ReviewsTab';
-import { isSemiFinalistEditable } from '../../shared/config/j27FirstCut';
-import FirstCutCard from '../../shared/components/workbench/FirstCutCard';
+import { isChairsRecommendationEditable } from '../../shared/config/j27Scoring';
+import ScoringCard from '../../shared/components/workbench/ScoringCard';
 import ProposalTab from '../../shared/components/workbench/ProposalTab';
 import IntegrityTab from '../../shared/components/workbench/IntegrityTab';
 import OverviewTab from '../../shared/components/workbench/OverviewTab';
@@ -72,7 +72,7 @@ const LEGACY_TAB_ALIASES = {
 // Preserve the existing section key for saved links.
 const AI_REVIEW_PANEL = { key: 'group-review', label: 'AI Review Panel' };
 
-export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary = false, meetingRosterEnabled = false, initialRationaleEnabled = false, semiFinalistEnabled = false, semiFinalistRehearsalRequestId = null, integritySimulationIds = [], automaticIntegrityEnabled = false }) {
+export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary = false, meetingRosterEnabled = false, initialRationaleEnabled = false, chairsRecommendationEnabled = false, chairsRecommendationRehearsalRequestId = null, integritySimulationIds = [], automaticIntegrityEnabled = false }) {
   const router = useRouter();
   const { data: session } = useSession();
   const { isSuperuser, hasAccess } = useAppAccess();
@@ -125,8 +125,8 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
   // The redesigned shell follows the same sandbox boundary as the tested fields.
   const phaseLayout = staffReviewSummary && visibleContext?.cycleCode === 'J27';
   const showInitialRationale = phaseLayout && initialRationaleEnabled;
-  const rehearsalIds = semiFinalistRehearsalRequestId ? [semiFinalistRehearsalRequestId] : integritySimulationIds;
-  const showSemiFinalist = showInitialRationale && semiFinalistEnabled && (rehearsalIds.length
+  const rehearsalIds = chairsRecommendationRehearsalRequestId ? [chairsRecommendationRehearsalRequestId] : integritySimulationIds;
+  const showChairsRecommendation = showInitialRationale && chairsRecommendationEnabled && (rehearsalIds.length
     ? rehearsalIds.includes(routeKey) : visibleContext.isTestRequest === true);
   const showAwardee = phaseLayout && visibleContext.statusClass === 'DECIDED_AWARD';
   const phaseTabs = [
@@ -376,7 +376,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
           onSelectTab={selectTab}
           j27Handoffs={phaseLayout}
           initialRationaleEnabled={initialRationaleEnabled}
-          semiFinalistEnabled={showSemiFinalist}
+          chairsRecommendationEnabled={showChairsRecommendation}
           meetingRosterEnabled={meetingRosterEnabled}
           onJ27Facts={visibleContext?.j27 ? reportJ27Facts : null}
         />
@@ -400,20 +400,20 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
       ) : activeTab === 'proposal' ? (
         <>
           {visibleContext?.cycleCode === 'J27' && (
-            <FirstCutCard
-              key={`first-cut:${routeRequestId}`}
+            <ScoringCard
+              key={`scoring:${routeRequestId}`}
               context={visibleContext}
               canManage={canManage && !previewReadOnly}
               refresh={refreshPhaseIStatus}
             />
           )}
-          {showSemiFinalist && isSemiFinalistEditable(visibleContext.phaseIStatus) && (
-            <FirstCutCard
-              key={`semi-finalist:${routeRequestId}`}
+          {showChairsRecommendation && isChairsRecommendationEditable(visibleContext.phaseIStatus) && (
+            <ScoringCard
+              key={`chairs-recommendation:${routeRequestId}`}
               context={visibleContext}
               canManage={canManage && !previewReadOnly}
               refresh={refreshPhaseIStatus}
-              semiFinalist
+              chairsRecommendation
               automaticIntegrityEnabled={automaticIntegrityEnabled}
             />
           )}
@@ -520,8 +520,8 @@ export async function getServerSideProps() {
     && classifyTarget(process.env.DYNAMICS_URL) === 'sandbox';
   return { props: {
     previewReadOnly, staffReviewSummary, meetingRosterEnabled: meetingRosterSchemaEnabled(),
-    initialRationaleEnabled: initialAssessmentRationaleEnabled(), semiFinalistEnabled: j27SemiFinalistEnabled(),
-    semiFinalistRehearsalRequestId: j27SemiFinalistRehearsalRequestId(),
+    initialRationaleEnabled: initialAssessmentRationaleEnabled(), chairsRecommendationEnabled: j27ChairsRecommendationEnabled(),
+    chairsRecommendationRehearsalRequestId: j27ChairsRecommendationRehearsalRequestId(),
     integritySimulationIds: j27IntegritySimulationRequestIds(),
     automaticIntegrityEnabled: Boolean(j27IntegrityTarget()),
   } };

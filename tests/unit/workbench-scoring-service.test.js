@@ -1,16 +1,16 @@
 /** @jest-environment node */
 
-import { saveFirstCut, saveSemiFinalist } from '../../lib/services/workbench/first-cut-service';
+import { saveScoring, saveChairsRecommendation } from '../../lib/services/workbench/scoring-service';
 import { getById, updateById } from '../../lib/dataverse/adapters/grant-request';
 import { processAnnotations } from '../../lib/services/dynamics/annotations';
 import { getUserRole } from '../../lib/utils/auth';
 
-import { j27SemiFinalistEnabled, j27IntegrityTarget, j27SemiFinalistRehearsalRequestId } from '../../lib/utils/j27-integrity-readiness';
+import { j27ChairsRecommendationEnabled, j27IntegrityTarget, j27ChairsRecommendationRehearsalRequestId } from '../../lib/utils/j27-integrity-readiness';
 import { isJ27SandboxFactoryRequest } from '../../lib/services/workbench/j27-integrity-jobs';
 import { scheduleJ27IntegrityScreen, confirmJ27IntegrityDecision } from '../../lib/services/workbench/j27-integrity-dispatch';
 
 jest.mock('../../lib/utils/j27-integrity-readiness', () => ({
-  j27SemiFinalistEnabled: jest.fn(), j27IntegrityTarget: jest.fn(), j27SemiFinalistRehearsalRequestId: jest.fn(), j27IntegritySimulationRequestIds: () => [],
+  j27ChairsRecommendationEnabled: jest.fn(), j27IntegrityTarget: jest.fn(), j27ChairsRecommendationRehearsalRequestId: jest.fn(), j27IntegritySimulationRequestIds: () => [],
 }));
 jest.mock('../../lib/services/workbench/j27-integrity-jobs', () => ({
   isJ27SandboxFactoryRequest: jest.fn(),
@@ -54,7 +54,7 @@ test.each([
   [100000005, 'yes', 100000004],
 ])('lead PD may edit from %s to %s', async (current, decision, status) => {
   getById.mockResolvedValue({ ...row, wmkf_phaseistatus: current });
-  await expect(saveFirstCut({ ...input, decision })).resolves.toEqual({ success: true });
+  await expect(saveScoring({ ...input, decision })).resolves.toEqual({ success: true });
   expect(updateById).toHaveBeenCalledWith(requestId, { wmkf_phaseistatus: status }, {
     ifMatch: version, actingUserSystemId: callerSystemId,
   });
@@ -63,17 +63,17 @@ test.each([
 test.each([707510005, 707510006, 100000003, 100000002, 707510004, 100000001, 707510001, 707510002, 707510003, 682090001, 999])(
   'refuses locked or unknown status %s', async (status) => {
     getById.mockResolvedValue({ ...row, wmkf_phaseistatus: status });
-    await expect(saveFirstCut(input)).rejects.toMatchObject({ httpStatus: 409 });
+    await expect(saveScoring(input)).rejects.toMatchObject({ httpStatus: 409 });
     expect(updateById).not.toHaveBeenCalled();
   },
 );
 
 test('superuser can edit an unassigned request; other staff cannot', async () => {
   getById.mockResolvedValue({ ...row, _wmkf_programdirector_value: null });
-  await expect(saveFirstCut(input)).rejects.toMatchObject({ httpStatus: 403 });
+  await expect(saveScoring(input)).rejects.toMatchObject({ httpStatus: 403 });
   expect(updateById).not.toHaveBeenCalled();
   getUserRole.mockResolvedValue('superuser');
-  await expect(saveFirstCut(input)).resolves.toEqual({ success: true });
+  await expect(saveScoring(input)).resolves.toEqual({ success: true });
 });
 
 test.each([
@@ -83,23 +83,23 @@ test.each([
   { _etag: undefined },
 ])('rejects an ineligible cycle or stale/missing version: %o', async (changes) => {
   getById.mockResolvedValue({ ...row, ...changes });
-  await expect(saveFirstCut(input)).rejects.toMatchObject({ httpStatus: 409 });
+  await expect(saveScoring(input)).rejects.toMatchObject({ httpStatus: 409 });
   expect(updateById).not.toHaveBeenCalled();
 });
 
 test('maps a concurrent Dataverse edit to a conflict without retrying', async () => {
   updateById.mockRejectedValue({ status: 412 });
-  await expect(saveFirstCut(input)).rejects.toMatchObject({ httpStatus: 409 });
+  await expect(saveScoring(input)).rejects.toMatchObject({ httpStatus: 409 });
   expect(updateById).toHaveBeenCalledTimes(1);
 });
 
 test('saving the same decision skips the PATCH', async () => {
   getById.mockResolvedValue({ ...row, wmkf_phaseistatus: 100000004 });
-  await expect(saveFirstCut(input)).resolves.toEqual({ success: true });
+  await expect(saveScoring(input)).resolves.toEqual({ success: true });
   expect(updateById).not.toHaveBeenCalled();
 });
 
-describe('sandbox Semi-finalist decision', () => {
+describe('sandbox recommendation to Chairs', () => {
   const target = 'orgd9e66399.crm.dynamics.com';
   const runId = '11111111-1111-4111-8111-222222222222';
   const factoryRow = { ...row, wmkf_phaseistatus: 100000004, wmkf_istestrequest: true, wmkf_testcreationrunid: runId };
@@ -107,7 +107,7 @@ describe('sandbox Semi-finalist decision', () => {
 
   beforeEach(() => {
     process.env.DYNAMICS_URL = `https://${target}`;
-    j27SemiFinalistEnabled.mockReturnValue(true);
+    j27ChairsRecommendationEnabled.mockReturnValue(true);
     j27IntegrityTarget.mockReturnValue(target);
     isJ27SandboxFactoryRequest.mockResolvedValue(true);
     scheduleJ27IntegrityScreen.mockResolvedValue('started');
@@ -123,7 +123,7 @@ describe('sandbox Semi-finalist decision', () => {
   test('reserves background work, saves Yes and confirms only after the conditional write', async () => {
     let finishWrite;
     updateById.mockImplementation(() => new Promise(resolve => { finishWrite = resolve; }));
-    const save = saveSemiFinalist(input);
+    const save = saveChairsRecommendation(input);
     await new Promise(resolve => setImmediate(resolve));
     expect(scheduleJ27IntegrityScreen).toHaveBeenCalledWith({ target, requestId, profileId: 7, version });
     expect(updateById).toHaveBeenCalledWith(requestId, { wmkf_phaseistatus: 707510005 }, {
@@ -137,49 +137,49 @@ describe('sandbox Semi-finalist decision', () => {
 
   test('a failed conditional write cannot authorize paid work', async () => {
     updateById.mockRejectedValue({ status: 412 });
-    await expect(saveSemiFinalist(input)).rejects.toMatchObject({ httpStatus: 409 });
+    await expect(saveChairsRecommendation(input)).rejects.toMatchObject({ httpStatus: 409 });
     expect(confirmJ27IntegrityDecision).not.toHaveBeenCalled();
   });
 
   test('a dispatch outage still allows the meeting decision to save', async () => {
     scheduleJ27IntegrityScreen.mockResolvedValue('unconfirmed');
-    await expect(saveSemiFinalist(input)).resolves.toEqual({ success: true, automaticScreen: 'unconfirmed' });
+    await expect(saveChairsRecommendation(input)).resolves.toEqual({ success: true, automaticScreen: 'unconfirmed' });
     expect(updateById).toHaveBeenCalled();
     expect(confirmJ27IntegrityDecision).not.toHaveBeenCalled();
   });
 
   test('a lost screen confirmation reports a saved decision separately', async () => {
     confirmJ27IntegrityDecision.mockResolvedValue('unconfirmed');
-    await expect(saveSemiFinalist(input)).resolves.toEqual({ success: true, automaticScreen: 'unconfirmed' });
+    await expect(saveChairsRecommendation(input)).resolves.toEqual({ success: true, automaticScreen: 'unconfirmed' });
   });
 
   test('No saves in the same field without dispatch and repeat Yes does no work', async () => {
-    await expect(saveSemiFinalist({ ...input, decision: 'no' })).resolves.toEqual({ success: true });
+    await expect(saveChairsRecommendation({ ...input, decision: 'no' })).resolves.toEqual({ success: true });
     expect(updateById).toHaveBeenCalledWith(requestId, { wmkf_phaseistatus: 707510006 }, expect.any(Object));
     updateById.mockClear();
     getById.mockResolvedValue({ ...factoryRow, wmkf_phaseistatus: 707510005 });
-    await expect(saveSemiFinalist(input)).resolves.toEqual({ success: true });
+    await expect(saveChairsRecommendation(input)).resolves.toEqual({ success: true });
     expect(updateById).not.toHaveBeenCalled();
     expect(scheduleJ27IntegrityScreen).not.toHaveBeenCalled();
   });
 
   test('dropdown-only Preview accepts exactly the configured request without Factory or screening access', async () => {
-    j27SemiFinalistRehearsalRequestId.mockReturnValue(requestId);
+    j27ChairsRecommendationRehearsalRequestId.mockReturnValue(requestId);
     j27IntegrityTarget.mockReturnValue(null);
     getById.mockResolvedValue({ ...factoryRow, wmkf_istestrequest: null, wmkf_testcreationrunid: null });
-    await expect(saveSemiFinalist(input)).resolves.toEqual({ success: true });
+    await expect(saveChairsRecommendation(input)).resolves.toEqual({ success: true });
     expect(isJ27SandboxFactoryRequest).not.toHaveBeenCalled();
     expect(scheduleJ27IntegrityScreen).not.toHaveBeenCalled();
     updateById.mockClear();
-    await expect(saveSemiFinalist({ ...input, requestId: runId })).rejects.toMatchObject({ httpStatus: 403 });
+    await expect(saveChairsRecommendation({ ...input, requestId: runId })).rejects.toMatchObject({ httpStatus: 403 });
     expect(updateById).not.toHaveBeenCalled();
   });
 
   test('rejects an ordinary, wrong-host or unscored record before enqueueing', async () => {
     isJ27SandboxFactoryRequest.mockResolvedValueOnce(false);
-    await expect(saveSemiFinalist(input)).rejects.toMatchObject({ httpStatus: 409 });
+    await expect(saveChairsRecommendation(input)).rejects.toMatchObject({ httpStatus: 409 });
     getById.mockResolvedValue({ ...factoryRow, wmkf_phaseistatus: 100000005 });
-    await expect(saveSemiFinalist(input)).rejects.toMatchObject({ httpStatus: 409 });
+    await expect(saveChairsRecommendation(input)).rejects.toMatchObject({ httpStatus: 409 });
     expect(scheduleJ27IntegrityScreen).not.toHaveBeenCalled();
     expect(updateById).not.toHaveBeenCalled();
   });

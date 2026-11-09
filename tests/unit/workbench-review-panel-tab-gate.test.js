@@ -260,14 +260,14 @@ test.each([
   [100000005, true, false],
   [100000004, false, false],
   [100000004, true, true],
-])('J27 exposes Semi-finalist only after First Cut passes on a test request (%s, %s)', async (phaseIStatus, isTestRequest, visible) => {
+])('J27 exposes the recommendation to Chairs only after a Scored decision on a test request (%s, %s)', async (phaseIStatus, isTestRequest, visible) => {
   mockAccess = { isSuperuser: true, hasAccess: () => true };
   mockQuery = { requestId: 'request-1', tab: 'initial-assessment' };
   global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({
     success: true, requestId: 'request-1', cycleCode: 'J27', isTestRequest, phaseIStatus, requestVersion: 'W/"1"',
   }) }));
-  await act(async () => { render(<WorkbenchRequest staffReviewSummary initialRationaleEnabled semiFinalistEnabled />); });
-  expect(Boolean(screen.queryByRole('combobox', { name: 'Recommend as a semi-finalist?' }))).toBe(visible);
+  await act(async () => { render(<WorkbenchRequest staffReviewSummary initialRationaleEnabled chairsRecommendationEnabled />); });
+  expect(Boolean(screen.queryByRole('combobox', { name: 'Recommendation' }))).toBe(visible);
 });
 
 

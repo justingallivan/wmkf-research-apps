@@ -495,9 +495,9 @@ describe('J27 read model on the proposal list (plan C7)', () => {
     expect(byNumber['1002836']).not.toHaveProperty('j27');
     // Memo waves are off in this env, so their keys are unavailable and the basis is degraded (plan C1, C3).
     expect(byNumber['1000380'].j27).toEqual({
-      phase: 'initial-assessment', basis: 'degraded', primaryTask: 'record-first-cut',
-      taskKeys: ['record-first-cut', 'identify-reviewers'], blockerKeys: [],
-      recorded: { firstCut: 'unset', semiFinalist: 'unset', chairsOutcome: 'pending', label: null, unmapped: false }, outcome: 'none',
+      phase: 'initial-assessment', basis: 'degraded', primaryTask: 'record-scoring',
+      taskKeys: ['record-scoring', 'identify-reviewers'], blockerKeys: [],
+      recorded: { scoring: 'unset', chairsRecommendation: 'unset', chairsOutcome: 'pending', label: null, unmapped: false }, outcome: 'none',
     });
     expect(byNumber['1000385'].j27).toMatchObject({
       phase: 'peer-review', primaryTask: 'review-integrity',

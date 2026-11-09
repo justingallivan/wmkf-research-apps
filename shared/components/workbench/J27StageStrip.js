@@ -18,8 +18,8 @@ export const J27_PHASE_LABEL = {
 
 export const J27_TASK_LABEL = {
   'record-rationale': 'Record the staff rationale',
-  'record-first-cut': 'Record the First Cut decision',
-  'record-semi-finalist': 'Record the semi-finalist recommendation',
+  'record-scoring': 'Record Scored or Not Scored',
+  'record-chairs-recommendation': 'Record the recommendation to Chairs',
   'review-integrity': 'Review the integrity findings',
   'identify-reviewers': 'Identify reviewers',
   'send-invitations': 'Send reviewer invitations',
@@ -45,9 +45,9 @@ export const J27_BLOCKER_LABEL = {
 
 export const J27_OUTCOME_LABEL = {
   none: null,
-  'not-scored': 'First Cut: Not Scored',
-  triaged: 'Semi-finalist recommendation: No',
-  'not-invited': 'Chairs: not invited',
+  'not-scored': 'Not Scored',
+  'not-recommended': 'Not Recommended',
+  'not-invited': 'Not Invited',
   offramped: 'Offramped',
   'decided-award': 'Awarded',
   'decided-no-award': 'Not awarded',

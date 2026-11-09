@@ -2,11 +2,11 @@
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import OverviewTab from '../../shared/components/workbench/OverviewTab';
-import { FIRST_CUT_STATUS, SEMI_FINALIST_STATUS } from '../../shared/config/j27FirstCut';
+import { SCORING_STATUS, CHAIRS_RECOMMENDATION_STATUS } from '../../shared/config/j27Scoring';
 
 const context = {
   requestId: 'request-a', requestStatus: 'Phase I Pending', statusClass: 'IN_FLIGHT',
-  phaseIStatus: FIRST_CUT_STATUS.yes,
+  phaseIStatus: SCORING_STATUS.yes,
 };
 const base = {
   'reviewer-rollup': { success: true, counts: { received: 1, completed: 0 }, needed: 3 },
@@ -68,9 +68,9 @@ test('saved review prose without a presentation opens Reports directly', async (
   expect(screen.queryByText(/Visit assessment ·/)).toBeNull();
 });
 
-test('First Cut Not Scored points to Initial Assessment without treating it as a formal outcome', async () => {
-  renderOverview({ status: { phaseIStatus: FIRST_CUT_STATUS.no } });
-  expect(await screen.findByRole('heading', { name: 'First Cut marked Not Scored' })).toBeVisible();
+test('Not Scored points to Initial Assessment without treating it as a formal outcome', async () => {
+  renderOverview({ status: { phaseIStatus: SCORING_STATUS.no } });
+  expect(await screen.findByRole('heading', { name: 'Marked Not Scored' })).toBeVisible();
   expect(screen.getByText('The decision and staff rationale are in Initial Assessment.')).toBeVisible();
   expect(screen.queryByText('Request outcome recorded')).toBeNull();
 });
@@ -98,15 +98,15 @@ test('a failed read stays unknown once that stage has relevant evidence', async 
 
 test.each([
   [null, 'No decision recorded', '', 'No saved text'],
-  [FIRST_CUT_STATUS.yes, 'First Cut · Scored', 'Saved rationale', 'Saved'],
-  [SEMI_FINALIST_STATUS.yes, 'Semi-finalist · Yes', 'Saved rationale', 'Saved'],
+  [SCORING_STATUS.yes, 'Scored', 'Saved rationale', 'Saved'],
+  [CHAIRS_RECOMMENDATION_STATUS.yes, 'Recommended to Chairs', 'Saved rationale', 'Saved'],
 ])('keeps the Initial Assessment checkpoint after peer review (%s)', async (phaseIStatus, decision, rationale, rationaleStatus) => {
   renderOverview({ status: { phaseIStatus }, reads: { 'initial-assessment-rationale': { rationale } } });
   expect(await screen.findByRole('heading', { name: 'Staff review summary saved' })).toBeVisible();
   const checkpoint = screen.getByText('Initial Assessment', { exact: true }).closest('div');
   expect(checkpoint).toHaveTextContent(decision);
   expect(checkpoint).toHaveTextContent(`Staff rationale · ${rationaleStatus}`);
-  if (phaseIStatus === SEMI_FINALIST_STATUS.yes) expect(checkpoint).not.toHaveTextContent('First Cut');
+  if (phaseIStatus === CHAIRS_RECOMMENDATION_STATUS.yes) expect(checkpoint).not.toHaveTextContent('Scored');
 });
 
 test('step E: reports the reviewer rollup and the handoff reads to the page with the meeting-roster projection', async () => {
