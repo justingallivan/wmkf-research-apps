@@ -367,6 +367,33 @@ test('names who is blocking synthesis instead of reporting a bare count', async 
   expect(screen.getByText(/1 participating reviewer\(s\) remain unresolved/)).toBeInTheDocument();
 });
 
+test('the blocker hint names the Panel tab in the J27 phase layout', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      success: true,
+      proposals: [{
+        proposalId: 'req1',
+        reviewers: [],
+        reviewSynthesis: null,
+        reviewSynthesisState: {
+          current: false,
+          status: 'not_started',
+          ready: false,
+          canRunManually: true,
+          submittedCount: 4,
+          blockingCount: 1,
+          blockers: [{ suggestionId: 'S9', reason: 'active_invitation', name: 'Benjamin Garcia', accepted: false, emailSentAt: '2026-08-20T00:00:00Z' }],
+        },
+      }],
+    }),
+  });
+
+  render(<ReviewsTab requestId="req1" showStaffReviewSummary />);
+  const list = await screen.findByTestId('synthesis-blockers');
+  expect(list).toHaveTextContent('Resolve on the Panel tab');
+});
+
 test('lists submitted reviewer names and accepted affiliations beside the anonymous synthesis', async () => {
   fetch.mockResolvedValue({
     ok: true,

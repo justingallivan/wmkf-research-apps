@@ -77,3 +77,13 @@ test('the recommendation dropdown saves immediately and keeps screen uncertainty
   expect(screen.getByRole('status')).toHaveTextContent('Recommendation saved.');
   expect(screen.getByRole('alert')).toHaveTextContent('automatic Integrity Screen could not be confirmed');
 });
+
+test('a read-only card says why only when authority is what is missing', () => {
+  const view = render(<ScoringCard context={context} canManage={false} refresh={jest.fn()} />);
+  expect(screen.getByText('Scoring is read-only. Only the lead Program Director or a superuser can record it.')).toBeInTheDocument();
+  view.rerender(<ScoringCard context={context} canManage={false} previewReadOnly refresh={jest.fn()} />);
+  expect(screen.getByText('Scoring is read-only on Preview.')).toBeInTheDocument();
+  // The lead with no request version cannot save either; that is not an authority problem.
+  view.rerender(<ScoringCard context={{ ...context, requestVersion: null }} canManage refresh={jest.fn()} />);
+  expect(screen.getByText('Scoring is read-only.')).toBeInTheDocument();
+});

@@ -404,6 +404,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
               key={`scoring:${routeRequestId}`}
               context={visibleContext}
               canManage={canManage && !previewReadOnly}
+              previewReadOnly={previewReadOnly}
               refresh={refreshPhaseIStatus}
             />
           )}

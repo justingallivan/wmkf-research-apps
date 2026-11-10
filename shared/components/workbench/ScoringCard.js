@@ -3,7 +3,7 @@ import { Card } from '../Layout';
 import { SCORING_STATUS, isScoringEditable, hasChairsRecommendation, CHAIRS_RECOMMENDATION_STATUS, isChairsRecommendationEditable } from '../../config/j27Scoring';
 import { requestJson } from '../../utils/api-request';
 
-export default function ScoringCard({ context, canManage, refresh, chairsRecommendation = false, automaticIntegrityEnabled = false }) {
+export default function ScoringCard({ context, canManage, refresh, chairsRecommendation = false, automaticIntegrityEnabled = false, previewReadOnly = false }) {
   const [pendingDecision, setPendingDecision] = useState('');
   const saveInFlight = useRef(false);
   const [saving, setSaving] = useState(false);
@@ -79,7 +79,10 @@ export default function ScoringCard({ context, canManage, refresh, chairsRecomme
         </label>
       ) : !recommendationRecorded && (
         <p className="mt-2 text-sm text-gray-600">
-          {chairsRecommendation ? (current === 'yes' ? 'Recommended Invite' : current === 'no' ? 'Recommended Do Not Invite' : 'Decision pending') : 'Scoring is read-only.'}
+          {chairsRecommendation ? (current === 'yes' ? 'Recommended Invite' : current === 'no' ? 'Recommended Do Not Invite' : 'Decision pending') : previewReadOnly ? 'Scoring is read-only on Preview.'
+              // Say why only when authority is the one thing missing (staff flow audit, finding 6).
+              : editable && requestVersion && !canManage ? 'Scoring is read-only. Only the lead Program Director or a superuser can record it.'
+                : 'Scoring is read-only.'}
         </p>
       )}
       {(saving || saved) && (

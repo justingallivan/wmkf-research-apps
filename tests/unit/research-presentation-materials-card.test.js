@@ -117,7 +117,8 @@ describe('ResearchPresentationMaterialsCard', () => {
   it('surfaces processing and attention counts without changing file-list availability', async () => {
     global.fetch = jest.fn(async () => respond({ success: true, folderFound: true, slides: [], participantBios: [] }));
     render(<ResearchPresentationMaterialsCard requestId={REQUEST_ID} siteVisitContext={VISIT} materialsSummary={{ state: 'processing', processingCount: 1, attentionCount: 1 }} />);
-    expect(await screen.findByText('Presentation scheduled · 1 upload needs coordinator attention.')).toBeInTheDocument();
+    expect(await screen.findByText(/Presentation scheduled · 1 upload needs coordinator attention\./)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open meeting record' })).toHaveAttribute('href', `/meeting-tracker/visits/${REQUEST_ID}`);
     await waitFor(() => expect(screen.getAllByText('Not received yet')).toHaveLength(2));
   });
 });

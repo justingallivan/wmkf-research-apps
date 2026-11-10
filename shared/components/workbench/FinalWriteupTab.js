@@ -785,7 +785,7 @@ export default function FinalWriteupTab({ requestId, renderBoardDraft = null, on
                       {status.startBlockedReason === 'final_writeup_site_visit_not_ended'
                         ? 'Group review becomes available after the scheduled presentation ends.'
                         : status.startBlockedReason
-                          ? 'The presentation schedule could not be verified. Check Staff Deliberations before starting group review.'
+                          ? `The presentation schedule could not be verified. Check ${renderBoardDraft ? 'Deliberations' : 'Staff Deliberations'} before starting group review.`
                           : 'Only the lead Program Director or a superuser can start this stage.'}
                     </p>
                   )}

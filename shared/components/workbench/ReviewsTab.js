@@ -495,7 +495,9 @@ export function WriteupParagraphsCard({ reviewers, synthesis, synthesisCurrent }
   );
 }
 
-function SynthesisCard({ requestId, synthesis, state, reviewers = [], onUpdated, updating = false, previewReadOnly = false }) {
+// `rosterTab` names the tab that holds the reviewer roster: "Reviewers" in the
+// original layout, "Panel" (under Peer Review) in the J27 phase layout.
+function SynthesisCard({ requestId, synthesis, state, reviewers = [], onUpdated, updating = false, previewReadOnly = false, rosterTab = 'Reviewers' }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const automaticInFlight = state?.status === 'queued' || state?.status === 'running';
@@ -618,7 +620,7 @@ function SynthesisCard({ requestId, synthesis, state, reviewers = [], onUpdated,
               {describeSynthesisBlocker(blocker)}
             </li>
           ))}
-          <li className="text-gray-500">Resolve on the Reviewers tab: remove an open invitation, or confirm early generation.</li>
+          <li className="text-gray-500">Resolve on the {rosterTab} tab: remove an open invitation, or confirm early generation.</li>
         </ul>
       )}
       {error && <p className="text-xs text-amber-600 mt-2">{error}</p>}
@@ -983,6 +985,7 @@ export default function ReviewsTab({ requestId, previewReadOnly = false, showSta
           </p>
         </Card>
         <SynthesisCard
+          rosterTab={showStaffReviewSummary ? 'Panel' : 'Reviewers'}
           requestId={requestId}
           synthesis={activeProposal?.reviewSynthesis ?? null}
           state={activeProposal?.reviewSynthesisState ?? null}
@@ -1092,6 +1095,7 @@ export default function ReviewsTab({ requestId, previewReadOnly = false, showSta
         </>
       )}
       <SynthesisCard
+        rosterTab={showStaffReviewSummary ? 'Panel' : 'Reviewers'}
         requestId={requestId}
         synthesis={activeProposal?.reviewSynthesis ?? null}
         state={activeProposal?.reviewSynthesisState ?? null}
