@@ -7,52 +7,10 @@
  */
 import { J27_BLOCKERS, J27_OUTCOMES, J27_PHASES, J27_TASKS } from '../../../lib/services/workbench/j27-read-model';
 
-export const J27_PHASE_LABEL = {
-  'initial-assessment': 'Initial Assessment',
-  'peer-review': 'Peer Review',
-  deliberations: 'Deliberations',
-  'final-assessment': 'Final Assessment',
-  decided: 'Decided',
-  unclassified: 'Not classified',
-};
+import { J27_BLOCKER_LABEL, J27_IDLE_LABEL, J27_OUTCOME_LABEL, J27_PHASE_LABEL, J27_TASK_LABEL } from '../../config/j27Labels';
 
-export const J27_TASK_LABEL = {
-  'record-rationale': 'Record the staff rationale',
-  'record-scoring': 'Record Scored or Not Scored',
-  'record-chairs-recommendation': 'Record the recommendation to Chairs',
-  'review-integrity': 'Review the integrity findings',
-  'identify-reviewers': 'Identify reviewers',
-  'send-invitations': 'Send reviewer invitations',
-  'read-reports': 'Read the reviewer reports',
-  'record-offramp': 'Record an offramp decision if one is needed',
-  'confirm-roster': 'Confirm presentation attendance',
-  'write-visit-assessment': 'Write the staff visit assessment',
-  'write-board-draft': 'Write the Board draft',
-  'start-group-review': 'Start group review',
-};
-
-export const J27_BLOCKER_LABEL = {
-  'chairs-outcome-pending': 'Reviewer invitations wait for the Chairs’ outcome',
-  'phase-two-status-pending': 'Reviewer invitations open once the Phase II status is Pending Committee Review',
-  'integrity-unreviewed': 'Integrity findings need a Program Director’s review before invitations or scheduling',
-  offramped: 'This request took the offramp; it is not invited or presented',
-  'presentation-not-ended': 'Group review starts after the presentation ends',
-  'presentation-end-unverified': 'The presentation’s end has not been verified yet',
-  'presentation-schedule-unavailable': 'The presentation schedule could not be read',
-  'evidence-stale': 'Reviewer reports changed after the staff summary was saved',
-  'roster-stale': 'The confirmed attendance no longer matches the presentation',
-};
-
-export const J27_OUTCOME_LABEL = {
-  none: null,
-  'not-scored': 'Not Scored',
-  'not-recommended': 'Not Recommended',
-  'not-invited': 'Not Invited',
-  offramped: 'Offramped',
-  'decided-award': 'Awarded',
-  'decided-no-award': 'Not awarded',
-  withdrawn: 'Withdrawn',
-};
+// Labels live in shared/config/j27Labels.js; re-exported under their original names.
+export { J27_PHASE_LABEL, J27_TASK_LABEL, J27_BLOCKER_LABEL, J27_OUTCOME_LABEL };
 export { J27_OUTCOMES };
 
 const BASIS_NOTE = {
@@ -86,7 +44,7 @@ export default function J27StageStrip({ stage }) {
         {stage.primaryTask ? (
           <span>Next: {J27_TASK_LABEL[stage.primaryTask] || stage.primaryTask}</span>
         ) : (stage.phase === 'decided' || (stage.outcome && stage.outcome !== 'none')) ? null : (
-          <span className="text-gray-600">Nothing is waiting on staff right now.</span>
+          <span className="text-gray-600">{J27_IDLE_LABEL}</span>
         )}
         {note && <span className="text-gray-500">{note}</span>}
       </div>

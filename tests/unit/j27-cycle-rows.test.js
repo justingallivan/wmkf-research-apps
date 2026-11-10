@@ -1,0 +1,188 @@
+import { deriveJ27Stage, J27_TASKS, J27_OUTCOMES } from '../../lib/services/workbench/j27-read-model';
+import { j27DashboardDto } from '../../lib/services/workbench/j27-read-model-inputs';
+import { SCORING_STATUS, CHAIRS_RECOMMENDATION_STATUS } from '../../shared/config/j27Scoring';
+import {
+  J27_REVIEWER_STAGE_LABEL, J27_STANDING_LABEL, J27_WAIT_LABEL, J27_IDLE_LABEL, J27_DEGRADED_NOTE,
+} from '../../shared/config/j27Labels';
+import {
+  isClosedRow, standingKey, rowChip, rowLine, rowNote, matchesSearch, matchesShowing, rowsForTab,
+  standingCounts, tabCounts, J27_SHOWING_KEYS, J27_SHOWING_LABEL,
+} from '../../shared/utils/j27CycleRows';
+
+const INVITED = 100000003;
+const NOT_INVITED = 100000002;
+const NL = { status: 'not-loaded' };
+const counts = (over = {}) => ({ status: 'present', candidates: 0, invited: 0, accepted: 0, received: 0, completed: 0, ...over });
+
+/** A dashboard row as the list receives it: the model's stage through the server's slim DTO. */
+function row(request = {}, over = {}, extra = {}) {
+  const input = {
+    request: {
+      status: 'present', requestStatus: 'Phase I Pending', statusClass: 'IN_FLIGHT', phaseIStatus: 100000000,
+      phaseIStatusLabel: null, phaseIIStatus: null, readyForReview: true, cycleCode: 'J27', ...request,
+    },
+    rationale: { status: 'present' }, reviewSummary: { status: 'absent' }, visitAssessment: { status: 'absent' },
+    rosterMemo: { status: 'absent' },
+    reviewers: { status: 'present', anySuggestion: false, counts: counts() },
+    integrity: { status: 'present', latest: null },
+    calendar: { status: 'present', today: '2027-01-15', offrampMeetingDate: null },
+    capabilities: { status: 'present', readOnly: false },
+    features: { status: 'present', chairsRecommendationEnabled: true },
+    presentation: NL, roster: NL, boardDraft: NL, transition: NL,
+    ...over,
+  };
+  return {
+    requestId: 'r1', requestNumber: '1009001', title: 'Mapping signalling lipids', institution: 'Northfield University',
+    projectLeader: 'Alex Sample', programDirector: 'Jordan Example', workRemaining: 'find',
+    j27: j27DashboardDto(deriveJ27Stage(input)), ...extra,
+  };
+}
+
+const notScored = () => row();
+const scored = () => row({ phaseIStatus: SCORING_STATUS.yes });
+const recommended = (over) => row({ phaseIStatus: CHAIRS_RECOMMENDATION_STATUS.yes }, over);
+const invited = (request = {}, over) => row({ phaseIStatus: INVITED, ...request }, over);
+
+describe('label coverage', () => {
+  test('the Showing menu lists open, everything and every ending', () => {
+    expect(J27_SHOWING_KEYS.slice(2).sort()).toEqual(J27_OUTCOMES.filter((key) => key !== 'none').sort());
+    for (const key of J27_SHOWING_KEYS) expect(typeof J27_SHOWING_LABEL[key]).toBe('string');
+  });
+  test('the optional tasks are exactly the two the model marks secondary', () => {
+    expect(J27_TASKS.filter((task) => task.secondary).map((task) => task.key)).toEqual(['identify-reviewers', 'record-offramp']);
+  });
+});
+
+describe('the four January samples (build plan finding 1)', () => {
+  test('not yet scored: chip and the scoring task', () => {
+    const r = notScored();
+    expect(rowChip(r)).toMatchObject({ kind: 'standing', key: 'not-yet-scored', label: J27_STANDING_LABEL['not-yet-scored'] });
+    expect(rowLine(r)).toMatchObject({ kind: 'next', key: 'record-scoring' });
+  });
+  test('scored: the recommendation task', () => {
+    const r = scored();
+    expect(rowChip(r).key).toBe('scored');
+    expect(rowLine(r)).toMatchObject({ kind: 'next', key: 'record-chairs-recommendation' });
+  });
+  test('recommended: the model says Identify reviewers; the row says it is waiting on the Chairs', () => {
+    const r = recommended();
+    expect(r.j27.primaryTask).toBe('identify-reviewers');
+    expect(rowChip(r).key).toBe('recommended');
+    expect(rowLine(r)).toEqual({ kind: 'wait', key: 'chairs-outcome-pending', text: J27_WAIT_LABEL['chairs-outcome-pending'] });
+  });
+  test('invited without the Phase II status: Identify reviewers leads in Peer Review', () => {
+    const r = invited();
+    expect(r.j27.phase).toBe('peer-review');
+    expect(r.j27.blockerKeys).toContain('phase-two-status-pending');
+    expect(rowChip(r)).toMatchObject({ kind: 'reviewer-stage', label: J27_REVIEWER_STAGE_LABEL.find });
+    expect(rowLine(r)).toMatchObject({ kind: 'next', key: 'identify-reviewers' });
+  });
+});
+
+describe('line ordering', () => {
+  test('a recommended request that already has reviewer suggestions still waits on the Chairs', () => {
+    const r = recommended({ reviewers: { status: 'present', anySuggestion: true, counts: counts({ candidates: 2 }) } });
+    expect(r.j27.phase).toBe('peer-review');
+    expect(rowLine(r).key).toBe('chairs-outcome-pending');
+  });
+  test('a main task outranks a wait', () => {
+    const r = recommended({ rationale: { status: 'absent' } });
+    expect(rowLine(r)).toMatchObject({ kind: 'next', key: 'record-rationale' });
+  });
+  test('an unreviewed integrity finding is a main task', () => {
+    const r = recommended({ integrity: { status: 'present', latest: { flagged: true, reviewed: false } } });
+    expect(rowLine(r)).toMatchObject({ kind: 'next', key: 'review-integrity' });
+  });
+  test('invited, reviewers complete, Phase II status missing: the invitations line', () => {
+    const r = invited({}, {
+      reviewSummary: { status: 'present' },
+      reviewers: { status: 'present', anySuggestion: true, counts: counts({ candidates: 3, invited: 3, accepted: 3, received: 3, completed: 3 }) },
+    });
+    expect(r.j27.taskKeys).toEqual(['record-offramp']);
+    expect(rowLine(r)).toEqual({ kind: 'wait', key: 'phase-two-status-pending', text: J27_WAIT_LABEL['phase-two-status-pending'] });
+  });
+  test('the optional offramp task never leads: an invited, fully reviewed request is idle', () => {
+    const r = invited({ requestStatus: 'Phase II Pending' }, {
+      reviewSummary: { status: 'present' },
+      reviewers: { status: 'present', anySuggestion: true, counts: counts({ candidates: 3, invited: 3, accepted: 3, received: 3, completed: 3 }) },
+    });
+    expect(r.j27.primaryTask).toBe('record-offramp');
+    expect(rowLine(r)).toEqual({ kind: 'idle', text: J27_IDLE_LABEL });
+  });
+  test('a memo-placed Deliberations row: plain phase chip, no optional task leading', () => {
+    const r = invited({ requestStatus: 'Phase II Pending' }, {
+      reviewSummary: { status: 'present' }, visitAssessment: { status: 'present' },
+      reviewers: { status: 'present', anySuggestion: true, counts: counts({ candidates: 3, invited: 3, accepted: 3, received: 3, completed: 3 }) },
+    });
+    expect(r.j27.phase).toBe('deliberations');
+    expect(rowChip(r)).toEqual({ kind: 'phase', key: 'deliberations', label: 'Deliberations' });
+    expect(rowLine(r).kind).toBe('idle');
+  });
+});
+
+describe('closed rows', () => {
+  test('each recorded ending closes the row and shows no line', () => {
+    const cases = [
+      [row({ phaseIStatus: SCORING_STATUS.no }), 'not-scored', 'Not Scored'],
+      [row({ phaseIStatus: CHAIRS_RECOMMENDATION_STATUS.no }), 'not-recommended', 'Not Recommended'],
+      [row({ phaseIStatus: NOT_INVITED }), 'not-invited', 'Not Invited'],
+      [invited({ phaseIIStatus: 682090001 }), 'offramped', 'Offramped'],
+      [invited({ statusClass: 'DECIDED_AWARD' }), 'decided-award', 'Awarded'],
+      [invited({ statusClass: 'DECIDED_NO_AWARD' }), 'decided-no-award', 'Not awarded'],
+      [row({ statusClass: 'WITHDRAWN' }), 'withdrawn', 'Withdrawn'],
+    ];
+    for (const [r, key, label] of cases) {
+      expect(isClosedRow(r)).toBe(true);
+      expect(rowChip(r)).toEqual({ kind: 'closed', key, label });
+      expect(rowLine(r)).toEqual({ kind: 'none', text: null });
+      expect(matchesShowing(r, 'open')).toBe(false);
+      expect(matchesShowing(r, key)).toBe(true);
+      expect(matchesShowing(r, 'everything')).toBe(true);
+    }
+  });
+  test('a Phase I status the model does not map is closed under its Dataverse label (owner decision 1)', () => {
+    const r = row({ phaseIStatus: 999, phaseIStatusLabel: 'Ineligible' });
+    expect(r.j27.taskKeys).toContain('record-scoring');
+    expect(isClosedRow(r)).toBe(true);
+    expect(rowChip(r)).toEqual({ kind: 'closed', key: 'unmapped', label: 'Ineligible' });
+    expect(rowLine(r).kind).toBe('none');
+    expect(standingKey(r)).toBeNull();
+    expect(matchesShowing(r, 'open')).toBe(false);
+    expect(matchesShowing(r, 'everything')).toBe(true);
+    expect(J27_SHOWING_KEYS.slice(2).some((key) => matchesShowing(r, key))).toBe(false);
+  });
+});
+
+describe('notes, search, tabs and counts', () => {
+  test('only a failed read earns the note; a partial row does not', () => {
+    expect(notScored().j27.basis).toBe('partial');
+    expect(rowNote(notScored())).toBeNull();
+    const degraded = row({}, { integrity: { status: 'unavailable' } });
+    expect(degraded.j27.basis).toBe('degraded');
+    expect(rowNote(degraded)).toEqual({ kind: 'degraded', text: J27_DEGRADED_NOTE });
+  });
+  test('search covers number, title, institution and Principal Investigator', () => {
+    const r = notScored();
+    for (const q of ['1009001', 'signalling', 'northfield', 'alex sample', '  ', '']) expect(matchesSearch(r, q)).toBe(true);
+    expect(matchesSearch(r, 'Jordan Example')).toBe(false);
+    expect(matchesSearch(r, 'no such')).toBe(false);
+  });
+  test('a row without a stage is neither closed nor chipped', () => {
+    const bare = { requestId: 'x', requestNumber: '1' };
+    expect(isClosedRow(bare)).toBe(false);
+    expect(rowChip(bare)).toBeNull();
+    expect(rowLine(bare)).toEqual({ kind: 'none', text: null });
+    expect(matchesShowing(bare, 'open')).toBe(true);
+  });
+  test('phase tabs filter by the derived phase; other tabs list every row', () => {
+    const rows = [notScored(), scored(), recommended(), invited(), row({ phaseIStatus: SCORING_STATUS.no })];
+    expect(rowsForTab(rows, 'requests')).toHaveLength(5);
+    expect(rowsForTab(rows, 'initial-assessment')).toHaveLength(4);
+    expect(rowsForTab(rows, 'peer-review')).toHaveLength(1);
+    expect(standingCounts(rows)).toEqual({ 'not-yet-scored': 1, scored: 1, recommended: 1 });
+  });
+  test('a tab count is the number of rows of that phase with a Next line', () => {
+    const rows = [notScored(), scored(), recommended(), invited(), row({ phaseIStatus: SCORING_STATUS.no })];
+    expect(tabCounts(rows)).toEqual({ 'initial-assessment': 2, 'peer-review': 1 });
+  });
+});
