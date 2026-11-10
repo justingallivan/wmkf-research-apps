@@ -1,0 +1,21 @@
+{
+  "name": "akoya_request-narratives",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "akoya_request",
+  "attributes": [
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_LayAbstract",
+      "displayName": "Lay Abstract",
+      "description": "Optional request lay abstract, initialized once by the external Power Automate workflow and subsequently edited by staff. Never automatically regenerate or overwrite staff edits, including intentional clearing.",
+      "maxLength": 100000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_InitialAssessment",
+      "displayName": "Initial Assessment",
+      "description": "Optional request assessment text, initialized once by the external Power Automate workflow and subsequently edited by staff. Separate from the governed Initial Assessment document. Never automatically regenerate or overwrite staff edits, including intentional clearing.",
+      "maxLength": 100000
+    }
+  ]
+}

@@ -18,6 +18,7 @@ import { useState, useEffect, useRef } from 'react';
 import { requestEnvelope } from '../../utils/api-request';
 import { Card } from '../Layout';
 import { StatusBadge } from './StatusTab';
+import RequestNarrativesCard from './RequestNarrativesCard';
 
 const USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 const money = (n) => (typeof n === 'number' && Number.isFinite(n) ? USD.format(n) : '—');
@@ -148,6 +149,8 @@ export default function OverviewTab({ context, requestId, onSelectTab }) {
           </Field>
         </dl>
       </Section>}
+
+      {context && <RequestNarrativesCard requestId={requestId} />}
 
       {/* AI artifacts */}
       {context && <Section

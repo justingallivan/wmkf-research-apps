@@ -77,6 +77,18 @@ People (lookups):
 Content / abstract:
 - `wmkf_abstract` (full proposal abstract; added by WMKF, not in vendor schema)
 - `wmkf_excludedreviewers` (free-form names)
+- `wmkf_layabstract` and `wmkf_initialassessment` (optional plain-text Memo,
+  100,000 characters each) — **[BRANCH IMPLEMENTATION; NOT PROVISIONED]**.
+  Read-only production metadata probe on 2026-11-09 found neither field;
+  Wave `36-request-narratives` dry run succeeded without writes. App contract:
+  `lay_abstract` / `initial_assessment`, read and conditionally saved through
+  `/api/workbench/request-narratives` and the Overview Request text card.
+  External Power Automate supplies the initial text; no app generation or
+  automatic replacement. This assessment text is separate from the governed
+  Initial Assessment document pointer below. Provisioning and the external
+  one-time initialization requirements are recorded in
+  `docs/plans/REQUEST_NARRATIVES_HANDOFF_2026-11-09.md`.
+
 
 Governed artifact pointers:
 - `wmkf_currentinitialassessment` (Lookup →
