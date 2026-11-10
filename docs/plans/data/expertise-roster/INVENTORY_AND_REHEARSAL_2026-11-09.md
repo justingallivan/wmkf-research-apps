@@ -4,7 +4,8 @@
 Scope authorized by Justin: full roster export, feedback roster IDs, saved Site Visit
 and deliberation session/slot attendee references, linked Contact/User identity and
 status fields. No Production writes, real-record copy to sandbox, Preview configuration
-change or Dataverse schema provisioning occurred.
+change occurred during the inventory phase. Subsequent sandbox provisioning and
+synthetic tests are recorded in `SANDBOX_REHEARSAL_2026-11-09.md`.
 
 ## Inventory
 
@@ -26,7 +27,7 @@ and deltas. The explicit UUID is a fixed lineage identifier, not an export times
 | Production deliberation sessions | 9 maps; no roster-kind references found |
 | Sandbox Site Visits / sessions | 4 Site Visits with no saved maps; zero sessions |
 | Deliberation slots | No slot-local attendee field by design; slots inherit the parent session attendee map |
-| Proposed Expertise Profile | `wmkf_expertiseprofile` absent in both environments |
+| Expertise Profile | Absent in both at inventory time; subsequently provisioned in sandbox only |
 | Source DB | PostgreSQL 17.11; read-only transactions enforced |
 
 The attendee parser counts explicit `{kind:'roster', rosterId:...}` references;
@@ -47,9 +48,9 @@ metadata, reference maps, linked Contacts, enabled User identity candidates, inp
 checksums, aggregate analysis and draft mappings for each target. Every draft mapping
 is `confirmed:false`; links/eligibility are not guessed or approved by the exporter.
 The original roster remains active as found: Kevin's retirement override has NOT been
-applied. Beth's lead eligibility and the two new PD identities remain pending. No
-production GUID was treated as a sandbox counterpart. Missing profile tables mean
-there is no valid complete target-profile snapshot for a real import dry run yet.
+applied. Subsequent confirmed staff overrides and placeholder handling are in
+`OWNER_MAPPING_DECISIONS_2026-11-09.md` and a separate private receipt; raw exports
+remain unchanged. No Production GUID was treated as a sandbox counterpart.
 
 ## Dedicated local rehearsal
 
@@ -95,9 +96,9 @@ required lineage and Git-destination rejection; existing planner tests remain gr
 
 1. Slot field investigation is resolved: use parent-session attendee references for
    migration parity. No slot-local column is required.
-2. Review per-person mappings and owner overrides; no guessed new PD identities.
-3. Provision and prove the reviewed Expertise Profile schema in sandbox, including
-   auditing, attribution, keys/null behavior and permissions, under scoped write approval.
+2. Apply the saved owner overrides through a reviewed import implementation.
+3. Complete remaining audit-event, attribution and staff-permission checks after
+   the sandbox schema/key rehearsal recorded in `SANDBOX_REHEARSAL_2026-11-09.md`.
 4. Extend the local fixture into a full isolated application database and configure a
    dedicated Preview only when the runtime slice is ready. Verify every actual deployed
    connection alias then. Do not point that Preview at shared Postgres.

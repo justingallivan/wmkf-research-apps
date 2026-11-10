@@ -15,7 +15,7 @@ related:
 
 ## Status and authority
 
-**PLANNED — no schema provisioned, import performed, or runtime change made by this work.**
+**IN PROGRESS — sandbox schema provisioned; no real roster import, Production schema change, or runtime cutover.**
 Owner decisions below were settled with Justin on November 9, 2026. Justin developed the recovered design with Codex and sent it to Connor; Justin confirms Connor supports it. Connor's previous matcher embedded expertise in a Claude prompt executed by Power Automate. It is not evidence of an existing Expertise Profile table.
 
 This plan replaces the recovered email's proposed Short ID, program partition, Match Type and roster dates. It also supersedes the roster comparison/selection task in J27 alignment log D15/X1/T8: the destination is a shared Dataverse roster, not an unresolved choice between two verified roster tables. Scoring, lead assignment, load balancing, and expertise prose are separate future work.
@@ -38,7 +38,7 @@ The target logical name `wmkf_expertiseprofile` below is a **proposed implementa
 | Expertise | Preserve current structured fields as optional text. Wording/granularity and scoring remain deferred. No Match Type. |
 | Editing | Preserve current access: anyone with Expertise Finder access can edit profiles, links, status and eligibility. |
 
-**Import confirmations, not schema blockers:** Kevin Moses is retired and must be imported inactive. Beth Pruitt remains a roster member; her lead eligibility is unconfirmed, not inferred from CSO title or the old fallback rule. Identify the two new PDs and their User GUIDs with Justin. Do not infer their expertise. Until confirmed, lead eligibility defaults false; record the pending decision in the import report so false is not mistaken for a final owner decision.
+**Confirmed import overrides:** Justin and Jean are lead eligible; Beth remains active with lead eligibility off. John Sader is existing roster ID 1, changes from Consultant to Research Program Staff, uses his verified target-specific User link and is lead eligible. Kevin is inactive. Amy Rowat is staged inactive without a User link or eligibility until she starts in December. Exclude TBD profile ID 35, preserving its numeric identity for the verified feedback reference. See `docs/plans/data/expertise-roster/OWNER_MAPPING_DECISIONS_2026-11-09.md`. The runtime editor must expose easy deactivate/reactivate and inactive filtering; other roster retirements can be decided later.
 
 ## 2. Current contract and evidence
 
@@ -167,8 +167,8 @@ Implementation adds meaningful unit, integration and browser contract tests. Run
 
 Code work uses a fresh implementation branch under the release strategy. This document's existence authorizes neither schema deployment nor import. No feature work is included in this planning commit.
 
-Review status: final Claude Fable 5.2 OAuth plan check returned **READY**, confirming N1/N2 resolved with no named repairs. See `docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_4_2026-11-09.md`. This is a plan-text verdict, not platform verification. The offline foundation (schema specification, inert bridge SQL draft, file-only import planner and synthetic tests) is implemented on `codex/expertise-roster-foundation-2026-11-09`; see `docs/plans/data/expertise-roster/README.md`. No schema, data, prompt or runtime has been deployed. Platform rehearsal and owner prompt gates remain prerequisites.
+Review status: final Claude Fable 5.2 OAuth plan check returned **READY**, confirming N1/N2 resolved with no named repairs. See `docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_4_2026-11-09.md`. This is a plan-text verdict, not platform verification. The offline foundation (schema specification, inert bridge SQL draft, file-only import planner and synthetic tests) is implemented on `codex/expertise-roster-foundation-2026-11-09`; see `docs/plans/data/expertise-roster/README.md`. Sandbox schema and synthetic rehearsal work are now recorded in `docs/plans/data/expertise-roster/SANDBOX_REHEARSAL_2026-11-09.md`; no Production or runtime cutover occurred. Platform rehearsal and owner prompt gates remain prerequisites.
 
 ## 8. Durable context and limits
 
-The historical contact-link plan and Atlas still accurately describe current Postgres behavior until cutover. Update them at implementation, not to falsely claim migration shipped. This plan is linked from the isolated branch's session handoff for discovery. The root checkout has concurrent owner/Claude WIP and is not edited. Any cross-branch reconciliation must preserve that work. The subsequent roster census and rehearsal-preparation report is linked above. Live schema provisioning/key tests, actual flow integration and runtime tests remain pending; no completeness claim extends to those surfaces.
+The historical contact-link plan and Atlas still accurately describe current Postgres behavior until cutover. Update them at implementation, not to falsely claim migration shipped. This plan is linked from the isolated branch's session handoff for discovery. The root checkout has concurrent owner/Claude WIP and is not edited. Any cross-branch reconciliation must preserve that work. The subsequent roster census and rehearsal-preparation report is linked above. Sandbox schema/key preparation is recorded separately; actual flow integration and full runtime tests remain pending; no completeness claim extends to those surfaces.

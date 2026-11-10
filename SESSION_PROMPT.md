@@ -54,12 +54,14 @@ Read-model branch, 2026-11-09 (oldest first): `ff1a978cf`, `470cd3f76`,
 Justin and Codex recovered the earlier roster migration design and settled the
 schema decisions with Connor supporting the direction. The implementation plan
 is `docs/plans/EXPERTISE_ROSTER_DATAVERSE_MIGRATION_PLAN_2026-11-09.md`.
-This is planned work, not a provisioned table or deployed migration. One profile
+Sandbox schema and foundation rehearsal are now complete; Production runtime
+remains unchanged. One profile
 per person, no program partition or Short ID, separate lead-PD eligibility,
 optional external Contact links, Active/Inactive only, optional preserved
 expertise fields, and unchanged editor access are settled. Expertise wording,
-scoring and recommendation policy remain deferred. Beth's eligibility and the
-two new PD identities remain import confirmations. Claude Fable 5.2 reviewed the plan via approved OAuth and returned READY WITH
+scoring and recommendation policy remain deferred. Confirmed mappings: Justin/Jean/John lead eligible, Beth off, Kevin inactive,
+Amy staged inactive without a User. See
+`docs/plans/data/expertise-roster/OWNER_MAPPING_DECISIONS_2026-11-09.md`. Claude Fable 5.2 reviewed the plan via approved OAuth and returned READY WITH
 NAMED CHANGES. The repairs are incorporated; the original review and disposition
 are in `docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_2026-11-09.md`. Third Fable OAuth review confirmed B1–B5 and all six rehearsal gates resolved.
 Its two new cutover findings were repaired with inert automatic migrations, a
@@ -73,10 +75,11 @@ draft and file-only import planner. Synthetic verification and runbook:
 local PostgreSQL 17.11 rehearsal database are prepared; see
 `docs/plans/data/expertise-roster/INVENTORY_AND_REHEARSAL_2026-11-09.md`.
 39 roster rows, 10 healthy Contact links, 7 feedback references. Slot attendee maps are inherited from parent sessions; the reported missing-field
-issue was an inventory interpretation error, now resolved. The active
-"TBD: Neurodegeneration specialist" roster placeholder needs an import decision. Mapping confirmation and sandbox
-schema provisioning remain pending; no Production writes. Owner prompt approval and platform rehearsal
-gates remain prerequisites; no schema or runtime has been deployed. The existing J27 stream below is
+issue was an inventory interpretation error, now resolved. TBD profile is excluded from migration while its numeric identity is retained for
+one verified historical feedback reference. Sandbox schema/keys and synthetic SQL
+cutover/rollback tests passed; see
+`docs/plans/data/expertise-roster/SANDBOX_REHEARSAL_2026-11-09.md`. No Production writes. Owner prompt approval and platform rehearsal
+gates remain prerequisites; no Production schema or runtime has been deployed. The existing J27 stream below is
 preserved and has not been resumed by this planning task.
 
 ## Next Items

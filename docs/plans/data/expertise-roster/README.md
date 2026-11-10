@@ -2,7 +2,8 @@
 
 [VERIFIED via source and synthetic tests] First implementation slice of
 `docs/plans/EXPERTISE_ROSTER_DATAVERSE_MIGRATION_PLAN_2026-11-09.md`.
-This is not a deployed migration. The app still uses its existing roster.
+The app still uses its existing roster. Sandbox schema and synthetic rehearsal status
+are recorded in `SANDBOX_REHEARSAL_2026-11-09.md`; no Production migration occurred.
 
 ## Artifacts and boundaries
 
@@ -11,7 +12,7 @@ This is not a deployed migration. The app still uses its existing roster.
   eligibility, optional User lookup and Contact GUID text, three alternate keys.
   Choice values are provisional until metadata preflight. Audit configuration,
   actor attribution, permissions, concurrency and key activation are separate
-  unexecuted gates. Do not provision this specification yet.
+  release gates. This specification is now provisioned in sandbox only.
 - `identity-bridge.sql`: inert DDL draft, deliberately outside auto-discovered
   migrations. No allocator, population, FK retarget or sequence advancement.
   Assign a migration number only after branch claims and live ledger reconciliation;
@@ -97,9 +98,9 @@ This review does not certify the implementation or live readiness.
 
 Real inventory and a dedicated local PostgreSQL 17 synthetic fixture are now prepared;
 see `INVENTORY_AND_REHEARSAL_2026-11-09.md` for verified counts and limitations.
-Reconcile mappings, Beth's eligibility, new PD identities and the active specialist
-placeholder. Slot attendee storage is resolved as parent-session inheritance.
-Then prove
+Staff eligibility, new PD staging and placeholder exclusion are recorded in
+`OWNER_MAPPING_DECISIONS_2026-11-09.md`. Slot storage is parent-session inheritance.
+Complete the remaining
 schema/audit/keys/permissions, build the roster service and bridge recovery, integrate
 consumers, and rehearse import plus rollback. The owner-reviewed minimal matching
 prompt contract and verified old-deployment admission/drain remain cutover prerequisites.
