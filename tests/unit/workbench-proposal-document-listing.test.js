@@ -236,7 +236,7 @@ test('J27 GOApply names fill the AI Materials slots; both D26 and J27 names pres
 });
 
 describe('single-submission layout (J27 onward)', () => {
-  const AI = `${ROOT}/AI Materials`;
+  const AI = `${ROOT}/Submission-Documents`;
   const pdf = (name, folder = AI) => ({ name, folder, mimeType: 'application/pdf' });
 
   beforeEach(() => {
@@ -256,7 +256,9 @@ describe('single-submission layout (J27 onward)', () => {
       pdf('Biosketches_1002379.pdf'),
       pdf('Other-Support_1002379.pdf'),
       pdf('Collaboration-Letters_1002379.pdf'),
-      { name: 'Graphical-Abstract_1002379.png', folder: AI, mimeType: 'image/png' },
+      { name: 'Graphical-Abstract_1002379.jpg', folder: AI, mimeType: 'image/jpeg' },
+      pdf('declarationofstatus_Test 1.pdf'),
+      pdf('Research Proposal_2026-10-28T19-04-54Z.pdf'),
       pdf('PhaseI-Cover-Page_1002379.pdf'),
       pdf('Abstract_1002379.pdf'),
       pdf('Graphical-Abstract-Page_1002379.pdf'),
@@ -273,7 +275,7 @@ describe('single-submission layout (J27 onward)', () => {
       ['Biosketches', true, 'Biosketches_1002379.pdf'],
       ['Other Support', true, 'Other-Support_1002379.pdf'],
       ['Collaboration Letters', true, 'Collaboration-Letters_1002379.pdf'],
-      ['Graphical Abstract', true, 'Graphical-Abstract_1002379.png'],
+      ['Graphical Abstract', true, 'Graphical-Abstract_1002379.jpg'],
     ]);
     expect(result.aiMaterials[2]).toMatchObject({ library: 'akoya_request', folder: AI });
   });
@@ -306,9 +308,9 @@ describe('single-submission layout (J27 onward)', () => {
     expect(result.aiMaterials.find((item) => item.key === 'graphicalAbstract').found).toBe(false);
   });
 
-  test('files outside the active AI Materials folder, another request\'s files and both narrative names do not fill a row', async () => {
+  test('files outside the Submission-Documents folder, another request\'s files and both narrative names do not fill a row', async () => {
     listFiles.mockResolvedValue([
-      pdf('Biosketches_1002379.pdf', `${ROOT}/Submission-Documents`),
+      pdf('Biosketches_1002379.pdf', `${ROOT}/AI Materials`),
       pdf('Other-Support_1009999.pdf'),
       pdf('Project-Narrative_1002379.pdf'),
       pdf('ProposalNarrative_1002379.pdf'),
@@ -337,6 +339,7 @@ describe('single-submission layout (J27 onward)', () => {
     for (const files of [
       [],
       [pdf('Caltech_Staff-Version_1002379.pdf', AI)],
+      [pdf('Caltech_Staff-Version_1002379.pdf', `${ROOT}/AI Materials`)],
       [pdf('Caltech_Staff-Version_1009999.pdf', ROOT)],
       [pdf('_Staff-Version_1002379.pdf', ROOT)],
       [pdf('Caltech_Staff-Version_1002379.docx', ROOT)],

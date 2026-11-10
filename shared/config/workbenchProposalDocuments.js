@@ -29,9 +29,8 @@ const DEFAULT_CONFIG = {
 };
 
 // Single-submission cycles (J27 onward) have no `Phase I` folder: GOApply
-// originals sit in `Submission-Documents` and the flows write
-// `{Type}_{Request#}` files to `AI Materials` (Connor, 2026-10-26). The
-// Proposal tab lists those individual files instead of labeled slots. The
+// individual `{Type}_{Request#}` files sit in `Submission-Documents` (Connor,
+// 2026-11-10). The Proposal tab lists those files instead of labeled slots. The
 // rule is "this cycle or any later one", so a new cycle needs no entry here.
 export const SINGLE_SUBMISSION_LAYOUT = 'single-submission';
 const FIRST_SINGLE_SUBMISSION_CYCLE = 'J27';

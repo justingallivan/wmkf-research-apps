@@ -162,7 +162,7 @@ test.each([false, undefined])('does not expose documents from malformed success=
 
 describe('single-submission layout (J27 onward)', () => {
   const material = (key, label, name) => (name
-    ? { key, label, filename: name, found: true, library: 'akoya_request', folder: `${ROOT}/AI Materials`, name, mimeType: 'application/pdf' }
+    ? { key, label, filename: name, found: true, library: 'akoya_request', folder: `${ROOT}/Submission-Documents`, name, mimeType: 'application/pdf' }
     : { key, label, filename: null, found: false });
 
   function j27Body(overrides = {}) {
