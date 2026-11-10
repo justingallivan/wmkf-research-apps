@@ -44,7 +44,7 @@ For Research requests in J27 and later cycles, the cycle page shows six tabs:
 **All requests · Initial Assessment · Peer Review · Deliberations · Final Assessment · Awardees**
 
 The page opens on **All requests**: every request in the cycle, one row
-each, showing the phase it is in, its next task and, if it has stopped, how
+each, showing where it stands, its next task and, if it has stopped, how
 it ended. This mirrors the request page, which is Overview plus the same four
 phases, and it sits where the Request list sits today.
 
@@ -60,7 +60,7 @@ unchanged, the same way the request page keeps its older tabs for them.
 
 | Today's tab | In the new layout | Notes |
 |---|---|---|
-| Request list | **Becomes All requests, the first tab and the opening view.** | Same place, same My/All switch. Rows gain the phase, the next task and the request title. The reviewer progress chip and bar move to the Peer Review list. The Advancing / Set aside dropdown is already hidden for J27 `[VERIFIED via RequestListPanel.js:224]`; the scoring decision and the recommendation to Chairs on the request page replace it. "Include set-aside requests" becomes "Show closed". |
+| Request list | **Becomes All requests, the first tab and the opening view.** | Same place, same My/All switch. Rows gain the request's standing, the next task and the request title. The reviewer progress chip and bar move to the Peer Review list and appear nowhere else. The Advancing / Set aside dropdown is already hidden for J27 `[VERIFIED via RequestListPanel.js:224]`; the scoring decision and the recommendation to Chairs on the request page replace it. "Include set-aside requests" becomes "Show closed". |
 | Reviewer follow-up | **Becomes a section inside Peer Review** ("Reviewers"). | Same panel, same controls, no change to what it reads or writes. It is the cycle view of Peer Review, as the owner described. |
 | Staff deliberations | **Becomes the Deliberations list.** | Its rows already carry the presentation schedule and next step. Rows it shows as "Group review" or "Leadership review" move to Final Assessment, where the stage model puts them. |
 | Initial assessments | **The name stays as the first phase; the content changes.** | Today the tab lists the Initial Assessment Word documents from the earlier placeholder workflow. In J27 the phase is the material generated automatically at submission plus the staff rationale, the scoring decision, the recommendation to Chairs and integrity review on each request, so the phase opens on requests. The document list leaves the J27 cycle page (owner, 2026-11-09). |
@@ -71,7 +71,7 @@ unchanged, the same way the request page keeps its older tabs for them.
 
 | Tab | Opens on | Second section |
 |---|---|---|
-| All requests | Every request in the cycle: phase, next task, how it ended if it has stopped | none |
+| All requests | Every request in the cycle: standing, next task, how it ended if it has stopped | none |
 | Initial Assessment | Requests in the phase: recorded standing, next task, blockers; a filter on standing | none |
 | Peer Review | Requests in the phase: reviewer progress, next task, blockers | Reviewers |
 | Deliberations | Requests in the phase: presentation timing and scheduling cue, next task, blockers | none |
@@ -117,13 +117,13 @@ Added from the staff flow audit (owner agreed, 2026-11-09):
    February Chairs meeting and carries most of the cycle, so one undivided
    list would not be usable. The three groups follow what is recorded today;
    if further standings are built later they become extra filter values.
-10. **Reviewer progress shows on any row that has reviewer activity**, on
-    All requests and Initial Assessment as well as Peer Review, because
-    Program Directors may shortlist reviewers before the Chairs meeting.
-    **A request that has moved past Peer Review with a review still
-    outstanding says so on its row** ("1 review outstanding"), on the
-    Deliberations and Final Assessment lists and on All requests, so the
-    reviewer is not forgotten (owner, 2026-11-09). The count is accepted
+10. **Reviewer progress appears on the Peer Review list only.** An earlier
+    version of this rule put it on every row with reviewer activity; the
+    owner reversed that after seeing a mock-up (2026-11-09), because the bar
+    was present on some rows and not others and its "declined" segment read
+    as a problem. On the other lists **a request that has moved past Peer
+    Review with a review still outstanding says so in words** ("1 review
+    outstanding"), so the reviewer is not forgotten. The count is accepted
     reviewers who have not yet returned a review, from the reviewer counts
     the dashboard rows already carry
     `[VERIFIED via dashboard-service.js:383-386 and j27PageStage.js:25]`.
@@ -131,13 +131,12 @@ Added from the staff flow audit (owner agreed, 2026-11-09):
     scheduled", time not confirmed). Scheduling is not a task in the stage
     model, so without the cue the row would show nothing to do before the
     presentation.
-12. **A blocked row says who it is waiting on**, for example "Waiting on:
-    Grants Manager — the Chairs' outcome has not been recorded". The wording
-    for each blocker is written with the owner. A filter on this was
-    proposed and then left out of the first version (owner, 2026-11-09): it
-    was meant as a worklist for the Grants Manager and the Program
-    Coordinator, who may not use the Workbench much. It can be added later
-    from the same row wording.
+12. **A request that is waiting shows a quiet status line**, for example
+    "Awaiting the Chairs' outcome", in place of a next task. It names no
+    role and there is no filter on it (owner, 2026-11-09): the Grants
+    Manager records the Chairs' outcomes on or about the day of the
+    meeting, so the wait is short. An earlier version of this rule had the
+    row say who it was waiting on.
 13. **Someone who leads no requests opens on "All in program"** rather than
     an empty "Assigned to me".
 14. **Every label comes from one shared list** used by the stage strip and
@@ -296,6 +295,9 @@ Constraints the build keeps:
   internal names were renamed to match on `claude/j27-read-model`
   (alignment log D52 on that branch).
 - **The six audit suggestions are accepted** (rules 9 to 14 in section 4).
+  Two were then revised after the owner reviewed a mock-up: reviewer
+  progress is on the Peer Review list only (rule 10), and a waiting request
+  shows a quiet status line with no role named (rule 12).
 - **Program Coordinator support is to be built later; not urgent** (section 9).
 
 No decision is waiting on the owner. The owner's answers to the audit's
@@ -312,9 +314,9 @@ its questions for staff on 2026-11-09:
 | Phases or meetings? | The phases make sense. | Phase tabs stand. |
 | Words for standing before the Chairs meeting | Language varies; staff can adapt to the Scored / Not Scored split. | Filter labels in rule 9 stand. |
 | What the Program Coordinator opens first | He probably does not use the Workbench much; he works in Meeting Tracker, which feeds the Workbench. | The scheduling cue (rule 11) is information for Program Directors, not a coordinator worklist. Coordinator support stays deferred and may belong mostly in Meeting Tracker. |
-| Does the Grants Manager use the Workbench before Awardees? | To be determined; she has worked in AkoyaGO and may not need to do much in the Workbench. | The "waiting on" label on a row stands. The filter on it is left out of the first version (rule 12). |
+| Does the Grants Manager use the Workbench before Awardees? | To be determined; she has worked in AkoyaGO and may not need to do much in the Workbench. | Superseded after the mock-up review: rows show a quiet status line with no role named, and no filter (rule 12). |
 | Looking back at earlier cycles | Has not really happened yet, since D26 is the first cycle with the dashboard; AkoyaGO has been used. Searching by Principal Investigator or institution is the likely need. | The All requests search covers Principal Investigator and institution, as well as request number and title. |
-| One phase per request when work overlaps | Fine to move a request along with a reviewer outstanding, provided the row shows it so the Program Director does not forget. Tabs can be opened freely at any time. | Rule 2 stands; rule 10 gains the outstanding-review cue. |
+| One phase per request when work overlaps | Fine to move a request along with a reviewer outstanding, provided the row shows it so the Program Director does not forget. Tabs can be opened freely at any time. | Rule 2 stands; rule 10 carries the outstanding-review cue. |
 
 Nothing is open after these answers. The audit
 also lists request-page wording fixes that are outside this plan.
