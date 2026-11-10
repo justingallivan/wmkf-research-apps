@@ -72,8 +72,9 @@ draft and file-only import planner. Synthetic verification and runbook:
 `docs/plans/data/expertise-roster/README.md`. Real inventory and a synthetic-only
 local PostgreSQL 17.11 rehearsal database are prepared; see
 `docs/plans/data/expertise-roster/INVENTORY_AND_REHEARSAL_2026-11-09.md`.
-39 roster rows, 10 healthy Contact links, 7 feedback references. Slot attendee-map
-column is absent in both Dataverse environments. Mapping confirmation and sandbox
+39 roster rows, 10 healthy Contact links, 7 feedback references. Slot attendee maps are inherited from parent sessions; the reported missing-field
+issue was an inventory interpretation error, now resolved. The active
+"TBD: Neurodegeneration specialist" roster placeholder needs an import decision. Mapping confirmation and sandbox
 schema provisioning remain pending; no Production writes. Owner prompt approval and platform rehearsal
 gates remain prerequisites; no schema or runtime has been deployed. The existing J27 stream below is
 preserved and has not been resumed by this planning task.

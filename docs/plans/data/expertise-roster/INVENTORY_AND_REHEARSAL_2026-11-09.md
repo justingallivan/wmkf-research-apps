@@ -25,14 +25,17 @@ and deltas. The explicit UUID is a fixed lineage identifier, not an export times
 | Production Site Visits | 32 read; 29 nonempty attendee maps; no roster-kind references found |
 | Production deliberation sessions | 9 maps; no roster-kind references found |
 | Sandbox Site Visits / sessions | 4 Site Visits with no saved maps; zero sessions |
-| Deliberation slots | `wmkf_attendeerefsjson` absent from live metadata in BOTH environments; census cannot read a nonexistent column |
+| Deliberation slots | No slot-local attendee field by design; slots inherit the parent session attendee map |
 | Proposed Expertise Profile | `wmkf_expertiseprofile` absent in both environments |
 | Source DB | PostgreSQL 17.11; read-only transactions enforced |
 
 The attendee parser counts explicit `{kind:'roster', rosterId:...}` references;
 zero does not eliminate the requirement to preserve supported future/historical
-reference behavior. Metadata absence is a schema/code reconciliation finding, not
-permission to add a slot column during this task.
+reference behavior. The earlier missing-slot-field finding was an inventory interpretation error, now
+resolved: `DELIBERATION_SLOT_SELECT` omits the field,
+`DELIBERATION_SESSION_EXPAND` includes it on `wmkf_Session`, and
+`meeting-tracker/schedule-reader.js` resolves attendees from that parent session.
+The Wave 28 slot/session schema specifications agree. No schema change is needed.
 
 All four configured source aliases were connected read-only and reported `neondb`;
 pooled and direct endpoints report different internal server addresses. This alone
@@ -90,8 +93,8 @@ required lineage and Git-destination rejection; existing planner tests remain gr
 
 ## Next boundaries
 
-1. Reconcile the slot metadata/code discrepancy before claiming complete dependency
-   parity. Preserve the evidence; no need to create a field solely for this inventory.
+1. Slot field investigation is resolved: use parent-session attendee references for
+   migration parity. No slot-local column is required.
 2. Review per-person mappings and owner overrides; no guessed new PD identities.
 3. Provision and prove the reviewed Expertise Profile schema in sandbox, including
    auditing, attribution, keys/null behavior and permissions, under scoped write approval.

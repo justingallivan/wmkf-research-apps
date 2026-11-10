@@ -97,7 +97,8 @@ This review does not certify the implementation or live readiness.
 
 Real inventory and a dedicated local PostgreSQL 17 synthetic fixture are now prepared;
 see `INVENTORY_AND_REHEARSAL_2026-11-09.md` for verified counts and limitations.
-Reconcile mappings, Beth's eligibility, new PD identities and the slot metadata gap.
+Reconcile mappings, Beth's eligibility, new PD identities and the active specialist
+placeholder. Slot attendee storage is resolved as parent-session inheritance.
 Then prove
 schema/audit/keys/permissions, build the roster service and bridge recovery, integrate
 consumers, and rehearse import plus rollback. The owner-reviewed minimal matching
