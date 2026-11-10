@@ -70,6 +70,12 @@ for wave in 37-j27-staff-review-summary 38-j27-staff-visit-assessment \
 done
 ```
 
+## Postgres preparation
+
+**[PLANNED; added 2026-11-10]** Apply migration `096_j27_integrity_jobs.sql` to the Production database with `node scripts/apply-migrations.js` before the J27 code serves there. The J27 read model reads the latest Integrity Screen for every J27 Research row through a query that joins `j27_integrity_jobs`, whether or not the automatic screen is switched on. Without the table that read fails and every J27 row shows "Some details could not be read." [VERIFIED via a throwaway local Postgres, 2026-11-10; read-model plan section 11]. Whether the shared database already has the table is unknown; the `schema_migrations` read is owner-run. The table is additive and empty until the automatic screen is enabled.
+
+The memo fields above stay switched off in Production after waves 37 through 40 are applied: each readiness helper also requires a non-production deployment (`lib/utils/initial-assessment-rationale-readiness.js`, `lib/utils/meeting-roster-readiness.js`, `staffReviewSummaryEnabled`). Enabling them in Production is a separate code change. Until then those facts read "not provisioned" and do not mark a row.
+
 ## Verification and staged release
 
 1. **Build the admission changes on the development branch.** Recheck remote main and the final diff. Require type checks, focused Workbench and legacy regressions, route/DAL and reviewer boundary checks, and production admission tests. Test both deployment/target pairs, J27 and older/unlinked cycles, off, invalid setting, unavailable settings read, pilot allowed and denied IDs, and on. Hit the four GET/POST routes directly. Off, wrong cycle, wrong target, missing staff access, unmapped actor, or stale versions must fail as applicable. Populate the denied fixtures with data so the test proves exclusion. Test a stale open page across a switch to off.

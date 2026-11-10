@@ -332,6 +332,18 @@ describe('C8.4 basis', () => {
       expect(deriveJ27Stage(page()).basis).toBe('full');
     },
   );
+  test('memo keys whose wave is not provisioned withhold their tasks and phase rows without degrading', () => {
+    const OFF = { status: 'not-provisioned' };
+    const off = { rationale: OFF, reviewSummary: OFF, visitAssessment: OFF, rosterMemo: OFF };
+    const onPage = deriveJ27Stage(page({}, off));
+    expect(onPage.basis).toBe('full');
+    expect(onPage.taskKeys).not.toContain('record-rationale');
+    const onList = deriveJ27Stage(tier1({}, off));
+    expect(onList.basis).toBe('partial');
+    expect(onList.phase).toBe(deriveJ27Stage(tier1({}, { rosterMemo: { status: 'absent' }, visitAssessment: { status: 'absent' } })).phase);
+    // A real failed read still degrades alongside unprovisioned memos.
+    expect(deriveJ27Stage(page({}, { ...off, integrity: UNAVAILABLE })).basis).toBe('degraded');
+  });
   test('rationale unavailable withholds the task and degrades the basis', () => {
     const r = deriveJ27Stage(invitedPage());
     const degraded = deriveJ27Stage(page({ requestStatus: P2, phaseIStatus: PHASE_I_CHAIRS.invited }, { rationale: UNAVAILABLE }));

@@ -493,9 +493,9 @@ describe('J27 read model on the proposal list (plan C7)', () => {
     expect(getCycleDatesById).toHaveBeenCalledWith('cycle-j27');
     const byNumber = Object.fromEntries(body.proposals.map((p) => [p.requestNumber, p]));
     expect(byNumber['1002836']).not.toHaveProperty('j27');
-    // Memo waves are off in this env, so their keys are unavailable and the basis is degraded (plan C1, C3).
+    // Memo waves are off in this env: their keys are not-provisioned and do not degrade; tier 2 is not loaded, so partial (plan C1, C3).
     expect(byNumber['1000380'].j27).toEqual({
-      phase: 'initial-assessment', basis: 'degraded', primaryTask: 'record-scoring',
+      phase: 'initial-assessment', basis: 'partial', primaryTask: 'record-scoring',
       taskKeys: ['record-scoring', 'identify-reviewers'], blockerKeys: [],
       recorded: { scoring: 'unset', chairsRecommendation: 'unset', chairsOutcome: 'pending', label: null, unmapped: false }, outcome: 'none',
     });

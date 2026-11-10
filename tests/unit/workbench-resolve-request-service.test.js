@@ -222,9 +222,9 @@ describe('J27 read model (plan C7)', () => {
     expect(require('../../lib/services/workbench/program-scope-service').resolveDiscoveryScope).toHaveBeenCalledTimes(1);
     expect(getById).toHaveBeenCalledTimes(1);
     expect(body.meetingDate).toBe('2027-06-10');
-    // Memo waves are off in this env, so their keys are unavailable and the basis is degraded (plan C1, C3).
+    // Memo waves are off in this env: their keys are not-provisioned and do not degrade; tier 2 is not loaded, so partial (plan C1, C3).
     expect(body.j27).toMatchObject({
-      phase: 'peer-review', basis: 'degraded', outcome: 'none',
+      phase: 'peer-review', basis: 'partial', outcome: 'none',
       recorded: { chairsRecommendation: 'yes', chairsOutcome: 'pending' },
       blockerKeys: ['chairs-outcome-pending', 'integrity-unreviewed'],
     });

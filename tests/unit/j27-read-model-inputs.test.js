@@ -70,13 +70,13 @@ describe('projection', () => {
 });
 
 describe('memo presence', () => {
-  test('unprovisioned waves are unavailable; provisioned read presence from the row, sparse rows read absent', () => {
+  test('unprovisioned waves are not-provisioned, never unavailable; provisioned read presence from the row, sparse rows read absent', () => {
     process.env.TEST_RATIONALE_WAVE = 'on';
     process.env.TEST_ROSTER_WAVE = 'on';
     const memo = j27MemoInputs(row({ wmkf_initialassessmentrationale: 'Saved', wmkf_confirmedmeetingroster: '   ' }));
     expect(memo).toEqual({
-      rationale: { status: 'present' }, reviewSummary: { status: 'unavailable' },
-      visitAssessment: { status: 'unavailable' }, rosterMemo: { status: 'absent' },
+      rationale: { status: 'present' }, reviewSummary: { status: 'not-provisioned' },
+      visitAssessment: { status: 'not-provisioned' }, rosterMemo: { status: 'absent' },
     });
     expect(j27MemoInputs(row()).rationale).toEqual({ status: 'absent' });
   });
@@ -161,7 +161,7 @@ describe('composition', () => {
     expect(stage.phase).toBe('initial-assessment');
     expect(stage.input.request.cycleCode).toBe('J27');
     expect(j27DashboardDto(stage)).toEqual({
-      phase: 'initial-assessment', basis: 'degraded', primaryTask: 'record-scoring', taskKeys: ['record-scoring'],
+      phase: 'initial-assessment', basis: 'partial', primaryTask: 'record-scoring', taskKeys: ['record-scoring'],
       blockerKeys: [], recorded: stage.recorded, outcome: 'none',
     });
   });
