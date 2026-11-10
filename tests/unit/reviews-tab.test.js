@@ -367,7 +367,7 @@ test('names who is blocking synthesis instead of reporting a bare count', async 
   expect(screen.getByText(/1 participating reviewer\(s\) remain unresolved/)).toBeInTheDocument();
 });
 
-test('the blocker hint names the Panel tab in the J27 phase layout', async () => {
+test('the blocker hint names the Reviewers tab in the J27 phase layout', async () => {
   fetch.mockResolvedValue({
     ok: true,
     json: async () => ({
@@ -391,7 +391,7 @@ test('the blocker hint names the Panel tab in the J27 phase layout', async () =>
 
   render(<ReviewsTab requestId="req1" showStaffReviewSummary />);
   const list = await screen.findByTestId('synthesis-blockers');
-  expect(list).toHaveTextContent('Resolve on the Panel tab');
+  expect(list).toHaveTextContent('Resolve on the Reviewers tab');
 });
 
 test('lists submitted reviewer names and accepted affiliations beside the anonymous synthesis', async () => {

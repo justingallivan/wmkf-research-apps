@@ -153,9 +153,9 @@ test('the existing group-review link opens the AI Review Panel with its new labe
   expect(screen.getByTestId('review-panel-tab')).toHaveAttribute('data-request-id', 'request-1');
   expect(screen.getByTestId('review-panel-tab')).toHaveAttribute('data-title', 'AI Review Panel');
   const sections = within(screen.getByRole('navigation', { name: 'Peer Review sections' }));
-  expect(sections.getAllByRole('button').map(button => button.textContent)).toEqual(['Panel', 'Reports', 'AI Review Panel']);
+  expect(sections.getAllByRole('button').map(button => button.textContent)).toEqual(['Reviewers', 'Reports', 'AI Review Panel']);
   expect(sections.getByRole('button', { name: 'AI Review Panel', exact: true })).toHaveAttribute('aria-current', 'page');
-  expect(sections.getByRole('button', { name: 'Panel', exact: true })).not.toHaveAttribute('aria-current');
+  expect(sections.getByRole('button', { name: 'Reviewers', exact: true })).not.toHaveAttribute('aria-current');
   expect(screen.queryByRole('button', { name: 'Group review', exact: true })).toBeNull();
 });
 
@@ -189,7 +189,7 @@ test('sandbox requests outside J27 retain the existing navigation', async () => 
 test.each([
   ['proposal', 'Initial Assessment', 'Proposal'],
   ['initial-writeup', 'Initial Assessment', 'Assessment'],
-  ['reviewers', 'Peer Review', 'Panel'],
+  ['reviewers', 'Peer Review', 'Reviewers'],
   ['review-panel', 'Peer Review', 'AI Review Panel'],
   ['pre-site-visit', 'Deliberations', null],
   ['site-visit', 'Deliberations', null],
@@ -249,7 +249,7 @@ test('Panel navigation returns to the roster and retains the Finder proposal cho
     proposalFile: 'document-key', repairCandidate: 'candidate', repairSuggestion: 'suggestion' };
   global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, requestId: 'request-1', cycleCode: 'J27' }) }));
   await act(async () => { render(<WorkbenchRequest staffReviewSummary />); });
-  fireEvent.click(screen.getByRole('button', { name: 'Panel', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: 'Reviewers', exact: true }));
   expect(mockPush).toHaveBeenLastCalledWith({ pathname: '/workbench/request-1', query: {
     tab: 'peer-review', section: 'panel', proposalFile: 'document-key',
   } }, undefined, { shallow: true });

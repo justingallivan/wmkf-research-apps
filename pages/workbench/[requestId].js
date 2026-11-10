@@ -168,7 +168,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
     // Keep the route for existing document links while staff use the in-app assessment.
     { key: 'assessment', label: 'Assessment', legacyOnly: showInitialRationale },
   ] : phase === 'peer-review' ? [
-    { key: 'panel', label: 'Panel' }, { key: 'reports', label: 'Reports' },
+    { key: 'panel', label: 'Reviewers' }, { key: 'reports', label: 'Reports' },
     ...(hasAccess('review-panel') === true ? [AI_REVIEW_PANEL] : []),
   ] : [];
   const section = sections.some((item) => item.key === requestedSection) ? requestedSection : sections[0]?.key;
