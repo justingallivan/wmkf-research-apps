@@ -18,7 +18,9 @@ Author: Claude for Justin Gallivan, 2026-11-09. Status: **Design decisions
 settled with the owner on 2026-11-09. No build is authorized.** The staff
 flow audit (`docs/plans/J27_STAFF_FLOW_AUDIT_2026-11-09.md`) and the owner's
 answers to its questions are applied below. The two feed checks are done (section 5).
-Before a build is planned: a design pass.
+The layout and wording are in
+`docs/plans/J27_CYCLE_PAGE_DESIGN_BRIEF_2026-11-09.md`, confirmed by the
+owner the same day. Next is a build plan, when the owner asks for one.
 
 All code described here was read on branch `claude/j27-read-model` at
 `680252fe5` (worktree `WMKF_Apps-claude-j27-read-model`), which is not on
@@ -96,8 +98,9 @@ Rules common to the request lists:
    tab they sit in the phase where they stopped. A "Show closed" switch
    controls whether they are listed; when it is off the list says how many
    are hidden.
-4. **All requests is where staff look back.** It has a search box and a
-   filter on how the request ended, so a declined or triaged request from a
+4. **All requests is where staff look back.** It has a search box and one
+   "Showing" menu that covers both open-or-closed and how the request ended
+   (design brief, section 7), so a declined or triaged request from a
    past cycle is found in one place wherever it stopped.
 5. **Awards** appear in Awardees, as today, and in All requests.
 6. **Each row links to the request page**, on the request's current phase.
