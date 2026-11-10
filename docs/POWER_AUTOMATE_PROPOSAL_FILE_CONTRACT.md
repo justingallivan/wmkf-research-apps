@@ -70,9 +70,11 @@ governed narrative and bibliography readers accept the J27 names in
 still require exactly one copy across the accepted places and fail closed
 otherwise: `AI Materials` under either name, or `Submission-Documents` under the
 J27 name. Connor plans an `AI Materials` folder for J27 with different contents.
-The one item named so far is `Narrative-Bibliography_{Request#}`, the combined
-document for Reviewer Finder (alignment log D60; extension not stated; the
-Reviewer Finder loader does not read it yet).
+The one item named so far is `Narrative-Bibliography_{Request#}.pdf`, the
+combined document for Reviewer Finder, built by Connor's flow (alignment log
+D60; not yet created). Derived files go in `AI Materials` so that
+`Submission-Documents` holds only the applicant's originals. On the J27 line
+Reviewer Finder loads that file by default when a request has exactly one.
 
 The J27 staff version sits at the root of the request folder, named
 `{AKA}_Staff-Version_{Request#}` (Connor, 2026-11-10; AKA is the institution's
