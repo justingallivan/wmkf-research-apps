@@ -14,8 +14,10 @@ Three Active alternate keys cover `wmkf_creationkey`, nullable `wmkf_contactguid
 is enabled. Table-level auditing was enabled with a table-scoped metadata update.
 Complete actor attribution/audit-event/permissions validation remains a release gate.
 
-The only profile writer so far is the explicitly authorized sandbox synthetic
-rehearsal script. Real roster data has not been imported. The related
+The only profile writer executed in the recorded live evidence is the explicitly
+authorized sandbox synthetic rehearsal script. The separate sandbox-only
+`scripts/execute-expertise-roster-import.cjs` is now implemented and synthetically
+tested on the import branch, but has not been run against Dataverse or Postgres. Real roster data has not been imported. The related
 `expertise_roster_identity` and `expertise_roster_binding` tables exist only in the
 local synthetic rehearsal database; no shared-Postgres bridge migration was applied.
 

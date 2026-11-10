@@ -3,8 +3,10 @@
 Owner-confirmed decisions, not changes to Production records.
 Private GUID-bearing receipt: `/private/tmp/wmkf-roster-inventory-20261109-final/confirmed-owner-decisions.json`.
 Raw source export remains unchanged. These overrides must be applied explicitly by
-an import implementation; the first-slice planner does not yet apply category overrides,
-exclusions or new-person staging automatically.
+the planner/executor through explicit `roleType`, `exclude`, and `newProfiles` mapping
+entries. These mechanisms are implemented on the import branch and tested with synthetic
+fixtures; no real mappings or new-person staging were executed. See `README.md` for
+the input and replay contract.
 
 | Existing roster ID | Decision |
 |---|---|

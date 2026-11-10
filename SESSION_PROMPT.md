@@ -68,9 +68,13 @@ Its two new cutover findings were repaired with inert automatic migrations, a
 gated operational cutover script, and isolated v2 prompt/admission controls.
 See `docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_3_2026-11-09.md`. The final Fable plan check returned READY with no named repairs; see
 `docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_4_2026-11-09.md`.
-Offline foundation built on `codex/expertise-roster-foundation-2026-11-09` in
-`/private/tmp/wmkf-codex-isolated-start-2026-11-09`: schema spec, inert bridge SQL
-draft and file-only import planner. Synthetic verification and runbook:
+Roster continuation is on `codex/expertise-roster-import-2026-11-10` in
+`/Users/gallivan/Code/WMKF_Apps-codex-roster-import`, based on repair commit
+`e90babb2a`. The temporary worktree disappeared; the pushed checkpoint was preserved.
+The branch now includes the file-only planner and a separate sandbox-only import
+executor with explicit overrides/exclusions/new-person staging and replay recovery.
+No real import has been performed. Private prior inventory/rehearsal directories
+are unavailable here; do not invent replacements for their source lineage or GUIDs. Synthetic verification and runbook:
 `docs/plans/data/expertise-roster/README.md`. Real inventory and a synthetic-only
 local PostgreSQL 17.11 rehearsal database are prepared; see
 `docs/plans/data/expertise-roster/INVENTORY_AND_REHEARSAL_2026-11-09.md`.

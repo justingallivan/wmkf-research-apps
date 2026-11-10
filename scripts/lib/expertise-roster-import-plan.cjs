@@ -31,7 +31,7 @@ function planImport(source, target, mapping, registeredHosts) {
   assert(Array.isArray(mapping.rows), 'mapping.rows required');
   const mapped = new Map();
   for (const m of mapping.rows) {
-    exactKeys(m, ['legacyId', 'staffUserGuid', 'contactGuid', 'leadPdEligible', 'active', 'confirmed'], 'mapping row');
+    exactKeys(m, ['legacyId', 'staffUserGuid', 'contactGuid', 'leadPdEligible', 'active', 'confirmed', 'roleType', 'exclude'], 'mapping row');
     assert(Number.isSafeInteger(m.legacyId) && m.legacyId > 0 && !mapped.has(m.legacyId), 'mapping: invalid/duplicate legacyId');
     assert(typeof m.confirmed === 'boolean', 'mapping: confirmed must be explicit');
     mapped.set(m.legacyId, m);
@@ -54,28 +54,44 @@ function planImport(source, target, mapping, registeredHosts) {
     }
   }
   const sourceIds = new Set(), sourceLinks = new Map(), results = [];
-  for (const row of source.rows) {
+  const additions = mapping.newProfiles || [];
+  assert(Array.isArray(additions), 'mapping.newProfiles must be an array');
+  const newKeys = new Set();
+  for (const item of additions) {
+    exactKeys(item, ['mutationId', 'row', 'decision'], 'new profile');
+    guid(item.mutationId, 'new profile mutationId');
+    assert(!newKeys.has(item.mutationId), 'duplicate new profile mutationId'); newKeys.add(item.mutationId);
+    assert(item.row && !Object.hasOwn(item.row, 'id'), 'new person must not have a guessed legacy ID');
+    exactKeys(item.decision, ['staffUserGuid', 'contactGuid', 'leadPdEligible', 'active', 'confirmed'], 'new profile decision');
+  }
+  const entries = [...source.rows.map(row => ({row, m: mapped.get(row?.id), legacy: true})),
+    ...additions.map(item => ({row: item.row, m: item.decision, legacy: false, mutationId: item.mutationId}))];
+  for (const {row, m, legacy, mutationId} of entries) {
     const errors = [], warnings = [];
     let values = null, creationKey = null, existing = null;
     try {
       assert(row && typeof row === 'object', 'source row must be an object');
+      if (legacy) {
       assert(Number.isSafeInteger(row.id) && row.id > 0 && row.id <= 2147483647, 'legacy ID must be a positive Postgres integer');
       assert(!sourceIds.has(row.id), 'duplicate source ID'); sourceIds.add(row.id);
+      }
       for (const k of Object.keys(row)) assert(allowedSource.has(k), `unmapped source field: ${k}`);
       assert(typeof row.name === 'string' && row.name.trim() && row.name.length <= 255, 'name missing or exceeds 255');
       assert(Object.hasOwn(category, row.role_type), 'unknown category');
       assert(typeof row.is_active === 'boolean', 'is_active must be boolean');
-      const m = mapped.get(row.id);
       assert(m, 'explicit per-target mapping required (null links are permitted)');
-      assert(m.confirmed, 'mapping/eligibility requires owner confirmation');
+      assert(m.confirmed === true, 'mapping/eligibility requires owner confirmation');
       assert(Object.hasOwn(m, 'staffUserGuid') && Object.hasOwn(m, 'contactGuid'), 'both link decisions must be explicit');
       const user = optionalGuid(m.staffUserGuid, 'staff user'), contact = optionalGuid(m.contactGuid, 'contact');
       assert(typeof m.leadPdEligible === 'boolean' && typeof m.active === 'boolean', 'active and lead eligibility must be explicit booleans');
-      const staff = row.role_type === 'Research Program Staff';
+      const roleType = Object.hasOwn(m, 'roleType') ? m.roleType : row.role_type;
+      assert(Object.hasOwn(category, roleType), 'unknown category override');
+      assert(m.exclude === undefined || typeof m.exclude === 'boolean', 'exclude must be boolean');
+      const staff = roleType === 'Research Program Staff';
       assert(staff ? contact === null : user === null, 'category/link mismatch');
       assert(!m.leadPdEligible || (staff && user && m.active), 'lead eligibility requires active staff and User link');
-      creationKey = `legacy_${source.datasetId}_${row.id}`;
-      values = { wmkf_name: row.name, wmkf_category: category[row.role_type], wmkf_leadpdeligible: m.leadPdEligible, wmkf_staffuser: user, wmkf_contactguid: contact, wmkf_creationkey: creationKey, statecode: m.active ? 0 : 1 };
+      creationKey = legacy ? `legacy_${source.datasetId}_${row.id}` : `app_${mutationId}`;
+      values = { wmkf_name: row.name, wmkf_category: category[roleType], wmkf_leadpdeligible: m.leadPdEligible, wmkf_staffuser: user, wmkf_contactguid: contact, wmkf_creationkey: creationKey, statecode: m.active ? 0 : 1 };
       for (const key of fields) {
         assert(Object.hasOwn(row, key), `source export missing ${key}`);
         const value = row[key];
@@ -86,6 +102,10 @@ function planImport(source, target, mapping, registeredHosts) {
       if (row.dataverse_contact_id && row.dataverse_contact_id !== contact) warnings.push('source Contact link differs: retain approved per-target mapping; do not copy source GUID');
       if (row.is_active !== m.active) warnings.push('owner lifecycle override differs from raw import');
       warnings.push('User enabled state, Contact health and actual key/audit metadata not verified offline');
+      if (m.exclude) {
+        assert(legacy && !m.active && !m.leadPdEligible && !user && !contact, 'exclusion requires an inactive unlinked legacy identity');
+        assert(!targetKeys.has(creationKey), 'excluded identity already has a target profile; reconcile without deletion');
+      }
       for (const key of linkNames) if (values[key]) {
         const link = `${key}:${values[key]}`;
         const previous = sourceLinks.get(link);
@@ -98,7 +118,7 @@ function planImport(source, target, mapping, registeredHosts) {
         for (const [k, v] of Object.entries(values)) assert(Object.hasOwn(existing.values, k) && existing.values[k] === v, `existing keyed profile differs at ${k}; reconcile, do not overwrite`);
       }
     } catch (e) { errors.push(e.message); }
-    const result = { legacyId: row?.id ?? null, creationKey, action: errors.length ? 'blocked' : existing ? 'unchanged' : 'create', profileGuid: existing?.profileGuid ?? null, sourceHash: fingerprint(row), values, errors, warnings };
+    const result = { legacyId: legacy ? row?.id ?? null : null, creationKey, action: errors.length ? 'blocked' : m.exclude ? 'exclude' : existing ? 'unchanged' : 'create', profileGuid: existing?.profileGuid ?? null, sourceHash: fingerprint(row), values, errors, warnings };
     results.push(result);
     if (!errors.length) for (const key of linkNames) if (values[key]) sourceLinks.set(`${key}:${values[key]}`, result);
   }
@@ -112,6 +132,6 @@ function planImport(source, target, mapping, registeredHosts) {
     if (sourceMatches.length || targetMatches.length) result.warnings.push(`Possible duplicate name; human review required, never auto-merge. Source IDs: ${sourceMatches.join(',') || 'none'}; target GUIDs: ${targetMatches.join(',') || 'none'}`);
   }
   for (const id of mapped.keys()) assert(sourceIds.has(id), `mapping legacy ID ${id} is absent from source export`);
-  return { version: 1, mode: 'offline-dry-run', datasetId: source.datasetId, targetHost: target.targetHost, sourceHash: fingerprint(source), targetHash: fingerprint(target), mappingHash: fingerprint(mapping), executionAuthorized: false, blocked: results.some(r => r.errors.length > 0), summary: { total: results.length, create: results.filter(r => r.action === 'create').length, unchanged: results.filter(r => r.action === 'unchanged').length, blocked: results.filter(r => r.action === 'blocked').length }, rows: results };
+  return { version: 1, mode: 'offline-dry-run', datasetId: source.datasetId, targetHost: target.targetHost, sourceHash: fingerprint(source), targetHash: fingerprint(target), mappingHash: fingerprint(mapping), executionAuthorized: false, blocked: results.some(r => r.errors.length > 0), summary: { total: results.length, create: results.filter(r => r.action === 'create').length, unchanged: results.filter(r => r.action === 'unchanged').length, blocked: results.filter(r => r.action === 'blocked').length, exclude: results.filter(r => r.action === 'exclude').length }, rows: results };
 }
 module.exports = { planImport, fingerprint };

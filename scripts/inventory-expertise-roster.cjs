@@ -39,7 +39,7 @@ async function main() {
     const constraints = (await pg.query("SELECT conname, pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid IN ('expertise_roster'::regclass,'consultant_feedback'::regclass)")).rows;
     const sequence = (await pg.query('SELECT last_value, is_called FROM expertise_roster_id_seq')).rows;
     const ledger = (await pg.query('SELECT * FROM schema_migrations ORDER BY name')).rows;
-    write('source.json', {version:1,datasetId,rows});
+    write('source.json', {version:1,datasetId,sequenceHighWater:Number(sequence[0].last_value),rows});
     write('postgres-evidence.json', {checkedAt:new Date().toISOString(), identity, aliasIdentities, columns, feedback, constraints, sequence, ledger, sourceHash:fingerprint(rows)});
     for (const [label,host] of [['production','wmkf.crm.dynamics.com'],['sandbox','orgd9e66399.crm.dynamics.com']]) write(`mapping-${label}.json`, {version:1,datasetId,targetHost:host,rows:rows.map(r=>({legacyId:r.id,confirmed:false,staffUserGuid:null,contactGuid:null,leadPdEligible:false,active:r.is_active}))});
     await pg.query('ROLLBACK');
