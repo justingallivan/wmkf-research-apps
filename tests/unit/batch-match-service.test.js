@@ -99,16 +99,16 @@ describe('batchMatch', () => {
     GraphService.downloadFileByPath.mockResolvedValue({ buffer: Buffer.from('x') });
     pdf.mockResolvedValue({ text: 'short' });
 
-    GraphService.listFiles.mockResolvedValue([{ name: 'other.docx' }, { name: 'Caltech_Staff Version_R-1000.pdf' }]);
+    GraphService.listFiles.mockResolvedValue([{ name: 'other.docx' }, { name: 'Caltech_Staff-Version_R-1000.pdf' }]);
     await expect(batchMatch(ARGS)).rejects.toMatchObject({
       httpStatus: 400,
-      body: { filename: 'Caltech_Staff Version_R-1000.pdf' },
+      body: { filename: 'Caltech_Staff-Version_R-1000.pdf' },
     });
-    expect(GraphService.downloadFileByPath).toHaveBeenLastCalledWith(expect.anything(), '/f', 'Caltech_Staff Version_R-1000.pdf');
+    expect(GraphService.downloadFileByPath).toHaveBeenLastCalledWith(expect.anything(), '/f', 'Caltech_Staff-Version_R-1000.pdf');
 
     for (const files of [
-      [{ name: 'Caltech_Staff Version_R-2000.pdf' }],
-      [{ name: 'Caltech_Staff Version_R-1000.pdf' }, { name: 'CIT_Staff Version_R-1000.pdf' }],
+      [{ name: 'Caltech_Staff-Version_R-2000.pdf' }],
+      [{ name: 'Caltech_Staff-Version_R-1000.pdf' }, { name: 'CIT_Staff-Version_R-1000.pdf' }],
     ]) {
       GraphService.listFiles.mockResolvedValue(files);
       await expect(batchMatch(ARGS)).rejects.toMatchObject({

@@ -322,25 +322,25 @@ describe('single-submission layout (J27 onward)', () => {
   });
   test('finds the staff version at the request root by its name ending, whatever the institution prefix', async () => {
     listFiles.mockResolvedValue([
-      pdf('Caltech_Staff Version_1002379.pdf', ROOT),
+      pdf('Caltech_Staff-Version_1002379.pdf', ROOT),
       pdf('Project-Narrative_1002379.pdf'),
     ]);
 
     const result = await listProposalDocuments(REQUEST_ID, REQUEST_NUMBER, 'J27');
 
     expect(result.staffVersion).toMatchObject({
-      key: 'staffVersion', found: true, library: 'akoya_request', folder: ROOT, name: 'Caltech_Staff Version_1002379.pdf',
+      key: 'staffVersion', found: true, library: 'akoya_request', folder: ROOT, name: 'Caltech_Staff-Version_1002379.pdf',
     });
   });
 
   test('the staff version is not found when missing, in a subfolder, for another request, or ambiguous', async () => {
     for (const files of [
       [],
-      [pdf('Caltech_Staff Version_1002379.pdf', AI)],
-      [pdf('Caltech_Staff Version_1009999.pdf', ROOT)],
-      [pdf('_Staff Version_1002379.pdf', ROOT)],
-      [pdf('Caltech_Staff Version_1002379.docx', ROOT)],
-      [pdf('Caltech_Staff Version_1002379.pdf', ROOT), pdf('CIT_Staff Version_1002379.pdf', ROOT)],
+      [pdf('Caltech_Staff-Version_1002379.pdf', AI)],
+      [pdf('Caltech_Staff-Version_1009999.pdf', ROOT)],
+      [pdf('_Staff-Version_1002379.pdf', ROOT)],
+      [pdf('Caltech_Staff-Version_1002379.docx', ROOT)],
+      [pdf('Caltech_Staff-Version_1002379.pdf', ROOT), pdf('CIT_Staff-Version_1002379.pdf', ROOT)],
     ]) {
       listFiles.mockResolvedValue(files);
       const result = await listProposalDocuments(REQUEST_ID, REQUEST_NUMBER, 'J27');
@@ -350,7 +350,7 @@ describe('single-submission layout (J27 onward)', () => {
 
   test('earlier cycles carry no staff version entry', async () => {
     getProposalDocumentConfig.mockReturnValue({ phaseFolder: 'Phase I', excludeFilenames: [], slots: [] });
-    listFiles.mockResolvedValue([pdf('Caltech_Staff Version_1002379.pdf', ROOT)]);
+    listFiles.mockResolvedValue([pdf('Caltech_Staff-Version_1002379.pdf', ROOT)]);
     const result = await listProposalDocuments(REQUEST_ID, REQUEST_NUMBER, 'D26');
     expect(result).not.toHaveProperty('staffVersion');
   });

@@ -143,13 +143,13 @@ test('membership: a found staff version is allowed; a missing one, or another ro
   const base = await listProposalDocuments();
   listProposalDocuments.mockResolvedValue({
     ...base,
-    staffVersion: { key: 'staffVersion', found: true, library: 'Documents', folder: FOLDER, name: 'Caltech_Staff Version_1002794.pdf' },
+    staffVersion: { key: 'staffVersion', found: true, library: 'Documents', folder: FOLDER, name: 'Caltech_Staff-Version_1002794.pdf' },
   });
-  await expect(downloadProposalDocument(args({ filename: 'Caltech_Staff Version_1002794.pdf' }))).resolves.toBeTruthy();
+  await expect(downloadProposalDocument(args({ filename: 'Caltech_Staff-Version_1002794.pdf' }))).resolves.toBeTruthy();
   const stray = await downloadProposalDocument(args({ filename: 'Notes.pdf' })).catch((e) => e);
   expect(stray.httpStatus).toBe(403);
 
   listProposalDocuments.mockResolvedValue({ ...base, staffVersion: { key: 'staffVersion', found: false } });
-  const missing = await downloadProposalDocument(args({ filename: 'Caltech_Staff Version_1002794.pdf' })).catch((e) => e);
+  const missing = await downloadProposalDocument(args({ filename: 'Caltech_Staff-Version_1002794.pdf' })).catch((e) => e);
   expect(missing.httpStatus).toBe(403);
 });

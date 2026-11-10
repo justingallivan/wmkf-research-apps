@@ -221,7 +221,7 @@ describe('single-submission layout (J27 onward)', () => {
     global.fetch.mockResolvedValueOnce({
       ok: true,
       json: async () => j27Body({
-        staffVersion: { key: 'staffVersion', label: 'Staff version', found: true, library: 'akoya_request', folder: ROOT, name: 'Caltech_Staff Version_1002379.pdf', mimeType: 'application/pdf' },
+        staffVersion: { key: 'staffVersion', label: 'Staff version', found: true, library: 'akoya_request', folder: ROOT, name: 'Caltech_Staff-Version_1002379.pdf', mimeType: 'application/pdf' },
       }),
     });
 
@@ -229,7 +229,7 @@ describe('single-submission layout (J27 onward)', () => {
 
     const heading = await screen.findByText('Staff version');
     const row = heading.parentElement;
-    expect(within(row).getByText('Caltech_Staff Version_1002379.pdf')).toBeInTheDocument();
+    expect(within(row).getByText('Caltech_Staff-Version_1002379.pdf')).toBeInTheDocument();
     expect(within(row).getAllByRole('link').length).toBeGreaterThan(0);
     for (const later of [screen.getByText('Reviewer Materials'), screen.getByText('Individual files')]) {
       expect(heading.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
