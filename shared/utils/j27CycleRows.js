@@ -102,14 +102,29 @@ export function rowLine(row) {
   return { kind: 'idle', text: J27_IDLE_LABEL };
 }
 
-/**
- * The small third line. Only a failed read ("degraded") earns the note: every
- * open list row is "partial" because the list never loads the later-phase facts.
- */
-export function rowNote(row) {
+const PAST_PEER_REVIEW = new Set(['deliberations', 'final-assessment']);
+
+/** Reviews still owed on an open request that has moved past Peer Review, else 0. */
+export function outstandingReviews(row) {
   const stage = stageOf(row);
-  if (stage && stage.basis === 'degraded') return { kind: 'degraded', text: J27_DEGRADED_NOTE };
-  return null;
+  if (!stage || isClosedRow(row) || !PAST_PEER_REVIEW.has(stage.phase)) return 0;
+  const count = Number(row.reviewers?.outstanding);
+  return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+}
+
+/**
+ * The small third lines, in display order. A review still owed is said in
+ * words once the request has left Peer Review, so the reviewer is not
+ * forgotten. Only a failed read ("degraded") earns the other note: every open
+ * list row is "partial" because the list never loads the later-phase facts.
+ */
+export function rowNotes(row) {
+  const stage = stageOf(row);
+  const notes = [];
+  const owed = outstandingReviews(row);
+  if (owed) notes.push({ kind: 'outstanding', text: `${owed} review${owed === 1 ? '' : 's'} outstanding` });
+  if (stage && stage.basis === 'degraded') notes.push({ kind: 'degraded', text: J27_DEGRADED_NOTE });
+  return notes;
 }
 
 /** Search over request number, title, institution and Principal Investigator. */
@@ -126,6 +141,15 @@ export function matchesShowing(row, showing = 'open') {
   const closed = isClosedRow(row);
   if (showing === 'open') return !closed;
   return closed && stageOf(row)?.outcome === showing;
+}
+
+/**
+ * Phase tab filter: closed rows only with "Show closed"; on Initial
+ * Assessment a chosen standing lists just the open rows that stand there.
+ */
+export function matchesPhaseFilters(row, { showClosed = false, standing = '' } = {}) {
+  if (standing) return standingKey(row) === standing;
+  return showClosed || !isClosedRow(row);
 }
 
 /** Rows of one tab: every row on All requests, a phase filter elsewhere. */

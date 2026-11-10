@@ -28,6 +28,7 @@ jest.mock('../../shared/components/Layout', () => ({
 }));
 jest.mock('../../shared/components/workbench/RequestLocator', () => ({ __esModule: true, RequestLocator: () => null }));
 jest.mock('../../shared/components/workbench/IntegrityAlerts', () => ({ __esModule: true, default: () => null }));
+jest.mock('../../shared/components/workbench/ReviewerStatusIndicator', () => ({ __esModule: true, default: (props) => <div data-testid="reviewer-progress" data-accepted={props.reviewers?.accepted ?? ''} /> }));
 jest.mock('../../shared/components/workbench/RequestListPanel', () => ({ __esModule: true, default: (props) => <div data-testid="legacy-request-list" data-cycle={props.cycleCode || ''} /> }));
 jest.mock('../../shared/components/workbench/ReviewerFollowUpPanel', () => ({ __esModule: true, default: (props) => <div data-testid="reviewer-follow-up" data-scope={props.scope} /> }));
 jest.mock('../../shared/components/workbench/StaffDeliberationsPanel', () => ({ __esModule: true, default: (props) => <div data-testid="staff-deliberations" data-scope={props.scope} /> }));
@@ -58,6 +59,11 @@ const ROWS = [
   {
     requestId: 'r4', requestNumber: '1009030', title: 'A set-aside idea', institution: 'Hillside College', projectLeader: 'Casey Sample', programDirector: 'Jordan Example', workRemaining: 'find',
     j27: stage({ primaryTask: null, taskKeys: [], outcome: 'not-scored', recorded: { scoring: 'not-scored', chairsRecommendation: 'unset', chairsOutcome: 'pending', label: 'Not Scored', unmapped: false } }),
+  },
+  {
+    requestId: 'r5', requestNumber: '1009040', title: 'Presented already', institution: 'Ridgeway University', projectLeader: 'Robin Example', programDirector: 'Jordan Example', workRemaining: 'review',
+    reviewers: { accepted: 3, outstanding: 1 },
+    j27: stage({ phase: 'deliberations', primaryTask: 'record-offramp', taskKeys: ['record-offramp'], recorded: { scoring: 'inferred-scored', chairsRecommendation: 'inferred-yes', chairsOutcome: 'invited', label: 'Invited', unmapped: false } }),
   },
 ];
 
@@ -206,4 +212,34 @@ test('an earlier cycle and another program keep today’s tabs, and a new link m
   expect(await screen.findByTestId('legacy-request-list')).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Request list' })).toHaveAttribute('aria-current', 'page');
   expect(screen.queryByRole('link', { name: 'All requests' })).not.toBeInTheDocument();
+});
+
+test('Initial Assessment filters by standing; a standing with no requests is disabled', async () => {
+  open(`/workbench?view=initial-assessment&programId=${RESEARCH}&cycleCode=J27`);
+  await screen.findByText('Mapping signalling lipids');
+  const standing = within(screen.getByRole('group', { name: 'Standing' }));
+  expect(standing.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true');
+  expect(standing.getByRole('button', { name: 'Not yet scored (1)' })).toBeEnabled();
+  expect(standing.getByRole('button', { name: 'Scored (0)' })).toBeDisabled();
+  fireEvent.click(standing.getByRole('button', { name: 'Recommended to Chairs (1)' }));
+  await waitFor(() => expect(screen.queryByText('Mapping signalling lipids')).not.toBeInTheDocument());
+  expect(screen.getByText('Programmable lattices')).toBeInTheDocument();
+  expect(routerState.query.standing).toBe('recommended');
+  expect(screen.queryByRole('group', { name: 'Standing' })).toBeInTheDocument();
+});
+
+test('reviewer progress appears on Peer Review rows and nowhere else; a later request says a review is outstanding', async () => {
+  const first = open('/workbench');
+  await screen.findByText('Presented already');
+  expect(screen.queryByTestId('reviewer-progress')).not.toBeInTheDocument();
+  expect(screen.getByText('1 review outstanding')).toBeInTheDocument();
+  expect(screen.getByText('Deliberations', { selector: 'span' })).toBeInTheDocument();
+  expect(screen.queryByText(/Record an offramp/)).not.toBeInTheDocument();
+  first.unmount();
+
+  open(`/workbench?view=peer-review&programId=${RESEARCH}&cycleCode=J27`);
+  await screen.findByText('Deep-ocean carbon cycling');
+  expect(screen.getAllByTestId('reviewer-progress')).toHaveLength(1);
+  expect(screen.queryByText('Presented already')).not.toBeInTheDocument();
+  expect(screen.queryByRole('group', { name: 'Standing' })).not.toBeInTheDocument();
 });

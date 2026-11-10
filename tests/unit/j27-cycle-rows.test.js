@@ -5,7 +5,7 @@ import {
   J27_REVIEWER_STAGE_LABEL, J27_STANDING_LABEL, J27_WAIT_LABEL, J27_IDLE_LABEL, J27_DEGRADED_NOTE,
 } from '../../shared/config/j27Labels';
 import {
-  isClosedRow, standingKey, rowChip, rowLine, rowNote, matchesSearch, matchesShowing, rowsForTab,
+  isClosedRow, standingKey, rowChip, rowLine, rowNotes, outstandingReviews, matchesPhaseFilters, matchesSearch, matchesShowing, rowsForTab,
   standingCounts, tabCounts, J27_SHOWING_KEYS, J27_SHOWING_LABEL,
 } from '../../shared/utils/j27CycleRows';
 
@@ -41,7 +41,7 @@ function row(request = {}, over = {}, extra = {}) {
 const notScored = () => row();
 const scored = () => row({ phaseIStatus: SCORING_STATUS.yes });
 const recommended = (over) => row({ phaseIStatus: CHAIRS_RECOMMENDATION_STATUS.yes }, over);
-const invited = (request = {}, over) => row({ phaseIStatus: INVITED, ...request }, over);
+const invited = (request = {}, over, extra) => row({ phaseIStatus: INVITED, ...request }, over, extra);
 
 describe('label coverage', () => {
   test('the Showing menu lists open, everything and every ending', () => {
@@ -156,10 +156,35 @@ describe('closed rows', () => {
 describe('notes, search, tabs and counts', () => {
   test('only a failed read earns the note; a partial row does not', () => {
     expect(notScored().j27.basis).toBe('partial');
-    expect(rowNote(notScored())).toBeNull();
+    expect(rowNotes(notScored())).toEqual([]);
     const degraded = row({}, { integrity: { status: 'unavailable' } });
     expect(degraded.j27.basis).toBe('degraded');
-    expect(rowNote(degraded)).toEqual({ kind: 'degraded', text: J27_DEGRADED_NOTE });
+    expect(rowNotes(degraded)).toEqual([{ kind: 'degraded', text: J27_DEGRADED_NOTE }]);
+  });
+  test('a review still owed is said in words only once the request has left Peer Review', () => {
+    const past = (outstanding, over = {}) => invited({ requestStatus: 'Phase II Pending' }, {
+      reviewSummary: { status: 'present' }, visitAssessment: { status: 'present' }, ...over,
+    }, { reviewers: { outstanding } });
+    expect(past(1).j27.phase).toBe('deliberations');
+    expect(rowNotes(past(1))).toEqual([{ kind: 'outstanding', text: '1 review outstanding' }]);
+    expect(rowNotes(past(2))).toEqual([{ kind: 'outstanding', text: '2 reviews outstanding' }]);
+    expect(rowNotes(past(0))).toEqual([]);
+    expect(rowNotes(past(undefined))).toEqual([]);
+    // Still in Peer Review: the reviewer bar on that tab carries it.
+    expect(outstandingReviews(invited({}, {}, { reviewers: { outstanding: 2 } }))).toBe(0);
+    // Closed: nothing is owed.
+    expect(outstandingReviews(invited({ phaseIIStatus: 682090001 }, { visitAssessment: { status: 'present' } }, { reviewers: { outstanding: 1 } }))).toBe(0);
+    // Both notes can apply.
+    expect(rowNotes(past(1, { integrity: { status: 'unavailable' } })).map((note) => note.kind)).toEqual(['outstanding', 'degraded']);
+  });
+  test('phase filters: Show closed, and a standing lists only the open rows that stand there', () => {
+    const closed = row({ phaseIStatus: SCORING_STATUS.no });
+    expect(matchesPhaseFilters(closed)).toBe(false);
+    expect(matchesPhaseFilters(closed, { showClosed: true })).toBe(true);
+    expect(matchesPhaseFilters(closed, { showClosed: true, standing: 'scored' })).toBe(false);
+    expect(matchesPhaseFilters(scored(), { standing: 'scored' })).toBe(true);
+    expect(matchesPhaseFilters(notScored(), { standing: 'scored' })).toBe(false);
+    expect(matchesPhaseFilters(recommended(), { standing: 'recommended' })).toBe(true);
   });
   test('search covers number, title, institution and Principal Investigator', () => {
     const r = notScored();

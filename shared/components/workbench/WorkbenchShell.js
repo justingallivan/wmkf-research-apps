@@ -252,6 +252,8 @@ export function WorkbenchShell({ previewReadOnly = false, j27IntegrityEnabled = 
     onShowingChange: (showing) => navigate({ showing }),
     showClosed: location.showClosed,
     onShowClosedChange: (showClosed) => navigate({ showClosed }),
+    standing: location.standing,
+    onStandingChange: (standing) => navigate({ standing }),
   };
   const sectionSwitch = <SectionSwitch section={section} onChange={(next) => navigate({ view: 'peer-review', section: next, search: '' })} />;
 

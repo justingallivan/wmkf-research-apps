@@ -44,6 +44,7 @@ describe('fetchReviewerRollup (characterization)', () => {
       held: 0,
       received: 1,
       completed: 0,
+      outstanding: 0,
       progress: {
         total: 2, accepted: 1, pending: 0, released: 0, declined: 1, uninvited: 0,
       },
@@ -144,6 +145,40 @@ describe('fetchReviewerRollup (characterization)', () => {
 
     expect(out[REQUEST_A].progress).toMatchObject({ pending: 1, released: 0 });
     expect(out[REQUEST_A].held).toBe(1);
+  });
+
+  test('outstanding counts active accepted reviewers with no review received; the totals alone cannot tell', async () => {
+    const accepted = { wmkf_selected: true, wmkf_invited: true, wmkf_accepted: true, wmkf_declined: false, wmkf_emailsentat: '2026-01-01', wmkf_responsetype: RESPONSE_TYPE_MAP.accepted };
+    const released = { ...accepted, wmkf_reviewstatus: TERMINAL_REVIEW_STATUS_VALUES.released };
+    const active = { ...accepted, wmkf_reviewstatus: null };
+    jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
+      records: [
+        // A: the released reviewer's report is in; the active reviewer still owes one.
+        { ...released, _wmkf_request_value: REQUEST_A, wmkf_reviewreceivedat: '2026-01-05' },
+        { ...active, _wmkf_request_value: REQUEST_A, wmkf_reviewreceivedat: null },
+        // B: the active reviewer's report is in; the released reviewer returned nothing.
+        { ...released, _wmkf_request_value: REQUEST_B, wmkf_reviewreceivedat: null },
+        { ...active, _wmkf_request_value: REQUEST_B, wmkf_reviewreceivedat: '2026-01-05' },
+      ],
+    });
+    const out = await fetchReviewerRollup([REQUEST_A, REQUEST_B]);
+    const totals = ({ accepted: a, received, progress }) => ({ accepted: a, received, progressAccepted: progress.accepted, released: progress.released });
+    expect(totals(out[REQUEST_A])).toEqual(totals(out[REQUEST_B]));
+    expect(out[REQUEST_A].outstanding).toBe(1);
+    expect(out[REQUEST_B].outstanding).toBe(0);
+    expect(emptyCounts().outstanding).toBe(0);
+  });
+
+  test('outstanding ignores declined, not-yet-accepted and archived reviewers', async () => {
+    jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
+      records: [
+        { _wmkf_request_value: REQUEST_A, wmkf_selected: true, wmkf_invited: true, wmkf_accepted: true, wmkf_declined: true, wmkf_responsetype: RESPONSE_TYPE_MAP.declined, wmkf_reviewreceivedat: null },
+        { _wmkf_request_value: REQUEST_A, wmkf_selected: true, wmkf_invited: true, wmkf_accepted: false, wmkf_declined: false, wmkf_responsetype: null, wmkf_reviewreceivedat: null },
+        { _wmkf_request_value: REQUEST_A, wmkf_selected: false, wmkf_invited: true, wmkf_accepted: true, wmkf_declined: false, wmkf_responsetype: RESPONSE_TYPE_MAP.accepted, wmkf_reviewreceivedat: null },
+      ],
+    });
+    const out = await fetchReviewerRollup([REQUEST_A]);
+    expect(out[REQUEST_A].outstanding).toBe(0);
   });
 
   test('chunks requestIds at 25 per OR-chain call: first call gets ids 0-24 in order, second gets id 25', async () => {

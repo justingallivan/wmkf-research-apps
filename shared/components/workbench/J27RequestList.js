@@ -14,9 +14,11 @@ import ScopeSegment from './ScopeSegment';
 import TestRequestBadge from '../TestRequestBadge';
 import { TOOLBAR_CONTROL_HEIGHT_CLASS, TOOLBAR_SELECT_CLASS } from '../ToolbarSelect';
 import { useUrlMirroredInput } from './useUrlMirroredInput';
-import { J27_PHASE_LABEL } from '../../config/j27Labels';
+import ReviewerStatusIndicator from './ReviewerStatusIndicator';
+import { J27_PHASE_LABEL, J27_STANDING_LABEL } from '../../config/j27Labels';
 import {
-  J27_SHOWING_KEYS, J27_SHOWING_LABEL, isClosedRow, matchesSearch, matchesShowing, rowChip, rowLine, rowNote, rowsForTab,
+  J27_SHOWING_KEYS, J27_SHOWING_LABEL, J27_STANDING_KEYS, isClosedRow, matchesPhaseFilters, matchesSearch, matchesShowing,
+  rowChip, rowLine, rowNotes, rowsForTab, standingCounts,
 } from '../../utils/j27CycleRows';
 
 // Reviewer stage chips keep the colors the Request list uses today; every
@@ -47,16 +49,21 @@ export function j27RequestHref(row) {
   return `/workbench/${row.requestId}${query ? `?${query}` : ''}`;
 }
 
-function RequestRow({ row }) {
+// Peer Review rows add reviewer progress at the right, as on today's Request
+// list; no other tab shows it (owner, 2026-11-09).
+const ROW_GRID = 'lg:grid-cols-[minmax(0,1fr)_22rem]';
+const ROW_GRID_WITH_REVIEWERS = 'lg:grid-cols-[minmax(0,1fr)_18rem_16rem]';
+
+function RequestRow({ row, showReviewers }) {
   const chip = rowChip(row);
   const line = rowLine(row);
-  const note = rowNote(row);
+  const notes = rowNotes(row);
   const people = [
     row.projectLeader && `PI ${row.projectLeader}`,
     row.programDirector && `PD ${row.programDirector}`,
   ].filter(Boolean).join(' · ');
   return (
-    <li className="relative grid grid-cols-1 gap-x-8 gap-y-2 px-4 py-3 transition-colors hover:bg-gray-50 focus-within:bg-gray-50 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
+    <li className={`relative grid grid-cols-1 gap-x-8 gap-y-2 px-4 py-3 transition-colors hover:bg-gray-50 focus-within:bg-gray-50 lg:items-start ${showReviewers ? ROW_GRID_WITH_REVIEWERS : ROW_GRID}`}>
       <div className="min-w-0">
         <div className="flex min-w-0 items-center gap-2">
           {/* Stretched link: the whole row opens the request, and it is a real
@@ -84,8 +91,15 @@ function RequestRow({ row }) {
         {line.kind === 'next' && <p className="mt-1 text-sm text-gray-900">Next: {line.text}</p>}
         {line.kind === 'wait' && <p className="mt-1 text-sm text-gray-600">{line.text}</p>}
         {line.kind === 'idle' && <p className="mt-1 text-sm text-gray-500">{line.text}</p>}
-        {note && <p className="mt-0.5 text-xs text-gray-500">{note.text}</p>}
+        {notes.map((note) => (
+          <p key={note.kind} className={`mt-0.5 text-xs ${note.kind === 'outstanding' ? 'font-medium text-amber-800' : 'text-gray-500'}`}>{note.text}</p>
+        ))}
       </div>
+      {showReviewers && (
+        <div className="lg:[&>div]:items-end">
+          <ReviewerStatusIndicator reviewers={row.reviewers} />
+        </div>
+      )}
     </li>
   );
 }
@@ -129,6 +143,8 @@ const EMPTY_PHASE = {
  * @param {Function} props.onShowingChange
  * @param {boolean} props.showClosed      phase tabs only
  * @param {Function} props.onShowClosedChange
+ * @param {string} props.standing         Initial Assessment only; '' = all
+ * @param {Function} props.onStandingChange
  * @param {React.ReactNode} [props.leading] section switch, first in the control row
  */
 export default function J27RequestList({
@@ -144,6 +160,8 @@ export default function J27RequestList({
   onShowingChange = () => {},
   showClosed = false,
   onShowClosedChange = () => {},
+  standing = '',
+  onStandingChange = () => {},
   leading = null,
 }) {
   const allRequests = tab === 'requests';
@@ -153,10 +171,12 @@ export default function J27RequestList({
   const tabRows = rowsForTab(rows, tab);
   const closedCount = tabRows.filter(isClosedRow).length;
   const query = allRequests ? searchInput : '';
+  const standingFilter = tab === 'initial-assessment' ? standing : '';
+  const byStanding = tab === 'initial-assessment' ? standingCounts(tabRows) : null;
   const visible = tabRows.filter((row) => (allRequests
     ? matchesShowing(row, showing) && matchesSearch(row, query)
-    : showClosed || !isClosedRow(row)));
-  const hiddenClosed = (allRequests ? showing === 'open' : !showClosed) ? closedCount : 0;
+    : matchesPhaseFilters(row, { showClosed, standing: standingFilter })));
+  const hiddenClosed = (allRequests ? showing === 'open' : !showClosed && !standingFilter) ? closedCount : 0;
   const searching = query.trim().length > 0;
   const showLoading = loadingCycles || (!hasSnapshot && !error);
   const revealClosed = () => (allRequests ? onShowingChange('everything') : onShowClosedChange(true));
@@ -195,6 +215,29 @@ export default function J27RequestList({
             </label>
           </>
         ) : (
+          <>
+          {byStanding && (
+            <div role="group" aria-label="Standing" className={`flex ${TOOLBAR_CONTROL_HEIGHT_CLASS} flex-wrap items-center gap-2`}>
+              {['', ...J27_STANDING_KEYS].map((key) => {
+                const count = key ? byStanding[key] : null;
+                const selected = standingFilter === key;
+                return (
+                  <button
+                    key={key || 'all'}
+                    type="button"
+                    disabled={Boolean(key) && count === 0}
+                    aria-pressed={selected}
+                    onClick={() => onStandingChange(key)}
+                    className={`rounded-full border px-3 py-1.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${
+                      selected ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {key ? `${J27_STANDING_LABEL[key]} (${count})` : 'All'}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <label className={`flex ${TOOLBAR_CONTROL_HEIGHT_CLASS} items-center gap-2 text-sm font-medium text-gray-700`}>
             <input
               type="checkbox"
@@ -204,6 +247,7 @@ export default function J27RequestList({
             />
             Show closed
           </label>
+          </>
         )}
       </div>
 
@@ -244,7 +288,7 @@ export default function J27RequestList({
         </Card>
       ) : (
         <ul className="divide-y divide-gray-200 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-          {visible.map((row) => <RequestRow key={row.requestId} row={row} />)}
+          {visible.map((row) => <RequestRow key={row.requestId} row={row} showReviewers={tab === 'peer-review'} />)}
         </ul>
       )}
     </section>
