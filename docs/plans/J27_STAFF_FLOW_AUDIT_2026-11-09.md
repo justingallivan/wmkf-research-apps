@@ -183,10 +183,15 @@ plan is final, if a deck is still wanted.
   waits on its file name and folder from Connor. The file names used come
   from Connor's 2026-10-26 email and have not been checked against a real
   J27 folder.
-- **Open, needs the owner's wording: 8, 10.** One name for the Final
-  Assessment document; "visit" or "presentation"; "Panel" beside "AI
-  Review Panel". The plain-text tab names in Overview next steps (10) are
-  also still unlinked.
+- **Fixed: 8** for J27 requests (owner, 2026-11-10). The document is the
+  "Draft Writeup" and becomes the "Final Writeup"; "Board recommendation"
+  and "Board draft" are gone from the J27 screens. Text shared with earlier
+  cycles still writes "draft writeup" and "Final writeup" in lower case.
+- **Fixed: 10** in part (owner, 2026-11-10). The staff assessment after the
+  research presentation says "presentation", not "visit".
+- **Open: 10**, the rest. "Panel" beside "AI Review Panel" awaits the
+  owner's wording. The plain-text tab names in Overview next steps are
+  still unlinked.
 
 ## 4. Questions only staff can answer
 
