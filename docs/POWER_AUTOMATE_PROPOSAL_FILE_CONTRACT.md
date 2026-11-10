@@ -63,8 +63,13 @@ or download, for J27 and later cycles: `Biosketches_{Request#}.pdf`,
 `Graphical-Abstract_{Request#}` with whatever single extension it carries.
 Names are matched exactly and case-sensitively in the active request's
 `AI Materials` folder; they come from Connor's email and have not been checked
-against a real J27 folder. The J27 staff and reviewer copies are still to be
-specified.
+against a real J27 folder.
+
+The J27 staff version sits at the root of the request folder, named
+`{AKA}_Staff Version_{Request#}` (Connor, 2026-11-10; AKA is the institution's
+short name). The Proposal tab on the J27 line shows it first, matching any
+single root file whose name ends `_Staff Version_{Request#}.pdf`; the `.pdf`
+extension is assumed. The J27 reviewer copy is still to be specified.
 
 ## File purposes
 

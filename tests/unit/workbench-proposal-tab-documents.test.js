@@ -183,7 +183,7 @@ describe('single-submission layout (J27 onward)', () => {
     });
   }
 
-  test('lists the individual files in a section that starts open and drops the Phase I and Phase II groups', async () => {
+  test('lists the individual files in a collapsed section and drops the Phase I and Phase II groups', async () => {
     global.fetch.mockResolvedValueOnce({ ok: true, json: async () => j27Body() });
 
     render(<ProposalTab context={context} />);
@@ -191,7 +191,7 @@ describe('single-submission layout (J27 onward)', () => {
     const summary = await screen.findByText('Individual files');
     const section = summary.closest('details');
     expect(section).not.toBeNull();
-    expect(section.open).toBe(true);
+    expect(section.open).toBe(false);
     expect(within(section).getAllByRole('listitem').map((item) => item.firstChild.textContent)).toEqual([
       'Project Narrative', 'Bibliography', 'Biosketches', 'Other Support', 'Collaboration Letters', 'Graphical Abstract',
     ]);
@@ -216,5 +216,36 @@ describe('single-submission layout (J27 onward)', () => {
 
     expect(await screen.findByText('Phase II documents')).toBeInTheDocument();
     expect(screen.getByText('Budget.pdf')).toBeInTheDocument();
+  });
+  test('shows the staff version first, with its links', async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => j27Body({
+        staffVersion: { key: 'staffVersion', label: 'Staff version', found: true, library: 'akoya_request', folder: ROOT, name: 'Caltech_Staff Version_1002379.pdf', mimeType: 'application/pdf' },
+      }),
+    });
+
+    render(<ProposalTab context={context} />);
+
+    const heading = await screen.findByText('Staff version');
+    const row = heading.parentElement;
+    expect(within(row).getByText('Caltech_Staff Version_1002379.pdf')).toBeInTheDocument();
+    expect(within(row).getAllByRole('link').length).toBeGreaterThan(0);
+    for (const later of [screen.getByText('Reviewer Materials'), screen.getByText('Individual files')]) {
+      expect(heading.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+  });
+
+  test('says the staff version is not received yet when it is missing', async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => j27Body({ staffVersion: { key: 'staffVersion', label: 'Staff version', found: false } }),
+    });
+
+    render(<ProposalTab context={context} />);
+
+    const row = (await screen.findByText('Staff version')).parentElement;
+    expect(within(row).getByText('not received yet')).toBeInTheDocument();
+    expect(within(row).queryByRole('link')).toBeNull();
   });
 });

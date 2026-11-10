@@ -408,6 +408,20 @@ function DocumentsSection({ requestId, docs, error }) {
   return (
     <div className="space-y-4">
       {docs.boardWriteups?.length > 0 && <div><p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Final Board writeups</p><ul>{docs.boardWriteups.map(document => <li key={document.documentId} className="py-2"><a className="text-blue-700 underline" href={document.webUrl} target="_blank" rel="noreferrer">{document.cycle} — {document.filename}</a>{document.archivedAt && <span className="ml-2 text-xs text-gray-500">Archived {new Date(document.archivedAt).toLocaleDateString()}</span>}</li>)}</ul></div>}
+      {singleSubmission && docs.staffVersion && (
+        <div>
+          <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Staff version</p>
+          <div className="flex items-center justify-between gap-3 py-2">
+            <span className="text-sm text-gray-700 truncate">{docs.staffVersion.found ? docs.staffVersion.name : 'Combined proposal'}</span>
+            {docs.staffVersion.found ? (
+              <DocActions requestId={requestId} file={docs.staffVersion} />
+            ) : (
+              <span className="text-xs text-gray-400">not received yet</span>
+            )}
+          </div>
+        </div>
+      )}
+
       <div>
         <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Reviewer Materials</p>
         {reviewerMaterials.length > 0 ? (
@@ -429,10 +443,8 @@ function DocumentsSection({ requestId, docs, error }) {
 
       {singleSubmission ? (
         // J27 onward: the individual files sit in a collapsed section (owner,
-        // 2026-10-27). The combined staff version will lead this section once
-        // its file name is known; until then the list starts open (owner,
-        // 2026-11-10), since it holds everything a reader can open.
-        <details open>
+        // 2026-10-27), under the combined staff version shown first.
+        <details>
           <summary className="cursor-pointer text-xs uppercase tracking-wide text-gray-400 mb-1">Individual files</summary>
           <ul className="divide-y divide-gray-100">
             {aiMaterials.map((material) => (
