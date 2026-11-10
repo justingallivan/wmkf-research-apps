@@ -65,8 +65,12 @@ request 1003384 holds `Project-Narrative_`, `Bibliography_`, `Biosketches_`,
 `Graphical-Abstract_{Request#}.jpg` there, and has no `AI Materials` folder.
 On the J27 line (not promoted) the Workbench Proposal tab lists those six from
 `Submission-Documents` for J27 and later cycles, matching names exactly. The
-governed narrative and bibliography readers below still require `AI Materials`;
-whether J27 requests get that folder, and whether the readers move, is open.
+governed narrative and bibliography readers accept the J27 names in
+`Submission-Documents` as well (owner, 2026-11-10; alignment log D59). They
+still require exactly one copy across the accepted places and fail closed
+otherwise: `AI Materials` under either name, or `Submission-Documents` under the
+J27 name. Connor plans an `AI Materials` folder for J27 with different contents,
+not yet specified.
 
 The J27 staff version sits at the root of the request folder, named
 `{AKA}_Staff-Version_{Request#}` (Connor, 2026-11-10; AKA is the institution's
