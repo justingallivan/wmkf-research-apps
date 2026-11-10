@@ -44,7 +44,7 @@ const input = {
   capabilities: { status: 'present', readOnly: false }, features: { status: 'present', chairsRecommendationEnabled: true },
   presentation: NL, roster: NL, boardDraft: NL, transition: NL,
 };
-// An invited request with invitations open: idle until reviewer counts load, then "Send reviewer invitations".
+// An invited request with invitations open: no line until reviewer counts load, then "Send reviewer invitations".
 // The recommended request above reads "Awaiting the Chairs' outcome" either way, so it cannot show a facts change.
 const invitedInput = { ...input, request: { ...input.request, requestStatus: 'Phase II Pending', phaseIStatus: PHASE_I_CHAIRS.invited } };
 const resolved = (id, j27 = true, stageInput = invitedInput) => ({ ok: true, json: async () => ({ success: true, requestId: id, requestNumber: '1000384', cycleCode: 'J27', ...(j27 ? { j27: { phase: 'initial-assessment', input: stageInput } } : {}) }) });
@@ -59,7 +59,10 @@ test('the strip renders from the resolve DTO and recomputes when the Overview re
   await act(async () => { pending.get('/api/workbench/resolve-request?requestId=request-a')(resolved('request-a')); });
   const strip = await screen.findByLabelText('Where this request stands');
   expect(strip).toHaveTextContent('Peer Review');
-  expect(strip).toHaveTextContent('Nothing is waiting on staff right now.');
+  // Reviewer counts are not loaded yet, so the strip does not claim that nothing is waiting.
+  expect(strip).not.toHaveTextContent('Nothing is waiting');
+  expect(strip).not.toHaveTextContent('Next:');
+  expect(strip).toHaveTextContent('Some facts load as you open tabs.');
   await act(async () => { overviewFacts({ progress: { status: 'ready', data: { counts: { candidates: 2, received: 0 } } } }); });
   expect(screen.getByLabelText('Where this request stands')).toHaveTextContent('Next: Send reviewer invitations');
 });
@@ -87,7 +90,7 @@ test('facts reported for one request never shape another request\'s strip', asyn
   await act(async () => { pending.get('/api/workbench/resolve-request?requestId=request-b')(resolved('request-b')); });
   const stripB = await screen.findByLabelText('Where this request stands');
   await act(async () => { reportForA({ progress: { status: 'ready', data: { counts: { candidates: 2 } } } }); });
-  expect(stripB).toHaveTextContent('Nothing is waiting on staff right now.');
+  expect(stripB).not.toHaveTextContent('Nothing is waiting');
   expect(stripB).not.toHaveTextContent('Next:');
 });
 
@@ -126,7 +129,7 @@ test('A → B → A starts A again from the server stage; nothing from the first
   routeId = 'request-a'; view.rerender(<WorkbenchRequest />);
   await act(async () => { pending.get('/api/workbench/resolve-request?requestId=request-a')(resolved('request-a')); });
   const strip = await screen.findByLabelText('Where this request stands');
-  expect(strip).toHaveTextContent('Nothing is waiting on staff right now.');
+  expect(strip).not.toHaveTextContent('Nothing is waiting');
   expect(strip).not.toHaveTextContent('Next:');
 });
 

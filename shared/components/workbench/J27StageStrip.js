@@ -3,7 +3,7 @@
  * phase, the next-step line, and the blockers that touch a task of the model.
  * The next-step line is the cycle list's rule (`rowLine`), so a request reads
  * the same in both places: a wait on the Chairs is said as a wait, and an
- * optional task never leads.
+ * optional task never leads. The idle sentence waits for a full basis.
  * It renders only what the resolve DTO and the page's existing reads provide;
  * it fetches nothing and gates nothing. Label maps are pinned to the read
  * model's vocabularies in tests/unit/j27-page-stage.test.js.
@@ -38,7 +38,11 @@ export default function J27StageStrip({ stage }) {
   if (!stage || stage.phase === 'unclassified') return null;
   const blockers = visibleBlockerKeys(stage.blockerKeys, stage.phase);
   const note = BASIS_NOTE[stage.basis];
-  const line = stage.phase === 'decided' ? { kind: 'none' } : rowLine({ j27: stage });
+  const computed = stage.phase === 'decided' ? { kind: 'none' } : rowLine({ j27: stage });
+  // The list always has reviewer counts; the page gets them, and the later-phase
+  // facts, only as tabs load. "Nothing is waiting" is said only once every fact
+  // behind it is in; until then the basis note stands alone.
+  const line = computed.kind === 'idle' && stage.basis !== 'full' ? { kind: 'none' } : computed;
   return (
     <section aria-label="Where this request stands" className="mb-6 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">

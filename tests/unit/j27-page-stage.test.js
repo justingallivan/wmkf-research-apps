@@ -168,6 +168,13 @@ describe('strip', () => {
     expect(strip).toHaveTextContent('took the offramp');
     expect(strip).not.toHaveTextContent('Nothing is waiting');
   });
+  test('the idle sentence waits for a full basis', () => {
+    const idle = { phase: 'peer-review', primaryTask: null, taskKeys: [], blockerKeys: [], outcome: 'none', recorded: {} };
+    const view = render(<J27StageStrip stage={{ ...idle, basis: 'partial' }} />);
+    expect(screen.getByLabelText('Where this request stands')).not.toHaveTextContent('Nothing is waiting');
+    view.rerender(<J27StageStrip stage={{ ...idle, basis: 'full' }} />);
+    expect(screen.getByLabelText('Where this request stands')).toHaveTextContent('Nothing is waiting on staff right now.');
+  });
   test('a decided row shows the phase alone', () => {
     render(<J27StageStrip stage={{ phase: 'decided', basis: 'full', primaryTask: null, taskKeys: [], blockerKeys: [] }} />);
     const strip = screen.getByLabelText('Where this request stands');
