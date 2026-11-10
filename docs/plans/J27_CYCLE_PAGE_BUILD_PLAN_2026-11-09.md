@@ -98,17 +98,69 @@ Two smaller points:
 - **"1 review outstanding" needs an exact formula.** The reviewer counts
   offer several candidates (accepted, received, completed, and a separate
   exclusive "progress" breakdown)
-  `[VERIFIED via lib/services/reviewer-rollup.js:78-122]`. Which difference
-  equals "accepted and not yet returned" is `[ASSUMED]` until slice 2 pins
-  it with a test built from that file's rules.
+  `[VERIFIED via lib/services/reviewer-rollup.js:78-122]`. Codex's third
+  review showed that no difference of those totals works: the accepted
+  count keeps a reviewer who was later released, and the received count
+  includes that reviewer's report, so the same totals can mean "one review
+  still owed" or "none owed" `[VERIFIED via reviewer-rollup.js:82-90,103-105,121]`.
+  Slice 2 therefore adds one count, worked out reviewer by reviewer:
+  accepted, not declined, not released, and no review received.
+
+## 1a. Codex reviews, 2026-11-09
+
+Codex reviewed this plan twice against the branch code and returned "needs
+attention" both times. Nearly every finding concerned working out
+Deliberations and Final Assessment on the list. **The owner therefore split
+the plan (decision 5): this plan builds the tab row, All requests, Initial
+Assessment, Peer Review and their counts. The Deliberations and Final
+Assessment lists get their own plan** (section 3a).
+
+First review, four confirmed findings, each checked against the source:
+
+| Codex finding | Checked | Outcome |
+|---|---|---|
+| The Staff deliberations feed cannot reproduce the request page's rule for "a Board draft exists" or for the review phase. The feed accepts a draft in Draft, Review or Final state; the request page requires Review state and a stable SharePoint identity, and its group-review check also requires the source version and content hash. | `[VERIFIED via lib/services/pre-site-visit/cycle-list-service.js:521-557,639-649; lib/services/final-writeup/transition-model.js:119-135,194-213; lib/services/final-writeup/transition-state.js:62-70]` | Moved to the separate plan. |
+| The rule for the line under the chip let "Record an offramp decision if one is needed" lead a row. | `[VERIFIED via lib/services/workbench/j27-read-model.js:267-272,281-286]` | Fixed: the optional offramp task never leads a row (section 2). |
+| A request can hold a presentation or a draft without being Invited, so the later-phase facts cannot be gated on standing. | `[VERIFIED via j27-read-model.js:194-209, which checks draft, review and presentation facts before the Chairs' outcome]` | Moved to the separate plan. |
+| Confirmed attendance is stored per presentation and tied to that presentation's start and end, so the list's "a roster memo exists" fact cannot stand in for it. | `[VERIFIED via lib/services/workbench/meeting-roster-service.js:90-93,115-126 and j27-read-model-inputs.js:75-80]` | Moved to the separate plan. |
+
+Second review, on a version that worked the later phases out on the server.
+One finding applies to this plan and is fixed in section 2: "Identify
+reviewers" could still lead a row that is waiting on the Chairs, because a
+recommended request with any reviewer suggestion is already in Peer Review
+`[VERIFIED via j27-read-model.js:208-209]`. The other four are requirements
+for the separate plan and are listed in section 3a as Codex reported them;
+they have not yet been checked against the source.
+
+Third review, on the split plan: one finding, that "1 review outstanding"
+cannot be worked out from the existing reviewer totals; fixed by adding a
+count (section 1 and slice 2). Codex found the row-line ordering, the
+Deliberations fallback and the tab mapping sound, and named three existing
+tests whose expectations change with this work: the address test (old
+state shape, and "Assigned to me" omitted from the address), the shell
+test (J27 Initial assessments panel), and the stage-strip label test.
+Those are its reading of the tests, not observed failures. The Final
+writeups panel keeps its "Not filtered by program" hint under the new tab.
+
+Codex confirmed the six findings in section 1, the closed-first ordering,
+the offramp fix and the tab-count definition, and listed shell points that
+are now in slice 1.
 
 ## 2. How it is built
 
 **One set of rows, loaded once.** In the new layout the shell loads the
 request list feed once for the current program, cycle and scope and hands
-the rows to whichever tab is open. All requests, the four phase lists and
-the tab counts are different filters over the same rows, so switching tabs
-does not reload.
+the rows to whichever tab is open. All requests, the Initial Assessment and
+Peer Review lists and the tab counts are different filters over the same
+rows, so switching among them does not reload.
+
+**Deliberations and Final Assessment keep today's panels for now.** Until
+their own plan is built, the Deliberations tab shows the existing Staff
+deliberations list and the Final Assessment tab shows the existing Final
+writeups list, both unchanged. Nothing staff use today is lost. On All
+requests, a request in one of those phases shows its Peer Review standing,
+because the request list cannot yet tell that it has moved on (redesign
+plan, section 5).
 
 **New pieces** (names are working names):
 
@@ -117,7 +169,7 @@ does not reload.
 | Label list | One file holding every phase, task, blocker, outcome and standing label. The stage strip's label maps move here and the strip imports them (redesign rule 14). |
 | Row rules | A file of pure functions: the standing chip, the line under it, the small third line, whether a row is closed, the filters, the search match and the tab counts. No fetching, fully unit-tested. |
 | Rows hook | Loads the feed for the shell, with the same guards against stale or mismatched responses the Request list has today `[VERIFIED via RequestListPanel.js:129-185]`. |
-| Request list and row | One list component and one row component, used by all five request tabs. |
+| Request list and row | One list component and one row component, used by All requests, Initial Assessment and Peer Review. |
 | Control row | Section switch, scope, and the tab-specific control. |
 
 **Existing files that change:**
@@ -127,29 +179,41 @@ does not reload.
 | `WorkbenchShell.js` | Chooses the new layout when the program is Research and the cycle is 2027 or later; otherwise renders exactly what it renders today. |
 | `WorkbenchViewsNav.js` | A second tab set for the new layout; receives counts. |
 | `workbench-location.js` | New tab keys and filter keys; old links mapped (table below). |
-| `dashboard-service.js` | Adds the request title to the read and the row; in slice 3, adds the model's input to in-scope rows. |
+| `dashboard-service.js` | Adds the request title to the read and the row. |
 | `program-scope-service.js` | Adds the true/false field to each program. |
-| `J27StageStrip.js` | Imports its labels from the label list. No visible change. |
-| `StaffDeliberationsPanel.js` | Slice 3 only: its timing chip rule moves to a shared file that both it and the new row import. No visible change. Its next-step and problem wording stays where it is (decision 3). |
+| `reviewer-rollup.js` | Slice 2: adds the outstanding-review count. The existing counts keep their meaning. |
+| `J27StageStrip.js` | Imports its labels from the label list and keeps exporting them under today's names, so its existing test holds. No visible change. |
 
-`RequestListPanel.js`, the Reviewer follow-up panel, the Final writeups
-panel and Awardees are not edited. Earlier cycles and other programs keep
-using them as they are.
+`RequestListPanel.js`, `StaffDeliberationsPanel.js`, the Staff deliberations
+feed, the stage model and its inputs, the Reviewer follow-up panel, the
+Final writeups panel and Awardees are not edited. Earlier cycles and other
+programs keep using them as they are.
 
 **The line under the chip.** In this order:
 
 1. Closed request: nothing; the chip says how it ended.
-2. The model's next task, when it is a main task or belongs to the row's own
-   phase: "Next: …".
+2. A main task, if the request has one: "Next: …". The model marks two
+   tasks as optional ("Identify reviewers" and "Record an offramp decision
+   if one is needed") `[VERIFIED via j27-read-model.js:40,43]`; every other
+   task is a main task, including reviewing integrity findings.
 3. Otherwise, when the request is waiting on the Chairs: "Awaiting the
-   Chairs' outcome". When it is invited and waiting for its Phase II status:
-   "Reviewer invitations are not open yet" (decision 2).
-4. Otherwise, in Deliberations before the presentation: nothing (decision
-   3).
-5. Otherwise: "Nothing is waiting on staff right now."
+   Chairs' outcome".
+4. Otherwise, on a Peer Review row with "Identify reviewers" outstanding:
+   "Next: Identify reviewers". It is the real work of that phase.
+5. Otherwise, when the request is invited and waiting for its Phase II
+   status: "Reviewer invitations are not open yet" (decision 2).
+6. Otherwise: "Nothing is waiting on staff right now."
 
-Rule 2 keeps "Next: Identify reviewers" on a Peer Review row, where it is
-the real work, and drops it from a row that is waiting on the Chairs.
+The optional offramp task never leads a row. The Chairs wait is checked
+before "Identify reviewers", so a recommended request shows the wait even
+when it already has reviewer suggestions. The Phase II wait is checked
+after it: once a request is Invited, identifying reviewers is work the
+Program Director can do, and decision 2 puts the message there only "when
+nothing else is next". Codex recommended checking both waits first; this
+plan follows it for the Chairs and keeps decision 2 for the Phase II wait.
+
+A tab count is the number of rows in that phase whose line starts with
+"Next:".
 
 **The chip.**
 
@@ -157,8 +221,14 @@ the real work, and drops it from a row that is waiting on the Chairs.
 |---|---|
 | Initial Assessment | The recorded standing: Not yet scored, Scored, Recommended to Chairs. |
 | Peer Review | Today's reviewer stage, already on each row `[VERIFIED via dashboard-service.js:389]`. |
-| Deliberations, Final Assessment | The Staff deliberations feed (slice 3). |
 | Closed | The outcome label; for a status the model does not know, its Dataverse label (decision 1). |
+
+The request list can already place a request in Deliberations when a staff
+visit assessment or attendance memo is saved (redesign plan, section 5).
+Until the separate plan, such a row appears on All requests with the plain
+chip "Deliberations" and the line from the rules above; it is not on the
+Initial Assessment or Peer Review lists. The fuller Deliberations and Final
+Assessment chips belong to the separate plan.
 
 **Addresses.** All requests keeps today's default address, so existing
 bookmarks to the Workbench open on it. New tab keys: `initial-assessment`,
@@ -172,7 +242,7 @@ New keys for the section, the "Showing" choice, the standing filter and
 | Reviewer follow-up | Peer Review, Reviewers section |
 | Staff deliberations | Deliberations |
 | Initial assessments | Initial Assessment |
-| Final writeups | Final Assessment, Writeup review section |
+| Final writeups | Final Assessment |
 | Awardees | Awardees |
 
 The reverse also holds: a new address opened on an earlier cycle or another
@@ -196,10 +266,20 @@ is promoted until the owner decides (section 6).
 - Shell and nav choose the layout; address keys and old-link mapping.
 - Title and program field added on the server.
 - All requests: search, "Showing" menu, count line, all states in the brief.
-- The other four request tabs show the same list filtered to their phase,
-  without their extras yet, so no tab is empty or broken between slices.
+- Initial Assessment and Peer Review show the same list filtered to their
+  phase, without their extras yet. Deliberations and Final Assessment mount
+  today's Staff deliberations and Final writeups panels. No tab is empty or
+  broken between slices.
+- Shell points from the Codex review: keep the address round trip exact
+  for every key the shell compares; do not map an old link until the page
+  knows whether the program qualifies; keep an explicit "Assigned to me"
+  distinct from no choice; keep the path that starts loading rows when the
+  address names both program and cycle
+  `[VERIFIED via WorkbenchShell.js:134-139]`.
 - Tests: row rules against every case in section 2, including the four
-  sample inputs from finding 1; address mapping in both directions; the
+  sample inputs from finding 1, both optional tasks in every phase, a
+  recommended request that already has reviewer suggestions, and an Invited
+  request without its Phase II status; address mapping in both directions; the
   shell renders today's layout unchanged for D26 and for another program;
   label parity between the label list and the stage model's keys.
 - Timings recorded on the 20 sandbox fixtures.
@@ -209,34 +289,16 @@ is promoted until the owner decides (section 6).
 - Standing filter chips with counts on Initial Assessment.
 - Reviewer progress on the Peer Review row; Reviewers section mounts the
   existing panel.
-- "1 review outstanding", with its formula pinned by a test.
+- "1 review outstanding", from the new count. Tests: an active and a
+  released reviewer, with the one received report belonging to each in
+  turn. Every other reader of the reviewer counts is checked for the added
+  field.
 - "Show closed" on the phase tabs.
 
-**Slice 3: Deliberations and Final Assessment.**
-
-- The page calls the existing Staff deliberations feed, only when at least
-  one loaded request is Invited, and merges presentation timing, review
-  phase and draft state into each row's stage the way the request page
-  merges its own reads `[VERIFIED via shared/utils/j27PageStage.js:76-93]`.
-  From December to the February Chairs meeting no request is Invited, so
-  the feed is not called at all.
-- No route is added and the feed is not changed. The request list feed
-  gains the model's input on in-scope rows so the page can derive the stage
-  again.
-- A test pins how the feed's draft state maps to "a Board draft exists"
-  for the available, unavailable, pending and ambiguous cases (the caveat
-  in the redesign plan, section 5).
-- Writeup review section mounts the existing panel.
-- Open technical point: the list has no read of the confirmed attendance
-  record, so "Confirm presentation attendance" would not appear on a row.
-  Whether the saved roster memo the list already reads is the same fact is
-  `[ASSUMED]`; slice 3 starts by reading that path.
-- This slice crosses the server and the page, so it gets a whole-flow
-  review before it is built.
-
-**Slice 4: tab counts.** Counts come from the row rules and the rows already
-loaded, so this is small. A count is the number of rows in that phase whose
-line starts with "Next:".
+**Slice 3: tab counts.** Counts on Initial Assessment and Peer Review come
+from the row rules and the rows already loaded, so this is small.
+Deliberations and Final Assessment carry no count until their own plan is
+built.
 
 **Checks for every slice.** The unit tests for the files touched; the type
 check; and the gates for the surfaces changed: route matrix, Atlas,
@@ -245,12 +307,52 @@ red today from before this work (model settings on the scoring route, two
 stale J27 register rows, a worktree link); the first two are cleaned up
 before slice 1 starts.
 
+## 3a. Separate plan: Deliberations and Final Assessment lists
+
+Not part of this build. Its own plan is written, given a whole-flow review
+and sent to Codex before anything is built. Starting requirements:
+
+- A request appears in Deliberations or Final Assessment on the list
+  exactly when its request page says so.
+- The later-phase facts are read for every in-scope request, whatever its
+  standing (first Codex review, verified).
+- Confirmed attendance uses the attendance service's rule, tied to the
+  presentation (first Codex review, verified).
+- **Before its presentation, a Deliberations row shows no next-step line at
+  all**, including work left from Peer Review such as reading the reviewer
+  reports (owner, 2026-11-09: staff know to read the reports and do not
+  need reminding). What is shared before a presentation is still to be
+  decided (decision 3).
+
+From the second Codex review, as reported and not yet checked against the
+source:
+
+- The request page learns that a presentation has ended only for someone
+  allowed to start group review, on a request with an eligible draft. The
+  list needs a timing rule that does not depend on either, and the two must
+  be reconciled.
+- Reusing the Final writeup status needs its whole flow, including its
+  error handling and readiness check, and a document read that returns
+  every field it checks without returning document text.
+- The attendance service and the schedule check can disagree about one
+  request's presentation; the list must keep "a presentation exists"
+  separate from "its timing is confirmed". The attendance service also
+  accepts the literal J27 cycle only
+  `[VERIFIED via lib/services/workbench/meeting-roster-service.js:46]`,
+  while the new layout covers later cycles.
+- Batched reads fail as a whole today, and the schedule check makes a
+  further read per ended presentation; cost and partial failure need an
+  explicit design, measured at 300 requests.
+
 ## 4. What is not built
 
-No new route, table, permission, status or field. No writes from any list.
-No change to the request page beyond the label import. No change to what the
-Reviewer follow-up, Final writeups or Awardees panels read or write. No
-Program Coordinator work. Nothing for Southern California.
+No new route, table, permission, status or Dataverse field. No writes from
+any list. The request list feed gains three response fields (the title,
+the program field and the outstanding-review count). No change to the request page beyond the label import.
+No change to the stage model, the Staff deliberations list or its feed, or
+to what the Reviewer follow-up, Final writeups or Awardees panels read or
+write. No Deliberations or Final Assessment list (section 3a). No Program
+Coordinator work. Nothing for Southern California.
 
 ## 5. Decisions (owner, 2026-11-09)
 
@@ -265,16 +367,18 @@ Program Coordinator work. Nothing for Southern California.
    "Reviewer invitations are not open yet" when nothing else is next. The
    owner does not expect a significant lag between the two steps, so the
    line is a fallback that will rarely be seen.
-3. **Deliberations rows before the presentation: to be decided** (finding
-   6). The owner has not settled what is shared with colleagues and the
-   Chairs before a research presentation. Until he has, a Deliberations row
-   shows the timing chip, the stage model's two tasks after the
-   presentation, and no next-step line before it. No wording about the
-   proposal discussion brief goes on the row.
+3. **Deliberations rows before the presentation: no next-step line.** What
+   is shared with colleagues and the Chairs before a research presentation
+   is still to be decided, so no wording about the proposal discussion
+   brief goes on the row; and work left from Peer Review is not repeated
+   there, because staff know to read the reports. This applies when the
+   Deliberations list is built (section 3a).
 4. **Release:** no constraint on the order. The owner expects all of this
    to be settled before the first proposal arrives, and staff do not work
-   on deliberations before reviews have gone out. The slices can be
-   promoted together with the J27 line or as they are finished.
+   on deliberations before reviews have gone out.
+5. **The plan is split** after two Codex reviews: this plan builds the tab
+   row, All requests, Initial Assessment, Peer Review and counts; the
+   Deliberations and Final Assessment lists get their own plan.
 
 Still open: **the go-ahead to build**, and whether to start with the branch
 clean-up.
@@ -285,4 +389,4 @@ The work branches from `claude/j27-read-model` and follows that line's
 promotion decision, which has not been taken. The sandbox fixtures stay as
 they are. On approval, the decision is logged in the alignment log on the
 J27 line (redesign plan, section 10), and the route matrix and Atlas pages
-are updated with the two added response fields in the slice that adds them.
+are updated with the added response fields in the slice that adds them.
