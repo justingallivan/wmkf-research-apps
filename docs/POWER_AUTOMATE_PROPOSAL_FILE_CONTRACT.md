@@ -56,8 +56,15 @@ files are PDFs except `Graphical-Abstract_{Request#}`, which is an image
 (format not specified). Connor's other J27 `AI Materials`
 files (`Graphical-Abstract_`, `Biosketches_`, `Other-Support_`,
 `Collaboration-Letters_`, `PhaseI-Cover-Page_`, `Abstract_`,
-`Graphical-Abstract-Page_`) are not app inputs today. The J27 staff and
-reviewer copies are still to be specified.
+`Graphical-Abstract-Page_`) are not AI inputs today. On the J27 line (2026-11-10,
+not promoted) the Workbench Proposal tab lists four of them for staff to open
+or download, for J27 and later cycles: `Biosketches_{Request#}.pdf`,
+`Other-Support_{Request#}.pdf`, `Collaboration-Letters_{Request#}.pdf`, and
+`Graphical-Abstract_{Request#}` with whatever single extension it carries.
+Names are matched exactly and case-sensitively in the active request's
+`AI Materials` folder; they come from Connor's email and have not been checked
+against a real J27 folder. The J27 staff and reviewer copies are still to be
+specified.
 
 ## File purposes
 

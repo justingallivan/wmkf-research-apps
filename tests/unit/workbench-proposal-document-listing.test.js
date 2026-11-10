@@ -234,3 +234,90 @@ test('J27 GOApply names fill the AI Materials slots; both D26 and J27 names pres
     expect.objectContaining({ key: 'proposalBibliography', found: false, filename: 'ProposalBibliography_1002379.pdf' }),
   ]);
 });
+
+describe('single-submission layout (J27 onward)', () => {
+  const AI = `${ROOT}/AI Materials`;
+  const pdf = (name, folder = AI) => ({ name, folder, mimeType: 'application/pdf' });
+
+  beforeEach(() => {
+    getRequestSharePointBuckets.mockResolvedValue([ACTIVE]);
+    getProposalDocumentConfig.mockReturnValue({
+      layout: 'single-submission',
+      phaseFolder: null,
+      excludeFilenames: [],
+      slots: [],
+    });
+  });
+
+  test('lists the six individual files in order and leaves the front matter out', async () => {
+    listFiles.mockResolvedValue([
+      pdf('Project-Narrative_1002379.pdf'),
+      pdf('Bibliography_1002379.pdf'),
+      pdf('Biosketches_1002379.pdf'),
+      pdf('Other-Support_1002379.pdf'),
+      pdf('Collaboration-Letters_1002379.pdf'),
+      { name: 'Graphical-Abstract_1002379.png', folder: AI, mimeType: 'image/png' },
+      pdf('PhaseI-Cover-Page_1002379.pdf'),
+      pdf('Abstract_1002379.pdf'),
+      pdf('Graphical-Abstract-Page_1002379.pdf'),
+    ]);
+
+    const result = await listProposalDocuments(REQUEST_ID, REQUEST_NUMBER, 'J27');
+
+    expect(result.layout).toBe('single-submission');
+    expect(result.slots).toEqual([]);
+    expect(result.otherDocuments).toEqual([]);
+    expect(result.aiMaterials.map((item) => [item.label, item.found, item.name])).toEqual([
+      ['Project Narrative', true, 'Project-Narrative_1002379.pdf'],
+      ['Bibliography', true, 'Bibliography_1002379.pdf'],
+      ['Biosketches', true, 'Biosketches_1002379.pdf'],
+      ['Other Support', true, 'Other-Support_1002379.pdf'],
+      ['Collaboration Letters', true, 'Collaboration-Letters_1002379.pdf'],
+      ['Graphical Abstract', true, 'Graphical-Abstract_1002379.png'],
+    ]);
+    expect(result.aiMaterials[2]).toMatchObject({ library: 'akoya_request', folder: AI });
+  });
+
+  test('a missing file is reported as not found, with the name that is expected', async () => {
+    listFiles.mockResolvedValue([pdf('Project-Narrative_1002379.pdf')]);
+
+    const result = await listProposalDocuments(REQUEST_ID, REQUEST_NUMBER, 'J27');
+
+    expect(result.aiMaterials.map((item) => [item.key, item.found, item.filename])).toEqual([
+      ['proposalNarrative', true, 'Project-Narrative_1002379.pdf'],
+      ['proposalBibliography', false, 'Bibliography_1002379.pdf'],
+      ['biosketches', false, 'Biosketches_1002379.pdf'],
+      ['otherSupport', false, 'Other-Support_1002379.pdf'],
+      ['collaborationLetters', false, 'Collaboration-Letters_1002379.pdf'],
+      ['graphicalAbstract', false, null],
+    ]);
+  });
+
+  test('the graphical abstract page is not taken for the graphical abstract; two images are ambiguous', async () => {
+    listFiles.mockResolvedValue([pdf('Graphical-Abstract-Page_1002379.pdf')]);
+    let result = await listProposalDocuments(REQUEST_ID, REQUEST_NUMBER, 'J27');
+    expect(result.aiMaterials.find((item) => item.key === 'graphicalAbstract').found).toBe(false);
+
+    listFiles.mockResolvedValue([
+      { name: 'Graphical-Abstract_1002379.png', folder: AI },
+      { name: 'Graphical-Abstract_1002379.jpg', folder: AI },
+    ]);
+    result = await listProposalDocuments(REQUEST_ID, REQUEST_NUMBER, 'J27');
+    expect(result.aiMaterials.find((item) => item.key === 'graphicalAbstract').found).toBe(false);
+  });
+
+  test('files outside the active AI Materials folder, another request\'s files and both narrative names do not fill a row', async () => {
+    listFiles.mockResolvedValue([
+      pdf('Biosketches_1002379.pdf', `${ROOT}/Submission-Documents`),
+      pdf('Other-Support_1009999.pdf'),
+      pdf('Project-Narrative_1002379.pdf'),
+      pdf('ProposalNarrative_1002379.pdf'),
+    ]);
+
+    const result = await listProposalDocuments(REQUEST_ID, REQUEST_NUMBER, 'J27');
+
+    expect(result.aiMaterials.every((item) => item.found === false)).toBe(true);
+    // No phase folder is configured, so nothing is swept into "Other documents".
+    expect(result.otherDocuments).toEqual([]);
+  });
+});

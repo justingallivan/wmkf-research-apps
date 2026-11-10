@@ -404,6 +404,7 @@ function DocumentsSection({ requestId, docs, error }) {
   const slots = Array.isArray(docs.slots) ? docs.slots : [];
   const phaseIIDocuments = Array.isArray(docs.phaseIIDocuments) ? docs.phaseIIDocuments : [];
   const others = Array.isArray(docs.otherDocuments) ? docs.otherDocuments : [];
+  const singleSubmission = docs.layout === 'single-submission';
   return (
     <div className="space-y-4">
       {docs.boardWriteups?.length > 0 && <div><p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Final Board writeups</p><ul>{docs.boardWriteups.map(document => <li key={document.documentId} className="py-2"><a className="text-blue-700 underline" href={document.webUrl} target="_blank" rel="noreferrer">{document.cycle} — {document.filename}</a>{document.archivedAt && <span className="ml-2 text-xs text-gray-500">Archived {new Date(document.archivedAt).toLocaleDateString()}</span>}</li>)}</ul></div>}
@@ -426,9 +427,12 @@ function DocumentsSection({ requestId, docs, error }) {
         )}
       </div>
 
-      {aiMaterials.length > 0 && (
-        <div>
-          <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">AI Materials</p>
+      {singleSubmission ? (
+        // J27 onward: the individual files sit in a collapsed section (owner,
+        // 2026-10-27). The combined staff version will lead this section once
+        // its file name is known.
+        <details>
+          <summary className="cursor-pointer text-xs uppercase tracking-wide text-gray-400 mb-1">Individual files</summary>
           <ul className="divide-y divide-gray-100">
             {aiMaterials.map((material) => (
               <li key={material.key} className="flex items-center justify-between gap-3 py-2">
@@ -436,48 +440,70 @@ function DocumentsSection({ requestId, docs, error }) {
                 {material.found ? (
                   <DocActions requestId={requestId} file={material} />
                 ) : (
+                  <span className="text-xs text-gray-400">not received yet</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : (
+        <>
+        {aiMaterials.length > 0 && (
+          <div>
+            <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">AI Materials</p>
+            <ul className="divide-y divide-gray-100">
+              {aiMaterials.map((material) => (
+                <li key={material.key} className="flex items-center justify-between gap-3 py-2">
+                  <span className="text-sm text-gray-700">{material.label}</span>
+                  {material.found ? (
+                    <DocActions requestId={requestId} file={material} />
+                  ) : (
+                    <span className="text-xs text-gray-400">not found</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div>
+          <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Phase I documents</p>
+          <ul className="divide-y divide-gray-100">
+            {slots.map((s) => (
+              <li key={s.key} className="flex items-center justify-between gap-3 py-2">
+                <span className="text-sm text-gray-700">{s.label}</span>
+                {s.found ? (
+                  <DocActions requestId={requestId} file={s} />
+                ) : (
                   <span className="text-xs text-gray-400">not found</span>
                 )}
               </li>
             ))}
           </ul>
         </div>
+        </>
       )}
 
-      <div>
-        <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Phase I documents</p>
-        <ul className="divide-y divide-gray-100">
-          {slots.map((s) => (
-            <li key={s.key} className="flex items-center justify-between gap-3 py-2">
-              <span className="text-sm text-gray-700">{s.label}</span>
-              {s.found ? (
-                <DocActions requestId={requestId} file={s} />
-              ) : (
-                <span className="text-xs text-gray-400">not found</span>
-              )}
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div>
-        <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Phase II documents</p>
-        {phaseIIDocuments.length > 0 ? (
-          <ul className="divide-y divide-gray-100">
-            {phaseIIDocuments.map((document) => (
-              <li
-                key={`${document.library}/${document.folder}/${document.name}`}
-                className="flex items-center justify-between gap-3 py-2"
-              >
-                <span className="text-sm text-gray-700 truncate">{document.name}</span>
-                <DocActions requestId={requestId} file={document} />
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-gray-400 py-2">No documents found.</p>
-        )}
-      </div>
+      {(!singleSubmission || phaseIIDocuments.length > 0) && (
+        <div>
+          <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Phase II documents</p>
+          {phaseIIDocuments.length > 0 ? (
+            <ul className="divide-y divide-gray-100">
+              {phaseIIDocuments.map((document) => (
+                <li
+                  key={`${document.library}/${document.folder}/${document.name}`}
+                  className="flex items-center justify-between gap-3 py-2"
+                >
+                  <span className="text-sm text-gray-700 truncate">{document.name}</span>
+                  <DocActions requestId={requestId} file={document} />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-gray-400 py-2">No documents found.</p>
+          )}
+        </div>
+      )}
 
       {others.length > 0 && (
         <div>
