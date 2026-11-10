@@ -49,6 +49,21 @@ Read-model branch, 2026-11-09 (oldest first): `ff1a978cf`, `470cd3f76`,
 `1556da9e9`, `806e7bc6c`, `52fc7a6b6`, `b0b4f21d9`, `591f33267`, `74f6b8111`,
 `480464177`, `680252fe5`. Factory branch: `e0ad4ade7` to `9070030c7`.
 
+## Expertise roster migration planning — November 9, 2026
+
+Justin and Codex recovered the earlier roster migration design and settled the
+schema decisions with Connor supporting the direction. The implementation plan
+is `docs/plans/EXPERTISE_ROSTER_DATAVERSE_MIGRATION_PLAN_2026-11-09.md`.
+This is planned work, not a provisioned table or deployed migration. One profile
+per person, no program partition or Short ID, separate lead-PD eligibility,
+optional external Contact links, Active/Inactive only, optional preserved
+expertise fields, and unchanged editor access are settled. Expertise wording,
+scoring and recommendation policy remain deferred. Beth's eligibility and the
+two new PD identities remain import confirmations. Claude Fable review is
+pending explicit consumption approval after automatic approval review rejected
+the first invocation; no review was run. The existing J27 stream below is
+preserved and has not been resumed by this planning task.
+
 ## Next Items
 
 ### Verified Open
