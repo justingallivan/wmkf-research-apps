@@ -140,7 +140,7 @@ Implementation adds meaningful unit, integration and browser contract tests. Run
 
 Code work uses a fresh implementation branch under the release strategy. This document's existence authorizes neither schema deployment nor import. No feature work is included in this planning commit.
 
-Review status: Claude Fable 5.2 completed an OAuth review on November 9, 2026: **READY WITH NAMED CHANGES**. Review session `07c90a79-7dc2-4eee-840f-95a370458f23`, reviewed commit `be5790336`. Findings and disposition are retained in `docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_2026-11-09.md`. The required repairs have been incorporated and source-checked by Codex; Fable has not re-reviewed the revised text. The prompt/eligibility integration contract and platform sandbox gates remain explicit release prerequisites. No production/runtime readiness is claimed.
+Review status: two Claude Fable 5.2 OAuth reviews completed November 9, 2026, both **READY WITH NAMED CHANGES**. First review and applied disposition: `docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_2026-11-09.md`. Second review of `acc1f7507`, session `21ea0ecc-c011-4f40-b0bf-6aa841d55662`: `docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_2_2026-11-09.md`. The second review confirms most earlier fixes but leaves B1–B5 OPEN: rehearsal database/dual allocator isolation; prompt gate tied to cutover and per-target prompt rollout; per-consumer handling of unmapped/invalid rows; Contact GUID uniqueness type; deterministic import idempotency. These qualify the proposed mechanics above; do not execute affected work packages until repaired. Additional rehearsal gates are recorded in the second review. No runtime or unconditional implementation readiness is claimed.
 
 ## 8. Durable context and limits
 
