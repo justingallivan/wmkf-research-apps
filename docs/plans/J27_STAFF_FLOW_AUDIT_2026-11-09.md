@@ -159,15 +159,12 @@ plan is final, if a deck is still wanted.
 
 ## 4. Questions only staff can answer
 
-- Do Program Directors think of the cycle in these four phases, or by
-  meeting: the January triage sessions, the Chairs, the offramp, the
-  presentations, the Board?
-- Which words do they use for a proposal's standing between December and
-  the Chairs meeting?
-- What does the Program Coordinator open first each day, and is their list
-  the whole program or particular Program Directors' requests?
-- Does the Grants Manager open the Workbench before Awardees, and would a
-  "waiting on me" filter be used?
-- When staff look back at an earlier cycle, what are they looking for and
-  how do they search?
-- Is one phase per request acceptable when work overlaps, as in finding 3?
+Answered by the owner on 2026-11-09; the answers and their effect are
+recorded in section 8 of the cycle page plan. In brief: the phases make
+sense; staff can adapt to the Scored / Not Scored wording; the Program
+Coordinator works mainly in Meeting Tracker and uses the Workbench little;
+the Grants Manager's use of the Workbench is undetermined; looking back at
+earlier cycles has not yet been a habit, and Principal Investigator and
+institution are the likely search terms. One phase per request is
+acceptable when work overlaps, provided a row shows any review still
+outstanding.

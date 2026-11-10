@@ -250,7 +250,9 @@ sequence.
   it, and the Workbench's "Assigned to me" means lead Program Director. The
   owner wants the infrastructure for the Program Coordinator built later:
   coordinator tasks, a coordinator's own request scope, and coordinator next
-  steps on the cycle lists. Interim cover and the finding behind it:
+  steps on the cycle lists. The owner adds that the coordinator works
+  mainly in Meeting Tracker, which feeds the Workbench, and uses the
+  Workbench little; set the scope when the work is taken up. Interim cover and the finding behind it:
   `docs/plans/J27_CYCLE_PAGE_REDESIGN_PLAN_2026-11-09.md` (section 9) and
   `docs/plans/J27_STAFF_FLOW_AUDIT_2026-11-09.md` (findings 11 to 14).
 

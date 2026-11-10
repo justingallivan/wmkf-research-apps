@@ -3,7 +3,7 @@ title: J27 cycle page redesign plan
 domain: workbench
 kind: plan
 status: draft
-summary: Proposal to reorganize the cycle-level Workbench page for J27 Research as All requests plus the request page's phases (Initial Assessment, Peer Review, Deliberations, Final Assessment) and Awardees, stating what happens to each of today's six tabs. Draft for owner review; no build authorized; the staff flow audit may change it.
+summary: Proposal to reorganize the cycle-level Workbench page for J27 Research as All requests plus the request page's phases (Initial Assessment, Peer Review, Deliberations, Final Assessment) and Awardees, stating what happens to each of today's six tabs. Design decisions settled with the owner 2026-11-09; no build authorized.
 canonical: false
 owner: product-engineering
 related:
@@ -14,10 +14,11 @@ related:
 
 # J27 cycle page redesign plan
 
-Author: Claude for Justin Gallivan, 2026-11-09. Status: **DRAFT for owner
-review. No build is authorized.** The staff flow audit's desk findings
-(`docs/plans/J27_STAFF_FLOW_AUDIT_2026-11-09.md`) are applied below; its
-questions for staff are still open and may change the plan.
+Author: Claude for Justin Gallivan, 2026-11-09. Status: **Design decisions
+settled with the owner on 2026-11-09. No build is authorized.** The staff
+flow audit (`docs/plans/J27_STAFF_FLOW_AUDIT_2026-11-09.md`) and the owner's
+answers to its questions are applied below. Before a build is planned: the
+two feed checks in section 5 marked `[ASSUMED]`, and a design pass.
 
 All code described here was read on branch `claude/j27-read-model` at
 `680252fe5` (worktree `WMKF_Apps-claude-j27-read-model`), which is not on
@@ -116,14 +117,24 @@ Added from the staff flow audit (owner agreed, 2026-11-09):
 10. **Reviewer progress shows on any row that has reviewer activity**, on
     All requests and Initial Assessment as well as Peer Review, because
     Program Directors may shortlist reviewers before the Chairs meeting.
+    **A request that has moved past Peer Review with a review still
+    outstanding says so on its row** ("1 review outstanding"), on the
+    Deliberations and Final Assessment lists and on All requests, so the
+    reviewer is not forgotten (owner, 2026-11-09). The count is accepted
+    reviewers who have not yet returned a review, from the reviewer counts
+    the dashboard rows already carry
+    `[VERIFIED via dashboard-service.js:383-386 and j27PageStage.js:25]`.
 11. **The Deliberations list keeps today's scheduling cue** ("Not
     scheduled", time not confirmed). Scheduling is not a task in the stage
     model, so without the cue the row would show nothing to do before the
     presentation.
-12. **A blocked row says who it is waiting on**, and All requests can filter
-    on that. This gives the Grants Manager and the Program Coordinator a
-    list of what is waiting on them without adding a role. The wording for
-    each blocker is written with the owner.
+12. **A blocked row says who it is waiting on**, for example "Waiting on:
+    Grants Manager — the Chairs' outcome has not been recorded". The wording
+    for each blocker is written with the owner. A filter on this was
+    proposed and then left out of the first version (owner, 2026-11-09): it
+    was meant as a worklist for the Grants Manager and the Program
+    Coordinator, who may not use the Workbench much. It can be added later
+    from the same row wording.
 13. **Someone who leads no requests opens on "All in program"** rather than
     an empty "Assigned to me".
 14. **Every label comes from one shared list** used by the stage strip and
@@ -258,15 +269,25 @@ Constraints the build keeps:
 - **The six audit suggestions are accepted** (rules 9 to 14 in section 4).
 - **Program Coordinator support is to be built later; not urgent** (section 9).
 
-No decision is waiting on the owner. The plan stays a draft until the
-audit's questions for staff are answered or set aside.
+No decision is waiting on the owner. The owner's answers to the audit's
+questions are in section 8.
 
 ## 8. Staff flow audit
 
 The desk audit is at `docs/plans/J27_STAFF_FLOW_AUDIT_2026-11-09.md`. Its six
-suggestions for this plan are rules 9 to 14 in section 4. Its questions for
-staff (section 4 of the audit) are unanswered; the plan stays a draft until
-the owner has those answers or decides to proceed without them. The audit
+suggestions for this plan are rules 9 to 14 in section 4. The owner answered
+its questions for staff on 2026-11-09:
+
+| Question | Owner's answer | Effect on this plan |
+|---|---|---|
+| Phases or meetings? | The phases make sense. | Phase tabs stand. |
+| Words for standing before the Chairs meeting | Language varies; staff can adapt to the Scored / Not Scored split. | Filter labels in rule 9 stand. |
+| What the Program Coordinator opens first | He probably does not use the Workbench much; he works in Meeting Tracker, which feeds the Workbench. | The scheduling cue (rule 11) is information for Program Directors, not a coordinator worklist. Coordinator support stays deferred and may belong mostly in Meeting Tracker. |
+| Does the Grants Manager use the Workbench before Awardees? | To be determined; she has worked in AkoyaGO and may not need to do much in the Workbench. | The "waiting on" label on a row stands. The filter on it is left out of the first version (rule 12). |
+| Looking back at earlier cycles | Has not really happened yet, since D26 is the first cycle with the dashboard; AkoyaGO has been used. Searching by Principal Investigator or institution is the likely need. | The All requests search covers Principal Investigator and institution, as well as request number and title. |
+| One phase per request when work overlaps | Fine to move a request along with a reviewer outstanding, provided the row shows it so the Program Director does not forget. Tabs can be opened freely at any time. | Rule 2 stands; rule 10 gains the outstanding-review cue. |
+
+Nothing is open after these answers. The audit
 also lists request-page wording fixes that are outside this plan.
 
 ## 9. Not in this plan
@@ -278,9 +299,11 @@ reads or writes.
 **Deferred, not urgent (owner, 2026-11-09): Program Coordinator support.**
 The stage model's tasks are a Program Director's; scheduling, presentation
 materials and the invitation email are outside it, and "Assigned to me"
-means lead Program Director. Rules 11 to 13 above are the interim cover.
+means lead Program Director. Rules 11 and 13 above are the interim cover.
 Coordinator tasks, a coordinator's own "mine", and coordinator next steps on
 the lists are a later piece of work, tracked in `docs/CURRENT_WORK_QUEUE.md`.
+The owner notes the coordinator works mainly in Meeting Tracker, so the
+scope of that work is to be set when it is taken up.
 
 ## 10. Recording the decision
 
