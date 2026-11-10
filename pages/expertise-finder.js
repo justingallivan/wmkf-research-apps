@@ -260,6 +260,12 @@ function MatchTab() {
 
 function RosterTab() {
   const [members, setMembers] = useState([]);
+  const [includeInactive, setIncludeInactive] = useState(false);
+  const [backend, setBackend] = useState(null);
+  const [staffUsers, setStaffUsers] = useState([]);
+  const [notice, setNotice] = useState(null);
+  const loadGeneration = useRef(0);
+  const createIdentity = useRef(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
@@ -271,26 +277,34 @@ function RosterTab() {
   const [saving, setSaving] = useState(false);
 
   const fetchRoster = useCallback(async () => {
+    const generation = ++loadGeneration.current;
     try {
       setLoading(true);
       const params = new URLSearchParams();
       if (search) params.set('search', search);
       if (roleFilter) params.set('roleType', roleFilter);
       params.set('limit', '500');
+      if (includeInactive) params.set('includeInactive', 'true');
 
       const { ok, data, error } = await requestEnvelope(`/api/expertise-finder/roster?${params}`);
 
       if (!ok) throw new Error(data.error || error.message);
+      if (generation !== loadGeneration.current) return;
       setMembers(data.members);
+      setBackend(data.backend || null);
+      setStaffUsers(data.users || []);
+      setNotice(data.warnings?.join(' ') || null);
+      setError(null);
     } catch (err) {
-      setError(err.message);
+      if (generation === loadGeneration.current) setError(err.message);
     } finally {
-      setLoading(false);
+      if (generation === loadGeneration.current) setLoading(false);
     }
-  }, [search, roleFilter]);
+  }, [search, roleFilter, includeInactive]);
 
   useEffect(() => {
     fetchRoster();
+    return () => { loadGeneration.current += 1; };
   }, [fetchRoster]);
 
   const handleEdit = (member) => {
@@ -301,6 +315,7 @@ function RosterTab() {
 
   const handleSaveEdit = async (formData) => {
     setSaving(true);
+    loadGeneration.current += 1;
     try {
       const { ok, data, error } = await requestEnvelope('/api/expertise-finder/roster', {
         method: 'PATCH',
@@ -308,7 +323,8 @@ function RosterTab() {
       });
       if (!ok) throw new Error(data.error || error.message);
 
-      setMembers(prev => prev.map(m => m.id === formData.id ? data.member : m));
+      if (data.warning) setNotice(data.warning);
+      await fetchRoster();
       setEditingId(null);
       setEditForm({});
     } catch (err) {
@@ -318,32 +334,34 @@ function RosterTab() {
     }
   };
 
-  const handleDelete = async (id, name) => {
-    if (!confirm(`Deactivate "${name}"? This can be undone.`)) return;
-
+  const handleStatus = async (member) => {
+    const active = member.is_active === false;
+    if (!confirm(`${active ? 'Reactivate' : 'Deactivate'} "${member.name}"? ${active ? '' : 'History will be preserved.'}`)) return;
+    setSaving(true);
+    loadGeneration.current += 1;
     try {
       const { ok, data, error } = await requestEnvelope('/api/expertise-finder/roster', {
-        method: 'DELETE',
-        body: { id },
+        method: 'PATCH', body: { id: member.id, etag: member.etag, is_active: active },
       });
       if (!ok) throw new Error(data.error || error.message);
-
-      setMembers(prev => prev.filter(m => m.id !== id));
-    } catch (err) {
-      setError(err.message);
-    }
+      if (data.warning) setNotice(data.warning);
+      await fetchRoster();
+    } catch (err) { setError(err.message); }
+    finally { setSaving(false); }
   };
 
   const handleAdd = async (formData) => {
     setSaving(true);
+    loadGeneration.current += 1;
     try {
       const { ok, data, error } = await requestEnvelope('/api/expertise-finder/roster', {
         method: 'POST',
-        body: formData,
+        body: backend ? { ...formData, mutation_id: createIdentity.current || (createIdentity.current = crypto.randomUUID()) } : formData,
       });
       if (!ok) throw new Error(data.error || error.message);
 
-      setMembers(prev => [...prev, data.member]);
+      createIdentity.current = null;
+      await fetchRoster();
       setShowAddForm(false);
     } catch (err) {
       setError(err.message);
@@ -382,18 +400,23 @@ function RosterTab() {
           <option value="">All Roles</option>
           {roleTypes.map(r => <option key={r} value={r}>{r}</option>)}
         </select>
-        <Button onClick={() => setShowAddForm(!showAddForm)}>
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input type="checkbox" checked={includeInactive} onChange={e => setIncludeInactive(e.target.checked)} />
+          Include inactive
+        </label>
+        <Button onClick={() => { createIdentity.current = null; setShowAddForm(!showAddForm); }}>
           {showAddForm ? 'Cancel' : '+ Add Member'}
         </Button>
       </div>
 
+      {notice && <p role="status" className="text-sm text-amber-800">{notice}</p>}
       {error && <ErrorAlert error={error} onDismiss={() => setError(null)} />}
 
       {/* Add Form */}
       {showAddForm && (
         <Card>
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Roster Member</h3>
-          <RosterForm onSubmit={handleAdd} onCancel={() => setShowAddForm(false)} saving={saving} roleTypes={roleTypes} />
+          <RosterForm staffUsers={staffUsers} dataverse={Boolean(backend)} onSubmit={handleAdd} onCancel={() => setShowAddForm(false)} saving={saving} roleTypes={roleTypes} />
         </Card>
       )}
 
@@ -424,6 +447,7 @@ function RosterTab() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
+                  {member.is_active === false && <span className="text-xs font-medium text-gray-500">Inactive</span>}
                   <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded ${roleBadgeColor(member.role_type)}`}>
                     {member.role_type}
                   </span>
@@ -437,6 +461,8 @@ function RosterTab() {
                   {editingId === member.id ? (
                     <div className="pt-4">
                       <RosterForm
+                        staffUsers={staffUsers}
+                        dataverse={Boolean(backend)}
                         initialData={editForm}
                         onSubmit={handleSaveEdit}
                         onCancel={() => { setEditingId(null); setEditForm({}); }}
@@ -505,10 +531,11 @@ function RosterTab() {
                           Edit
                         </button>
                         <button
-                          onClick={() => handleDelete(member.id, member.name)}
+                          disabled={saving}
+                          onClick={() => handleStatus(member)}
                           className="text-sm text-red-600 hover:text-red-800"
                         >
-                          Deactivate
+                          {member.is_active === false ? 'Reactivate' : 'Deactivate'}
                         </button>
                       </div>
                     </div>
@@ -538,8 +565,9 @@ function DetailRow({ label, value, isLink }) {
 
 // ─── Roster Form (shared for Add and Edit) ───
 
-export function RosterForm({ initialData, onChange, onSubmit, onCancel, saving, roleTypes, isEdit }) {
+export function RosterForm({ initialData, onChange, onSubmit, onCancel, saving, roleTypes, isEdit, dataverse = false, staffUsers = [] }) {
   const [form, setForm] = useState(initialData || {
+    is_active: true, lead_pd_eligible: false, dataverse_user_id: null,
     name: '', preferred_email: '', dataverse_contact_id: null, role_type: 'Consultant', role: '', affiliation: '', orcid: '',
     primary_fields: '', keywords: '', subfields_specialties: '',
     methods_techniques: '', distinctions: '', expertise: '',
@@ -550,6 +578,13 @@ export function RosterForm({ initialData, onChange, onSubmit, onCancel, saving, 
 
   const updateField = (field, value) => {
     const updated = { ...form, [field]: value };
+    if (dataverse && field === 'role_type' && value !== form.role_type) {
+      updated.dataverse_contact_id = null;
+      updated.dataverse_user_id = null;
+      updated.lead_pd_eligible = false;
+      setContactLinkDirty(true);
+    }
+    if (dataverse && ((field === 'is_active' && !value) || (field === 'dataverse_user_id' && !value))) updated.lead_pd_eligible = false;
     setForm(updated);
     if (onChange) onChange(updated);
   };
@@ -576,6 +611,20 @@ export function RosterForm({ initialData, onChange, onSubmit, onCancel, saving, 
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {dataverse && <div className="space-y-3 rounded-lg border border-gray-200 p-3">
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.is_active !== false} onChange={e => updateField('is_active', e.target.checked)} />Active on the roster</label>
+        {form.role_type === 'Research Program Staff' && <>
+          <label className="block text-sm font-medium">Staff account
+            <select aria-label="Staff account" className="mt-1 w-full rounded border border-gray-300 p-2" value={form.dataverse_user_id || ''} onChange={e => updateField('dataverse_user_id', e.target.value || null)}>
+              <option value="">No account linked yet</option>
+              {form.dataverse_user_id && !staffUsers.some(u => u.id === form.dataverse_user_id) && <option value={form.dataverse_user_id}>Linked account unavailable — select a replacement</option>}
+              {staffUsers.map(u => <option key={u.id} value={u.id}>{u.name}{u.email ? ` (${u.email})` : ''}</option>)}
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(form.lead_pd_eligible)} disabled={!form.dataverse_user_id || form.is_active === false} onChange={e => updateField('lead_pd_eligible', e.target.checked)} />Eligible for lead-PD recommendations</label>
+        </>}
+        <p className="text-xs text-gray-500">Changing category clears person links and lead eligibility. Review these settings before saving.</p>
+      </div>}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
@@ -593,12 +642,12 @@ export function RosterForm({ initialData, onChange, onSubmit, onCancel, saving, 
           />
           {linked && <p className="mt-1 text-xs text-gray-500">Read-only while linked; email comes from the Dataverse contact.</p>}
         </div>
-        <RosterContactField
+        {(!dataverse || form.role_type !== 'Research Program Staff') && <RosterContactField
           contactId={form.dataverse_contact_id}
           memberName={form.name}
           onSelect={(contact) => updateContact(contact.contactId)}
           onClear={() => updateContact(null)}
-        />
+        />}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Role Type *</label>
           <select value={form.role_type} onChange={(e) => updateField('role_type', e.target.value)} className={fieldClass}>

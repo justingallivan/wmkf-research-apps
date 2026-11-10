@@ -34,6 +34,7 @@ export default async function handler(req, res) {
 
   const access = await requireAppAccess(req, res, APP_KEY);
   if (!access) return;
+  if (process.env.EXPERTISE_ROSTER_REHEARSAL && process.env.EXPERTISE_ROSTER_REHEARSAL !== 'off') return res.status(503).json({ error:'Matching is unavailable during roster rehearsal until the new prompt contract is enabled.' });
 
   const { requestId, requestNumber, additionalNotes } = req.body || {};
 

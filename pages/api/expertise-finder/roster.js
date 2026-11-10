@@ -24,6 +24,11 @@ import { sql } from '@vercel/postgres';
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
 
+import rehearsal from '../../../lib/services/expertise-finder/roster-rehearsal-target.cjs';
+import { listRoster, saveRoster } from '../../../lib/services/expertise-finder/roster-service';
+import { withDalContext } from '../../../lib/dataverse/core/context';
+import { actorRefFromSession } from '../../../lib/utils/actor-ref';
+
 const CONTACT_LINK_INDEX = 'idx_expertise_roster_active_contact';
 
 function normalizePreferredEmail(value) {
@@ -97,6 +102,18 @@ function isContactLinkConflict(error) {
 export default async function handler(req, res) {
   const access = await requireAppAccess(req, res, 'expertise-finder');
   if (!access) return;
+
+  try {
+    if (rehearsal.enabled()) return await withDalContext('expertise-roster-rehearsal', async () => {
+      rehearsal.assertTarget();
+      if (req.method === 'GET') return res.status(200).json(await listRoster(req.query));
+      if (!['POST','PATCH','DELETE'].includes(req.method)) return res.status(405).json({ error: 'Method not allowed' });
+      const body = req.method === 'DELETE' ? { id:req.body?.id, etag:req.body?.etag, is_active:false } : req.body;
+      return res.status(req.method === 'POST' ? 201 : 200).json(await saveRoster(body, actorRefFromSession(access.session), { create:req.method === 'POST' }));
+    });
+  } catch (error) {
+    return res.status(error.status === 412 ? 409 : error.status || 503).json({ error:error.status === 412 ? 'Profile changed; reload before saving.' : error.message });
+  }
 
   switch (req.method) {
     case 'GET':
