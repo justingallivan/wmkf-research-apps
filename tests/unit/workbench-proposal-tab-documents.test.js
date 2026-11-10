@@ -183,7 +183,7 @@ describe('single-submission layout (J27 onward)', () => {
     });
   }
 
-  test('lists the individual files in a collapsed section and drops the Phase I and Phase II groups', async () => {
+  test('lists the individual files in a section that starts open and drops the Phase I and Phase II groups', async () => {
     global.fetch.mockResolvedValueOnce({ ok: true, json: async () => j27Body() });
 
     render(<ProposalTab context={context} />);
@@ -191,7 +191,7 @@ describe('single-submission layout (J27 onward)', () => {
     const summary = await screen.findByText('Individual files');
     const section = summary.closest('details');
     expect(section).not.toBeNull();
-    expect(section.open).toBe(false);
+    expect(section.open).toBe(true);
     expect(within(section).getAllByRole('listitem').map((item) => item.firstChild.textContent)).toEqual([
       'Project Narrative', 'Bibliography', 'Biosketches', 'Other Support', 'Collaboration Letters', 'Graphical Abstract',
     ]);

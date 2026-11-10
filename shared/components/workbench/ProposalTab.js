@@ -430,8 +430,9 @@ function DocumentsSection({ requestId, docs, error }) {
       {singleSubmission ? (
         // J27 onward: the individual files sit in a collapsed section (owner,
         // 2026-10-27). The combined staff version will lead this section once
-        // its file name is known.
-        <details>
+        // its file name is known; until then the list starts open (owner,
+        // 2026-11-10), since it holds everything a reader can open.
+        <details open>
           <summary className="cursor-pointer text-xs uppercase tracking-wide text-gray-400 mb-1">Individual files</summary>
           <ul className="divide-y divide-gray-100">
             {aiMaterials.map((material) => (
