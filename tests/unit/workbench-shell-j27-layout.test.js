@@ -243,3 +243,18 @@ test('reviewer progress appears on Peer Review rows and nowhere else; a later re
   expect(screen.queryByText('Presented already')).not.toBeInTheDocument();
   expect(screen.queryByRole('group', { name: 'Standing' })).not.toBeInTheDocument();
 });
+
+test('details unread on every request are reported once above the list, not on each row', async () => {
+  const degraded = ROWS.map((row) => ({ ...row, j27: { ...row.j27, basis: 'degraded' } }));
+  global.fetch = jest.fn(async (url) => {
+    const params = new URL(String(url), 'http://localhost').searchParams;
+    if (!params.get('cycleCode')) {
+      return response({ success: true, programs, programId: RESEARCH, stageProgramIds: [RESEARCH], defaultCycleCode: 'J27', cycles: [{ code: 'J27', label: 'June 2027', count: 5, myCount: 5, mySetAsideCount: 0 }] });
+    }
+    return response({ success: true, programId: params.get('programId'), cycleCode: params.get('cycleCode'), scope: params.get('scope'), proposals: degraded, rollup: {} });
+  });
+  open('/workbench');
+  await screen.findByText('Mapping signalling lipids');
+  expect(screen.getAllByText('Some details could not be read for these requests.')).toHaveLength(1);
+  expect(screen.queryByText('Some details could not be read.')).not.toBeInTheDocument();
+});

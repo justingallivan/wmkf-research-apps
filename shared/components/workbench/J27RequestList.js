@@ -15,9 +15,9 @@ import TestRequestBadge from '../TestRequestBadge';
 import { TOOLBAR_CONTROL_HEIGHT_CLASS, TOOLBAR_SELECT_CLASS } from '../ToolbarSelect';
 import { useUrlMirroredInput } from './useUrlMirroredInput';
 import ReviewerStatusIndicator from './ReviewerStatusIndicator';
-import { J27_PHASE_LABEL, J27_STANDING_LABEL } from '../../config/j27Labels';
+import { J27_DEGRADED_LIST_NOTE, J27_PHASE_LABEL, J27_STANDING_LABEL } from '../../config/j27Labels';
 import {
-  J27_SHOWING_KEYS, J27_SHOWING_LABEL, J27_STANDING_KEYS, isClosedRow, matchesPhaseFilters, matchesSearch, matchesShowing,
+  J27_SHOWING_KEYS, J27_SHOWING_LABEL, J27_STANDING_KEYS, degradedEverywhere, isClosedRow, matchesPhaseFilters, matchesSearch, matchesShowing,
   rowChip, rowLine, rowNotes, rowsForTab, standingCounts,
 } from '../../utils/j27CycleRows';
 
@@ -54,10 +54,10 @@ export function j27RequestHref(row) {
 const ROW_GRID = 'lg:grid-cols-[minmax(0,1fr)_22rem]';
 const ROW_GRID_WITH_REVIEWERS = 'lg:grid-cols-[minmax(0,1fr)_18rem_16rem]';
 
-function RequestRow({ row, showReviewers }) {
+function RequestRow({ row, showReviewers, suppressDegraded }) {
   const chip = rowChip(row);
   const line = rowLine(row);
-  const notes = rowNotes(row);
+  const notes = rowNotes(row, { suppressDegraded });
   const people = [
     row.projectLeader && `PI ${row.projectLeader}`,
     row.programDirector && `PD ${row.programDirector}`,
@@ -169,6 +169,7 @@ export default function J27RequestList({
   const { rows, hasSnapshot, loading, error, reload } = rowsState;
 
   const tabRows = rowsForTab(rows, tab);
+  const allDegraded = degradedEverywhere(rows);
   const closedCount = tabRows.filter(isClosedRow).length;
   const query = allRequests ? searchInput : '';
   const standingFilter = tab === 'initial-assessment' ? standing : '';
@@ -257,6 +258,9 @@ export default function J27RequestList({
           {hiddenLink && <> · {hiddenLink}</>}
         </p>
       )}
+      {hasSnapshot && !showLoading && allDegraded && visible.length > 0 && (
+        <p className="-mt-3 mb-4 text-xs text-gray-500">{J27_DEGRADED_LIST_NOTE}</p>
+      )}
 
       {error && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">
@@ -288,7 +292,7 @@ export default function J27RequestList({
         </Card>
       ) : (
         <ul className="divide-y divide-gray-200 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-          {visible.map((row) => <RequestRow key={row.requestId} row={row} showReviewers={tab === 'peer-review'} />)}
+          {visible.map((row) => <RequestRow key={row.requestId} row={row} showReviewers={tab === 'peer-review'} suppressDegraded={allDegraded} />)}
         </ul>
       )}
     </section>

@@ -6,7 +6,7 @@ import {
 } from '../../shared/config/j27Labels';
 import {
   isClosedRow, standingKey, rowChip, rowLine, rowNotes, outstandingReviews, matchesPhaseFilters, matchesSearch, matchesShowing, rowsForTab,
-  standingCounts, tabCounts, J27_SHOWING_KEYS, J27_SHOWING_LABEL,
+  standingCounts, tabCounts, degradedEverywhere, J27_SHOWING_KEYS, J27_SHOWING_LABEL,
 } from '../../shared/utils/j27CycleRows';
 
 const INVITED = 100000003;
@@ -160,6 +160,14 @@ describe('notes, search, tabs and counts', () => {
     const degraded = row({}, { integrity: { status: 'unavailable' } });
     expect(degraded.j27.basis).toBe('degraded');
     expect(rowNotes(degraded)).toEqual([{ kind: 'degraded', text: J27_DEGRADED_NOTE }]);
+  });
+  test('when every request is affected the list says it once, not on each row', () => {
+    const degraded = () => row({}, { integrity: { status: 'unavailable' } });
+    expect(degradedEverywhere([degraded(), degraded()])).toBe(true);
+    expect(degradedEverywhere([degraded(), notScored()])).toBe(false);
+    expect(degradedEverywhere([degraded()])).toBe(false);
+    expect(degradedEverywhere([])).toBe(false);
+    expect(rowNotes(degraded(), { suppressDegraded: true })).toEqual([]);
   });
   test('a review still owed is said in words only once the request has left Peer Review', () => {
     const past = (outstanding, over = {}) => invited({ requestStatus: 'Phase II Pending' }, {

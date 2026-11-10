@@ -118,13 +118,24 @@ export function outstandingReviews(row) {
  * forgotten. Only a failed read ("degraded") earns the other note: every open
  * list row is "partial" because the list never loads the later-phase facts.
  */
-export function rowNotes(row) {
+export function rowNotes(row, { suppressDegraded = false } = {}) {
   const stage = stageOf(row);
   const notes = [];
   const owed = outstandingReviews(row);
   if (owed) notes.push({ kind: 'outstanding', text: `${owed} review${owed === 1 ? '' : 's'} outstanding` });
-  if (stage && stage.basis === 'degraded') notes.push({ kind: 'degraded', text: J27_DEGRADED_NOTE });
+  if (!suppressDegraded && stage && stage.basis === 'degraded') notes.push({ kind: 'degraded', text: J27_DEGRADED_NOTE });
   return notes;
+}
+
+/**
+ * True when every loaded request (two or more) could not be fully read. That
+ * is a condition of the deployment or of one failed batch read, not of any one
+ * request, so the list says it once instead of on every row (seen on the
+ * sandbox Preview, 2026-11-09).
+ */
+export function degradedEverywhere(rows) {
+  const staged = (Array.isArray(rows) ? rows : []).filter((row) => stageOf(row));
+  return staged.length > 1 && staged.every((row) => stageOf(row).basis === 'degraded');
 }
 
 /** Search over request number, title, institution and Principal Investigator. */

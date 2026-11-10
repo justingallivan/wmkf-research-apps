@@ -79,3 +79,5 @@ export const J27_WAIT_LABEL = {
 
 export const J27_IDLE_LABEL = 'Nothing is waiting on staff right now.';
 export const J27_DEGRADED_NOTE = 'Some details could not be read.';
+/** Shown once above the list when every request is affected, in place of the note on each row. */
+export const J27_DEGRADED_LIST_NOTE = 'Some details could not be read for these requests.';
