@@ -57,7 +57,7 @@ export default function ScoringCard({ context, canManage, refresh, chairsRecomme
       <h2 className="text-base font-semibold text-gray-900">{title}</h2>
       {!chairsRecommendation && (
         <p className="mt-1 text-sm text-gray-600">
-          {recommendationRecorded ? 'Scoring is closed.' : <>Phase I status: {phaseIStatusLabel || (phaseIStatus === null ? 'Not set' : 'Unavailable')}</>}
+          {recommendationRecorded ? 'Scoring is closed.' : <>Status: {phaseIStatusLabel || (phaseIStatus === null ? 'Not set' : 'Unavailable')}</>}
         </p>
       )}
       {chairsRecommendation && automaticIntegrityEnabled && !current && (

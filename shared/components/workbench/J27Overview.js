@@ -60,7 +60,7 @@ function initialAssessmentDecision(context) {
     case CHAIRS_RECOMMENDATION_STATUS.no: return 'Not Recommended';
     default:
       if (isScoringEditable(context.phaseIStatus)) return 'No decision recorded';
-      return context.phaseIStatusLabel ? `Phase I status · ${context.phaseIStatusLabel}` : 'Couldn’t check the decision';
+      return context.phaseIStatusLabel ? `Status · ${context.phaseIStatusLabel}` : 'Couldn’t check the decision';
   }
 }
 
