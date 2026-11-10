@@ -20,8 +20,8 @@ function nextAction(context, handoff, progress, chairsRecommendationEnabled) {
       detail: 'The recommendation is in Initial Assessment.' };
   }
   if (handoff.visit) {
-    return { heading: 'Visit assessment saved',
-      detail: 'Final Assessment shows the Board draft status and whether group review can start.' };
+    return { heading: 'Presentation assessment saved',
+      detail: 'Final Assessment shows the Draft Writeup status and whether group review can start.' };
   }
   if (handoff.presentation) {
     return { heading: 'Presentation record available',
@@ -148,7 +148,7 @@ export default function J27Overview({ context, requestId, reviewerProgress,
           {showDeliberations && (
             <div>
               <dt className="font-semibold">Deliberations</dt>
-              <dd className="text-gray-600">Visit assessment · {savedLabel(handoff.visit)}</dd>
+              <dd className="text-gray-600">Presentation assessment · {savedLabel(handoff.visit)}</dd>
               {meetingRosterEnabled && <dd className="text-gray-600">Attendance · {handoff.roster === true ? 'Confirmed'
                 : handoff.roster === false ? 'No current confirmation' : 'Couldn’t check'}</dd>}
             </div>

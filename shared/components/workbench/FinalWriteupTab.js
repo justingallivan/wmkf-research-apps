@@ -27,7 +27,7 @@ const SITE_VISIT_PREREQUISITE_MESSAGE = 'Final writeup needs a draft writeup fir
 
 function transitionErrorMessage(error, boardDraftAvailable = false) {
   return error?.code === 'final_writeup_source_missing'
-    ? boardDraftAvailable ? 'The Board draft changed. Refresh Final Assessment to see the current draft.' : SITE_VISIT_PREREQUISITE_MESSAGE
+    ? boardDraftAvailable ? 'The Draft Writeup changed. Refresh Final Assessment to see the current draft.' : SITE_VISIT_PREREQUISITE_MESSAGE
     : error?.message;
 }
 // Phases with a current Final row: review tracking loads and the review panel renders.
@@ -583,10 +583,10 @@ export default function FinalWriteupTab({ requestId, renderBoardDraft = null, on
 
       <Card hover={false}>
         <div className="max-w-3xl">
-          <h2 className="text-xl font-semibold tracking-tight text-gray-900">{boardDraftAvailable ? 'Board recommendation' : 'Final writeup'}</h2>
+          <h2 className="text-xl font-semibold tracking-tight text-gray-900">{boardDraftAvailable ? 'Draft Writeup' : 'Final writeup'}</h2>
           <p className="mt-2 text-sm leading-6 text-gray-600">
             {boardDraftAvailable
-              ? 'Write the Board recommendation in Word. Starting group review records its current Word version.'
+              ? 'Write the Draft Writeup in Word. Starting group review records its current Word version.'
               : 'The final writeup continues the same editable document prepared as the draft writeup. Starting a review records its current Word version.'}
           </p>
         </div>
@@ -825,7 +825,7 @@ export default function FinalWriteupTab({ requestId, renderBoardDraft = null, on
           <details className="rounded-lg border bg-white p-4" onToggle={event => {
             if (event.currentTarget.open) setShowBoardDraft(true);
           }}>
-            <summary className="cursor-pointer font-semibold">Board draft tools</summary>
+            <summary className="cursor-pointer font-semibold">Draft Writeup tools</summary>
             {showBoardDraft && (
               <div className="mt-3">
                 {renderBoardDraft({

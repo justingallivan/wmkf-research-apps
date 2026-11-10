@@ -1606,7 +1606,7 @@ export default function StaffDeliberationsTab({
         {error && <p role="alert" className="text-sm text-red-800">{error}</p>}
         {draftNeedsAttention && onSelectTab && (
           <p className="text-sm text-amber-800">
-            Board draft preparation needs attention.{' '}
+            Draft Writeup preparation needs attention.{' '}
             <button type="button" onClick={() => onSelectTab('final-writeup')} className="font-medium underline">
               Open Final Assessment
             </button>
@@ -1626,13 +1626,13 @@ export default function StaffDeliberationsTab({
     <Step
       id="deliberations-writeup"
       number={boardDraftOnly ? null : 1}
-      title={boardDraftOnly ? 'Board recommendation draft' : 'Draft writeup'}
+      title={boardDraftOnly ? 'Draft Writeup' : 'Draft writeup'}
       status={boardDraftOnly ? 'current' : writeupStatus}
       summary={writeupSummary && <p className={summaryClass}>{writeupSummary}</p>}
       details={readyFile ? (
         <div className="mt-2 text-sm text-gray-700">
           <p className="text-gray-600">{boardDraftOnly
-            ? 'This draft becomes the Board recommendation.'
+            ? 'This draft becomes the Final Writeup.'
             : 'Findings from the research presentation. All draft writeup edits go into this one file.'}</p>
           {!preSiteShared && !preSiteFinal && readyFile.lastModified && (
             <p className="mt-1">{`Draft generated ${new Date(readyFile.lastModified).toLocaleDateString()}`}</p>
@@ -1704,7 +1704,7 @@ export default function StaffDeliberationsTab({
       {boardDraftOnly && !checkingStatus && !due && !artifact && !error && (
         <p className="mt-2 text-sm text-gray-600">
           {timing?.availability === 'missing' ? 'No presentation is scheduled.'
-            : timing?.availability === 'available' ? 'Prepare the Board draft after the scheduled presentation ends.'
+            : timing?.availability === 'available' ? 'Prepare the Draft Writeup after the scheduled presentation ends.'
               : 'The presentation end could not be verified.'}
           {timing?.availability !== 'available' && (
             <> <Link href={`/meeting-tracker/visits/${encodeURIComponent(requestId)}`} className="font-medium text-blue-800 underline">Open meeting record</Link></>
@@ -1824,7 +1824,7 @@ export default function StaffDeliberationsTab({
         </div>
       )}
       <section id="deliberations-status" aria-labelledby="deliberations-steps-heading" className="scroll-mt-6 space-y-3">
-        <h2 id="deliberations-steps-heading" className="sr-only">{boardDraftOnly ? 'Board draft preparation' : 'Staff Deliberations'}</h2>
+        <h2 id="deliberations-steps-heading" className="sr-only">{boardDraftOnly ? 'Draft Writeup preparation' : 'Staff Deliberations'}</h2>
         <p className="sr-only" data-testid="deliberations-stage-sentence">{phase}</p>
         {hasProblemNotice && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -1861,7 +1861,7 @@ export default function StaffDeliberationsTab({
         )}
         {!boardDraftOnly && meetingDetails}
         <Card hover={false} padding="p-0">
-          <ol aria-label={boardDraftOnly ? 'Board draft preparation' : 'Staff deliberations steps'} className="divide-y divide-gray-200">
+          <ol aria-label={boardDraftOnly ? 'Draft Writeup preparation' : 'Staff deliberations steps'} className="divide-y divide-gray-200">
             {writeupStep}
             {!boardDraftOnly && <>{reviewStep}{briefingStep}{presentationStep}</>}
           </ol>

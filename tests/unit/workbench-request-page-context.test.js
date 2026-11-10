@@ -219,7 +219,7 @@ test('Final Writeup reads the saved visit assessment while the Deliberations dra
   const assessmentUrl = '/api/workbench/staff-visit-assessment?requestId=request-a';
   const record = { assessment: 'Saved assessment', version: 'W/"123"' };
   await resolve(assessmentUrl, record);
-  fireEvent.change(screen.getByRole('textbox', { name: 'Staff assessment of the visit' }), {
+  fireEvent.change(screen.getByRole('textbox', { name: 'Staff assessment of the presentation' }), {
     target: { value: 'Unsaved assessment edit' },
   });
 
@@ -227,11 +227,11 @@ test('Final Writeup reads the saved visit assessment while the Deliberations dra
   view.rerender(<WorkbenchRequest staffReviewSummary />);
   await resolve(assessmentUrl, record);
   expect(screen.getByText('Saved assessment')).toBeInTheDocument();
-  expect(screen.queryByRole('textbox', { name: 'Staff assessment of the visit' })).toBeNull();
+  expect(screen.queryByRole('textbox', { name: 'Staff assessment of the presentation' })).toBeNull();
 
   tabName = 'staff-deliberations';
   view.rerender(<WorkbenchRequest staffReviewSummary />);
-  expect(screen.getByRole('textbox', { name: 'Staff assessment of the visit' })).toHaveValue('Unsaved assessment edit');
+  expect(screen.getByRole('textbox', { name: 'Staff assessment of the presentation' })).toHaveValue('Unsaved assessment edit');
 });
 
 test('J27 Initial Assessment hides the Word option and keeps the rationale draft across legacy links and Reports', async () => {

@@ -64,11 +64,11 @@ export default function StaffVisitAssessment({ requestId, readOnly = false }) {
     }
   }
 
-  const content = error || record?.assessment || (record ? 'No visit assessment saved.' : 'Loading…');
+  const content = error || record?.assessment || (record ? 'No presentation assessment saved.' : 'Loading…');
   if (readOnly) {
     return (
       <section className="py-3">
-        <h3 className="text-sm font-semibold text-gray-900">Staff assessment of the visit</h3>
+        <h3 className="text-sm font-semibold text-gray-900">Staff assessment of the presentation</h3>
         <p className="mt-2 whitespace-pre-wrap text-sm">{content}</p>
       </section>
     );
@@ -76,13 +76,13 @@ export default function StaffVisitAssessment({ requestId, readOnly = false }) {
 
   return (
     <section className="mb-4 rounded-lg border bg-white p-4" aria-labelledby="staff-visit-heading">
-      <h2 id="staff-visit-heading" className="text-base font-semibold">Staff assessment of the visit</h2>
+      <h2 id="staff-visit-heading" className="text-base font-semibold">Staff assessment of the presentation</h2>
       <p id="staff-visit-guidance" className="mt-1 text-sm text-gray-600">
-        Record the tone of the visit, what the presentation clarified, and any concerns that remained.
+        Record the tone of the presentation, what it clarified, and any concerns that remained.
       </p>
       {record && (
         <form className="mt-3 space-y-2" onSubmit={save}>
-          <label className="sr-only" htmlFor="staff-visit-assessment">Staff assessment of the visit</label>
+          <label className="sr-only" htmlFor="staff-visit-assessment">Staff assessment of the presentation</label>
           <textarea id="staff-visit-assessment" aria-describedby="staff-visit-guidance"
             className="w-full rounded-lg border p-2" rows={4} maxLength={10000}
             value={draft} disabled={busy} onChange={event => { setDraft(event.target.value); setSaved(false); }} />

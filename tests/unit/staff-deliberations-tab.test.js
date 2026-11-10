@@ -1933,11 +1933,11 @@ test('J27 Deliberations shows presentation evidence and skips earlier Word workf
   expect(screen.queryByRole('button', { name: 'Ready for group review' })).toBeNull();
 });
 
-test('Board draft preparation retains the existing file and excludes early brief and review actions', async () => {
+test('Draft Writeup preparation retains the existing file and excludes early brief and review actions', async () => {
   queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(DRAFT) }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} mode="board-draft" />);
   expect(await screen.findByRole('link', { name: 'Edit draft writeup in Word' })).toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx');
-  expect(screen.getByRole('heading', { name: /Board recommendation draft/ })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Draft Writeup' })).toBeInTheDocument();
   expect(calls('briefGet')).toHaveLength(0);
   expect(screen.queryByRole('button', { name: 'Ready for group review' })).toBeNull();
 });

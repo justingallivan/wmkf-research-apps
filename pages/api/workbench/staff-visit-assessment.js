@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   }
   const access = await requireAppAccess(req, res, 'reviewers');
   if (!access) return;
-  if (!staffReviewSummaryEnabled()) return res.status(404).json({ error: 'Staff visit assessment is unavailable.' });
+  if (!staffReviewSummaryEnabled()) return res.status(404).json({ error: 'Staff presentation assessment is unavailable.' });
 
   const requestId = req.method === 'GET' ? req.query.requestId : req.body?.requestId;
   if (typeof requestId !== 'string' || !isGuid(requestId)) {
@@ -41,7 +41,7 @@ export default async function handler(req, res) {
     } catch (error) {
       if (error instanceof ServiceHttpError) return res.status(error.httpStatus).json({ error: error.message });
       console.error('Workbench staff visit assessment failed:', error);
-      return res.status(500).json({ error: 'Staff visit assessment could not be accessed.' });
+      return res.status(500).json({ error: 'Staff presentation assessment could not be accessed.' });
     }
   });
 }

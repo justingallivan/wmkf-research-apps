@@ -27,8 +27,8 @@ export const J27_TASK_LABEL = {
   'read-reports': 'Read the reviewer reports',
   'record-offramp': 'Record an offramp decision if one is needed',
   'confirm-roster': 'Confirm presentation attendance',
-  'write-visit-assessment': 'Write the staff visit assessment',
-  'write-board-draft': 'Write the Board draft',
+  'write-visit-assessment': 'Write the staff presentation assessment',
+  'write-board-draft': 'Write the Draft Writeup',
   'start-group-review': 'Start group review',
 };
 

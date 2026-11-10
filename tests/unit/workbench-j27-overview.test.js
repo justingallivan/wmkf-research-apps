@@ -41,17 +41,17 @@ test('intake shows one instruction and keeps later-stage empty states out of the
   expect(screen.getByText('Read the proposal and record the staff rationale in Initial Assessment.')).toBeVisible();
   expect(screen.queryByRole('button', { name: 'Open Initial Assessment' })).toBeNull();
   expect(screen.queryByText('0 reports received')).toBeNull();
-  expect(screen.queryByText(/Visit assessment ·/)).toBeNull();
+  expect(screen.queryByText(/Presentation assessment ·/)).toBeNull();
   expect(screen.getByText('Request details')).toBeVisible();
 });
 
-test('a saved visit points to the Board recommendation and preserves handoff evidence', async () => {
+test('a saved presentation assessment points to the Draft Writeup and preserves handoff evidence', async () => {
   renderOverview({ reads: {
     'staff-visit-assessment': { assessment: 'Saved visit assessment' },
     'meeting-roster': { presentation: { id: 'visit' }, stale: false, roster: {} },
   } });
-  expect(await screen.findByRole('heading', { name: 'Visit assessment saved' })).toBeVisible();
-  expect(screen.getByText(/Final Assessment shows the Board draft status/)).toBeVisible();
+  expect(await screen.findByRole('heading', { name: 'Presentation assessment saved' })).toBeVisible();
+  expect(screen.getByText(/Final Assessment shows the Draft Writeup status/)).toBeVisible();
   expect(screen.getByText('Recorded request status').closest('dl')).toHaveTextContent('Phase I Pending');
   expect(screen.getByText('1 report received')).toBeVisible();
   expect(screen.getByText('Attendance · Confirmed')).toBeVisible();
@@ -65,7 +65,7 @@ test('saved review prose without a presentation opens Reports directly', async (
   expect(await screen.findByRole('heading', { name: 'Staff review summary saved' })).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: 'Open Reports' }));
   expect(onSelectTab).toHaveBeenCalledWith('reviews');
-  expect(screen.queryByText(/Visit assessment ·/)).toBeNull();
+  expect(screen.queryByText(/Presentation assessment ·/)).toBeNull();
 });
 
 test('Not Scored points to Initial Assessment without treating it as a formal outcome', async () => {
@@ -80,7 +80,7 @@ test('a recorded outcome takes priority over the suggested handoff', async () =>
     status: { requestStatus: 'Phase II Declined', statusClass: 'DECIDED_NO_AWARD' },
     reads: { 'staff-visit-assessment': { assessment: 'Saved visit assessment' } },
   });
-  expect(await screen.findByText('Visit assessment · Saved')).toBeVisible();
+  expect(await screen.findByText('Presentation assessment · Saved')).toBeVisible();
   expect(screen.getByRole('heading', { name: 'Phase II Declined' })).toBeVisible();
   expect(screen.queryByText(/prepare the Board recommendation/)).toBeNull();
 });
@@ -90,7 +90,7 @@ test('a failed read stays unknown once that stage has relevant evidence', async 
     'staff-visit-assessment': null, 'staff-review-summary': null,
     'meeting-roster': { presentation: { id: 'visit' }, stale: false, roster: {} },
   } });
-  expect(await screen.findByText('Visit assessment · Couldn’t check')).toBeVisible();
+  expect(await screen.findByText('Presentation assessment · Couldn’t check')).toBeVisible();
   expect(screen.getByText('Staff review summary · Couldn’t check')).toBeVisible();
   expect(screen.getByText(/staff assessment in Deliberations/)).toBeVisible();
 });

@@ -32,11 +32,11 @@ jest.mock('../../shared/components/workbench/StaffDeliberationsTab', () => funct
   return <><h2>Presentation and staff discussion</h2>{presentationContext}</>;
 });
 jest.mock('../../shared/components/workbench/FinalWriteupTab', () => function Stub() {
-  return <h2>Board recommendation</h2>;
+  return <h2>Draft Writeup</h2>;
 });
 jest.mock('../../shared/components/workbench/IntegrityTab', () => function Stub() { return <div />; });
 jest.mock('../../shared/components/workbench/StaffVisitAssessment', () => function Stub() {
-  return <h3>Staff assessment of the visit</h3>;
+  return <h3>Staff assessment of the presentation</h3>;
 });
 jest.mock('../../shared/components/workbench/MeetingRoster', () => function Stub() {
   return <h3>Meeting roster</h3>;
@@ -278,24 +278,24 @@ test('J27 Deliberations leads with the presentation and keeps staff inputs below
 
   const presentation = screen.getByRole('heading', { name: 'Presentation and staff discussion' });
   const roster = screen.getByRole('heading', { name: 'Meeting roster' });
-  const visit = screen.getByRole('heading', { name: 'Staff assessment of the visit' });
+  const visit = screen.getByRole('heading', { name: 'Staff assessment of the presentation' });
   const interpretation = screen.getByRole('heading', { name: 'Staff interpretation from Reports' });
   expect(presentation.compareDocumentPosition(interpretation)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   expect(interpretation.compareDocumentPosition(roster)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   expect(roster.compareDocumentPosition(visit)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 });
 
-test('J27 Final Assessment leads with the Board recommendation and groups the three saved records', async () => {
+test('J27 Final Assessment leads with the Draft Writeup and groups the three saved records', async () => {
   mockQuery = { requestId: 'request-1', tab: 'final-assessment' };
   global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, requestId: 'request-1', cycleCode: 'J27' }) }));
   await act(async () => { render(<WorkbenchRequest staffReviewSummary meetingRosterEnabled />); });
 
-  const recommendation = screen.getByRole('heading', { name: 'Board recommendation' });
+  const recommendation = screen.getByRole('heading', { name: 'Draft Writeup' });
   const evidence = screen.getByText('Supporting evidence').closest('details');
   expect(recommendation.compareDocumentPosition(evidence)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   expect(evidence).not.toHaveAttribute('open');
   expect(evidence.querySelectorAll('details')).toHaveLength(0);
   expect(evidence).toHaveTextContent('Staff review summary');
   expect(evidence).toHaveTextContent('Meeting roster');
-  expect(evidence).toHaveTextContent('Staff assessment of the visit');
+  expect(evidence).toHaveTextContent('Staff assessment of the presentation');
 });

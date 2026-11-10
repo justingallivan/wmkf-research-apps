@@ -726,7 +726,7 @@ describe('leadership digest copy (group-review Stage 5)', () => {
   });
 });
 
-test('J27 prepares the Board draft here and reloads the same Word workflow when preparation completes', async () => {
+test('J27 prepares the Draft Writeup here and reloads the same Word workflow when preparation completes', async () => {
   global.fetch
     .mockResolvedValueOnce(response({
       error: 'A Draft writeup is required before Final writeup can start.',
@@ -739,7 +739,7 @@ test('J27 prepares the Board draft here and reloads the same Word workflow when 
     <button type="button" onClick={onDraftChange}>Finish preparing draft</button>
   )} />);
 
-  expect(screen.getByRole('heading', { name: 'Board recommendation' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Draft Writeup' })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Ready for group review' })).toBeNull();
   fireEvent.click(await screen.findByRole('button', { name: 'Finish preparing draft' }));
   expect(await screen.findByRole('link', { name: 'Open draft in Word' })).toHaveAttribute('href', 'https://sharepoint.test/site-visit.docx');
@@ -748,13 +748,13 @@ test('J27 prepares the Board draft here and reloads the same Word workflow when 
   expect(global.fetch.mock.calls.every(([, init]) => init.method === 'GET')).toBe(true);
 });
 
-test('J27 retains Board draft tools when group review setup is inactive', async () => {
+test('J27 retains Draft Writeup tools when group review setup is inactive', async () => {
   global.fetch.mockResolvedValueOnce(response({ available: false, phase: 'unavailable' }));
   render(<FinalWriteupTab requestId={REQUEST_ID} renderBoardDraft={({ boardDraftAlreadyLinked }) => (
     <p>{boardDraftAlreadyLinked ? 'Draft already linked' : 'Draft preparation available'}</p>
   )} />);
   expect(await screen.findByRole('heading', { name: 'Final writeup setup is not active' })).toBeInTheDocument();
-  const tools = screen.getByText('Board draft tools').closest('details');
+  const tools = screen.getByText('Draft Writeup tools').closest('details');
   tools.open = true;
   fireEvent(tools, new Event('toggle'));
   expect(await screen.findByText('Draft preparation available')).toBeInTheDocument();
