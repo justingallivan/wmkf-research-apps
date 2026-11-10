@@ -16,12 +16,20 @@ AI summary, governed Initial Assessment document, or document pointer changes.
 | `lay_abstract` | `wmkf_layabstract` | Lay Abstract | Optional Memo, 100,000 characters |
 | `initial_assessment` | `wmkf_initialassessment` | Initial Assessment | Optional Memo, 100,000 characters |
 
-[VERIFIED via `scripts/probe-request-narrative-fields.js --target=prod` with a
-process-local production-read opt-in] Production has no matching Memo fields as
-of 2026-11-09 Pacific. Schema wave `36-request-narratives` dry-run passed. No
-schema or Request data was written. Sandbox URL is not configured locally, and local staff impersonation is disabled
-(read-only editor until an authorized environment enables it).
-Deployment, live save/readback, and the external Power Automate flow are unverified.
+[VERIFIED LIVE 2026-11-09 Pacific] After explicit owner approval, schema wave
+`36-request-narratives` created both columns in Production (`wmkf.crm.dynamics.com`).
+`scripts/probe-request-narrative-fields.js --target=prod --verify` independently
+confirmed the exact schema/display names, Memo type, optional RequiredLevel,
+100,000-character limits, and read/update capability. The runtime API accepted
+both columns in a zero-row projection; no Request content was retrieved or changed.
+Metadata IDs: Lay Abstract `b96d22b9-bcdc-f111-84e8-000d3a31b218`;
+Initial Assessment `0f0c69cc-bcdc-f111-84e8-000d3a361d0a`.
+
+The existing publisher and solution were reused. No broad publish operation was
+needed: the new columns were already selectable after creation. Sandbox URL is
+not configured locally, and local staff impersonation is disabled (read-only
+editor until an authorized environment enables it). App deployment, live staff
+save/readback, and the external Power Automate flow remain unverified.
 
 ## Contract and overwrite protection
 
@@ -78,16 +86,16 @@ schema change applies. The isolated additive wave contains exactly these two
 optional Memo attributes. Read-only commands:
 
 ```sh
-DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-request-narrative-fields.js --target=prod
+DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-request-narrative-fields.js --target=prod --verify
 DATAVERSE_ALLOW_PROD_READS=yes node scripts/apply-dataverse-schema.js --target=prod --wave=36-request-narratives
 ```
 
-An authorized operator must coordinate schema writes with the other sessions,
-apply this wave with the normal dated production-write acknowledgement and
-`--execute`, and publish/verify typed metadata and selectable columns using the
-existing schema release procedure. Do not deploy the consumer before provisioning.
-No live schema apply, test-record mutation, main merge, production deployment, or
-external workflow edit was performed in this implementation session.
+Provisioning is complete under the owner's explicit approval. The apply used the
+normal dated production-write acknowledgement and `--execute`; the subsequent
+independent typed-metadata/runtime projection probe passed. No Request-record
+mutation, main merge, application deployment, or external workflow edit was
+performed. Remaining release work is workflow-owner verification, an approved
+staff save/readback rehearsal, J27 integration review, and deliberate app promotion.
 
 Review the one-card Overview integration against Claude's active J27 branch before
 merge; the owner explicitly authorized the small independent integration. The
@@ -97,8 +105,8 @@ original main checkout and other sessions' dirty work were preserved.
 
 Scope: the new text fields only; existing governed document workflows are unrelated.
 Source, schema, route, editor, and tests agree on both field names and their
-optional semantics. Atlas and API security inventory record branch-built state,
-not live provisioning. Historical Initial Assessment document and AI-summary
+optional semantics. Atlas and API security inventory distinguish live schema from the
+branch-built, not-yet-promoted app consumer. Historical Initial Assessment document and AI-summary
 references remain unchanged because they describe distinct surfaces.
 
 Partial-success unit: one atomic conditional Request PATCH, never a batch. No new
