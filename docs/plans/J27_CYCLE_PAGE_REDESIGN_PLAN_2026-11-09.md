@@ -17,8 +17,8 @@ related:
 Author: Claude for Justin Gallivan, 2026-11-09. Status: **Design decisions
 settled with the owner on 2026-11-09. No build is authorized.** The staff
 flow audit (`docs/plans/J27_STAFF_FLOW_AUDIT_2026-11-09.md`) and the owner's
-answers to its questions are applied below. Before a build is planned: the
-two feed checks in section 5 marked `[ASSUMED]`, and a design pass.
+answers to its questions are applied below. The two feed checks are done (section 5).
+Before a build is planned: a design pass.
 
 All code described here was read on branch `claude/j27-read-model` at
 `680252fe5` (worktree `WMKF_Apps-claude-j27-read-model`), which is not on
@@ -163,19 +163,34 @@ Added from the staff flow audit (owner agreed, 2026-11-09):
 - The request page solves the same gap by merging facts from reads it already
   makes and deriving the stage again.
   `[VERIFIED via shared/utils/j27PageStage.js:76-93 and pages/workbench/[requestId].js:118-120]`
-- The Staff deliberations feed carries presentation timing and the review
-  phase per request. `[VERIFIED via StaffDeliberationsPanel.js:79-95,123-130]`
-  Whether it also carries enough to tell that a Board draft exists is
-  `[ASSUMED]` and must be checked before the build is planned.
+- **The Staff deliberations feed can supply what the two later phases
+  need** (checked 2026-11-09). Per request it returns presentation timing,
+  the review phase, and the draft writeup's availability and state.
+  `[VERIFIED via lib/services/pre-site-visit/cycle-list-service.js:521-557,576,633-663 and StaffDeliberationsPanel.js:79-95,123-130]`
+  It selects requests with the same program, cycle and discovery rule as
+  the request list `[VERIFIED via cycle-list-service.js:325-342 and dashboard-service.js:327-341]`,
+  so the two feeds can be joined by request. One caveat: the request page
+  decides "a Board draft exists" from the Final writeup status's source
+  document (`lib/services/final-writeup/transition-state.js:38,54,108`),
+  while this feed decides it from the request's current draft pointer. The
+  two rules were not proven identical for the unavailable, pending and
+  ambiguous cases; the build pins the mapping with a test.
 - Dashboard rows carry the request number, institution, applicant, project
   leader and Program Director, and no title.
   `[VERIFIED via dashboard-service.js:359-392, the row the feed returns]`
   Showing the title means adding it to that read. Which request field holds
   the title was not looked up and is `[ASSUMED]` to be available, since the
   Initial assessments list already shows one (`InitialAssessmentsPanel.js:86-87`).
-- Whether the dashboard feed returns declined and decided requests for a
-  finished cycle was not checked and is `[ASSUMED]`. All requests depends on
-  it and it is verified before the build is planned.
+- **The request list's feed returns stopped and decided requests** for a
+  J27-or-later Research cycle (checked 2026-11-09). Such a request is
+  admitted on "ready for review" alone; its request status, Phase I status
+  and triage status are not consulted.
+  `[VERIFIED via shared/config/workbenchVisibility.js:89-108 and dashboard-service.js:327-341]`
+  So Not Scored, Not Recommended, Not Invited, Offramped, declined and
+  awarded requests all remain in the feed and All requests can show them.
+  This holds while the request stays marked ready for review and linked to
+  the cycle and the Research program. The owner is confident the mark is
+  not cleared casually (2026-11-09), so the plan relies on it.
 - The tab row accepts counts but the shell passes none.
   `[VERIFIED via WorkbenchShell.js:262 and WorkbenchViewsNav.js:72,91]`
 - The shell passes Final writeups, Initial assessments and Awardees a cycle
@@ -223,10 +238,21 @@ Constraints the build keeps:
   dashboard read; that choice is made in the build plan after checking
   request volume.
 - **Volume.** Initial Assessment may hold about 300 requests at the start of
-  a cycle (cycle information plan, owner follow-up 2026-11-05). Whether the
-  dashboard read and the list stay responsive at that size is `[ASSUMED]`
-  and is measured in slice 1 before anything ships. All requests carries the
-  whole cycle, so it is the list most exposed to this.
+  a cycle (cycle information plan, owner follow-up 2026-11-05). The request
+  query itself is not the limit: its ceiling is 5,000 records
+  `[VERIFIED via lib/services/dynamics/constants.js:49]`. The cost is in the
+  reads that follow. Reviewer counts are fetched 25 requests at a time, one
+  query after another `[VERIFIED via lib/services/reviewer-rollup.js:71-74]`,
+  and the reviewer-presence check is also batched by 25
+  `[VERIFIED via lib/dataverse/adapters/reviewer-suggestion.js:464-473]`, so
+  300 requests means about a dozen queries for each. The Staff deliberations
+  feed reads documents, visits, schedules and materials for every request
+  the discovery rule admits, which for J27 Research is every ready request,
+  not only those near a presentation. This load exists on the branch's
+  Request list today; the redesign does not add to it in slices 1 and 2, but
+  slice 3 would run the Staff deliberations feed for All requests. Load time
+  at 300 requests is measured in slice 1 before anything ships, and slice 3
+  decides then whether to narrow that feed to requests past Peer Review.
 - **Release.** The J27 line is not yet promoted. This work would branch from
   it and follow the same promotion decision.
 
