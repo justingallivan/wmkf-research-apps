@@ -565,3 +565,27 @@ test('plan F1 program gate: a J27 row outside the Research scope lists without a
   expect(body.proposals.map((p) => p.requestNumber)).toEqual(['1000399']);
   expect(body.proposals[0]).not.toHaveProperty('j27');
 });
+
+// J27 cycle page (docs/plans/J27_CYCLE_PAGE_BUILD_PLAN_2026-11-09.md, slice 1).
+test('cycle page fields: both modes name the stage programs; rows carry the request title', async () => {
+  const RESEARCH = '94cab30b-958f-ee11-8179-000d3a341e8f';
+  const cycles = await loadDashboard(args());
+  expect(cycles.stageProgramIds).toEqual([RESEARCH]);
+
+  queryAllRequests.mockResolvedValue({
+    records: [
+      { akoya_requestid: 'r-1', akoya_requestnum: '1009001', akoya_title: 'Mapping signalling lipids', akoya_requeststatus: 'Phase II Pending', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, wmkf_triagestatus: 100000000 },
+      { akoya_requestid: 'r-2', akoya_requestnum: '1009002', akoya_requeststatus: 'Phase II Pending', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, wmkf_triagestatus: 100000000 },
+    ],
+  });
+  const body = await loadDashboard(args({ cycleCode: 'D26', scope: 'all' }));
+  expect(body.stageProgramIds).toEqual([RESEARCH]);
+  expect(body.proposals.map((p) => p.title)).toEqual(['Mapping signalling lipids', null]);
+  expect(queryAllRequests.mock.calls.at(-1)[0].select.split(',')).toContain('akoya_title');
+
+  resolveWorkbenchProgramScope.mockResolvedValueOnce({
+    programs: [{ programId: RESEARCH, name: 'Research' }], discoveryScope: { readinessOnlyProgramIds: [] },
+    defaultProgramId: RESEARCH, programId: RESEARCH, programName: 'Research',
+  });
+  await expect(loadDashboard(args())).resolves.toMatchObject({ stageProgramIds: [] });
+});

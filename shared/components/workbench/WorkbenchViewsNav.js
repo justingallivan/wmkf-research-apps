@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { useEffect, useRef } from 'react';
 import { buildWorkbenchHref } from './workbench-location';
+import { J27_PHASE_LABEL } from '../../config/j27Labels';
 
 /**
  * View metadata registry — key, nav label, and a one-sentence description the
@@ -41,21 +42,56 @@ export const VIEWS = {
   },
 };
 
+/**
+ * J27 Research layout (2027-or-later cycles of the Research program): All
+ * requests, then the request page's four phases, then Awardees
+ * (docs/plans/J27_CYCLE_PAGE_REDESIGN_PLAN_2026-11-09.md). The Deliberations
+ * and Final Assessment tabs mount today's Staff deliberations and Final
+ * writeups panels until their own lists are built. Phase labels are the stage
+ * strip's.
+ */
+export const J27_VIEWS = {
+  requests: {
+    label: 'All requests',
+    description: 'Every request in this program and cycle, with where it stands and what is next.',
+  },
+  'initial-assessment': {
+    label: J27_PHASE_LABEL['initial-assessment'],
+    description: 'Requests being read, scored and recommended to the Chairs.',
+  },
+  'peer-review': {
+    label: J27_PHASE_LABEL['peer-review'],
+    description: 'Requests invited by the Chairs: reviewers, invitations and reports.',
+  },
+  deliberations: {
+    label: J27_PHASE_LABEL.deliberations,
+    description: VIEWS['staff-deliberations'].description,
+  },
+  'final-assessment': {
+    label: J27_PHASE_LABEL['final-assessment'],
+    description: VIEWS['final-writeups'].description,
+  },
+  awardees: VIEWS.awardees,
+};
+
 const VIEW_LIST = Object.entries(VIEWS).map(([key, meta]) => ({ key, ...meta }));
+const J27_VIEW_LIST = Object.entries(J27_VIEWS).map(([key, meta]) => ({ key, ...meta }));
 
 // The four views that share the `scope` (my/all) URL key. Every other
 // per-view key resets on a switch; scope is carried only among these.
-const SCOPE_VIEWS = new Set(['requests', 'reviewer-follow-up', 'staff-deliberations', 'awardees']);
+const SCOPE_VIEWS = new Set(['requests', 'reviewer-follow-up', 'staff-deliberations', 'awardees', 'initial-assessment', 'peer-review', 'deliberations']);
 
 // Every view lives inside the shell page: links carry the shell's program and
 // cycle and switch the view shallowly (per-view filters reset on a switch,
 // except `scope`, preserved only among its three consumers above).
-function hrefFor(view, cycleCode, programId, scope) {
+function hrefFor(view, cycleCode, programId, scope, scopeSet) {
+  const carriesScope = SCOPE_VIEWS.has(view.key);
   return buildWorkbenchHref({
     view: view.key,
     programId,
     cycleCode,
-    scope: SCOPE_VIEWS.has(view.key) ? scope : undefined,
+    scope: carriesScope ? scope : undefined,
+    scopeSet: carriesScope ? scopeSet : false,
   });
 }
 
@@ -69,7 +105,14 @@ function visibleForCycle(view, cycleCode) {
   return cycleCode !== 'D26';
 }
 
-export default function WorkbenchViewsNav({ activeKey, cycleCode, programId = '', scope = 'my', counts = {} }) {
+/**
+ * @param {object} props
+ * @param {'legacy'|'j27'|'pending'} [props.layout] `pending` renders an empty
+ *   bar while the shell does not yet know which layout the program uses, so
+ *   tabs never flash from one set to the other.
+ * @param {boolean} [props.scopeSet] the scope was chosen explicitly (J27 layout)
+ */
+export default function WorkbenchViewsNav({ activeKey, cycleCode, programId = '', scope = 'my', scopeSet = false, counts = {}, layout = 'legacy' }) {
   const resolvedActiveKey = activeKey;
   const scrollerRef = useRef(null);
 
@@ -86,13 +129,14 @@ export default function WorkbenchViewsNav({ activeKey, cycleCode, programId = ''
   return (
     <nav ref={scrollerRef} aria-label="Workbench views" className="mb-4 overflow-x-auto border-b border-gray-200">
       <div className="flex min-w-max items-stretch gap-1">
-        {VIEW_LIST.filter((view) => visibleForCycle(view, cycleCode)).map((view) => {
+        {layout === 'pending' && <span aria-hidden="true" className="min-h-11" />}
+        {(layout === 'pending' ? [] : layout === 'j27' ? J27_VIEW_LIST : VIEW_LIST.filter((view) => visibleForCycle(view, cycleCode))).map((view) => {
           const active = resolvedActiveKey === view.key;
           const count = counts[view.key];
           return (
             <Link
               key={view.key}
-              href={hrefFor(view, cycleCode, programId, scope)}
+              href={hrefFor(view, cycleCode, programId, scope, scopeSet)}
               shallow
               aria-current={active ? 'page' : undefined}
               className={`-mb-px inline-flex min-h-11 items-center gap-2 border-b-2 px-4 py-2 text-sm font-semibold whitespace-nowrap transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-1 ${
@@ -102,7 +146,7 @@ export default function WorkbenchViewsNav({ activeKey, cycleCode, programId = ''
               }`}
             >
               {view.label}
-              {Number.isFinite(count) && (
+              {Number.isFinite(count) && count > 0 && (
                 <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-amber-50 px-1.5 py-0.5 text-xs tabular-nums text-amber-900">
                   {count}
                 </span>
