@@ -95,9 +95,10 @@ This review does not certify the implementation or live readiness.
 
 ## Next stage and remaining gates
 
-Prepare separately authorized full exports and metadata preflight; reconcile links,
-duplicates, field sizes, Beth's eligibility and new PD identities. Reserve a dedicated
-rehearsal Postgres database, never the shared Preview/Production database. Then prove
+Real inventory and a dedicated local PostgreSQL 17 synthetic fixture are now prepared;
+see `INVENTORY_AND_REHEARSAL_2026-11-09.md` for verified counts and limitations.
+Reconcile mappings, Beth's eligibility, new PD identities and the slot metadata gap.
+Then prove
 schema/audit/keys/permissions, build the roster service and bridge recovery, integrate
 consumers, and rehearse import plus rollback. The owner-reviewed minimal matching
 prompt contract and verified old-deployment admission/drain remain cutover prerequisites.
