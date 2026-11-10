@@ -164,7 +164,7 @@ plan is final, if a deck is still wanted.
   Program Director or a superuser can record it." when authority is what is
   missing. The absent integrity and reviewer controls still give no reason.
 - **Fixed: 9.** The two messages name the tab the current layout has
-  ("Panel", "Deliberations"); the earlier layout keeps its own names.
+  ("Reviewers", "Deliberations"); the earlier layout keeps its own names.
 - **Fixed: 13.** The "needs coordinator attention" line on the presentation
   materials card links to the meeting record.
 - **Fixed: the stage strip** (build plan, finding 1). It uses the cycle
@@ -189,9 +189,11 @@ plan is final, if a deck is still wanted.
   cycles still writes "draft writeup" and "Final writeup" in lower case.
 - **Fixed: 10** in part (owner, 2026-11-10). The staff assessment after the
   research presentation says "presentation", not "visit".
-- **Open: 10**, the rest. "Panel" beside "AI Review Panel" awaits the
-  owner's wording. The plain-text tab names in Overview next steps are
-  still unlinked.
+- **Fixed: 10**, the "Panel" part (owner, 2026-11-10). The reviewer roster
+  sub-tab under Peer Review is "Reviewers"; "panel" now means only the AI
+  Review Panel.
+- **Open: 10**, the rest. The plain-text tab names in Overview next steps
+  are still unlinked.
 
 ## 4. Questions only staff can answer
 
