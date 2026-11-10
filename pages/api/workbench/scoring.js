@@ -1,3 +1,4 @@
+// model-override-warming:ignore reason=scoring-save-writes-a-status-and-does-not-resolve-an-LLM-model
 import { requireAppAccess, actorRefFromSession } from '../../../lib/utils/auth';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { isGuid } from '../../../lib/utils/guid';
