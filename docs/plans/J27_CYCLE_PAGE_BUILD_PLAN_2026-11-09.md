@@ -43,6 +43,11 @@ The list therefore needs its own rule for the line under the chip (section
 `[VERIFIED via shared/components/workbench/J27StageStrip.js:86-87]`, so it
 would show the same odd line on such a request once its reviewer counts
 load; that belongs with the request-page wording fixes.
+**Fixed 2026-11-10** on the J27 line (`claude/j27-cycle-page`, commit
+`eaf8758f1` and the one after it; not promoted): the strip no longer prints
+the model's task directly. It uses the list's rule from section 2, and says
+"Nothing is waiting on staff right now." only once every fact behind it has
+loaded. The line reference above describes the strip before that change.
 
 **2. Statuses the stage model does not know.** The model maps seven Phase I
 status values. Any other value (Incomplete, Ineligible, Proposal Late,

@@ -157,8 +157,8 @@ be done before colleagues see the branch. Finding 7 is settled: the stage model
 stands. The deck is out of date and would be rebuilt after the cycle page
 plan is final, if a deck is still wanted.
 
-**Status, 2026-11-10** (J27 line, commit `eaf8758f1` on
-`claude/j27-cycle-page`; not promoted):
+**Status, 2026-11-10** (J27 line, commit `eaf8758f1` and the one after it
+on `claude/j27-cycle-page`; not promoted):
 
 - **Fixed: 6** in part. A read-only Scoring card now says "Only the lead
   Program Director or a superuser can record it." when authority is what is
@@ -169,7 +169,9 @@ plan is final, if a deck is still wanted.
   materials card links to the meeting record.
 - **Fixed: the stage strip** (build plan, finding 1). It uses the cycle
   list's next-step rule, so a request waiting on the Chairs reads "Awaiting
-  the Chairs' outcome".
+  the Chairs' outcome". The optional offramp task no longer leads on the
+  request page, and "Nothing is waiting on staff right now." appears only
+  once every fact behind it has loaded.
 - **Open, needs the owner's wording: 5, 8, 10.** What replaces "Phase I
   status" and the "Phase I / Phase II documents" headings; one name for the
   Final Assessment document; "visit" or "presentation"; "Panel" beside "AI
