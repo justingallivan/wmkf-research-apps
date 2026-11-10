@@ -178,9 +178,10 @@ plan is final, if a deck is still wanted.
   cycles. It shows the combined staff version first, then the six
   individual files in a collapsed "Individual files" section, as decided on
   2026-10-27; a missing file reads "not received yet". "Phase II documents"
-  appears only when that folder holds a file. The file names come from
-  Connor (2026-10-26 and 2026-11-10) and have not been checked against a
-  real J27 folder.
+  appears only when that folder holds a file. The individual files are read
+  from the request's `Submission-Documents` folder; their names match
+  Connor's Production test request 1003384 (owner-run listing, 2026-11-10).
+  The staff version's name has not yet been seen on a real request.
 - **Fixed: 8** for J27 requests (owner, 2026-11-10). The document is the
   "Draft Writeup" and becomes the "Final Writeup"; "Board recommendation"
   and "Board draft" are gone from the J27 screens. Text shared with earlier
