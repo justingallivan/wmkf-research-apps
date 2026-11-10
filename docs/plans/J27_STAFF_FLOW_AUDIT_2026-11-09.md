@@ -175,14 +175,12 @@ plan is final, if a deck is still wanted.
 - **Fixed: 5** for J27 requests. The Scoring card and the Overview say
   "Status" where they said "Phase I status" (owner, 2026-11-10). The
   Proposal section no longer shows "Phase I documents" for J27 or later
-  cycles: it lists the six individual files in an "Individual files"
-  section, as decided on 2026-10-27, and a missing file reads "not received
-  yet". The section starts open until the staff version row exists (owner,
-  2026-11-10). "Phase II documents" appears only when that folder holds a
-  file. Still to build there: the combined staff version on top, which
-  waits on its file name and folder from Connor. The file names used come
-  from Connor's 2026-10-26 email and have not been checked against a real
-  J27 folder.
+  cycles. It shows the combined staff version first, then the six
+  individual files in a collapsed "Individual files" section, as decided on
+  2026-10-27; a missing file reads "not received yet". "Phase II documents"
+  appears only when that folder holds a file. The file names come from
+  Connor (2026-10-26 and 2026-11-10) and have not been checked against a
+  real J27 folder.
 - **Fixed: 8** for J27 requests (owner, 2026-11-10). The document is the
   "Draft Writeup" and becomes the "Final Writeup"; "Board recommendation"
   and "Board draft" are gone from the J27 screens. Text shared with earlier
