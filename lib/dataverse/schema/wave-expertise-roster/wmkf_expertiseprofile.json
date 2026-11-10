@@ -1,0 +1,172 @@
+{
+  "name": "wmkf_expertiseprofile",
+  "kind": "new-entity",
+  "schemaName": "wmkf_ExpertiseProfile",
+  "displayName": "Expertise Profile",
+  "displayCollectionName": "Expertise Profiles",
+  "description": "Shared Research expertise roster. Schema specification only; provisioning, auditing, permissions and key validation require approved preflight.",
+  "ownershipType": "OrganizationOwned",
+  "hasActivities": false,
+  "hasNotes": false,
+  "primaryNameAttribute": {
+    "schemaName": "wmkf_Name",
+    "displayName": "Name",
+    "maxLength": 255
+  },
+  "attributes": [
+    {
+      "type": "Picklist",
+      "schemaName": "wmkf_Category",
+      "displayName": "Category",
+      "requiredLevel": "ApplicationRequired",
+      "options": [
+        {
+          "value": 100000000,
+          "label": "Research Program Staff"
+        },
+        {
+          "value": 100000001,
+          "label": "Consultant"
+        },
+        {
+          "value": 100000002,
+          "label": "Board"
+        }
+      ]
+    },
+    {
+      "type": "Boolean",
+      "schemaName": "wmkf_LeadPdEligible",
+      "displayName": "Eligible for lead-PD recommendations",
+      "default": false
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_ContactGuid",
+      "displayName": "Contact reference",
+      "maxLength": 36,
+      "description": "Optional lowercase GUID reference, intentionally no Contact relationship. Missing Contact never revives manual email."
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_CreationKey",
+      "displayName": "Creation key",
+      "maxLength": 80,
+      "requiredLevel": "ApplicationRequired",
+      "description": "Internal immutable retry key, not a staff-facing Short ID."
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_Role",
+      "displayName": "Title",
+      "maxLength": 255
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_Affiliation",
+      "displayName": "Affiliation",
+      "maxLength": 500
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_Orcid",
+      "displayName": "ORCID",
+      "maxLength": 255
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_PreferredEmail",
+      "displayName": "Preferred Email",
+      "maxLength": 320
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_PrimaryFields",
+      "displayName": "Primary Fields",
+      "maxLength": 100000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_Keywords",
+      "displayName": "Keywords",
+      "maxLength": 100000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_SubfieldsSpecialties",
+      "displayName": "Specialties",
+      "maxLength": 100000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_MethodsTechniques",
+      "displayName": "Methods",
+      "maxLength": 100000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_Distinctions",
+      "displayName": "Distinctions",
+      "maxLength": 100000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_Expertise",
+      "displayName": "Expertise",
+      "maxLength": 100000
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_KeckAffiliation",
+      "displayName": "Keck Affiliation",
+      "maxLength": 255
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_KeckAffiliationDetails",
+      "displayName": "Keck Affiliation Details",
+      "maxLength": 100000
+    }
+  ],
+  "relationships": [
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_expertiseprofile_systemuser",
+      "referencedEntity": "systemuser",
+      "lookupSchemaName": "wmkf_StaffUser",
+      "lookupDisplayName": "Staff User",
+      "required": "None",
+      "cascade": {
+        "Assign": "NoCascade",
+        "Delete": "Restrict",
+        "Merge": "NoCascade",
+        "Reparent": "NoCascade",
+        "Share": "NoCascade",
+        "Unshare": "NoCascade"
+      }
+    }
+  ],
+  "alternateKeys": [
+    {
+      "schemaName": "wmkf_expertiseprofile_creationkey",
+      "displayName": "Creation key",
+      "keyAttributes": [
+        "wmkf_creationkey"
+      ]
+    },
+    {
+      "schemaName": "wmkf_expertiseprofile_contact",
+      "displayName": "Contact identity",
+      "keyAttributes": [
+        "wmkf_contactguid"
+      ]
+    },
+    {
+      "schemaName": "wmkf_expertiseprofile_user",
+      "displayName": "Staff identity",
+      "keyAttributes": [
+        "wmkf_staffuser"
+      ]
+    }
+  ]
+}

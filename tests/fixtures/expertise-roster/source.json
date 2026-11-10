@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "datasetId": "11111111-1111-4111-8111-111111111111",
+  "rows": [
+    {
+      "id": 1,
+      "name": "Synthetic Board Example",
+      "role_type": "Board",
+      "is_active": true,
+      "dataverse_contact_id": null,
+      "role": null,
+      "affiliation": null,
+      "orcid": null,
+      "preferred_email": null,
+      "primary_fields": null,
+      "keywords": null,
+      "subfields_specialties": null,
+      "methods_techniques": null,
+      "distinctions": null,
+      "expertise": null,
+      "keck_affiliation": null,
+      "keck_affiliation_details": null
+    }
+  ]
+}

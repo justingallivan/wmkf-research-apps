@@ -64,8 +64,12 @@ NAMED CHANGES. The repairs are incorporated; the original review and disposition
 are in `docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_2026-11-09.md`. Third Fable OAuth review confirmed B1–B5 and all six rehearsal gates resolved.
 Its two new cutover findings were repaired with inert automatic migrations, a
 gated operational cutover script, and isolated v2 prompt/admission controls.
-See `docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_3_2026-11-09.md`. Those final two
-repairs have not been re-reviewed. Owner prompt approval and platform rehearsal
+See `docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_3_2026-11-09.md`. The final Fable plan check returned READY with no named repairs; see
+`docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_4_2026-11-09.md`.
+Offline foundation built on `codex/expertise-roster-foundation-2026-11-09` in
+`/private/tmp/wmkf-codex-isolated-start-2026-11-09`: schema spec, inert bridge SQL
+draft and file-only import planner. Synthetic verification and runbook:
+`docs/plans/data/expertise-roster/README.md`. Owner prompt approval and platform rehearsal
 gates remain prerequisites; no schema or runtime has been deployed. The existing J27 stream below is
 preserved and has not been resumed by this planning task.
 
