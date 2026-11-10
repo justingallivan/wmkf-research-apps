@@ -3,7 +3,7 @@
  *
  * POST: Match a single Dynamics proposal to the expertise roster.
  *
- * Resolves proposal → SharePoint folder → Phase_I_Staff_Version PDF → pdf-parse → Claude.
+ * Resolves proposal → SharePoint folder → staff version PDF → pdf-parse → Claude.
  * Uses the same prompt and matching logic as the interactive match endpoint.
  *
  * Request body:

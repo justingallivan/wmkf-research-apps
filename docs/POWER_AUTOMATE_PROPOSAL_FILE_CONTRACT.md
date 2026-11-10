@@ -68,8 +68,9 @@ against a real J27 folder.
 The J27 staff version sits at the root of the request folder, named
 `{AKA}_Staff Version_{Request#}` (Connor, 2026-11-10; AKA is the institution's
 short name). The Proposal tab on the J27 line shows it first, matching any
-single root file whose name ends `_Staff Version_{Request#}.pdf`; the `.pdf`
-extension is assumed. The J27 reviewer copy is still to be specified.
+single root file whose name ends `_Staff Version_{Request#}.pdf` (Connor
+confirmed the extension). The Expertise Finder batch match reads the same
+file, and still accepts the earlier `Phase_I_Staff_Version` name. The J27 reviewer copy is still to be specified.
 
 ## File purposes
 

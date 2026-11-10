@@ -86,10 +86,36 @@ describe('batchMatch', () => {
     await expect(batchMatch(ARGS)).rejects.toMatchObject({
       httpStatus: 404,
       body: {
-        error: 'No Phase_I_Staff_Version PDF found in SharePoint folder',
+        error: 'No staff version PDF found in SharePoint folder',
         requestNumber: 'R-1000', folder: '/f', availableFiles: ['other.docx'],
       },
     });
+  });
+
+  it('uses the J27 staff version name, and refuses another request\'s file or two candidates', async () => {
+    locAdapter.findByRegardingObject.mockResolvedValue({
+      records: [{ relativeurl: '/f', _parentsiteorlocation_value: null }],
+    });
+    GraphService.downloadFileByPath.mockResolvedValue({ buffer: Buffer.from('x') });
+    pdf.mockResolvedValue({ text: 'short' });
+
+    GraphService.listFiles.mockResolvedValue([{ name: 'other.docx' }, { name: 'Caltech_Staff Version_R-1000.pdf' }]);
+    await expect(batchMatch(ARGS)).rejects.toMatchObject({
+      httpStatus: 400,
+      body: { filename: 'Caltech_Staff Version_R-1000.pdf' },
+    });
+    expect(GraphService.downloadFileByPath).toHaveBeenLastCalledWith(expect.anything(), '/f', 'Caltech_Staff Version_R-1000.pdf');
+
+    for (const files of [
+      [{ name: 'Caltech_Staff Version_R-2000.pdf' }],
+      [{ name: 'Caltech_Staff Version_R-1000.pdf' }, { name: 'CIT_Staff Version_R-1000.pdf' }],
+    ]) {
+      GraphService.listFiles.mockResolvedValue(files);
+      await expect(batchMatch(ARGS)).rejects.toMatchObject({
+        httpStatus: 404,
+        body: { error: 'No staff version PDF found in SharePoint folder' },
+      });
+    }
   });
 
   it('400 with filename body on an empty PDF', async () => {
