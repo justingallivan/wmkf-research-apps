@@ -258,12 +258,14 @@ function MatchTab() {
 
 // ─── Roster Tab ───
 
-function RosterTab() {
+export function RosterTab() {
   const [members, setMembers] = useState([]);
   const [includeInactive, setIncludeInactive] = useState(false);
   const [backend, setBackend] = useState(null);
   const [staffUsers, setStaffUsers] = useState([]);
   const [notice, setNotice] = useState(null);
+  const [mutationNotice, setMutationNotice] = useState(null);
+  const mutationGeneration = useRef(0);
   const loadGeneration = useRef(0);
   const createIdentity = useRef(null);
   const [loading, setLoading] = useState(true);
@@ -307,6 +309,8 @@ function RosterTab() {
     return () => { loadGeneration.current += 1; };
   }, [fetchRoster]);
 
+  useEffect(() => () => { mutationGeneration.current += 1; }, []);
+
   const handleEdit = (member) => {
     setEditingId(member.id);
     setEditForm({ ...member });
@@ -314,59 +318,70 @@ function RosterTab() {
   };
 
   const handleSaveEdit = async (formData) => {
+    const generation = ++mutationGeneration.current;
     setSaving(true);
+    setMutationNotice(null);
     loadGeneration.current += 1;
     try {
       const { ok, data, error } = await requestEnvelope('/api/expertise-finder/roster', {
         method: 'PATCH',
         body: formData,
       });
+      if (generation !== mutationGeneration.current) return;
       if (!ok) throw new Error(data.error || error.message);
 
-      if (data.warning) setNotice(data.warning);
+      if (data.warning) setMutationNotice(data.warning);
       await fetchRoster();
+      if (generation !== mutationGeneration.current) return;
       setEditingId(null);
       setEditForm({});
     } catch (err) {
-      setError(err.message);
+      if (generation === mutationGeneration.current) setError(err.message);
     } finally {
-      setSaving(false);
+      if (generation === mutationGeneration.current) setSaving(false);
     }
   };
 
   const handleStatus = async (member) => {
     const active = member.is_active === false;
     if (!confirm(`${active ? 'Reactivate' : 'Deactivate'} "${member.name}"? ${active ? '' : 'History will be preserved.'}`)) return;
+    const generation = ++mutationGeneration.current;
     setSaving(true);
+    setMutationNotice(null);
     loadGeneration.current += 1;
     try {
       const { ok, data, error } = await requestEnvelope('/api/expertise-finder/roster', {
         method: 'PATCH', body: { id: member.id, etag: member.etag, is_active: active },
       });
+      if (generation !== mutationGeneration.current) return;
       if (!ok) throw new Error(data.error || error.message);
-      if (data.warning) setNotice(data.warning);
+      if (data.warning) setMutationNotice(data.warning);
       await fetchRoster();
-    } catch (err) { setError(err.message); }
-    finally { setSaving(false); }
+    } catch (err) { if (generation === mutationGeneration.current) setError(err.message); }
+    finally { if (generation === mutationGeneration.current) setSaving(false); }
   };
 
   const handleAdd = async (formData) => {
+    const generation = ++mutationGeneration.current;
     setSaving(true);
+    setMutationNotice(null);
     loadGeneration.current += 1;
     try {
       const { ok, data, error } = await requestEnvelope('/api/expertise-finder/roster', {
         method: 'POST',
         body: backend ? { ...formData, mutation_id: createIdentity.current || (createIdentity.current = crypto.randomUUID()) } : formData,
       });
+      if (generation !== mutationGeneration.current) return;
       if (!ok) throw new Error(data.error || error.message);
 
       createIdentity.current = null;
       await fetchRoster();
+      if (generation !== mutationGeneration.current) return;
       setShowAddForm(false);
     } catch (err) {
-      setError(err.message);
+      if (generation === mutationGeneration.current) setError(err.message);
     } finally {
-      setSaving(false);
+      if (generation === mutationGeneration.current) setSaving(false);
     }
   };
 
@@ -382,7 +397,7 @@ function RosterTab() {
   };
 
   return (
-    <div className="space-y-4">
+    <fieldset disabled={saving} aria-busy={saving} className="space-y-4 min-w-0">
       {/* Search and Filter Bar */}
       <div className="flex flex-col sm:flex-row gap-3">
         <input
@@ -409,6 +424,7 @@ function RosterTab() {
         </Button>
       </div>
 
+      {mutationNotice && <p role="status" className="text-sm text-amber-800">{mutationNotice}</p>}
       {notice && <p role="status" className="text-sm text-amber-800">{notice}</p>}
       {error && <ErrorAlert error={error} onDismiss={() => setError(null)} />}
 
@@ -433,7 +449,7 @@ function RosterTab() {
               {/* Summary Row */}
               <div
                 className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50"
-                onClick={() => setExpandedId(expandedId === member.id ? null : member.id)}
+                onClick={() => { if (!saving) setExpandedId(expandedId === member.id ? null : member.id); }}
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="min-w-0">
@@ -546,7 +562,7 @@ function RosterTab() {
           ))}
         </div>
       )}
-    </div>
+    </fieldset>
   );
 }
 
