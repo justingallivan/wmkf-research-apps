@@ -61,11 +61,12 @@ expertise fields, and unchanged editor access are settled. Expertise wording,
 scoring and recommendation policy remain deferred. Beth's eligibility and the
 two new PD identities remain import confirmations. Claude Fable 5.2 reviewed the plan via approved OAuth and returned READY WITH
 NAMED CHANGES. The repairs are incorporated; the original review and disposition
-are in `docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_2026-11-09.md`. A second Fable OAuth review also returned READY WITH NAMED CHANGES; B1–B5
-remain open in `docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_2_2026-11-09.md`.
-These cover rehearsal isolation, prompt cutover, per-consumer unavailable
-profiles, Contact key type, and import idempotency. Resolve before building
-the affected mechanics; matching and platform rehearsal gates remain. The existing J27 stream below is
+are in `docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_2026-11-09.md`. Third Fable OAuth review confirmed B1–B5 and all six rehearsal gates resolved.
+Its two new cutover findings were repaired with inert automatic migrations, a
+gated operational cutover script, and isolated v2 prompt/admission controls.
+See `docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_3_2026-11-09.md`. Those final two
+repairs have not been re-reviewed. Owner prompt approval and platform rehearsal
+gates remain prerequisites; no schema or runtime has been deployed. The existing J27 stream below is
 preserved and has not been resumed by this planning task.
 
 ## Next Items
