@@ -157,8 +157,8 @@ be done before colleagues see the branch. Finding 7 is settled: the stage model
 stands. The deck is out of date and would be rebuilt after the cycle page
 plan is final, if a deck is still wanted.
 
-**Status, 2026-11-10** (J27 line, commit `eaf8758f1` and the one after it
-on `claude/j27-cycle-page`; not promoted):
+**Status, 2026-11-10** (J27 line, commits `eaf8758f1` to `3e3c7e80f` on
+`claude/j27-cycle-page`; not promoted):
 
 - **Fixed: 6** in part. A read-only Scoring card now says "Only the lead
   Program Director or a superuser can record it." when authority is what is
@@ -172,9 +172,18 @@ on `claude/j27-cycle-page`; not promoted):
   the Chairs' outcome". The optional offramp task no longer leads on the
   request page, and "Nothing is waiting on staff right now." appears only
   once every fact behind it has loaded.
-- **Open, needs the owner's wording: 5, 8, 10.** What replaces "Phase I
-  status" and the "Phase I / Phase II documents" headings; one name for the
-  Final Assessment document; "visit" or "presentation"; "Panel" beside "AI
+- **Fixed: 5** for J27 requests. The Scoring card and the Overview say
+  "Status" where they said "Phase I status" (owner, 2026-11-10). The
+  Proposal section no longer shows "Phase I documents" for J27 or later
+  cycles: it lists the six individual files in a collapsed "Individual
+  files" section, as decided on 2026-10-27, and a missing file reads "not
+  received yet". "Phase II documents" appears only when that folder holds a
+  file. Still to build there: the combined staff version on top, which
+  waits on its file name and folder from Connor. The file names used come
+  from Connor's 2026-10-26 email and have not been checked against a real
+  J27 folder.
+- **Open, needs the owner's wording: 8, 10.** One name for the Final
+  Assessment document; "visit" or "presentation"; "Panel" beside "AI
   Review Panel". The plain-text tab names in Overview next steps (10) are
   also still unlinked.
 
