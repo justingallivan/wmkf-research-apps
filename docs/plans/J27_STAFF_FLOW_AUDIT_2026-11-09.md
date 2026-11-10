@@ -157,6 +157,25 @@ be done before colleagues see the branch. Finding 7 is settled: the stage model
 stands. The deck is out of date and would be rebuilt after the cycle page
 plan is final, if a deck is still wanted.
 
+**Status, 2026-11-10** (J27 line, commit `eaf8758f1` on
+`claude/j27-cycle-page`; not promoted):
+
+- **Fixed: 6** in part. A read-only Scoring card now says "Only the lead
+  Program Director or a superuser can record it." when authority is what is
+  missing. The absent integrity and reviewer controls still give no reason.
+- **Fixed: 9.** The two messages name the tab the current layout has
+  ("Panel", "Deliberations"); the earlier layout keeps its own names.
+- **Fixed: 13.** The "needs coordinator attention" line on the presentation
+  materials card links to the meeting record.
+- **Fixed: the stage strip** (build plan, finding 1). It uses the cycle
+  list's next-step rule, so a request waiting on the Chairs reads "Awaiting
+  the Chairs' outcome".
+- **Open, needs the owner's wording: 5, 8, 10.** What replaces "Phase I
+  status" and the "Phase I / Phase II documents" headings; one name for the
+  Final Assessment document; "visit" or "presentation"; "Panel" beside "AI
+  Review Panel". The plain-text tab names in Overview next steps (10) are
+  also still unlinked.
+
 ## 4. Questions only staff can answer
 
 Answered by the owner on 2026-11-09; the answers and their effect are
