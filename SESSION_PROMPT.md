@@ -59,9 +59,11 @@ per person, no program partition or Short ID, separate lead-PD eligibility,
 optional external Contact links, Active/Inactive only, optional preserved
 expertise fields, and unchanged editor access are settled. Expertise wording,
 scoring and recommendation policy remain deferred. Beth's eligibility and the
-two new PD identities remain import confirmations. Claude Fable review is
-pending explicit consumption approval after automatic approval review rejected
-the first invocation; no review was run. The existing J27 stream below is
+two new PD identities remain import confirmations. Claude Fable 5.2 reviewed the plan via approved OAuth and returned READY WITH
+NAMED CHANGES. The repairs are incorporated; the original review and disposition
+are in `docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_2026-11-09.md`. The revised text
+has not been re-reviewed. Matching prompt/eligibility integration and sandbox
+platform checks remain release prerequisites. The existing J27 stream below is
 preserved and has not been resumed by this planning task.
 
 ## Next Items
