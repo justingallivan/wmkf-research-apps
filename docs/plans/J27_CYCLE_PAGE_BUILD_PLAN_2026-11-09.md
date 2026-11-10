@@ -3,7 +3,7 @@ title: J27 cycle page build plan
 domain: workbench
 kind: plan
 status: draft
-summary: Build plan for the J27 Workbench cycle page — what the code reading changed, the files and data each slice touches, tests, and the owner's decisions of 2026-11-09. No build authorized.
+summary: Build plan for the J27 Workbench cycle page — what the code reading changed, the files and data each slice touches, tests, and the owner's decisions of 2026-11-09. Built on branch claude/j27-cycle-page the same day; not promoted.
 canonical: false
 owner: product-engineering
 related:
@@ -15,7 +15,9 @@ related:
 # J27 cycle page build plan
 
 Author: Claude for Justin Gallivan, 2026-11-09. **Reviewed with the owner
-the same day; his decisions are in section 5. No build is authorized.** The redesign plan says what the page contains; the design
+the same day; his decisions are in section 5. He gave the go-ahead and the three slices
+were built that day on branch `claude/j27-cycle-page` (section 7); nothing
+is promoted.** The redesign plan says what the page contains; the design
 brief says how it looks and reads. This plan says how it would be built, in
 what order, and what has to be decided first.
 
@@ -72,8 +74,8 @@ Research.** The server works out which program qualifies
 `[VERIFIED via lib/services/workbench/program-scope-service.js:36-42,106]`
 but returns only each program's id and name to the page
 `[VERIFIED via program-scope-service.js:154-160 and dashboard-service.js:230-240, 293-305]`.
-The tab row has to be chosen before any rows load, so the program list the
-page already receives gains one true/false field per program. The cycle test
+The tab row has to be chosen before any rows load, so the feed's
+response names the qualifying programs in a short list. The cycle test
 is the stage model's own (`isJ27ScopeCycle`, 2027 or later), so no cycle
 name is written into new code.
 
@@ -179,8 +181,7 @@ plan, section 5).
 | `WorkbenchShell.js` | Chooses the new layout when the program is Research and the cycle is 2027 or later; otherwise renders exactly what it renders today. |
 | `WorkbenchViewsNav.js` | A second tab set for the new layout; receives counts. |
 | `workbench-location.js` | New tab keys and filter keys; old links mapped (table below). |
-| `dashboard-service.js` | Adds the request title to the read and the row. |
-| `program-scope-service.js` | Adds the true/false field to each program. |
+| `dashboard-service.js` | Adds the request title to the read and the row, and the list of qualifying programs to the response. |
 | `reviewer-rollup.js` | Slice 2: adds the outstanding-review count. The existing counts keep their meaning. |
 | `J27StageStrip.js` | Imports its labels from the label list and keeps exporting them under today's names, so its existing test holds. No visible change. |
 
@@ -264,7 +265,7 @@ is promoted until the owner decides (section 6).
 
 - Label list, row rules, rows hook, list, row, control row.
 - Shell and nav choose the layout; address keys and old-link mapping.
-- Title and program field added on the server.
+- Title and the list of qualifying programs added on the server.
 - All requests: search, "Showing" menu, count line, all states in the brief.
 - Initial Assessment and Peer Review show the same list filtered to their
   phase, without their extras yet. Deliberations and Final Assessment mount
@@ -348,7 +349,7 @@ source:
 
 No new route, table, permission, status or Dataverse field. No writes from
 any list. The request list feed gains three response fields (the title,
-the program field and the outstanding-review count). No change to the request page beyond the label import.
+the list of qualifying programs and the outstanding-review count). No change to the request page beyond the label import.
 No change to the stage model, the Staff deliberations list or its feed, or
 to what the Reviewer follow-up, Final writeups or Awardees panels read or
 write. No Deliberations or Final Assessment list (section 3a). No Program
@@ -380,8 +381,8 @@ Coordinator work. Nothing for Southern California.
    row, All requests, Initial Assessment, Peer Review and counts; the
    Deliberations and Final Assessment lists get their own plan.
 
-Still open: **the go-ahead to build**, and whether to start with the branch
-clean-up.
+6. **Go-ahead to build**, given the same day, starting with the branch
+   clean-up.
 
 ## 6. Release and records
 
@@ -390,3 +391,29 @@ promotion decision, which has not been taken. The sandbox fixtures stay as
 they are. On approval, the decision is logged in the alignment log on the
 J27 line (redesign plan, section 10), and the route matrix and Atlas pages
 are updated with the added response fields in the slice that adds them.
+
+## 7. What was built (2026-11-09)
+
+On branch `claude/j27-cycle-page`, cut from `claude/j27-read-model` and
+pushed; not promoted. Verified by unit tests and the gates for the changed
+surfaces. `[VERIFIED via the branch's commits aa02f0068, 34e467db8, 056833739 and 4038e8ace]`
+
+- **Branch clean-up** on `claude/j27-read-model`: the scoring route marked
+  as not resolving a model, and two stale J27 register rows rebound.
+- **Slice 1:** as planned, plus "Show closed" on the phase tabs and the tab
+  counts, which were small once the rows were shared.
+- **Slice 2:** the standing filter, reviewer progress on Peer Review rows,
+  and "1 review outstanding" from the new count.
+
+Differences from the plan as written above:
+
+- The qualifying programs are a list on the feed's response
+  (`stageProgramIds`), not a field on each program, so
+  `program-scope-service.js` was not changed.
+- A request with a final decision (awarded, not awarded, withdrawn) is
+  listed on All requests only: the stage model files it under "decided",
+  not under the phase where it stopped. Not Scored, Not Recommended and Not
+  Invited stay in Initial Assessment under "Show closed".
+- The All requests search covers number, title, institution and Principal
+  Investigator, as the design brief says; it does not search Program
+  Director.
