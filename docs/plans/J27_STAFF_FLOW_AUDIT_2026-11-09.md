@@ -157,7 +157,7 @@ be done before colleagues see the branch. Finding 7 is settled: the stage model
 stands. The deck is out of date and would be rebuilt after the cycle page
 plan is final, if a deck is still wanted.
 
-**Status, 2026-11-10** (J27 line, commits `eaf8758f1` to `3e3c7e80f` on
+**Status, 2026-11-10** (J27 line, commits `eaf8758f1` onward on
 `claude/j27-cycle-page`; not promoted):
 
 - **Fixed: 6** in part. A read-only Scoring card now says "Only the lead
@@ -175,9 +175,10 @@ plan is final, if a deck is still wanted.
 - **Fixed: 5** for J27 requests. The Scoring card and the Overview say
   "Status" where they said "Phase I status" (owner, 2026-11-10). The
   Proposal section no longer shows "Phase I documents" for J27 or later
-  cycles: it lists the six individual files in a collapsed "Individual
-  files" section, as decided on 2026-10-27, and a missing file reads "not
-  received yet". "Phase II documents" appears only when that folder holds a
+  cycles: it lists the six individual files in an "Individual files"
+  section, as decided on 2026-10-27, and a missing file reads "not received
+  yet". The section starts open until the staff version row exists (owner,
+  2026-11-10). "Phase II documents" appears only when that folder holds a
   file. Still to build there: the combined staff version on top, which
   waits on its file name and folder from Connor. The file names used come
   from Connor's 2026-10-26 email and have not been checked against a real
