@@ -1,8 +1,9 @@
 # Pure roster freshness comparison
 
 This receipt preserves the pure/offline checkpoint. The subsequent default-off
-shared staff endpoint is branch-built at `6fe01c88e` (docs `de67742db`); final Opus
-closure is blocked pending explicit payload authorization, not READY. See the
+shared staff endpoint is branch-built at `6fe01c88e` (docs `f9b3dd1b4` (superseding `de67742db`)); the exact Opus payload was subsequently approved and reviewed with one PG proof
+gap, locally corrected in test-only `ef5507ab8` (33/33 real PG tests). No unqualified
+Opus READY or second external review is claimed. See the
 [current plan checkpoint](POWER_AUTOMATE_RECOMMENDATIONS_PLAN_2026-11-11.md).
 
 [VERIFIED via source and coordinating-session tests] The exported

@@ -1,6 +1,6 @@
 # Expertise recommendations through the shared Executor
 
-Status: REVIEWED PLAN; pure domain contract source-built, shared offline typed fixture built; staff endpoint branch-built/default-off; final review authorization pending; recommendations-only direction approved by Justin on November 11,
+Status: REVIEWED PLAN; pure domain contract source-built, shared offline typed fixture built; staff endpoint branch-built/default-off; qualified review completed; PG proof gap locally closed; recommendations-only direction approved by Justin on November 11,
 2026. This document does not activate a flow, authorize provider spending or approve Production cutover. The initial source
 policy is owner-selected below; general future placement remains unsettled. Opus review disposition is recorded
 in the companion review document. Owner: roster stream; shared infrastructure remains owned by
@@ -89,14 +89,18 @@ The shared offline typed fixture is built at runtime `7d0cf0392`, checkpoint
 `eb0010163` (coordinating-session source verification; reported 380 tests/25 suites,
 Opus READY). The agreed earlier interface is `a756735fa`; `0c4b8d39c` remains its
 historical runtime baseline. The shared staff endpoint is branch-built and default-off at runtime `6fe01c88e`,
-docs `de67742db` (clean checkpoint verified by the coordinating session). Shared
+docs `f9b3dd1b4` (superseding `de67742db`) (clean checkpoint verified by the coordinating session). Shared
 verification reports 527 tests/32 suites including three PostgreSQL suites, types,
 lint, applicable gates/secret-scan self-test and an environment-free guarded build
 passing, with four DOCX warnings. No activation, provider call, provisioning,
 deployment or positive live compatible-job proof occurred; a live producer/PA
-generation path is not established. Initial Opus review was READY WITH NAMED CHANGES;
-fixes were locally verified, but final Opus closure was blocked by automatic approval
-review and awaits explicit payload authorization. It is not a final READY verdict.
+generation path is not established. The owner approved the exact previously blocked Opus payload and the review ran.
+Its qualified verdict cleared items 1, 2, 4 and origin alignment; item 3b identified
+one PG inverse-proof gap. Test-only commit `ef5507ab8` restored a valid Sandbox
+binding and positive read before both fixture-reader refusals; its real PG suite
+passed 33/33, with lint/diff checks. The coordinating session independently reviewed
+that diff. Runtime remains `6fe01c88e`; no second external review or unqualified
+Opus READY verdict is claimed.
 The roster-only freshness comparator is source-built with 21 new passing tests
 (final combined 120 tests across seven suites); Opus source review returned READY with no concrete defects. It compares a
 retained hash to a trusted complete fresh projection, returning only current/stale/
@@ -406,23 +410,37 @@ or deployment were performed. Source/cache policy work remains shared-owner scop
 ## Shared staff endpoint checkpoint and final review boundary
 
 The shared staff endpoint is branch-built and default-off at runtime `6fe01c88e`,
-docs `de67742db` (clean checkpoint verified by the coordinating session). Shared
+docs `f9b3dd1b4` (superseding `de67742db`) (clean checkpoint verified by the coordinating session). Shared
 verification reports 527 tests/32 suites including three PostgreSQL suites, types,
 lint, applicable gates/secret-scan self-test and an environment-free guarded build
 passing, with four DOCX warnings. No activation, provider call, provisioning,
 deployment or positive live compatible-job proof occurred; a live producer/PA
-generation path is not established. Initial Opus review was READY WITH NAMED CHANGES;
-fixes were locally verified, but final Opus closure was blocked by automatic approval
-review and awaits explicit payload authorization. It is not a final READY verdict.
+generation path is not established. The owner approved the exact previously blocked Opus payload and the review ran.
+Its qualified verdict cleared items 1, 2, 4 and origin alignment; item 3b identified
+one PG inverse-proof gap. Test-only commit `ef5507ab8` restored a valid Sandbox
+binding and positive read before both fixture-reader refusals; its real PG suite
+passed 33/33, with lint/diff checks. The coordinating session independently reviewed
+that diff. Runtime remains `6fe01c88e`; no second external review or unqualified
+Opus READY verdict is claimed.
 
 The coordinating session independently ran 131 tests/six suites before the final
-wrapper fixes and read the latest fixes without finding a new blocker; that is not
-independent execution of the shared 527-test result or final Opus closure. The final
-private diff has not been sent. Its exact proposed review payload is
+wrapper fixes and reviewed the latest runtime fixes without a new blocker. That is
+separate from the shared 527-test checkpoint and the later 33/33 PG proof run.
+The initially blocked exact payload was subsequently owner-approved and sent:
 `/private/tmp/wmkf-expertise-sandbox-closure-opus-20261111.txt`, 14,786 bytes,
 SHA-256 `a7af9f7d0a27ba9473998603d3641049966ca24b9edfaa511d5f34ce2ac43d24`.
-Automatic approval review judged the prior review authorization insufficient for
-this payload/destination; explicit authorization is required before sending it to
-Claude Opus 5.5. No retry or substitution is authorized by this documentation.
+The approved review artifact is
+`/private/tmp/wmkf-expertise-sandbox-closure-approved-20261111.json`.
+The earlier automatic approval rejection is historical, not a current permission
+block. The review's item 3b gap was locally corrected: a positive baseline precedes
+the ten mutations, observer state is cleared, the original binding is restored and
+a positive current Sandbox result precedes both fixture-reader null assertions.
+The shared test fixture was removed after the passing run. Runtime is unchanged;
+this closes the named test evidence gap without inventing another Opus verdict.
 The initial AI Materials combined narrative–bibliography policy remains selected;
 prior sandbox read proof does not establish positive live endpoint delivery.
+
+Both owners agree the next dependency is bounded sandbox producer/admission and
+compatible-job delivery proof before PA wiring. That requires a separately reviewed
+trial and any needed paid-call authorization; no activation has started. Shared
+final docs `f9b3dd1b4` follow test-only `ef5507ab8`; runtime remains `6fe01c88e`.

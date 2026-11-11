@@ -135,14 +135,18 @@ The shared offline typed fixture is built at runtime `7d0cf0392`, checkpoint
 `eb0010163` (coordinating-session source verification; reported 380 tests/25 suites,
 Opus READY). The agreed earlier interface is `a756735fa`; `0c4b8d39c` remains its
 historical runtime baseline. The shared staff endpoint is branch-built and default-off at runtime `6fe01c88e`,
-docs `de67742db` (clean checkpoint verified by the coordinating session). Shared
+docs `f9b3dd1b4` (superseding `de67742db`) (clean checkpoint verified by the coordinating session). Shared
 verification reports 527 tests/32 suites including three PostgreSQL suites, types,
 lint, applicable gates/secret-scan self-test and an environment-free guarded build
 passing, with four DOCX warnings. No activation, provider call, provisioning,
 deployment or positive live compatible-job proof occurred; a live producer/PA
-generation path is not established. Initial Opus review was READY WITH NAMED CHANGES;
-fixes were locally verified, but final Opus closure was blocked by automatic approval
-review and awaits explicit payload authorization. It is not a final READY verdict.
+generation path is not established. The owner approved the exact previously blocked Opus payload and the review ran.
+Its qualified verdict cleared items 1, 2, 4 and origin alignment; item 3b identified
+one PG inverse-proof gap. Test-only commit `ef5507ab8` restored a valid Sandbox
+binding and positive read before both fixture-reader refusals; its real PG suite
+passed 33/33, with lint/diff checks. The coordinating session independently reviewed
+that diff. Runtime remains `6fe01c88e`; no second external review or unqualified
+Opus READY verdict is claimed.
 The roster-only freshness comparator is source-built with 21 new passing tests
 (final combined 120 tests across seven suites); Opus source review returned READY with no concrete defects. It compares a
 retained hash to a trusted complete fresh projection, returning only current/stale/
