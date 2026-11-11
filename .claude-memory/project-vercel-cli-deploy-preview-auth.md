@@ -112,4 +112,10 @@ JSON value) so they stay readable as Config.
 from `dpl_2GaUBQnXmXsYd2WdYEnxAKfppSxV`. The branch's code accepts the alias as a
 CSRF origin and the alias callback was already in Entra, so no URI change.
 
+**Script gotcha, 2026-11-11:** `vercel inspect` prints its details (the `id`
+line) on stderr. A polling loop that runs `vercel inspect <url> 2>/dev/null`
+gets no id and never matches, so it waits forever on a build that finished in
+under a minute. Capture with `2>&1` and parse `awk '$1=="id"{print $2}'`, then
+attest branch and commit through `vercel api /v13/deployments/<id>` meta.
+
 Related: [[project-vercel-sensitive-env-pull-empty]], [[project-dev-environment]], [[project-local-dev-auth-setup]], [[project-branded-domains]].

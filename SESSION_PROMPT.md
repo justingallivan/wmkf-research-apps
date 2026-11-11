@@ -11,7 +11,7 @@ other two streams are not yours to change.
 
 | Stream | Last worked by | Resume in | Read first | First step |
 |---|---|---|---|---|
-| **A. J27 cycle page and request page** | Claude, Session 673 (2026-11-11) | `/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model`, on `claude/j27-cycle-page` at `01a798524`, pushed. `claude/j27-read-model` (the sandbox Preview branch) fast-forwarded to the same commit and deployed; the stable alias points at it | Stream A below; `docs/plans/J27_LATER_PHASE_LISTS_PLAN_2026-11-10.md` section 6 (on `main`) | Owner's browser walk-through on the Preview (Stream A, Verified Open 1) |
+| **A. J27 cycle page and request page** | Claude, Session 673 (2026-11-11) | `/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model`, on `claude/j27-cycle-page` at `5f81733db`, pushed. `claude/j27-read-model` (the sandbox Preview branch) is at the same commit and deployed; the stable alias points at it | Stream A below; `docs/plans/J27_LATER_PHASE_LISTS_PLAN_2026-11-10.md` section 6 (on `main`) | Owner's browser walk-through on the Preview (Stream A, Verified Open 1) |
 | **B. Expertise roster** | Codex, Session 670; Codex again 2026-11-10 | **Observed 2026-11-11 by Claude, not Codex's own record:** active work is on `codex/expertise-roster-import-2026-11-10` at `e59d1ecb6` in `/Users/gallivan/Code/WMKF_Apps-codex-roster-import`, clean, **not pushed** (no remote branch). Codex's own section below still names the 2026-11-09 branch | Stream B below; `docs/plans/EXPERTISE_ROSTER_HANDOFF_2026-11-09.md`; that branch's own handoff commits | Ask Codex or the owner for the current boundary; do not resume from the 2026-11-09 text alone |
 | **C. Request narratives** | Codex, Session 669 | `codex/request-narratives-2026-11-09` at `06e1ba6a4`, pushed and verified. Recorded worktree `/private/tmp/wmkf-request-narratives` is gone from disk | Stream C below; `docs/plans/REQUEST_NARRATIVES_HANDOFF_2026-11-09.md` | Power Automate initialization contract with Connor, then the J27 integration review |
 
@@ -53,11 +53,13 @@ session is 674 whichever stream it takes. Earlier handoffs:
    sandbox `DYNAMICS_URL` and its own Postgres database (Neon branch
    `j27-preview`). Staff sign-in works only through
    `wmkfresearchapps-preview.vercel.app`; the owner signs in and repoints that
-   alias himself, or Claude does at his request. **Since 2026-11-11 it points
-   at `wmkfresearchapps-e5t3tam4d-justin-gallivans-projects.vercel.app`
-   (`dpl_EQFqtn7LtKy9G3XyNuspzzquvo6z`, `claude/j27-read-model` at
-   `01a798524`)** `[VERIFIED via vercel inspect and the deployment's API
-   meta]`. Previous target, to restore if needed:
+   alias himself, or Claude does at his request. **At the close of Session
+   673 it points at
+   `wmkfresearchapps-aasyjbl9f-justin-gallivans-projects.vercel.app`
+   (`dpl_HfWztktsLVVAXXAYLS26kgbFfMkE`, `claude/j27-read-model` at
+   `5f81733db`)** `[VERIFIED via vercel inspect and the deployment's API
+   meta]`. The alias was moved build by build through the day; the target
+   before Session 673 moved it, to restore if needed:
    `dpl_2GaUBQnXmXsYd2WdYEnxAKfppSxV` (`ksb8kwki6`, `393da5dde`).
 5. **Preserve:** sandbox fixtures 1000368 to 1000387; the untracked
    `docs/plans/J27_WORKBENCH_DEVELOPMENT_BRIEF_2026-11-06.md` in the main
@@ -72,9 +74,11 @@ page agree with it. The Deliberations and Final Assessment tabs are request
 lists built from facts worked out on the server for every viewer, and the
 request page uses the same facts. Two guards now stop group review before a
 presentation (2027 and later cycles) and stop any review step for an
-offramped request. Nothing is tied to the cycle named J27 any more. All on the
-J27 line; **not promoted, not on the Preview, not exercised in a browser or
-against live data.** The owner gave a standing go-ahead to build, with Codex
+offramped request. Nothing is tied to the cycle named J27 any more. On
+2026-11-11 the line went to the sandbox Preview, and the owner's first look
+there led to four small changes to the Reviewers views and the next-step line
+(items 9 to 11). All on the J27 line; **not promoted; the owner has looked at
+parts of it on the Preview but has not walked every tab.** The owner gave a standing go-ahead to build, with Codex
 adversarial review of plans and builds and Claude deciding when iteration
 stops (2026-11-10).
 
@@ -125,21 +129,42 @@ stops (2026-11-10).
 8. **Failing test fixed** (`3cb22bbb8`): the reviewer follow-up test expected
    the panel's loading text; the shell now shows "Loading…" until it knows
    the layout, for earlier-cycle links without a cycle too.
+9. **Preview moved, 2026-11-11** (`518ac8a4d` records it in the rollout
+   plan): see Verified Open 1 and rule 4.
+10. **Reviewer views (D66)** (`3f4d570df`, `9ff369953`, `c6bdd8e80`): the J27
+    Reviewers views are Find · Invite · Track · Roster, with the shorter
+    labels; the read-only roster summary comes last and lost its own heading.
+    They open on Track when any reviewer is out, otherwise on Invite when saved
+    candidates wait, otherwise Find. The opening view is settled once per
+    request, so it does not jump to Find after the last invitation. Earlier
+    cycles are unchanged.
+11. **Next names the current phase's step (D67)** (`3f6d1b9b2`, `5f81733db`):
+    a Peer Review request no longer reads "Next: Record the staff rationale".
+    An earlier phase's open step is named on the request page's strip ("Still
+    open from an earlier phase: …") and counted on a list row ("2 earlier
+    steps still open"). Such a row is not called idle. The stage model is
+    unchanged. Rule: `earlierTaskKeys` in `shared/utils/j27CycleRows.js`.
 
-Verification at `f5cbc0361` (code unchanged since): full Jest, 1,562 suites
-pass; type check; every `check:*` gate and its self-test pass except
-`check:agent-invariants`, red only in the J27 worktree because its
-per-machine memory link is missing. CI on `main` green at `6c96aab57`.
-**Not exercised:** anything in a browser, the Preview, live Dataverse, the
-feed's cost at volume (three batched reads per load; Codex counts at least
-36 queries at 300 rows).
+Verification at `f5cbc0361`: full Jest, 1,562 suites pass; type check; every
+`check:*` gate and its self-test pass except `check:agent-invariants`, red
+only in the J27 worktree because its per-machine memory link is missing. CI
+on `main` green at `6c96aab57`. For items 10 and 11: the J27, workbench and
+reviewer suites pass at `5f81733db`, the type check is clean, and the new
+tests fail when their rule is removed. A full run with 4 workers passed at
+`3f6d1b9b2`. The full run at `c6bdd8e80` had one failure,
+`reviewer-rehearsal-launcher`, which passes alone (18/18), under heavy load
+from other sessions' runs. No full run at `5f81733db`. Items 10 and 11 had
+no Codex review. **Not exercised:** live Dataverse writes, every tab in a
+browser, the feed's cost at volume (three batched reads per load; Codex
+counts at least 36 queries at 300 rows).
 
 #### Commits
 
 J27 line (`claude/j27-cycle-page`, all pushed): `3cb22bbb8`, `2ad468d96`,
 `afad05e16`, `c6292bbf1`, `3f561b330`, `7ed3f9322`, `31ee18bb6`, `91fc83581`,
 `e64587bc8`, `75b73897f`, `3d9e71363`, `562717d42`, `981095662`, `078cecef3`,
-`4a2f9c82e`, `ffdeedb43`, `f5cbc0361`, `01a798524`.
+`4a2f9c82e`, `ffdeedb43`, `f5cbc0361`, `01a798524`, `518ac8a4d`, `3f4d570df`,
+`9ff369953`, `3f6d1b9b2`, `c6bdd8e80`, `5f81733db`.
 `main` (documentation only, pushed): `5231fb6b3` through `33e2dc907`,
 including the later-phase lists plan and this handoff.
 
@@ -154,9 +179,10 @@ including the later-phase lists plan and this handoff.
    `CHAIRS_RECOMMENDATION_ENABLED`, `FINAL_WRITEUP_SCHEMA_READY` all `on`;
    `STAFF_DELIBERATIONS_SITE_VISIT_STATE_STATUS_PAIRS` copied from Production,
    `[[0,1,true],[1,2,true],[2,3,false],[3,4,true]]`), all read back from
-   Vercel; the build was attested and the alias moved (rule 4). **Not yet
-   done:** signing in and walking every tab, a request in each phase, and
-   timing the feed. Note that `CHAIRS_RECOMMENDATION_ENABLED` still limits the
+   Vercel; the build was attested and the alias moved (rule 4), and again
+   for each later commit. The owner has signed in and looked at #1000370's
+   Reviewers views and the Peer Review list. **Not yet done:** walking every
+   tab, a request in each phase, and timing the feed. Note that `CHAIRS_RECOMMENDATION_ENABLED` still limits the
    step to test requests or the rehearsal request id.
 2. **Confirm one behaviour on the request page** (owner): the stage strip,
    like the list, shows no next step in Deliberations until the presentation
@@ -169,8 +195,8 @@ including the later-phase lists plan and this handoff.
 5. **Promotion** remains the owner's decision; path in the rollout plan on
    the branch (migration 096 on Production first).
 6. Carried: the Final Assessment tab's "Checking the writeup stage…" seen on
-   #1000369 is likely the missing `FINAL_WRITEUP_SCHEMA_READY` on the Preview
-   (status returns unavailable); confirm on the walk-through.
+   #1000369 was likely the then-missing `FINAL_WRITEUP_SCHEMA_READY`, now set
+   for the Preview branch; confirm it is gone on the walk-through.
 
 #### Owner Decision Needed
 
@@ -200,9 +226,10 @@ including the later-phase lists plan and this handoff.
 
 #### Verify Before Acting
 
-1. **`ffdeedb43` and `f5cbc0361` had no Codex review** (stop rule: two rounds
-   per piece). Both are narrow, with tests that fail if their rule is
-   removed.
+1. **`ffdeedb43`, `f5cbc0361` and the 2026-11-11 Preview-feedback commits
+   (`3f4d570df` to `5f81733db`) had no Codex review** (stop rule: two rounds
+   per piece; the later ones are small UI rules from the owner's look). Each
+   has tests that fail if its rule is removed.
 2. **The stage model raises "presentation end not verified" when no
    presentation exists.** Existing reviewed tests require it; the list does
    not show it. Do not "fix" it without rechecking those tests.
@@ -221,13 +248,16 @@ including the later-phase lists plan and this handoff.
    https://claude.ai/artifact/Fov94msvFQit3QZCzv4TZZ has invented data.
 8. **Codex sandbox and git:** a Codex build run could not write the
    worktree's git index; Claude committed its work after review. Plan for it.
+9. **Watching a Preview build:** `vercel inspect` prints on stderr; a polling
+   loop that discards stderr never sees the id (cost 14 minutes on
+   2026-11-11). Recorded in `.claude-memory/project-vercel-cli-deploy-preview-auth.md`.
 
 #### Do Not Reopen Without New Decision
 
 1. Everything in Session 672's list (tabs and order; retired terms; wording;
    staff decisions in Phase I Status; no rerun on file replacement; J27
    Proposal section; D7, D8): `git show 33a233633:SESSION_PROMPT.md`.
-2. Session 673's decisions above (D60, D62 to D65), and the closed Overview
+2. Session 673's decisions above (D60, D62 to D67), and the closed Overview
    link finding.
 
 ### Key Files Reference
@@ -235,13 +265,14 @@ including the later-phase lists plan and this handoff.
 | File | Purpose |
 |---|---|
 | `docs/plans/J27_LATER_PHASE_LISTS_PLAN_2026-11-10.md` (`main`) | The design, owner decisions, review record (section 6) |
-| `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md` (branch) | D53 to D65 |
+| `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md` (branch) | D53 to D67 |
 | `docs/plans/J27_WORKBENCH_PRODUCTION_ROLLOUT_2026-11-07.md` (branch) | Settings table, Preview steps, pre-promotion checks |
 | `lib/services/workbench/j27-later-facts.js` (branch) | The four later-phase facts, one rule for every reader |
 | `lib/services/final-writeup/transition-schedule.js`, `transition-state.js` (branch) | The two guards; `stageFacts` on the status read |
 | `shared/utils/j27PageStage.js` (branch) | The page's composer: whole keys, latest report wins |
 | `shared/utils/j27CycleRows.js`, `shared/config/j27Labels.js` (branch) | List rules and labels |
 | `shared/components/workbench/workbench-location.js`, `WorkbenchShell.js` (branch) | Tabs, second sections, old links |
+| `shared/components/reviewers/ReviewersTab.js`, `reviewer-modes.js` (branch) | Reviewer views order and the opening view (D66) |
 
 ### Testing
 
