@@ -95,3 +95,14 @@ test('rollback failure is secondary and cannot erase original failure or unknown
  await expect(s.bridgeTransaction(90,async()=>{})).rejects.toBe(original);
  expect(original).toMatchObject({transactionPhase:'commit',bridgeCommitted:null,rollbackSucceeded:false,rollbackError:'rollback unavailable'});
 });
+test('inactive creation selects only atomic lifecycle transport with bounded timeout',async()=>{
+ const client={raw:jest.fn(),createInactiveExpertiseProfile:jest.fn().mockResolvedValue({ok:true})};
+ const s=createStore({env:env(),client,pg:pgMock()});
+ await s.create({wmkf_staffuser:null,statecode:1,wmkf_creationkey:'app_'+GUID});
+ expect(client.raw).not.toHaveBeenCalled();expect(client.createInactiveExpertiseProfile).toHaveBeenCalledWith({statecode:1,statuscode:2,wmkf_creationkey:'app_'+GUID},{timeoutMs:30000});
+});
+test('unknown state fails closed without either write path',async()=>{
+ const client={raw:jest.fn(),createInactiveExpertiseProfile:jest.fn()};
+ await expect(createStore({env:env(),client,pg:pgMock()}).create({statecode:2})).rejects.toThrow('Invalid profile state');
+ expect(client.raw).not.toHaveBeenCalled();expect(client.createInactiveExpertiseProfile).not.toHaveBeenCalled();
+});

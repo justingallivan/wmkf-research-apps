@@ -103,7 +103,7 @@ complete target census → metadata/link preflight → create-only Dataverse wri
 one locked bridge transaction → private receipt. There is no app/UI entry point,
 no matching prompt change and no consumer cutover in this slice.
 
-## Sandbox execution contract (canary blocked)
+## Sandbox execution contract
 
 `execute-expertise-roster-import.cjs` requires all six arguments:
 `--source FILE --mapping FILE --reviewed-plan FILE --env PRIVATE_FILE
@@ -124,8 +124,10 @@ use service-principal attribution; staff-editor permission/attribution verificat
 remains separate. The executor does not change schema, auditing, permissions or flags.
 
 The target must have active creation/User/Contact keys, table auditing and optimistic
-concurrency. A complete census and per-link reads precede writes. New records use
-POST only. A lost response is recovered by reading the same key and comparing every
+concurrency. A complete census and per-link reads precede writes. Active records use one POST. Inactive records use one atomic change set: POST
+creates the row as active, then PATCH `$1` deactivates only that just-created row
+before commit. The change-set contract is all-or-nothing (Microsoft Web API documentation);
+sandbox verification is recorded below. No pre-existing row is updated. The client method is sandbox-only and checks both embedded responses. A lost response is recovered by reading the same key and comparing every
 managed value. A mismatch fails without overwriting or deleting the profile.
 
 The dedicated local bridge transaction locks the old roster, identity and binding
@@ -196,8 +198,8 @@ Staff eligibility, new PD staging and placeholder exclusion are recorded in
 `OWNER_MAPPING_DECISIONS_2026-11-09.md`. Slot storage is parent-session inheritance.
 Complete the remaining
 schema/audit/keys/permissions verification, integrate consumers, and rehearse
-actual import plus rollback. First resolve the inactive-create rejection recorded below;
-the executor cannot currently import inactive profiles. The owner-reviewed minimal matching
+actual import plus rollback. The atomic inactive-create repair is implemented and
+Fable-reviewed; its live canary result is the next verification gate. The owner-reviewed minimal matching
 prompt contract and verified old-deployment admission/drain remain cutover prerequisites.
 
 ## Historical verification record — November 9, 2026
@@ -275,8 +277,12 @@ rows, zero identities/bindings, and unchanged sequence last_value 4 / is_called 
 No cleanup, PATCH, schema change or real-data import was attempted. Colima and the
 existing dedicated rehearsal container were started and left running.
 
-Next: investigate and review an inactive-creation lifecycle compatible with the
-create-only import safety contract, then rerun the canary. Do not silently import
+[VERIFIED via source and Fable review] Repair: the sandbox-only client operation
+`createInactiveExpertiseProfile` uses a single atomic create/deactivate change set.
+The PATCH addresses only the POST Content-ID `$1`; it cannot name a retained row.
+Existing keyed profiles still require exact equality, with no repair PATCH. The store
+selects this path only for state 1 and refuses unknown states. Rerun the same canary
+after the successful review; this implementation is not yet live-verified. Do not silently import
 inactive people as active or bypass exact-value checks. Successful commit/replay and
 empty-string behavior remain unverified; recover the private source before its census.
 

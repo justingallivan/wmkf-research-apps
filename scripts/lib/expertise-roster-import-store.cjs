@@ -1,6 +1,7 @@
 /** Sandbox + dedicated local-Postgres import transport. No Production path.
  * Operational import is service-principal attributed; staff editor attribution
- * is a separate contract. No metadata changes, profile updates or deletions.
+ * is a separate contract. No metadata changes, existing-profile updates or deletions.
+ * Inactive creates use one atomic create/deactivate changeset.
  */
 const {assertTarget} = require('../../lib/services/expertise-finder/roster-rehearsal-target.cjs');
 const contract = require('../../lib/services/expertise-finder/roster-contract.cjs');
@@ -72,7 +73,13 @@ function createStore({env, client, pg}) {
       if (r.status === 404) return null;
       return normalized(checked(r));
     },
-    async create(values) { checked(await post(ENTITY, payload(values))); },
+    async create(values) {
+      check(values.statecode === 0 || values.statecode === 1, 'Invalid profile state');
+      const body = payload(values);
+      if (values.statecode === 1) {
+        await client.createInactiveExpertiseProfile(body, {timeoutMs:30000});
+      } else checked(await post(ENTITY, body));
+    },
     async bridgeTransaction(floor, work) {
       let phase = 'begin', began = false;
       try {
