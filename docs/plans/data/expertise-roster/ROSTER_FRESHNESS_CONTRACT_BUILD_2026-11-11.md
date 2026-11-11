@@ -1,5 +1,10 @@
 # Pure roster freshness comparison
 
+This receipt preserves the pure/offline checkpoint. The subsequent default-off
+shared staff endpoint is branch-built at `6fe01c88e` (docs `de67742db`); final Opus
+closure is blocked pending explicit payload authorization, not READY. See the
+[current plan checkpoint](POWER_AUTOMATE_RECOMMENDATIONS_PLAN_2026-11-11.md).
+
 [VERIFIED via source and coordinating-session tests] The exported
 `compareRecommendationsRosterFreshness({expectedRosterHash, current})` is source-built.
 It requires only a retained lowercase SHA-256 hash and fresh `{complete, profiles,

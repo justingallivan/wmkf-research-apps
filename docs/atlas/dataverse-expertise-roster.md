@@ -134,10 +134,15 @@ No live calls or assignment writes were added. The initial source policy is AI M
 The shared offline typed fixture is built at runtime `7d0cf0392`, checkpoint
 `eb0010163` (coordinating-session source verification; reported 380 tests/25 suites,
 Opus READY). The agreed earlier interface is `a756735fa`; `0c4b8d39c` remains its
-historical runtime baseline. The shared staff access/currentness facade is offline-built at `c9777bc87`
-(docs `4a2eb6fa6`), with reported 409 tests/26 suites and Opus READY, and coordinating-
-session source review. It uses injected fabricated readers; no HTTP/live-DAL bridge
-or PA release is established.
+historical runtime baseline. The shared staff endpoint is branch-built and default-off at runtime `6fe01c88e`,
+docs `de67742db` (clean checkpoint verified by the coordinating session). Shared
+verification reports 527 tests/32 suites including three PostgreSQL suites, types,
+lint, applicable gates/secret-scan self-test and an environment-free guarded build
+passing, with four DOCX warnings. No activation, provider call, provisioning,
+deployment or positive live compatible-job proof occurred; a live producer/PA
+generation path is not established. Initial Opus review was READY WITH NAMED CHANGES;
+fixes were locally verified, but final Opus closure was blocked by automatic approval
+review and awaits explicit payload authorization. It is not a final READY verdict.
 The roster-only freshness comparator is source-built with 21 new passing tests
 (final combined 120 tests across seven suites); Opus source review returned READY with no concrete defects. It compares a
 retained hash to a trusted complete fresh projection, returning only current/stale/
