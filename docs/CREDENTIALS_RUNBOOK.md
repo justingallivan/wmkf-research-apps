@@ -229,10 +229,12 @@ the post-flip Workbench smoke emitted `mode=on` and no denial.
 
 **[VERIFIED via branch source, 2026-11-11]** The staff proposal draft trial
 defaults off. The separately approved Request 1003384 cohorts activated the gate
-only inside a local process. The trial left environment files, cron scheduling
-and deployments unchanged. It used the real Dataverse target and a
-short-lived, collection-POST-only rehearsal grant for the approved profile,
-tasks and AI-run audits. See the [staff trial plan](plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md).
+only inside local processes. Both left environment files, cron scheduling
+and deployments unchanged. On the real Dataverse target, short-lived
+rehearsal grants allowed the first cohort's approved profile and prompt
+POSTs, the second cohort's v2 prompt POSTs and conditional PATCHes of the
+exact two prior-version prompt rows, and the scoped AI-run audit POSTs.
+The runners checked the permitted record identities and operation scope. See the [staff trial plan](plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md).
 
 | Variable | Purpose | Contract |
 |---|---|---|
