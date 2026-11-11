@@ -64,6 +64,12 @@ invocations. Request linkage is present only when the Executor caller supplies
   v1 prompt and Request links, and current actor impersonation. The
   second cohort also read back both content-free audits linked to v2.
   [Trial receipt](../plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md#live-generation-outcome).
+- **[VERIFIED 2026-11-11 via scoped Sandbox write and readback]** The local
+  recommendations trial for Sandbox Request 1000339 delivered content-free
+  failure audit `2071381b-d4b7-4279-8f33-ce26e42f7dc1` after domain validation
+  rejected the saved response. Readback matched the frozen Request and
+  prompt, backend app creator, and empty raw output and override fields.
+  This used app-native attribution. [Sandbox trial receipt](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#live-sandbox-trial-outcome).
 - `pages/api/phase-i-dynamics/summarize.js` — Phase I summarization
 - `pages/api/grant-reporting/extract.js` — Grant Reporting extraction and goals assessment; writes a best-effort `wmkf_ai_run` audit row, not extracted values to `akoya_request` (`lib/services/grant-reporting/extract-service.js`)
 - `scripts/probe-impersonation-resmoke.js`, `scripts/probe-impersonation-as-user.js` — write sentinel rows during impersonation testing (S135). Filter `wmkf_ai_model='impersonation-resmoke'` to find them.

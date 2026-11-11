@@ -278,8 +278,11 @@ requires exactly `requestId`, `jobId`, `profileId`, `systemUserId`,
 staff subject and one exact Sandbox Request/job to the machine app and
 cohort. The reader independently checks the active Sandbox app grant.
 Unset, invalid or mismatched configuration withholds access. The read grant
-confers no admission rights. An enabled grant with a compatible live
-Sandbox job remains pending. [Sandbox recommendations contract](plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#sandbox-recommendations-read).
+confers no admission rights. A temporary local grant for the live
+Sandbox job passed the signed metadata-only withholding check. The
+available/current result path remains unverified in a live run.
+[Sandbox recommendations contract](plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#sandbox-recommendations-read),
+[live outcome](plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#live-sandbox-trial-outcome).
 
 ### Optional — Local Sandbox recommendations trial
 

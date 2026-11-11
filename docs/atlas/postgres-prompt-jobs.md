@@ -87,8 +87,13 @@ Configuration, results and audit outbox content expire after seven days.
 Source and response content expire after 24 hours. The bounded cleanup
 checks the pinned database, exact job, owner tuple and task before
 deleting expired content. Receipts remain and continue to count against
-the singleton. Operator cleanup and live admission evidence are pending.
-[Local trial contract](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#local-sandbox-recommendations-trial).
+the singleton. The approved shared-database run admitted one job for
+Sandbox Request 1000339. It saved the sealed snapshot and one provider
+response. Domain validation rejected the response, and the separate
+Sandbox audit was delivered. No validated result was retained. Physical
+cleanup remains due at the two scoped expiry deadlines.
+[Live outcome](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#live-sandbox-trial-outcome),
+[retention](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#sandbox-trial-retention).
 
 ## Synthetic safeguard follow-up (2026-11-11)
 

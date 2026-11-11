@@ -35,7 +35,11 @@ option, and the trial uses no fallback.
 `633f12a7cbf1690bb9341ae352a1807d180826aaf8d6dfbff2910ce8043f7d44`.
 Node syntax, scoped ESLint and the offline runner guard test passed.
 The grant-proof regression at `faac0819c` passed 119 focused tests.
-The reviewed source packet predates these local fixes.
+The reviewed source packet predates these local fixes. During live
+preflight, `f994e9f56` allowed only the pinned read-only staff lookup
+over the installed Neon SDK's HTTP transport. Its guard was tested
+against that exact SDK with mocked network traffic. This narrow
+transport fix postdates the Opus source review.
 
 ## Live boundary
 
@@ -51,4 +55,5 @@ The separately approved SharePoint copy and read-only preparation for
 Sandbox Request 1000339 succeeded with no trial ledger writes. At the
 close of source review, Sandbox prompt/profile publication, trial
 admission, the provider request, AI-run audit and signed GET were still
-pending. [Source and local trial evidence](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#local-sandbox-recommendations-trial).
+pending. [Source and local trial evidence](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#local-sandbox-recommendations-trial),
+[live trial outcome](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#live-sandbox-trial-outcome).

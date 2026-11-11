@@ -1,6 +1,6 @@
 # Shared Executor task interfaces
 
-**Status [BRANCH-BUILT, offline fixture and read facade], [BRANCH-BUILT, default-off Sandbox read and local admission], and [PLANNED, live caller integration].**
+**Status [BRANCH-BUILT, offline fixture and default-off Sandbox runtime], [LIVE-VERIFIED, local trial through authenticated withholding], and [PLANNED, broader caller integration].**
 This checkpoint coordinates the proposal-draft and expertise recommendation
 streams. The shared infrastructure owner controls the capability
 registry, Admin compiler, authorization, Executor, worker and ledger. The roster
@@ -121,9 +121,10 @@ projection. The route reuses the offline facade's receipt, owner,
 authorization and expiry fences.
 
 The GET remains read-only. The local operator trial below supplies a
-separate admission path. An authenticated live GET with a compatible
-Sandbox result remains pending. Production, PA and deployment remain
-outside the trial.
+separate admission path. A signed GET returning an available, current
+Sandbox result remains unverified. The trial uses Sandbox Dataverse and
+the approved shared PostgreSQL ledger. PA and deployment remain outside
+the trial.
 
 ## Local Sandbox recommendations trial
 
@@ -180,9 +181,58 @@ READY WITH NAMED CHANGES. The runner checks the exact database endpoint
 as well as the database identity. The configured application PostgreSQL
 database is shared by Production and Preview, even with Sandbox Dataverse.
 The owner explicitly approved one scoped trial on the shared ledger.
-No Sandbox trial prompt publication, job admission, provider call, audit
-delivery or signed GET has been verified.
 [Opus source review and dispositions](../audits/EXPERTISE_SANDBOX_ADMISSION_OPUS55_2026-11-11.md).
+
+### Live Sandbox trial outcome
+
+[VERIFIED 2026-11-11 via controlled runner, ledger and audit readback]
+Sandbox Request 1000339 used the approved combined PDF and the complete
+Sandbox roster. The runner published and verified one profile and one
+prompt in Sandbox Dataverse, admitted one job in the approved shared
+PostgreSQL ledger, and sealed the snapshot before dispatch.
+
+| Receipt | Value |
+| --- | --- |
+| Profile publication UUID | `a2c5629d-14e2-4eb8-9f5e-015cab42133c` |
+| Sandbox prompt row | `d190a925-f060-4ac6-acf2-88b63a61ee7f` |
+| Shared PostgreSQL job | `d85b9e13-a7a1-44a9-ae39-5961f4a9696a` |
+| Sandbox failure audit | `2071381b-d4b7-4279-8f33-ce26e42f7dc1`, delivered and read back |
+| Provider | One Sonnet 4.6 request, 14,190 input, 2,325 output, 21,376 cache-write and zero cache-read tokens |
+| Cost | $1.105236 preflight ceiling, $0.157605 estimated from usage |
+
+The saved response passed the closed JSON shape check. Offline validation
+of that exact checkpoint found `consultant_overlap[2]` used a valid roster
+GUID in the Board category, where the contract required Consultant.
+The live task recorded `failed_validation` / `profile_output_invalid`.
+It retained no validated recommendation result. The separate
+content-free audit was delivered by the Sandbox backend app without
+staff impersonation. The trial proved live publication, admission,
+snapshot and dispatch fences, response checkpointing, validation denial
+and audit delivery. It produced no usable recommendations. The
+operator made no paid retry, Request-field write or deployment.
+
+A normal Microsoft OAuth session then read the exact job through the
+local signed GET. The browser showed only the Request and job IDs,
+task key, contract version, expiry, `status: unavailable` and
+`freshness: unknown`. The separate anonymous GET returned 307 to
+sign-in. This verifies authenticated withholding after a failed
+generation. A signed GET with an available, current recommendation
+remains unverified. The local server was stopped after the check.
+
+### Sandbox trial retention
+
+The operator must run exact-job expiry after **2026-11-12 22:19:56.668 UTC**
+for source and response content, and again after **2026-11-18 22:19:56.668 UTC**
+for configuration and audit content and any retained result content.
+This run has no retained result. The operator runner requires the
+original private trial directory and pinned database and job identity.
+
+```sh
+node scripts/run-expertise-sandbox-trial-1000339.cjs expire /private/tmp/wmkf-expertise-sandbox-trial-20261111
+```
+
+The deletion checks are pending until those deadlines. The approved
+SharePoint copy and ledger receipts remain in place.
 
 ## Capability and result path
 
@@ -490,5 +540,5 @@ non-enumerating access checks. The environment-file-free source-copy
 build exited zero with the non-loopback Node TCP guard and included the
 new route. Four existing DOCX tracing warnings remained. Scoped lint,
 types and repository gates passed. Test receipts and observations were
-fabricated. No compatible live Sandbox job, route activation, model run,
-or deployment was verified.
+fabricated. This historical regression preceded the live operator
+trial above.
