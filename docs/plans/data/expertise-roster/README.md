@@ -170,8 +170,8 @@ Before a full import, separately authorize a one-row synthetic canary through th
 same executor: use a distinct synthetic lineage, an inactive staged new profile, and
 an empty-string text field. Verify exact read-back and retain the receipt. Count empty
 strings in the approved private source offline before deciding whether normalization
-needs a separately reviewed mapping policy. The November 10 authorized canary failed at inactive creation, before empty-string
-read-back could be tested; see the live record below. The private-source count remains
+needs a separately reviewed mapping policy. The November 10 rerun verified inactive creation, then failed because Dataverse
+normalized the empty role to null; see the live record below. The private-source count remains
 unperformed because the private source evidence is unavailable.
 
 Dataverse requests have 30-second timeouts so transport failure can release database
@@ -198,8 +198,9 @@ Staff eligibility, new PD staging and placeholder exclusion are recorded in
 `OWNER_MAPPING_DECISIONS_2026-11-09.md`. Slot storage is parent-session inheritance.
 Complete the remaining
 schema/audit/keys/permissions verification, integrate consumers, and rehearse
-actual import plus rollback. The atomic inactive-create repair is implemented and
-Fable-reviewed; its live canary result is the next verification gate. The owner-reviewed minimal matching
+actual import plus rollback. The atomic inactive-create repair is Fable-reviewed and live-verified.
+The next blocker is an explicit policy for empty-string-to-null normalization; no
+comparison relaxation or mapping change has been authorized or implemented. The owner-reviewed minimal matching
 prompt contract and verified old-deployment admission/drain remain cutover prerequisites.
 
 ## Historical verification record — November 9, 2026
@@ -243,7 +244,7 @@ The live record below supersedes that operational status; full import parity, re
 private source evidence, consumer integration and Production release remain pending.
 
 
-## Live synthetic canary — November 10, 2026
+## Historical initial canary — November 10, 2026
 
 [VERIFIED via executor receipts and final read-only Dataverse/Postgres probes]
 Justin authorized one synthetic inactive new profile against the registered sandbox
@@ -265,8 +266,8 @@ no User/Contact links, lead eligibility false, empty `role`, other optional text
 Metadata/audit/concurrency/key preflight and category label/value verification passed.
 Dataverse rejected POST with HTTP 400 / `0x80048408`: status code 2 is invalid for
 `wmkf_ExpertiseProfileState.Active`. The submitted payload included `statecode: 1`
-and `statuscode: 2`; the server response therefore blocks the current inactive-create
-contract. Its underlying platform cause has not yet been established. Empty-string
+and `statuscode: 2`; the server response blocked the original direct inactive-create
+contract (repaired in the rerun below). Its underlying platform cause has not yet been established. Empty-string
 normalization was not reached.
 
 Both receipts report `success:false`, `bridgeCommitted:false`, failed row phase,
@@ -277,16 +278,49 @@ rows, zero identities/bindings, and unchanged sequence last_value 4 / is_called 
 No cleanup, PATCH, schema change or real-data import was attempted. Colima and the
 existing dedicated rehearsal container were started and left running.
 
-[VERIFIED via source and Fable review] Repair: the sandbox-only client operation
-`createInactiveExpertiseProfile` uses a single atomic create/deactivate change set.
-The PATCH addresses only the POST Content-ID `$1`; it cannot name a retained row.
-Existing keyed profiles still require exact equality, with no repair PATCH. The store
-selects this path only for state 1 and refuses unknown states. Rerun the same canary
-after the successful review; this implementation is not yet live-verified. Do not silently import
-inactive people as active or bypass exact-value checks. Successful commit/replay and
-empty-string behavior remain unverified; recover the private source before its census.
+## Atomic inactive-create repair and live rerun — November 10, 2026
+
+[VERIFIED via source, Fable review, batch response and independent readback]
+Commit `83cf6c93c` adds the sandbox-only client operation
+`createInactiveExpertiseProfile`: one change set containing POST followed by PATCH
+of its Content-ID `$1`. Existing keyed rows remain immutable. Unknown states and
+non-sandbox targets fail closed. The complete request wire format, embedded status
+checks and private wire-body transport boundary have regression tests.
+
+Fable 5.2 returned READY for the bounded same-input canary, with no blocking defects.
+Report: `outputs/roster-inactive-fable-review-2026-11-10.md` (local ignored artifact).
+Its wire-format test recommendation was added before commit. Its diagnostic
+recommendations were addressed for this run by private capture of the raw batch
+response and separate client confirmation; no credentials were logged. 227 tests
+across 19 suites passed; the strengthened 14-test wire/client suite passed afterward.
+Lint, types, DAL/OData/GUID gates with sequential self-tests, and documentation gates
+passed. These tests do not replace the live evidence below.
+
+The same source, mapping, plan, lineage and creation key were rerun through the CLI.
+`atomic-run-context.json`, `atomic-batch-response.json`, `atomic-client-confirmation.json`,
+`atomic-receipt.json`, and `atomic-verification.json` are in the private directory above.
+The batch returned HTTP 200 with two embedded 204 responses; the client confirmed
+success directly (not by swallowing a parse failure and recovering through readback).
+Independent GET verified profile `db8e8f68-6add-f111-84ea-70a8a5b1c1c6` has
+`statecode:1`, `statuscode:2`, and the original creation key. Inactive creation works.
+
+The overall canary exited 2 because `wmkf_role` was persisted as null, although the
+reviewed input was the empty string. The exact-value guard stopped binding:
+`success:false`, `bridgeCommitted:false`, `rollbackSucceeded:true`, failed row with
+`profileOutcome:observed` and the retained GUID. Independent SQL readback shows
+three fixture roster rows, zero identities/bindings, sequence 4 / is_called true.
+One inactive synthetic profile now remains; it was not patched or deleted afterward.
+No Production writes or real-data import occurred.
+
+Next: recover the private source and count empty strings, then explicitly review
+whether to canonicalize empty text to null while retaining the immutable source.
+Do not bypass exact comparisons or mutate the retained canary without a reviewed
+reconciliation decision. Unchanged replay is blocked by this known mismatch.
+Successful bridge allocation/COMMIT/replay and a live forced changeset rollback
+remain unverified; this run proves the two-operation commit and subsequent SQL rollback.
 
 Narrow sweep mode A: current README, Atlas and roster session handoff now describe
-this failed canary. Dated pre-canary test/review records remain historical. Owner
-mapping decisions are unchanged. Evidence traces CLI → executor → Dataverse rejection
-→ SQL rollback → receipt → independent readback; no UI consumer is involved.
+the successful inactive-create repair and normalization-blocked canary. Dated earlier
+canary/test/review records remain historical. Owner
+mapping decisions are unchanged. Evidence traces CLI → executor → atomic Dataverse create/deactivate
+→ exact-value rejection → SQL rollback → receipt → independent readback; no UI consumer is involved.

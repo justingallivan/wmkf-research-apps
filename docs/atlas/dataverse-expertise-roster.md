@@ -14,11 +14,14 @@ Three Active alternate keys cover `wmkf_creationkey`, nullable `wmkf_contactguid
 is enabled. Table-level auditing was enabled with a table-scoped metadata update.
 Complete actor attribution/audit-event/permissions validation remains a release gate.
 
-The authorized sandbox importer canary at `04c44b9a8` ran November 10 and failed:
-Dataverse rejected inactive creation with HTTP 400 / `0x80048408` (status 2 invalid
-for Active). Local SQL locks/rollback executed; binding/COMMIT and empty-string
-round trips were not reached. Final readback found no canary profile, three existing
-sandbox profiles, zero local bridge identities/bindings and unchanged sequence 4.
+The authorized November 10 canary first failed on direct inactive creation. Repair
+`83cf6c93c` was Fable-reviewed and rerun with identical inputs: an atomic POST/PATCH
+Content-ID changeset returned two 204 responses and created one inactive synthetic
+profile (`statecode:1`, `statuscode:2`). Exact comparison then rejected the role field:
+Dataverse normalized empty string to null. The inactive profile remains, SQL rolled
+back, and final readback shows zero bridge identities/bindings and unchanged sequence 4.
+Successful binding/COMMIT/replay remains unverified. A reviewed empty-text policy and
+retained-row reconciliation are required before proceeding; unchanged replay blocks.
 Real roster data has not been imported. See the live canary record in
 `docs/plans/data/expertise-roster/README.md` for receipts and the next blocker. The related
 `expertise_roster_identity` and `expertise_roster_binding` tables exist only in the
