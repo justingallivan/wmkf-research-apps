@@ -58,7 +58,7 @@ async function main(argv) {
     key, JSON.parse(fs.readFileSync(args[option], 'utf8')),
   ]));
   let store;
-  async function readTarget() {
+  async function readTarget(options) {
     if (!store) {
       for (const key of ['DYNAMICS_TENANT_ID', 'DYNAMICS_CLIENT_ID', 'DYNAMICS_CLIENT_SECRET',
         'DATAVERSE_TARGET_INTERLOCK', 'DATAVERSE_DAL_ENFORCEMENT']) {
@@ -76,7 +76,7 @@ async function main(argv) {
       };
       store = createStore({ env, client });
     }
-    return store.readTarget();
+    return store.readTarget(options);
   }
   return runCutover({
     env, schema, phase, acknowledge: args['--execute'], manifestPath: args['--manifest'],

@@ -117,3 +117,14 @@ test.each([{name:'expertise_roster_cutover'},undefined,{}])('lifecycle state or 
  const calls=pg.query.mock.calls.map(([sql])=>sql);
  expect(calls.findIndex(sql=>sql.includes('to_regclass'))).toBeGreaterThan(calls.findIndex(sql=>sql.startsWith('LOCK TABLE')));
 });
+
+test('audit timestamps are selected only for the explicit rollback census',async()=>{
+ const client={raw:jest.fn().mockResolvedValue({ok:true,body:{value:[]}})};
+ const s=createStore({env:env(),client,pg:pgMock()});
+ await s.readTarget();await s.readTarget({includeAuditTimestamps:true});
+ const first=decodeURIComponent(client.raw.mock.calls[0][1]);
+ const second=decodeURIComponent(client.raw.mock.calls[1][1]);
+ expect(first).not.toMatch(/createdon|modifiedon/);
+ expect(second).toMatch(/createdon/);expect(second).toMatch(/modifiedon/);
+ expect(client.raw.mock.calls.every(call=>call[0]==='GET')).toBe(true);
+});

@@ -37,9 +37,9 @@ function createStore({env, client, pg}) {
   };
   return {
     targetHost:target.host,
-    async readTarget() {
+    async readTarget({includeAuditTimestamps=false} = {}) {
       const profiles = [], seen = new Set();
-      let next = ENTITY + '?$select=' + SELECT;
+      let next = ENTITY + '?$select=' + SELECT + (includeAuditTimestamps ? ',createdon,modifiedon' : '');
       while (next) {
         check(!seen.has(next) && seen.size < 100, 'Incomplete or looping roster census'); seen.add(next);
         const url = new URL(next, `https://${HOST}/api/data/v9.2/`);

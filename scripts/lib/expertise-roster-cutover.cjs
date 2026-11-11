@@ -5,7 +5,7 @@ const { randomUUID } = require('node:crypto');
 const target = require('../../lib/services/expertise-finder/roster-rehearsal-target.cjs');
 const contract = require('../../lib/services/expertise-finder/roster-contract.cjs');
 const {
-  createLifecycle, assertOperationalSchema, readState, installFreeze, verifyFreeze, removeFreeze, CONTROL_DDL,
+  createLifecycle, creationKey, assertOperationalSchema, readState, installFreeze, verifyFreeze, removeFreeze, CONTROL_DDL,
 } = require('../../lib/services/expertise-finder/roster-lifecycle.cjs');
 const { planImport, fingerprint, TEXT_POLICY } = require('./expertise-roster-import-plan.cjs');
 
@@ -16,10 +16,14 @@ const actions = {
   pause: { from: 'active', to: 'paused' },
   resume: { from: 'paused', to: 'active' },
   abort: { from: 'prepared', to: 'legacy' },
+  rollback: { from: 'paused', to: 'legacy' },
 };
 const bridgeFK = 'consultant_feedback_roster_identity_fk';
 const oldFK = 'consultant_feedback_consultant_roster_id_fkey';
 const maxId = 2147483647;
+const managedFields = ['name', 'role_type', 'is_active', 'dataverse_contact_id', ...contract.TEXT];
+const legacyWidths = { name: 255, role_type: 50, role: 255, affiliation: 500, orcid: 255,
+  keck_affiliation: 255, preferred_email: 320 };
 const quoted = value => '"' + value.replaceAll('"', '""') + '"';
 function check(ok, message) {
   if (!ok) throw Object.assign(new Error(message), { code: 'roster_cutover_refused' });
@@ -270,6 +274,181 @@ function verifyFrozenSource(local, metadata, manifest, exactBridge) {
   }
 }
 
+async function verifyLegacyProjection(client) {
+  const { rows: columns } = await client.query(`
+    SELECT a.attname AS name, format_type(a.atttypid,a.atttypmod) AS type, a.attnotnull AS required
+      FROM pg_attribute a
+     WHERE a.attrelid='expertise_roster'::regclass AND a.attnum>0 AND NOT a.attisdropped
+     ORDER BY a.attname`);
+  const types = {
+    id: 'integer', is_active: 'boolean', dataverse_contact_id: 'uuid',
+    created_at: 'timestamp without time zone', updated_at: 'timestamp without time zone',
+    created_by: 'integer', updated_by: 'integer',
+  };
+  const expected = [...managedFields, 'id', 'created_at', 'updated_at', 'created_by', 'updated_by']
+    .map(name => ({ name, required: ['id', 'name', 'role_type'].includes(name),
+      type: types[name] ?? (legacyWidths[name] ? `character varying(${legacyWidths[name]})` : 'text') }));
+  same(Object.fromEntries(columns.map(row => [row.name, row])), Object.fromEntries(expected.map(row => [row.name, row])),
+    'Unexpected legacy column layout.');
+  const { rows: indexes } = await client.query(`
+    SELECT c.relname AS name, i.indisvalid AND i.indisready AS usable,
+           i.indnkeyatts AS keys, i.indnatts AS columns, pg_get_indexdef(i.indexrelid,1,false) AS key,
+           pg_get_expr(i.indpred,i.indrelid) AS predicate
+      FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid
+     WHERE i.indrelid='expertise_roster'::regclass AND i.indisunique AND NOT i.indisprimary`);
+  same(indexes, [{ name: 'idx_expertise_roster_active_contact', usable: true, keys: 1, columns: 1,
+    key: 'dataverse_contact_id', predicate: '((dataverse_contact_id IS NOT NULL) AND (is_active = true))' }],
+  'Unexpected legacy active Contact index.');
+}
+
+function boundProfile(profile) {
+  const values = profile?.values;
+  check(values && creationKey(values.wmkf_creationkey) && [0, 1].includes(values.statecode) &&
+    typeof values.wmkf_leadpdeligible === 'boolean' &&
+    ['wmkf_staffuser', 'wmkf_contactguid'].every(key => values[key] === null || contract.guid(values[key])) &&
+    contract.TEXT.every(field => {
+      const value = values[contract.column(field)];
+      return value === null || typeof value === 'string';
+    }), 'Invalid or missing bound Dataverse profile.');
+  const { id, profile_guid, etag, updated_at, ...fields } = contract.decode({
+    ...values, wmkf_expertiseprofileid: profile.profileGuid, _wmkf_staffuser_value: values.wmkf_staffuser,
+  });
+  try {
+    return contract.normalize(fields, fields);
+  } catch {
+    check(false, 'Invalid bound Dataverse profile fields.');
+  }
+}
+function auditTimestamp(value) {
+  const parts = typeof value === 'string' && /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?Z$/.exec(value);
+  check(parts, 'Invalid Dataverse audit timestamp.');
+  const [, y, m, d, h, min, sec, fraction = ''] = parts;
+  const year = Number(y), month = Number(m);
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  check(year > 0 && month >= 1 && month <= 12 && Number(d) >= 1 && Number(d) <= days[month - 1] &&
+    Number(h) <= 23 && Number(min) <= 59 && Number(sec) <= 59 && !/[1-9]/.test(fraction.slice(6)),
+  'Invalid Dataverse audit timestamp.');
+  return `${y}-${m}-${d}T${h}:${min}:${sec}.${fraction.slice(0, 6).padEnd(6, '0')}Z`;
+}
+const projectionOf = row => Object.fromEntries(managedFields.map(field => [field, row[field]]));
+const activeContact = row => row?.is_active ? row.dataverse_contact_id : null;
+function reconcile({ local, manifest, snapshot, host, highWater }) {
+  const current = new Map(snapshot.profiles.map(row => [row.profileGuid, row]));
+  const baselineBound = new Map(manifest.boundProfiles.map(row => [row.profileGuid, row]));
+  const quarantine = new Map(manifest.unboundProfiles.map(row => [row.profileGuid, row.creationKey]));
+  const bound = new Set(local.bindings.map(row => row.dataverse_profile_guid));
+  const originals = new Map(local.source.map(row => [row.id, row]));
+  const final = new Map(originals);
+  const changes = [];
+  for (const profile of current.values()) {
+    check(bound.has(profile.profileGuid) || quarantine.get(profile.profileGuid) === profile.values.wmkf_creationkey,
+      'New unbound Dataverse profile requires reconciliation before rollback.');
+  }
+  for (const binding of local.bindings) {
+    const { roster_id: id, target_host: targetHost, dataverse_profile_guid: guid } = binding;
+    const prior = baselineBound.get(guid), profile = current.get(guid), original = originals.get(id);
+    check(targetHost === host && profile && (!original || prior) &&
+      (!prior || prior.values.wmkf_creationkey === profile.values.wmkf_creationkey), 'Missing or changed Dataverse profile binding.');
+    const next = boundProfile(profile);
+    let merged = { id, ...projectionOf(next) };
+    if (original) {
+      const before = boundProfile(prior);
+      check(before.dataverse_user_id === next.dataverse_user_id, 'Changed Dataverse User link cannot be restored to legacy.');
+      check(before.lead_pd_eligible === next.lead_pd_eligible ||
+        (before.lead_pd_eligible && !next.lead_pd_eligible && !next.is_active), 'Changed lead eligibility cannot be restored to legacy.');
+      merged = { id, ...projectionOf(original) };
+      for (const field of managedFields) {
+        if (next[field] !== before[field]) merged[field] = next[field];
+      }
+    } else {
+      check(!next.dataverse_user_id && !next.lead_pd_eligible, 'New legacy row has unsupported User or lead eligibility values.');
+    }
+    final.set(id, merged);
+    const fields = original ? managedFields.filter(field => merged[field] !== original[field]) : managedFields;
+    if (!fields.length) continue;
+    if (!original || fields.includes('preferred_email')) {
+      const email = merged.preferred_email;
+      check(email === null || email === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email), 'Preferred email is invalid for legacy.');
+      check(!merged.dataverse_contact_id || !email, 'Preferred email conflicts with a retained legacy Contact link.');
+    }
+    const modified = auditTimestamp(profile.values.modifiedon);
+    const created = original ? null : auditTimestamp(profile.values.createdon);
+    check(!created || created <= modified, 'Invalid Dataverse audit timestamp order.');
+    changes.push({ original, merged, fields, created, modified });
+  }
+  const contacts = new Set();
+  for (const row of final.values()) {
+    check(typeof row.name === 'string' && row.name.trim() && Object.hasOwn(contract.CATEGORIES, row.role_type) &&
+      typeof row.is_active === 'boolean' && (row.dataverse_contact_id === null || contract.guid(row.dataverse_contact_id)),
+    'Invalid legacy column value.');
+    for (const field of ['name', 'role_type', ...contract.TEXT]) {
+      const value = row[field];
+      check(value === null || (typeof value === 'string' && !value.includes('\0') &&
+        (!legacyWidths[field] || Array.from(value).length <= legacyWidths[field])), 'Value exceeds its legacy column limit.');
+    }
+    const contact = activeContact(row);
+    if (contact) {
+      check(!contacts.has(contact), 'Duplicate active Contact link in restored legacy roster.');
+      contacts.add(contact);
+    }
+  }
+  const nextLegacyId = Math.max(local.sequence.last_value, manifest.sequence.last_value, highWater, 0,
+    ...local.ids, ...final.keys()) + 1;
+  check(Number.isSafeInteger(nextLegacyId) && nextLegacyId > 0 && nextLegacyId <= maxId, 'Legacy sequence exhausted.');
+  const insertedRows = changes.filter(change => !change.original).length;
+  return { changes, final, result: { changedRows: changes.length - insertedRows, insertedRows, nextLegacyId } };
+}
+async function readLegacyAudit(client) {
+  return (await client.query(`SELECT id, created_by, updated_by,
+    created_at::text AS created_at, updated_at::text AS updated_at FROM expertise_roster ORDER BY id`)).rows;
+}
+async function applyRollback(client, schema, manifest, plan) {
+  const { changes, final, result: { nextLegacyId } } = plan;
+  const originalAudit = await readLegacyAudit(client);
+  const audit = new Map(originalAudit.map(row => [row.id, row]));
+  await removeFreeze(client);
+  const released = new Set(changes.filter(({ original, merged }) =>
+    activeContact(original) && activeContact(original) !== activeContact(merged)).map(({ merged }) => merged.id));
+  if (released.size) await client.query('UPDATE expertise_roster SET dataverse_contact_id=NULL WHERE id=ANY($1::int[])', [[...released]]);
+  for (const { original, merged, fields, created, modified } of changes) {
+    const id = merged.id;
+    const modifiedSql = `$${fields.length + 2}::timestamptz AT TIME ZONE 'UTC'`;
+    let saved;
+    if (original) {
+      const updates = released.has(id) && !fields.includes('dataverse_contact_id') ? [...fields, 'dataverse_contact_id'] : fields;
+      saved = await client.query(`UPDATE expertise_roster SET
+        ${updates.map((field, i) => `${field}=$${i + 2}`).join(',')},
+        updated_by=NULL, updated_at=$${updates.length + 2}::timestamptz AT TIME ZONE 'UTC'
+        WHERE id=$1`, [id, ...updates.map(field => merged[field]), modified]);
+    } else {
+      saved = await client.query(`INSERT INTO expertise_roster
+        (id,${fields.join(',')},created_at,updated_at,created_by,updated_by)
+        VALUES ($1,${fields.map((field, i) => `$${i + 2}`).join(',')},
+          $${fields.length + 3}::timestamptz AT TIME ZONE 'UTC',${modifiedSql},NULL,NULL)`,
+      [id, ...fields.map(field => merged[field]), modified, created]);
+    }
+    check(saved.rowCount === 1, 'Legacy reconciliation write count changed.');
+    const { rows: [stamps] } = await client.query(`SELECT
+      ($1::timestamptz AT TIME ZONE 'UTC')::text AS modified,
+      ($2::timestamptz AT TIME ZONE 'UTC')::text AS created`, [modified, created]);
+    audit.set(id, { id, created_by: original ? audit.get(id).created_by : null, updated_by: null,
+      created_at: original ? audit.get(id).created_at : stamps.created, updated_at: stamps.modified });
+  }
+  await client.query(`ALTER TABLE consultant_feedback DROP CONSTRAINT ${quoted(bridgeFK)}`);
+  await client.query(`ALTER TABLE consultant_feedback ADD CONSTRAINT ${quoted(oldFK)}
+    FOREIGN KEY (consultant_roster_id) REFERENCES expertise_roster(id)`);
+  const restored = await catalog(client, schema, false);
+  same(restored.feedbackFK, manifest.originalFeedbackFK, 'Restored feedback foreign key differs.');
+  await assertNoFreeze(client);
+  await client.query(`ALTER SEQUENCE expertise_roster_id_seq RESTART WITH ${nextLegacyId}`);
+  const local = await localSnapshot(client);
+  same(local.sequence, { last_value: nextLegacyId, is_called: false }, 'Legacy sequence restart differs.');
+  const expected = [...final].sort(([a], [b]) => a - b).map(([id, row]) => ({ id, ...projectionOf(row) }));
+  same(local.source.map(row => ({ id: row.id, ...projectionOf(row) })), expected, 'Restored legacy roster differs.');
+  same(await readLegacyAudit(client), [...audit.values()].sort((a, b) => a.id - b.id), 'Restored legacy audit differs.');
+}
+
 async function runCutover({ env, schema, phase, acknowledge, manifestPath, receiptPath, readTarget, review, connect, execute = false }) {
   assertOperationalSchema(schema);
   check(Object.hasOwn(actions, phase), 'An explicit rehearsal phase is required.');
@@ -292,12 +471,17 @@ async function runCutover({ env, schema, phase, acknowledge, manifestPath, recei
     const initial = await readState(client, host);
     const action = actions[phase];
     const observed = initial?.phase === action.to;
+    if (observed && action.to === 'legacy') {
+      check(initial.terminal_action === phase, 'Requested terminal action differs from the committed action.');
+    }
     check(observed || (initial?.phase ?? null) === action.from, 'Requested phase is incompatible with current state.');
     check(!initial || !Object.keys(initial.pending).length, 'Unsettled roster write intents prevent phase transition.');
     const original = readManifest(manifestFile);
     if (initial) verifyManifest(original, initial, host, schema);
-    const needsCensus = phase === 'prepare' || (phase === 'activate' && !observed);
-    const first = needsCensus ? census(await readTarget(), host) : null;
+    const rollingBack = phase === 'rollback' && !observed;
+    const needsCensus = phase === 'prepare' || (phase === 'activate' && !observed) || rollingBack;
+    const readCensus = async () => census(await (rollingBack ? readTarget({ includeAuditTimestamps: true }) : readTarget()), host);
+    const first = needsCensus ? await readCensus() : null;
     await client.query('BEGIN');
     transaction = true;
     await client.query('LOCK TABLE expertise_roster, expertise_roster_identity, expertise_roster_binding, consultant_feedback IN ACCESS EXCLUSIVE MODE');
@@ -329,6 +513,15 @@ async function runCutover({ env, schema, phase, acknowledge, manifestPath, recei
       ? Math.max(local.sequence.last_value, 0, ...local.source.map(row => row.id), ...local.ids)
       : state?.high_water ?? 0;
     check(highWater >= 0 && highWater <= maxId && (phase !== 'activate' || observed || highWater < maxId), 'Invalid or exhausted allocator high-water.');
+    let rollbackPlan;
+    if (rollingBack) {
+      await verifyLegacyProjection(client);
+      rollbackPlan = reconcile({ local, manifest: original, snapshot: first, host, highWater });
+      const { rowCount } = await client.query(`SELECT 1 FROM consultant_feedback
+        WHERE consultant_roster_id IS NOT NULL AND NOT (consultant_roster_id=ANY($1::int[])) LIMIT 1`,
+      [[...rollbackPlan.final.keys()]]);
+      check(rowCount === 0, 'Feedback references cannot be restored to legacy.');
+    }
     if (execute && !observed) {
       if (phase === 'prepare') {
         if (!original) writeManifest(manifestFile, manifest);
@@ -345,13 +538,14 @@ async function runCutover({ env, schema, phase, acknowledge, manifestPath, recei
           await catalog(client, schema, true);
         }
         if (phase === 'abort') await removeFreeze(client);
-        const result = await client.query(`UPDATE expertise_roster_cutover SET phase=$1,high_water=$2
+        if (rollingBack) await applyRollback(client, schema, original, rollbackPlan);
+        const result = await client.query(`UPDATE expertise_roster_cutover SET phase=$1,high_water=$2,terminal_action=$6
           WHERE target_host=$3 AND generation=$4 AND phase=$5 AND pending='{}'::jsonb`,
-        [action.to, highWater, host, state.generation, action.from]);
+        [action.to, highWater, host, state.generation, action.from, action.to === 'legacy' ? phase : null]);
         check(result.rowCount === 1, 'Lifecycle transition lost its expected state.');
       }
     }
-    if (needsCensus) same(census(await readTarget(), host), first, 'Dataverse census changed during the phase.');
+    if (needsCensus) same(await readCensus(), first, 'Dataverse census changed during the phase.');
     session.alive();
     if (execute && !observed) {
       committing = true;
@@ -361,7 +555,7 @@ async function runCutover({ env, schema, phase, acknowledge, manifestPath, recei
     transaction = false;
     const result = { phase, schema, status: observed ? 'observed' : execute ? 'committed' : 'dry-run',
       currentPhase: execute || observed ? action.to : state?.phase ?? null,
-      intendedPhase: action.to, generation: manifest?.generation ?? null, highWater };
+      intendedPhase: action.to, generation: manifest?.generation ?? null, highWater, ...rollbackPlan?.result };
     record(result);
     return result;
   } catch (error) {
