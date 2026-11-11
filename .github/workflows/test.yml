@@ -143,7 +143,7 @@ jobs:
         env:
           TEST_REQUEST_LEDGER_TEST_URL: postgres://postgres:ledger@127.0.0.1:5432/ledger
           TEST_REQUEST_LEDGER_REQUIRE: '1'
-      - run: npx jest tests/integration/prompt-jobs.pg.test.js tests/integration/prompt-jobs-executor.pg.test.js --runInBand
+      - run: npx jest tests/integration/prompt-jobs.pg.test.js tests/integration/prompt-jobs-executor.pg.test.js tests/integration/prompt-jobs-staff.pg.test.js --runInBand
         env:
           PROMPT_JOB_PG_TEST_URL: postgres://postgres:ledger@127.0.0.1:5432/ledger
           PROMPT_JOB_PG_TEST_REQUIRE: '1'

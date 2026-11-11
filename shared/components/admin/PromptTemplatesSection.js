@@ -135,7 +135,7 @@ function LegacyPromptTemplatesSection() {
   if (!prompts || prompts.length === 0) return <div className="text-gray-500 text-sm">No prompts found.</div>;
 
   const allGroups = groupState.groups;
-  const legacyPrompts = prompts.filter(prompt => !['synthetic.executive-summary','synthetic.methodology'].includes(prompt.name));
+  const legacyPrompts = prompts.filter(prompt => !['synthetic.executive-summary','synthetic.methodology','proposal.executive-summary','proposal.methodology'].includes(prompt.name));
   const activePrompts = legacyPrompts.filter(prompt => !prompt.isRetired);
   const retiredPrompts = legacyPrompts.filter(prompt => prompt.isRetired);
   const groups = allGroups.map(group => ({

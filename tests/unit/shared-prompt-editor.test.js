@@ -29,7 +29,7 @@ test('sample preview is required and task creation pins published profile and fi
   await ready();expect(screen.getByRole('button',{name:'Publish task'})).toBeDisabled();expect(screen.queryByRole('option',{name:'other-model'})).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button',{name:'Preview sample'}));await screen.findByRole('region',{name:'Sample preview'});expect(screen.getByText('Sample document')).toBeInTheDocument();
   const task=callBody('/api/admin/prompt-profiles','POST').task;const variables=JSON.parse(task.variables);expect(variables.execution.profile).toEqual({key:'proposal',revision:1,sha256:'a'.repeat(64)});expect(variables.variables).toEqual([{name:'proposal_context',source:{kind:'prepared_context'},required:true},{name:'pi_name',source:{kind:'frozen_record'},required:false}]);expect(JSON.parse(task.outputSchema).outputs[0]).toEqual({name:'summary',target:{kind:'none'},maxWords:200});expect(task.systemPrompt).toBe('');
-  fireEvent.click(screen.getByRole('button',{name:'Publish task'}));await screen.findByText('Published Executive summary, version 1.');expect(callBody('/api/admin/prompts','POST')).toMatchObject({...task,catalog:{title:'Executive summary (synthetic trial)',usage:'diagnostic'}});
+  fireEvent.click(screen.getByRole('button',{name:'Publish task'}));await screen.findByText('Published Synthetic executive summary, version 1.');expect(callBody('/api/admin/prompts','POST')).toMatchObject({...task,catalog:{title:'Synthetic executive summary',usage:'diagnostic'}});
 });
 test('edits invalidate preview, unknown placeholders and excessive token budgets block it',async()=>{
   await ready();fireEvent.click(screen.getByRole('button',{name:'Preview sample'}));await screen.findByText('Sample document');
@@ -41,7 +41,7 @@ test('profile publication creates immutable next revision with expected version'
 });
 test('publication failure preserves preview and retries the exact request id',async()=>{
   await ready();fireEvent.click(screen.getByRole('button',{name:'Preview sample'}));await screen.findByText('Sample document');let n=0;const old=global.fetch;global.fetch=jest.fn(async (url,opts)=>{if(url==='/api/admin/prompts'&&opts?.method==='POST' && n++===0) return response({error:'failed'},500);return old(url,opts);});
-  fireEvent.click(screen.getByRole('button',{name:'Publish task'}));await screen.findByRole('alert');expect(screen.getByText('Sample document')).toBeInTheDocument();const first=callBody('/api/admin/prompts','POST');fireEvent.click(screen.getByRole('button',{name:'Publish task'}));await screen.findByText('Published Executive summary, version 1.');const calls=global.fetch.mock.calls.filter(([url,opts])=>url==='/api/admin/prompts'&&opts?.method==='POST');expect(JSON.parse(calls[1][1].body).requestId).toBe(first.requestId);
+  fireEvent.click(screen.getByRole('button',{name:'Publish task'}));await screen.findByRole('alert');expect(screen.getByText('Sample document')).toBeInTheDocument();const first=callBody('/api/admin/prompts','POST');fireEvent.click(screen.getByRole('button',{name:'Publish task'}));await screen.findByText('Published Synthetic executive summary, version 1.');const calls=global.fetch.mock.calls.filter(([url,opts])=>url==='/api/admin/prompts'&&opts?.method==='POST');expect(JSON.parse(calls[1][1].body).requestId).toBe(first.requestId);
 });
 test('stale task load cannot replace a newer selection',async()=>{
   let resolveFirst;taskResponse=url=>url.endsWith('synthetic.executive-summary') ? new Promise(resolve=>{resolveFirst=resolve;}) : response({},404);
@@ -104,4 +104,22 @@ test('a replayed failed audit with the same request ID reloads and blocks republ
   });
   await ready();fireEvent.click(screen.getByRole('button',{name:'Preview sample'}));await screen.findByText('Sample document');fireEvent.click(screen.getByRole('button',{name:'Publish task'}));await screen.findByText('Could not publish the task. Retry the same previewed draft.');fireEvent.click(screen.getByRole('button',{name:'Publish task'}));await screen.findByText('The new version may exist and needs reconciliation. Reload the task.');await screen.findByText('This task has no single current version. Resolve its history before editing.');
   const calls=global.fetch.mock.calls.filter(([url,opts])=>url==='/api/admin/prompts'&&opts.method==='POST');expect(calls).toHaveLength(2);expect(JSON.parse(calls[0][1].body).requestId).toBe(JSON.parse(calls[1][1].body).requestId);expect(screen.getByRole('button',{name:'Publish task'})).toBeDisabled();expect(screen.queryByRole('button',{name:'Retry task load'})).not.toBeInTheDocument();expect(screen.getByLabelText('Task instructions')).toHaveValue('Summarize for {{pi_name}}.');
+});
+
+test('proposal task publication requires the stored PI declaration and uses its draft label',async()=>{
+  catalog.tasks.push({name:'proposal.executive-summary',kind:'proposal',outputName:'summary',maxWords:200});
+  try {
+    await open();fireEvent.change(screen.getByLabelText('Task'),{target:{value:'proposal.executive-summary'}});
+    await waitFor(()=>expect(screen.getByText('New task; publishing creates version 1.')).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText('Published profile'),{target:{value:'proposal@1'}});
+    fireEvent.change(screen.getByLabelText('Task instructions'),{target:{value:'Summarize the proposal.'}});
+    fireEvent.change(screen.getByLabelText('Reviewed Anthropic model'),{target:{value:'claude-sonnet-4-6'}});
+    expect(screen.getByRole('button',{name:'Preview sample'})).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Task instructions'),{target:{value:'Summarize for {{pi_name}}.'}});
+    fireEvent.click(screen.getByRole('button',{name:'Preview sample'}));await screen.findByText('Sample document');
+    const task=callBody('/api/admin/prompt-profiles','POST').task;
+    expect(JSON.parse(task.variables).variables).toContainEqual({name:'pi_name',source:{kind:'frozen_record'},required:true});
+    fireEvent.click(screen.getByRole('button',{name:'Publish task'}));await screen.findByText('Published Proposal executive summary, version 1.');
+    expect(callBody('/api/admin/prompts','POST').catalog.title).toBe('Proposal executive summary');
+  } finally {catalog.tasks.pop();}
 });

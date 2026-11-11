@@ -83,3 +83,10 @@ it('requires explicit concurrency/idempotency and prevents marker removal or con
   await expect(validateSharedTaskPublication({ ...args, payload: { ...task, variables: null } }, deps)).rejects.toMatchObject({ code: 'invalid_shared_task' });
   await expect(validateSharedTaskPublication({ ...args, priorRow: { ...priorRow, wmkf_ai_promptvariables: null } }, deps)).rejects.toMatchObject({ code: 'invalid_shared_task' });
 });
+
+it('proposal definition publication requires an authoritative PI and the fixed source profile',async()=>{
+  const{task,deps}=await fixture();task.name='proposal.executive-summary';
+  await expect(previewSharedTask({task},deps)).rejects.toThrow('stored PI');
+  const metadata=JSON.parse(task.variables);metadata.variables.find(v=>v.name==='pi_name').required=true;task.variables=JSON.stringify(metadata);
+  await expect(previewSharedTask({task},deps)).resolves.toMatchObject({sampleOnly:true});
+});

@@ -65,7 +65,7 @@ function DraftPanel({requestId,profileId}) {
     if (previous && same(previous.id,next.id) && next.version < previous.version) return;
     jobRef.current = next; setJob(next);
   }
-  function denied() { jobRef.current = null; setJob(null); setResult(null); setResultError(''); setEnabled(false); setError(''); }
+  function denied() { generation.current++; controllers.current.forEach(controller => controller.abort()); jobRef.current = null; setJob(null); setResult(null); setResultError(''); setEnabled(false); setError(''); }
   useEffect(() => {
     const epoch = generation.current, controller = new AbortController(), running = controllers.current; running.add(controller);
     (async () => {

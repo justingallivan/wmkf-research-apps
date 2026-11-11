@@ -1,4 +1,4 @@
-/** Synthetic shared-document profiles and tasks; publication remains server-validated. */
+/** Shared-document profiles and tasks; publication remains server-validated. */
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '../Layout';
 import { requestEnvelope } from '../../utils/api-request';
@@ -6,7 +6,7 @@ import { newRequestId } from './prompt-editor-utils';
 
 const INPUT = 'mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:bg-gray-100';
 const DEFAULT_LIMITS = {maxDocuments:1,maxDocumentBytes:262144,maxTotalDocumentBytes:262144,maxRecordBytes:16000};
-const LABELS = {'synthetic.executive-summary':'Executive summary','synthetic.methodology':'Methodology'};
+const LABELS = {'synthetic.executive-summary':'Synthetic executive summary','synthetic.methodology':'Synthetic methodology','proposal.executive-summary':'Proposal executive summary','proposal.methodology':'Proposal methodology'};
 const validName = value => /^[a-z][a-z0-9_-]{0,63}$/.test(value) && !['constructor','prototype','__proto__'].includes(value);
 const names = value => value.split(',').map(item => item.trim()).filter(Boolean);
 const id = publication => `${publication.profile.key}@${publication.profile.revision}`;
@@ -30,7 +30,7 @@ export default function SharedPromptEditor() {
   const [opened,setOpened] = useState(false);
   return <section className="mb-5 rounded-lg border border-gray-200 bg-white" aria-label="Shared document tasks">
     <div className="flex flex-wrap items-center justify-between gap-3 p-4">
-      <div><h3 className="text-sm font-semibold text-gray-900">Shared document tasks</h3><p className="mt-1 text-xs text-gray-600">Synthetic trial only. These tasks do not write to real Requests.</p></div>
+      <div><h3 className="text-sm font-semibold text-gray-900">Shared document tasks</h3><p className="mt-1 text-xs text-gray-600">Shared proposal drafts and synthetic trials. Request field writing is not enabled.</p></div>
       <Button type="button" variant="outline" size="sm" aria-expanded={open} onClick={() => { setOpened(true); setOpen(value => !value); }}>{open ? 'Hide editor' : 'Open editor'}</Button>
     </div>
     {opened && <div hidden={!open} className="border-t border-gray-200 p-4"><Editor /></div>}
@@ -124,9 +124,11 @@ function Editor() {
   const placeholders = [...task.body.matchAll(/\{\{([^{}]+)\}\}/g)].map(match => match[1].trim());
   const placeholdersValid = !/\{\{|\}\}/.test(task.body.replace(/\{\{[^{}]+\}\}/g,'')) && placeholders.every(name => validName(name) && selectedProfile?.profile.recordNames.includes(name) && name !== 'proposal_context');
   const tokenCeiling = Math.min(catalog?.maxOutputTokens || 0, models?.modelStatuses?.[task.model]?.capability?.maxOutputTokens || 0);
-  const taskValid = selectedProfile && capability && modelValid && task.body.trim() && placeholdersValid && /^\d+$/.test(task.maxTokens) && Number.isSafeInteger(tokenValue) && tokenValue > 0 && tokenValue <= tokenCeiling && ['new','existing'].includes(taskState);
+  const proposalTask = capability?.kind === 'proposal';
+  const proposalValid = !proposalTask || (JSON.stringify(selectedProfile?.profile.documentRoles) === '["proposal"]' && JSON.stringify(selectedProfile?.profile.recordNames) === '["pi_name"]' && placeholders.includes('pi_name'));
+  const taskValid = proposalValid && selectedProfile && capability && modelValid && task.body.trim() && placeholdersValid && /^\d+$/.test(task.maxTokens) && Number.isSafeInteger(tokenValue) && tokenValue > 0 && tokenValue <= tokenCeiling && ['new','existing'].includes(taskState);
   function taskPayload() {
-    const declarations = [...new Set(placeholders)].map(name => ({name,source:{kind:'frozen_record'},required:false}));
+    const declarations = [...new Set(placeholders)].map(name => ({name,source:{kind:'frozen_record'},required:proposalTask}));
     return {name:taskName,body:task.body,systemPrompt:'',variables:JSON.stringify({execution:{contractVersion:1,mode:'shared-document-task',profile:{key:selectedProfile.profile.key,revision:selectedProfile.profile.revision,sha256:selectedProfile.sha256}},variables:[{name:'proposal_context',source:{kind:'prepared_context'},required:true},...declarations]}),outputSchema:JSON.stringify({parseMode:'raw',outputs:[{name:capability.outputName,target:{kind:'none'},...(capability.maxWords ? {maxWords:capability.maxWords} : {}),...(capability.maxChars ? {maxChars:capability.maxChars} : {})}]}),model:task.model,maxTokens:tokenValue};
   }
   async function publishProfile() {
@@ -161,7 +163,7 @@ function Editor() {
   async function publishTask() {
     if (!taskValid || busy || !preview || preview.payloadKey !== JSON.stringify(taskPayload())) return;
     const payload = taskPayload();
-    const body = taskState === 'new' ? {...payload,catalog:{title:`${LABELS[taskName]} (synthetic trial)`,usage:'diagnostic'}} : {...payload,expectedVersion:taskVersion};
+    const body = taskState === 'new' ? {...payload,catalog:{title:LABELS[taskName],usage:'diagnostic'}} : {...payload,expectedVersion:taskVersion};
     if (taskState !== 'new') delete body.name;
     const requestId = requestIdentity(taskRequest,{name:taskName,body}), generation = editGeneration.current;
     setBusy('task'); setError(''); setNotice('');
