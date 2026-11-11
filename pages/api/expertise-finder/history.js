@@ -8,7 +8,7 @@
  *   offset: number - Default: 0
  */
 
-import { sql } from '@vercel/postgres';
+import { sql } from '../../../lib/services/expertise-finder/roster-sql.cjs';
 import { requireAppAccess } from '../../../lib/utils/auth';
 
 export default async function handler(req, res) {
