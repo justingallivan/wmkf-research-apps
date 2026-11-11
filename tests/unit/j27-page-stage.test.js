@@ -324,3 +324,34 @@ describe('report order and reopened drafts (Codex build review 3)', () => {
     expect(composeJ27PageInput(server(), legacyShape).presentation.ended).toBe(true);
   });
 });
+
+describe('the strip\'s next step in Deliberations (Codex build review 3, round 2)', () => {
+  const server = {
+    request: { status: 'present', cycleCode: 'J27', phaseIStatus: 100000003, requestStatus: 'Phase II Pending', statusClass: 'IN_FLIGHT' },
+    rationale: { status: 'present' }, reviewSummary: { status: 'present' }, visitAssessment: { status: 'present' },
+    roster: { status: 'present', stale: false },
+    presentation: { status: 'present', exists: true, id: 'v1', ended: true, legacyException: false },
+    boardDraft: { status: 'present', exists: true },
+    transition: { status: 'present', phase: null },
+  };
+
+  test('a reopened draft after an ended presentation reads "Write the Draft Writeup" on the strip', () => {
+    const facts = { finalWriteup: { error: true, code: 'final_writeup_source_ineligible' }, order: { finalWriteup: 1 } };
+    const stage = deriveJ27PageStage(server, facts);
+    expect(stage.phase).toBe('deliberations');
+    expect(stage.timing).toBe('after');
+    render(<J27StageStrip stage={stage} />);
+    expect(screen.getByText(new RegExp(J27_TASK_LABEL['write-board-draft']))).toBeInTheDocument();
+    expect(screen.queryByText(new RegExp(J27_TASK_LABEL['start-group-review']))).toBeNull();
+  });
+
+  test('before the presentation ends the strip, like the list, shows no next step', () => {
+    const before = { ...server, visitAssessment: { status: 'absent' }, roster: { status: 'absent' }, boardDraft: { status: 'present', exists: false },
+      presentation: { ...server.presentation, ended: false } };
+    const stage = deriveJ27PageStage(before, {});
+    expect(stage.phase).toBe('deliberations');
+    expect(stage.timing).toBe('before');
+    render(<J27StageStrip stage={stage} />);
+    expect(screen.queryByText(/^Next:/)).toBeNull();
+  });
+});

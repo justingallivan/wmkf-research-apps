@@ -11,7 +11,7 @@
  * `not_checked`, `unverified` and `missing` never become ended or absent on
  * their own: ended stays `null` (unknown) until the schedule check says so.
  */
-import { deriveJ27Stage } from '../../lib/services/workbench/j27-read-model';
+import { deriveJ27Stage, j27ListStanding } from '../../lib/services/workbench/j27-read-model';
 
 const DRAFT_NEEDED_CODES = new Set(['final_writeup_source_missing', 'final_writeup_source_ineligible']);
 const LEGACY_REASONS = new Set(['legacy_complete_review_without_schedule', 'legacy_review_schedule_unverified']);
@@ -130,5 +130,7 @@ export function composeJ27PageInput(serverInput, facts = {}) {
 
 export function deriveJ27PageStage(serverInput, facts) {
   const input = composeJ27PageInput(serverInput, facts);
-  return input ? deriveJ27Stage(input) : null;
+  // Timing and review by the list's rule, so the strip's next-step line follows
+  // the same Deliberations rule as a list row (Codex build review 3, round 2).
+  return input ? { ...deriveJ27Stage(input), ...j27ListStanding(input) } : null;
 }
