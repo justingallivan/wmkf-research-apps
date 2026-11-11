@@ -224,3 +224,11 @@ test.each([409, 412])(
     expect(patch).not.toHaveBeenCalled();
   },
 );
+
+test('profile strict scans reject duplicate keys across pages instead of overwriting', async () => {
+  const row = { wmkf_settingkey: 'executor.profiles.a.v000001', wmkf_settingvalue: 'first' };
+  get.mockResolvedValueOnce({ ok: true, body: { value: [row], '@odata.nextLink': 'next-page' } })
+    .mockResolvedValueOnce({ ok: true, body: { value: [{ ...row, wmkf_settingvalue: 'second' }] } });
+  await expect(listSettingsWithMetaStrict('executor.profiles.', { rejectDuplicates: true })).rejects.toMatchObject({ code: 'duplicate_setting_key' });
+  expect(get).toHaveBeenCalledTimes(2);
+});

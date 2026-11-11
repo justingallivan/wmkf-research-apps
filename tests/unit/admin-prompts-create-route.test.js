@@ -19,9 +19,9 @@ beforeEach(() => jest.clearAllMocks());
 it('passes the body to createPrompt with the gate profile, never a client-supplied one', async () => {
   createPrompt.mockResolvedValue({ status: 'completed', targetVersion: 1 });
   const r = res();
-  await handler({ method: 'POST', body: { name: 'a.b', catalog: { title: 'T' }, body: 'x', profileId: 999, requestId: 'req' } }, r);
+  await handler({ method: 'POST', body: { name: 'a.b', catalog: { title: 'T' }, body: 'x', variables: '{"execution":{}}', profileId: 999, requestId: 'req' } }, r);
   expect(r.statusCode).toBe(200);
-  expect(createPrompt).toHaveBeenCalledWith(expect.objectContaining({ name: 'a.b', requestId: 'req', profileId: 42 }));
+  expect(createPrompt).toHaveBeenCalledWith(expect.objectContaining({ name: 'a.b', requestId: 'req', variables: '{"execution":{}}', profileId: 42 }));
 });
 
 it('maps a typed service error to its status and body', async () => {

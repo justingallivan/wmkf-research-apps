@@ -115,7 +115,7 @@ describe('publishPrompt', () => {
       body, systemPrompt: '', variables: ANALYZE_VARIABLES, outputSchema: null,
       model: 'sonnet', temperature: null, maxTokens: null,
     });
-    sql.mockResolvedValueOnce({ rows: [{ phase: 'final', status: 'completed', new_prompt_id: 'n1', target_version: 9, body_hash: bodyHash }] });
+    sql.mockResolvedValueOnce({ rows: [{ prompt_name: NAME, phase: 'final', status: 'completed', new_prompt_id: 'n1', target_version: 9, body_hash: bodyHash }] });
     const r = await publishPrompt(args({ requestId: 'req-1' }));
     expect(r).toEqual({ status: 'already_published', newPromptId: 'n1', targetVersion: 9, version: 9, idempotentReplay: true });
     expect(aiPrompt.create).not.toHaveBeenCalled();
@@ -155,7 +155,7 @@ describe('publishPrompt', () => {
       body, systemPrompt: '', variables: ANALYZE_VARIABLES, outputSchema: null,
       model: 'sonnet', temperature: null, maxTokens: null,
     });
-    sql.mockResolvedValueOnce({ rows: [{ phase: 'final', status: 'completed', new_prompt_id: 'n1', target_version: 9, body_hash: bodyHash }] });
+    sql.mockResolvedValueOnce({ rows: [{ prompt_name: NAME, phase: 'final', status: 'completed', new_prompt_id: 'n1', target_version: 9, body_hash: bodyHash }] });
     await expect(publishPrompt(args({ requestId: 'req-cat' }))).resolves.toMatchObject({ idempotentReplay: true });
 
     aiPrompt.queryCurrentRows.mockResolvedValue({ records: [{ ...currentRow(), ...catalog }] });
@@ -287,7 +287,7 @@ describe('publishPrompt', () => {
     });
     sql.mockResolvedValueOnce({
       rows: [{
-        phase: 'pending',
+        prompt_name: NAME, phase: 'pending',
         target_version: 4,
         prior_prompt_id: 'old',
         body_hash: bodyHash,
@@ -596,7 +596,7 @@ describe('publishPrompt — first publish of a draft-only name', () => {
       model: 'sonnet', temperature: null, maxTokens: null,
     });
     sql.mockResolvedValueOnce({
-      rows: [{ phase: 'pending', target_version: 2, prior_prompt_id: 'draft-id', body_hash: bodyHash, outcome_json: {} }],
+      rows: [{ prompt_name: NAME, phase: 'pending', target_version: 2, prior_prompt_id: 'draft-id', body_hash: bodyHash, outcome_json: {} }],
     });
     const r = await publishPrompt(args({ requestId: 'retry', expectedVersion: 1 }));
     expect(r).toMatchObject({ status: 'completed', resumed: true, newPromptId: 'new-row', targetVersion: 2 });
