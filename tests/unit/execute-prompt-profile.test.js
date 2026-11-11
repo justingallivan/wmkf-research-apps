@@ -94,6 +94,17 @@ test('response is saved even when parsing rejects, and failure audit contains no
   expect(JSON.stringify(error.deferredAudit)).not.toContain('CANARY');expect(runAdapter.create).not.toHaveBeenCalled();
 });
 
+test('Dataverse null system prompt executes and shares the empty-string checkpoint binding', async()=>{
+  const row = {...prompt(),wmkf_ai_systemprompt:null};
+  const args = options({promptSnapshot:row});
+  const result = await executePrompt(args);
+  const [checkpoint] = args.onResponse.mock.calls[0];
+  const replay = await executePrompt({...args,promptSnapshot:prompt(),responseCheckpoint:checkpoint,onDispatch:null,onResponse:null});
+  expect(row.wmkf_ai_systemprompt).toBeNull();
+  expect(replay.parsed).toEqual(result.parsed);
+  expect(mockComplete).toHaveBeenCalledTimes(1);
+});
+
 test('failure to save intent prevents provider; failed response save propagates without inline audit',async()=>{
   await expect(executePrompt(options({onDispatch:async()=>{throw new Error('intent unavailable');}}))).rejects.toMatchObject({paidCall:false});
   expect(mockComplete).not.toHaveBeenCalled();
