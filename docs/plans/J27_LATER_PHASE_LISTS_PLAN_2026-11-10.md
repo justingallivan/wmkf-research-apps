@@ -166,7 +166,7 @@ the four keys the stage model already expects: `presentation`, `roster`,
 | `transition.phase` | The current Final row passes the committed check; its stage is group review or leadership review. No Final pointer is `null`; a pointer to a missing or wrong-type row, or a Final row that fails the check, is `unavailable`. | `findCurrentFinal`, `committedFinal`, `stageOf` |
 | `presentation.exists` | At least one presentation record in an accepted state. | To be settled in review: which of the two classifiers (finding 5) |
 | `presentation.ended` | Exactly one eligible record whose scheduled end has passed. More than one, or an unclassified record, is `null` (unknown). | The schedule check's classification, without its per-record re-read |
-| `presentation.legacyException` | The schedule check's exception, worked out for every viewer: a draft with a complete review milestone and either no presentation record or no configured schedule map. Kept separate from `ended`. The stage model already offers "start group review" on it `[VERIFIED via j27-read-model.js:280-282]`. | The classification part of `assertScheduledEnd`, moved into a function both the start action and this rule call |
+| `presentation.legacyException` | Always `false` for 2027 and later cycles (owner, 2026-11-10: no group review before a presentation). The stage model offers "start group review" on it `[VERIFIED via j27-read-model.js:280-282]`, so it must not be true for a J27 request. | The classification part of `assertScheduledEnd`, moved into a function both the start action and this rule call |
 | `roster` | The stored attendance for that presentation: present, stale when its binding no longer matches, absent. | `storedRosters` and the binding from the attendance service |
 
 - **Both callers use it.** The request list feed calls it once for the rows
@@ -190,9 +190,13 @@ the four keys the stage model already expects: `presentation`, `roster`,
   attendance schema is off for a deployment, the keys read
   `not-provisioned`, as the memo keys do since Session 672, so the rows are
   not marked as failed reads.
-- **Starting group review is unchanged.** The start action keeps its own
-  authorization, its per-record re-read and its error handling. The list
-  only reads.
+- **Starting group review changes in one respect.** For 2027 and later
+  cycles the start action no longer accepts the exception: it requires one
+  ended presentation. This is a change to a write path's guard, so it gets
+  its own tests (a J27 draft with a complete review milestone and no
+  presentation record is refused; the same draft on a D26 request is still
+  accepted). Its authorization, per-record re-read and error handling are
+  otherwise untouched. The list only reads.
 - **Failure.** A failed or capped batch read makes that key `unavailable` on
   every row, which the list already reports once
   (`degradedEverywhere`). A later-phase read failure is not to fail the
@@ -243,13 +247,13 @@ are, with a tab count from the same row rules.
   each missing checkpoint field; a replaced presentation, a rescheduled
   one and a newly ambiguous schedule each change the page's facts after a
   refresh; a J27 draft with a complete review milestone and no presentation
-  record gives the same answer to a lead Program Director and to another
-  viewer.
+  record is not offered "start group review" to anyone.
 
 ## 4. Not in this plan
 
 No new route, table, status or Dataverse field. No write from any list. No
-change to starting group review, to the Staff deliberations or Final
+change to starting group review beyond closing the exception for 2027 and
+later cycles (step 1), and none to the Staff deliberations or Final
 writeups panels, or to what is shared before a presentation (still
 undecided). No change to the J27 literals (decision 4). Program Coordinator
 support stays later.
@@ -258,14 +262,14 @@ support stays later.
 
 - Which classifier decides "a presentation exists" (finding 5). The two can
   disagree about one request.
-- **Owner question.** The schedule check's exception is not limited to
-  earlier cycles: nothing in it tests the cycle, and a draft with a complete
-  review milestone and no presentation record qualifies even with the
-  schedule map configured `[VERIFIED via transition-schedule.js:24-38]`
-  (Codex review, 2026-11-10; this draft had assumed otherwise). So a J27
-  request can start group review with no presentation on record. Whether
-  that should be allowed for J27 is a business rule; the plan carries the
-  exception as it is until decided.
+- **Decided (owner, 2026-11-10): J27 does not enter group review until a
+  presentation has been seen, and an offramped request does not go to the
+  Board.** The schedule check's exception was not limited to earlier
+  cycles: nothing in it tests the cycle, and a draft with a complete review
+  milestone and no presentation record qualifies even with the schedule map
+  configured `[VERIFIED via transition-schedule.js:24-38]` (Codex review,
+  2026-11-10; this draft had assumed otherwise). The exception is therefore
+  closed for 2027 and later cycles; earlier cycles keep it.
 - How the Staff deliberations list classifies timing (finding 5, last
   point).
 - Codex's second and fourth points are confirmed only in part: the Final
