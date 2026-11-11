@@ -72,13 +72,18 @@ path adds no tables, admission or dispatch. [Shared task interfaces](../plans/SH
 
 ## Local Sandbox recommendations trial
 
-[VERIFIED via branch source at `2a0f4d6bd` and loopback PostgreSQL]
-The local, default-off operator trial reuses the six migration 097 tables.
-Admission pins the configured PostgreSQL cluster and database. The same
-transaction takes a Sandbox singleton advisory lock, checks exact replay,
-and counts every `expertise.recommendations` job across `local-sandbox`
-and `preview-sandbox` regardless of state, cohort or app. Fixture jobs
-are outside the predicate. The sole draft task carries a typed v2 seal
+[VERIFIED via branch source at `2a0f4d6bd`, successor `2ae930fe2`, and
+loopback PostgreSQL] The local, default-off operator trial reuses the six
+migration 097 tables. Admission pins the configured PostgreSQL cluster
+and database. The same transaction takes a Sandbox-wide advisory lock,
+checks exact replay and counts every `expertise.recommendations` job across
+`local-sandbox` and `preview-sandbox` regardless of state, cohort or app.
+Fixture jobs are outside the predicate. The first job must be alone for
+a fresh successor, and its exact audited failure and unexpired configuration
+must prove the same owner, source, profile and database bindings. The
+successor requires a new scope, key and prompt revision. Both receipts
+count after expiry, so the same fence denies a third job. The sole draft
+task per job carries a typed v2 seal
 and checkpoint, one fenced dispatch attempt and no field reservation.
 A response saved before an unavailable currentness or access check can
 recover only through explicit zero-call validation.
@@ -87,13 +92,15 @@ Configuration, results and audit outbox content expire after seven days.
 Source and response content expire after 24 hours. The bounded cleanup
 checks the pinned database, exact job, owner tuple and task before
 deleting expired content. Receipts remain and continue to count against
-the singleton. The approved shared-database run admitted one job for
+the admission quota. The first approved shared-database run admitted one job for
 Sandbox Request 1000339. It saved the sealed snapshot and one provider
 response. Domain validation rejected the response, and the separate
-Sandbox audit was delivered. No validated result was retained. Physical
-cleanup remains due at the two scoped expiry deadlines.
-[Live outcome](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#live-sandbox-trial-outcome),
-[retention](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#sandbox-trial-retention).
+Sandbox audit was delivered. The authorized successor saved one response
+and reached terminal `claude_output_truncated` at the output ceiling,
+with its separate audit delivered. Neither job retained a validated result.
+Physical cleanup remains due at each job's scoped expiry deadlines.
+[First trial and retention](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#live-sandbox-trial-outcome),
+[successor and retention](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#live-successor-outcome).
 
 ## Synthetic safeguard follow-up (2026-11-11)
 

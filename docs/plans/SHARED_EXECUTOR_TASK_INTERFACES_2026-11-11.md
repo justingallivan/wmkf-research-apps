@@ -1,6 +1,6 @@
 # Shared Executor task interfaces
 
-**Status [BRANCH-BUILT, offline fixture and default-off Sandbox runtime], [LIVE-VERIFIED, local trial through authenticated withholding], and [PLANNED, broader caller integration].**
+**Status [BRANCH-BUILT, offline fixture and default-off Sandbox runtime], [LIVE-VERIFIED, two bounded trials through authenticated withholding], and [PLANNED, broader caller integration].**
 This checkpoint coordinates the proposal-draft and expertise recommendation
 streams. The shared infrastructure owner controls the capability
 registry, Admin compiler, authorization, Executor, worker and ledger. The roster
@@ -135,9 +135,11 @@ one staff actor, one backend app, one Request and a fixed cohort and
 idempotency key. The service verifies current staff access and checks the
 exact prompt, profile, combined PDF, complete roster and budget before
 new admission. A transaction lock spans both Sandbox environment labels
-in the pinned database. Exact replay precedes a singleton quota that
-counts every existing Sandbox recommendations job, including expired
-or terminal jobs. The only task is a typed draft without a destination.
+in the pinned database. Exact replay precedes the admission quota, which
+counts every existing Sandbox recommendations job, including expired or
+terminal jobs. The first job used the singleton rule. The sole successor
+exception is defined below. Each job has one typed draft task without a
+destination.
 
 The producer extracts text from the exact verified PDF bytes and
 freezes the source proof and roster digest. The worker rechecks
@@ -233,6 +235,111 @@ node scripts/run-expertise-sandbox-trial-1000339.cjs expire /private/tmp/wmkf-ex
 
 The deletion checks are pending until those deadlines. The approved
 SharePoint copy and ledger receipts remain in place.
+
+### Authorized role-prompt successor trial
+
+The owner approved one bounded successor to the first Sandbox trial.
+The [v2 candidate](EXPERTISE_SANDBOX_1000339_CANDIDATE_V2_2026-11-11.json)
+changes only the task body. It instructs the model to use each GUID's
+exact roster category, put Board recommendations in `board_interest`,
+reserve `consultant_overlap` for Consultants, and leave arrays or staff
+slots empty when no eligible candidate fits. The shared profile, typed
+output schema, roster validator, source, model and token ceiling stay
+the same. The candidate and role regression are in `8fb8dd00d`.
+The 67 focused candidate and role-contract tests passed.
+
+[VERIFIED via branch source at `2ae930fe2` and loopback PostgreSQL]
+The successor admission follows these invariants.
+
+| Boundary | Contract |
+| --- | --- |
+| Owner and quota | The same database-wide Sandbox transaction lock covers exact replay, count and insert. A fresh successor requires exactly one existing Sandbox recommendations job across both Sandbox environments and all owners. It must be the pinned first job, with its sole task and one attempt in `failed_validation` / `profile_output_invalid` and the audit delivered. |
+| Frozen pins | The service verifies current access, prompt/profile, exact combined PDF, complete roster and budget. The store reconstructs the first command hash from its receipt and retained configuration using the same Request, staff actor, backend app, database, source and profile. New admission requires the first configuration to remain unexpired. |
+| Successor identity | A new scope UUID, idempotency key, prompt GUID and the next prompt version distinguish the successor. Its exact replay returns the admitted job even after the first configuration expires. Both receipts remain quota-bearing. The transaction refuses a third job. |
+| Paid dispatch and retention | The successor has one draft-only task and at most one Sonnet 4.6 request at the existing 4,096-output-token cap. The same preflight cost, dispatch, checkpoint, audit and result guards apply. Source/response and configuration/result/audit expiry remain 24 hours and seven days respectively for each job. |
+
+The 89-test regression across four suites, including all three real
+loopback PostgreSQL job suites, passed. Scoped ESLint, types, Atlas and
+its self-test, and migration manifest checks passed.
+
+[VERIFIED via operator source at `2bc14a68d`] The runner checks the
+existing profile publication and refuses a v2 settings write. It
+creates the exact v2 prompt noncurrent, reads back the complete history,
+then conditionally demotes v1 and promotes v2 using the ETag from each
+full-row observation. Each write intent is fsynced before transport.
+An incomplete switch stops for inspection. A completed switch reads
+back v2 as sole current and preserves the v1 content and receipt.
+The guarded environment-file-free webpack build passed at that
+revision. Private v2 initialization and read-only source preparation
+also passed.
+
+[VERIFIED via the source review receipt] The ordinary OAuth review used
+only `claude-opus-5-5`, one turn and 136,123 ms elapsed. The 115,491-byte
+source packet SHA-256 was
+`31fcd50ea53874260e47fd4af9874d00508ec0bf993f7e7d91ada0188eb1c882`.
+The reviewer approved the role-only candidate and its tests with no
+blocking findings, and approved the successor code conditional on two
+source checks. The operator verified that `setIsCurrent` sends only
+`wmkf_ai_iscurrent` and passes the supplied `If-Match`, and that
+Dataverse annotations map `@odata.etag` to `_etag`. The recommended
+initial ETag check landed in `ddfe6761f`, before the v2 create, while
+the conditional demotion still uses the fresh post-create ETag.
+Syntax and runner guard tests passed. The packet predates that local
+fix. The candidate digest stayed fixed and the source review was not
+rerun. The review noted that the stricter wording can still yield a
+response the closed validator rejects. Publication and the live
+outcome are separate evidence.
+
+### Live successor outcome
+
+[VERIFIED via scoped Sandbox readback and shared-ledger admission]
+The operator reused the first profile publication and read back
+Sandbox prompt `9935d70a-986f-481f-abae-28fe255c8996` as sole-current
+version 2. The v1 row retained its body and became noncurrent. The
+preflight input bound was 125,694, with 4,096 output tokens and an
+estimated ceiling of $1.116198. The shared ledger admitted successor
+job `ba425a76-1257-4b6a-a54d-1c7fc6ceb3fe` and saved its sealed snapshot.
+
+[VERIFIED via the saved response checkpoint, audit readback and signed
+GET] One Sonnet 4.6 request stopped at `max_tokens` after 4,096 output
+tokens. The saved response was incomplete JSON. The task recorded
+`failed_validation` / `claude_output_truncated` before reaching the
+roster-role validator. The live response therefore supplies no verdict
+on whether the revised prompt fixes the first trial's category error.
+The job retained no validated recommendations.
+
+| Receipt | Value |
+| --- | --- |
+| Sandbox failure audit | `60b9bab4-d197-4043-a3ed-0dd5b97bbfab`, delivered and read back |
+| Provider usage | 14,475 input, 4,096 output, 21,370 cache-write and zero cache-read tokens |
+| Cost | $0.1850025 estimated from usage |
+
+The normal Microsoft OAuth session read only the second job's metadata,
+with `status: unavailable` and `freshness: unknown`. The separate
+anonymous GET returned 307 to sign-in. The local server was stopped
+after the check. The two trials verify withholding on distinct validation
+failures. An available, current recommendation has yet to be verified
+live. The trial made no Request-field writes or deployment. The admission
+quota still counts both receipts and denies a third job.
+
+A future candidate should bound rationale length and total output
+before another separately authorized trial. Keep the closed JSON and
+role validator in place.
+
+### Successor retention
+
+The operator must run exact-job expiry after **2026-11-12 22:52:13.832 UTC**
+for the successor's source and response, and again after
+**2026-11-18 22:52:13.832 UTC** for configuration and audit content.
+There is no retained successor result. Use the successor's private
+trial directory and the original pinned database and job identity.
+
+```sh
+node scripts/run-expertise-sandbox-trial-1000339.cjs expire /private/tmp/wmkf-expertise-sandbox-trial-1000339-v2-20261111
+```
+
+These deadlines are separate from the first job's deadlines. The
+approved SharePoint PDF and both quota-bearing receipts remain in place.
 
 ## Capability and result path
 
