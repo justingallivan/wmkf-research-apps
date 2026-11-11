@@ -9,9 +9,9 @@
  *      contract: see docs/EXECUTOR_CONTRACT.md § Test oracle).
  *   2. The second run reports cacheHit=true (within-prompt cache alignment).
  *
- * Once the PA-side ExecutePrompt child flow lands, run that against the same
- * (requestId, echo_text) inputs and confirm its wmkf_ai_rawoutput on the
- * resulting wmkf_ai_run row matches this script's output verbatim.
+ * This checks only repeated Vercel execution. Planned Power Automate callers
+ * submit to the same backend; this script does not prove its admission,
+ * authorization or job-recovery contracts.
  *
  * Usage:
  *   node scripts/test-echo-parity.js [--request <number>] [--echo-text <s>]

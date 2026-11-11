@@ -402,6 +402,17 @@ describe('LLMClient.complete', () => {
     await expect(client.complete({ messages: [] })).rejects.toThrow(/Claude API error 400/);
   });
 
+  test('durable callers can forbid parameter repair and its notification', async () => {
+    safeFetch.mockResolvedValueOnce(jsonResponse(
+      { error: { message: 'temperature is deprecated for this model' } }, { status: 400 },
+    ));
+    const client = new LLMClient({apiKey:'sk-ant-test',model:'claude-sonnet-4-6',maxRetries:0,allowParameterRepair:false});
+    await expect(client.complete({messages:[],temperature:0.7})).rejects.toMatchObject({status:400});
+    expect(JSON.parse(safeFetch.mock.calls[0][1].body).temperature).toBe(0.7);
+    expect(safeFetch).toHaveBeenCalledTimes(1);
+    expect(NotificationService.notify).not.toHaveBeenCalled();
+  });
+
   test('strips a deprecated temperature parameter once and retries', async () => {
     const messages = [{ role: 'user', content: 'hi' }];
     safeFetch
