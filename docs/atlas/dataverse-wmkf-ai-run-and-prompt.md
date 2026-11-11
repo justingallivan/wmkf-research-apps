@@ -50,10 +50,14 @@ invocations. Request linkage is present only when the Executor caller supplies
 
 **Write paths:**
 - `lib/services/dynamics-service.js` `logAiRun` — canonical writer. Truncates `wmkf_ai_rawoutput` with `…[truncated N chars]` marker as safety valve.
-- `lib/services/execute-prompt.js` `writeRunRow()` — Executor contract; logs
-  every prompt run with `wmkf_ai_Prompt@odata.bind` and, when the caller passes
-  `requestId`, `wmkf_ai_Request@odata.bind` (both capital — see nav-prop case
-  warning above)
+- `lib/services/execute-prompt.js` `writeRunRow()` — legacy Executor
+  audit attempt. Binds the prompt when resolved and the Request when
+  supplied. Both navigation names are case-sensitive.
+- **[BRANCH-BUILT, synthetic]** The job worker handles deferred audit
+  for validated results and classified validation failures. A confirmed
+  provider rejection stays on the PostgreSQL attempt with audit state
+  `none`. It creates no Dataverse AI-run row. See the [synthetic job
+  ledger](postgres-prompt-jobs.md#synthetic-safeguard-follow-up-2026-11-11).
 - `pages/api/phase-i-dynamics/summarize.js` — Phase I summarization
 - `pages/api/grant-reporting/extract.js` — Grant Reporting extraction and goals assessment; writes a best-effort `wmkf_ai_run` audit row, not extracted values to `akoya_request` (`lib/services/grant-reporting/extract-service.js`)
 - `scripts/probe-impersonation-resmoke.js`, `scripts/probe-impersonation-as-user.js` — write sentinel rows during impersonation testing (S135). Filter `wmkf_ai_model='impersonation-resmoke'` to find them.
@@ -62,11 +66,11 @@ invocations. Request linkage is present only when the Executor caller supplies
 **Cross-system links from `wmkf_ai_run`:**
 - `wmkf_ai_Prompt@odata.bind` → `wmkf_ai_prompt` (which prompt was used)
 - `wmkf_ai_Request@odata.bind` → `akoya_request` (which grant request was processed)
-The prompt link is always written for governed prompt execution; the request
-link is caller-supplied and must be passed by request-bound producers.
+An audit row binds the resolved prompt when available. Request-bound producers
+supply the request link.
 Migration plans touching either entity must preserve these foreign keys.
 
-**Migration disposition:** stays in Dataverse. No Postgres counterpart. Dynamics Explorer treats `wmkf_ai_run` as an operational log, not business data: `isOperationalLogTable` in `lib/services/dynamics-explorer/result-shaping.js` (matching against `OPERATIONAL_LOG_TABLES = new Set(['wmkf_ai_run', 'wmkf_ai_runs'])`) backs both `tools/describe-table.js`'s denial of direct schema requests for the table and `tools/composite.js`'s stripping of `wmkf_ai_run` hits from Dataverse Search results before tool output reaches Claude — moved out of the former `pages/api/dynamics-explorer/chat.js` monolith at S2 (result-shaping) and S5 (describe-table, composite) of the chat-service-extraction plan (2026-09-19).
+**Migration disposition:** the Dataverse AI-run entity stays in Dataverse. The branch-built synthetic PostgreSQL job ledger separately records attempt and audit-delivery state. Dynamics Explorer treats `wmkf_ai_run` as an operational log, not business data: `isOperationalLogTable` in `lib/services/dynamics-explorer/result-shaping.js` (matching against `OPERATIONAL_LOG_TABLES = new Set(['wmkf_ai_run', 'wmkf_ai_runs'])`) backs both `tools/describe-table.js`'s denial of direct schema requests for the table and `tools/composite.js`'s stripping of `wmkf_ai_run` hits from Dataverse Search results before tool output reaches Claude — moved out of the former `pages/api/dynamics-explorer/chat.js` monolith at S2 (result-shaping) and S5 (describe-table, composite) of the chat-service-extraction plan (2026-09-19).
 
 ## `wmkf_ai_prompt`
 

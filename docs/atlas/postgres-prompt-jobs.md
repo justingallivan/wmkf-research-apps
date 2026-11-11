@@ -35,12 +35,16 @@ authorization/freshness denial ends a queued task with
 `failed_pre_dispatch` / `dispatch_denied`. A confirmed provider rejection
 after dispatch intent revokes the attempt as `failed_pre_dispatch` /
 `provider_rejected`. Eligible initialization slots release in the same
-fenced mutation. Ambiguous outcomes still enter `unknown` and preserve
-the reservation. These receipts classify execution certainty. Billing is
-a separate provider fact.
+fenced mutation. The attempt keeps audit state `none`, so this outcome
+creates no Dataverse AI-run row. The Executor's `paidCall:true` indicates
+a response or confirmed rejection. Billing is a separate provider fact.
+Ambiguous outcomes enter `unknown` and preserve the reservation. If the
+deadline expires during the final pre-provider authorization/freshness
+check, the worker returns `waiting` without creating an attempt.
 
 An oversized canonical snapshot records `snapshot_too_large` on queued
-tasks and releases eligible slots. The Executor saves a bounded marker
+tasks and releases eligible slots. A subsequent tick returns
+`needs_attention` without rerunning preparation or dispatching. The Executor saves a bounded marker
 with available usage when a response exceeds its canonical checkpoint
 limit. Its parser and checkpoint recovery classify the marker as
 `failed_validation` / `profile_response_too_large`. Both cases are terminal

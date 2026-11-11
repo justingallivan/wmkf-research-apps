@@ -610,9 +610,13 @@ worker context. These arguments are internal server data.
    audit delivery and any conditional fixture publication separately.
    Explicit dispatch authorization or freshness denial records
    `failed_pre_dispatch` with `dispatch_denied` before a provider attempt.
-   A definitive Anthropic 400, 401, 429, or 529 rejection records
-   `failed_pre_dispatch` with `provider_rejected` after intent. This state
-   transition releases eligible slots and makes no billing assertion.
+   If the deadline expires during that late check, the tick returns
+   `waiting` without creating an attempt. A definitive Anthropic 400, 401,
+   429, or 529 rejection records `provider_rejected` in the PostgreSQL
+   attempt, reusing `failed_pre_dispatch` even though the provider responded.
+   This terminal state releases eligible slots. It keeps audit state `none`,
+   so the rejection has no Dataverse AI-run row. `paidCall:true` marks a
+   received response or rejection. Billing is a separate provider fact.
    Ambiguous outcomes become `unknown` and hold their fences. A saved response
    can resume validation. An unknown provider, audit, or destination outcome
    stops automatic replay of that operation.
@@ -637,8 +641,12 @@ published profile's exact key, revision, and hash before mutation. It
 requires a UUID, and updates also require the expected prompt version.
 Legacy names cannot switch modes, and the synthetic names require their
 shared-document marker. The editor ties the preview to the draft payload
-and drops it on edit. The worker reads the configuration frozen into its
-job. Later settings revisions do not change that configuration.
+and drops it on edit. A partial task publication, or a failed or conflicting
+publication with a new row ID, blocks further publication while the editor
+reloads and checks the current version. A lost profile-publication response
+retains its original revision payload and UUID for replay, including after
+refreshing profile history. The worker reads the configuration frozen into
+its job. Later settings revisions do not change that configuration.
 
 ## Test oracle
 

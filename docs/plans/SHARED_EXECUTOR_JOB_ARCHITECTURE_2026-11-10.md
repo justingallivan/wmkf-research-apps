@@ -244,8 +244,10 @@ queued -> preparing -> ready -> dispatching -> response_saved -> validated
 `failed_validation` follows a saved response and validation failure. Explicit
 pre-provider authorization or freshness denial records `failed_pre_dispatch`
 with `dispatch_denied` and no provider attempt. A confirmed provider rejection
-can use the same terminal state with the distinct `provider_rejected` code
-after intent. An unknown provider outcome fences subsequent sibling dispatch.
+uses the same terminal state with the distinct `provider_rejected` code
+after intent. An exhausted lease during the final check returns
+`waiting` before an attempt is created. An unknown provider outcome
+fences subsequent sibling dispatch.
 Other independent tasks may complete after a known sibling failure. Planned
 public DTOs must map every durable state and safe code explicitly.
 
@@ -263,9 +265,12 @@ snapshots are server-owned.
 
 The synthetic provider seam recognizes definitive Anthropic HTTP 400, 401,
 429, and 529 rejection responses from the actual transport. The worker
-ends the attempt and releases eligible initialization slots. This
-classification carries no billing assertion. Missing response, ambiguous
-transport errors, and an expired dispatched lease stay unknown. A synthetic
+ends the attempt and releases eligible initialization slots. This outcome
+stays in the PostgreSQL ledger with audit state `none` and creates no
+Dataverse AI-run row. The Executor's `paidCall:true` marks a received
+response or confirmed rejection. Billing is a separate provider fact.
+Missing response, ambiguous transport errors, and an expired dispatched
+lease stay unknown. A synthetic
 attempt has no automatic transport, parameter-repair, fallback-model, or
 semantic retry.
 
@@ -415,5 +420,13 @@ transport outcomes retain the existing fences. Canonical size checks cover
 escaped document/record content and the exact stored response/result shape.
 The source and result limits are hard bounds across the shared validators
 and storage seam. All user-facing job state projection and real adapters
-remain [PLANNED]. Integrated validation and the final build review are
-tracked separately.
+remain [PLANNED].
+
+The owner-authorized OAuth Opus 5.5 build review returned READY WITH NAMED
+CHANGES. The [verbatim build review and dispositions](../audits/SHARED_EXECUTOR_ADMIN_OPUS55_BUILD_REVIEW_2026-11-11.md)
+record the task reconciliation fix, late dispatch deadline behavior, verified
+oversize follow-up behavior, and PostgreSQL-only rejection audit boundary.
+The editor retains an uncertain profile publication's payload and UUID
+across a history refresh (`a69da2ae3`). Shared task preview and publication
+use consistent validation for hyphenated frozen record names (`20f781474`).
+Final integrated test and build results are pending in this receipt.
