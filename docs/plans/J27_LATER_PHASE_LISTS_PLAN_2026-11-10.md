@@ -2,7 +2,7 @@
 title: J27 Deliberations and Final Assessment lists plan
 domain: workbench
 kind: plan
-status: draft
+status: implemented
 summary: Plan for the two cycle-page lists the J27 build plan split off (its section 3a) — one server rule for the later-phase facts, shared by the cycle list and the request page, then the two lists. Draft for owner and Codex review; nothing is built.
 canonical: false
 owner: product-engineering
@@ -14,8 +14,9 @@ related:
 
 # J27 Deliberations and Final Assessment lists plan
 
-Author: Claude for Justin Gallivan, 2026-11-10 (Session 673). **Draft;
-nothing here is built.** The owner answered its four decisions on
+Author: Claude for Justin Gallivan, 2026-11-10 (Session 673). **Built on
+`claude/j27-cycle-page`, 2026-11-10 to 2026-11-11; not promoted and not
+exercised live (section 6).** The owner answered its four decisions on
 2026-11-10. Codex reviewed it the same day and returned "needs attention"
 with three findings, all confirmed against the source and worked into
 finding 4, step 1 and section 5. Its second review, of that amended text,
@@ -324,3 +325,33 @@ support stays later.
 - The chips in step 2 are the design brief's (its standing-chip table and
   tab descriptions). The brief's interim row, "Until the later phases are
   derived … Some details could not be read", ends when this plan is built.
+
+## 6. What was built (2026-11-10 to 2026-11-11)
+
+On branch `claude/j27-cycle-page`, pushed; not promoted, not deployed to the
+Preview, not exercised in a browser or against live data. Every piece was
+reviewed adversarially by Codex after it was committed; each finding below
+was reproduced or checked against the source before it was fixed.
+
+| Piece | Commits | Codex review |
+|---|---|---|
+| Guards: no group review before a presentation for 2027 and later cycles; no review transition for an offramped request | `91fc83581` (written by Codex, reviewed by Claude: removing either guard fails 9 and 6 tests) | Written by Codex |
+| 1. Shared facts module `lib/services/workbench/j27-later-facts.js`; schedule classification shared with the start guard; four fields added to the slim document read | `75b73897f` | Three findings (malformed stored roster read as confirmed; two pending Final rows read as ready; a presentation only the configured pairs recognise asked for attendance nobody could confirm), fixed in `3d9e71363` and confirmed closed |
+| 2. Feed and the Deliberations and Final Assessment lists; old panels as second sections | `3d9e71363` | One finding (Final Assessment dropped the All-in-program scope), fixed in `562717d42` |
+| 3. Request page uses the same facts for every viewer | `562717d42` | Two findings (an older report overwrote a newer one; a reopened draft was ignored), fixed in `4a2f9c82e`; the confirmation round found the strip lacked timing, so no Deliberations request page showed a next step, fixed in `ffdeedb43` with a rendered test. Review of this piece stopped there (two rounds) |
+
+Plan review stopped after three passes; the third found one problem (the
+schema gate on the draft), fixed before build.
+
+**Known and accepted.** Only the request page knows when a saved review
+summary is out of date (owner, 2026-11-10). The stage model still raises
+"presentation end not verified" when no presentation exists; existing
+reviewed tests require it and the list does not display it.
+
+**Not measured.** The feed's added cost: three batched reads per load, at
+least 36 queries at 300 rows by Codex's count. Time it on the sandbox
+fixtures when the Preview is moved, and with December's requests.
+
+**Before promotion**, in addition to the rollout plan: the Preview needs
+`STAFF_DELIBERATIONS_SITE_VISIT_STATE_STATUS_PAIRS` for group review to be
+rehearsable there, and the D26 Grant Cycle link check (rollout plan).
