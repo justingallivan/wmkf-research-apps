@@ -964,6 +964,13 @@ suite('local Sandbox recommendation admission and controlled stages', () => {
     expect(wrong.deps.source.prepare).not.toHaveBeenCalled();
     const original = trial();
     const { jobId } = await original.admit();
+    const priorGrant = process.env.EXPERTISE_RECOMMENDATIONS_TRIAL_ACCESS;
+    process.env.EXPERTISE_RECOMMENDATIONS_TRIAL_ACCESS = JSON.stringify({ ...original.grant, sourceHash: 'b'.repeat(64) });
+    original.deps.source.prepare.mockClear();
+    await expect(original.admit()).rejects.toMatchObject({ code: 'recommendations_trial_receipt_mismatch' });
+    expect(original.deps.source.prepare).not.toHaveBeenCalled();
+    process.env.EXPERTISE_RECOMMENDATIONS_TRIAL_ACCESS = priorGrant;
+    await expect(original.admit()).resolves.toEqual({ jobId, replayed: true });
     const conflict = trial({ applicationId: original.grant.applicationId, idempotencyKey: original.grant.idempotencyKey });
     await expect(conflict.admit()).rejects.toMatchObject({ code: 'prompt_job_idempotency_key_reused' });
     const { rows } = await pool.query('SELECT id FROM prompt_jobs');

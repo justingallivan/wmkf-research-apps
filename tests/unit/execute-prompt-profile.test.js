@@ -65,6 +65,7 @@ test('actual transport shares document prefix across tasks and caller labels, wi
   expect(a.parsed.summary).toContain('RESULT_CANARY');
   expect(LLMClient.mock.calls[0][0].maxRetries).toBe(0);
   expect(LLMClient.mock.calls[0][0].fallbackModel).toBeNull();
+  expect(LLMClient.mock.calls[0][0].failOnRedirect).toBe(true);
   expect(LLMClient.mock.calls[0][0].allowParameterRepair).toBe(false);
   expect(requestAdapter.getById).not.toHaveBeenCalled();
   expect(requestAdapter.updateById).not.toHaveBeenCalled();

@@ -949,3 +949,22 @@ test.each(['529', 'timeout', 'dropped unary body'])('durable Sonnet call posts o
   expect(body).not.toHaveProperty('thinking');
   expect(body).not.toHaveProperty('tools');
 });
+
+test('durable Sonnet call never follows a same-origin redirect into a second POST', async () => {
+  const originalFetch = global.fetch;
+  const nativeFetch = jest.fn().mockResolvedValue({ ...jsonResponse({}, {
+    status: 307, headers: { location: '/v1/another-messages-endpoint' },
+  }), ok: false });
+  global.fetch = nativeFetch;
+  safeFetch.mockImplementation(jest.requireActual('../../lib/utils/safe-fetch.js').safeFetch);
+  try {
+    const client = new LLMClient({ apiKey: 'fabricated-unused-key', model: 'claude-sonnet-4-6',
+      fallbackModel: null, maxRetries: 0, allowParameterRepair: false, failOnRedirect: true });
+    await expect(client.complete({ messages: [{ role: 'user', content: 'fabricated' }] })).rejects.toMatchObject({ status: 307 });
+    expect(nativeFetch).toHaveBeenCalledTimes(1);
+    expect(nativeFetch.mock.calls[0][1]).toMatchObject({ method: 'POST', redirect: 'manual' });
+  } finally {
+    if (originalFetch === undefined) delete global.fetch;
+    else global.fetch = originalFetch;
+  }
+});
