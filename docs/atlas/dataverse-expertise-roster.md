@@ -1,6 +1,6 @@
 # Atlas: Expertise Profile (sandbox preparation)
 
-**Last verified:** 2026-11-10 (full sandbox import, stable replay, sandbox role readback).
+**Last verified:** 2026-11-10 (import/replay, permissions, service writes/native audit and inactive-editor canary).
 
 `wmkf_expertiseprofile` / `wmkf_expertiseprofiles` is provisioned in sandbox
 `orgd9e66399.crm.dynamics.com` for the roster migration. It is not a Production
@@ -19,8 +19,8 @@ The owner-approved sandbox role is assigned to John, Beth and Jean with exactly
 Create, Read, Write, Append and Append To on this table. Nine platform-added default
 privileges were removed from this new role; exact role privileges and assignments
 were read back. No Delete, Assign or Share grant was added. Existing roles and
-Production were unchanged. Signed-in staff writes and native actor attribution
-remain release gates; effective grants alone do not prove those flows. See
+Production were unchanged. Actual impersonated service writes and native audit now
+verify John/Beth/Jean attribution; independent signed-in browser access remains open. See
 `docs/plans/data/expertise-roster/SANDBOX_PERMISSIONS_2026-11-10.md`.
 
 The November 10 canary first exposed inactive-create and empty/null issues.
@@ -53,3 +53,15 @@ Reproducible tools: `scripts/apply-roster-sandbox-schema.cjs`,
 `scripts/prepare-roster-full-import-rehearsal.cjs`, `scripts/verify-roster-full-import.cjs`.
 See `docs/plans/data/expertise-roster/SANDBOX_REHEARSAL_2026-11-09.md` for exact
 verified scope, retained fixtures and remaining gates.
+
+## Later consumer write checkpoint
+
+[VERIFIED via service probes] Feedback create/replay/edit/one-off/shared reads,
+native staff audit, isolated live v2 prompt/fallback bytes and formatter parity pass.
+Two additional inactive synthetic editor profiles are retained and unbound; the final
+complete adapter census verifies 45 sandbox profiles. Two new local feedback records
+bring that fixture to nine, with the original seven unchanged. Fable cleared the
+inactive editor repair; the live atomic canary confirmed two 204 operations,
+unchanged replay GUID/ETag and conflicting payload 409. Evidence and remaining
+browser/auth/attachment/matching/cutover gates:
+`docs/plans/data/expertise-roster/CONSUMER_WRITE_REHEARSAL_2026-11-10.md`.

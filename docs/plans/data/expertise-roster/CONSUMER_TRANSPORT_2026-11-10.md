@@ -56,7 +56,7 @@ revalidation, no fallback, complete lifecycle reads and concurrent release order
 The broader consumer/matching changes have focused regression coverage and prior
 fresh-agent review; this checkpoint does not certify their full live workflow.
 
-## Remaining gates
+## Remaining gates at this read-only checkpoint
 
 The local fixture contains import/bridge evidence, not the complete application
 schema. This run made no persistent SQL writes, Dataverse writes or model calls.
@@ -74,3 +74,10 @@ read proof from pending full-application verification. Existing import/replay an
 permissions receipts remain valid historical evidence. The normal-mode delegation
 and invalid-target negative tests are the disconfirming checks for accidental
 runtime widening. This is not a whole migration completion claim.
+
+## Subsequent write checkpoint
+
+`CONSUMER_WRITE_REHEARSAL_2026-11-10.md` records the later feedback writes, native
+staff audit, v2 live/fallback parity and inactive-editor canary. Its remaining-gate
+list supersedes this read-only checkpoint's pending claims. Full browser UAT and
+Production cutover remain unverified.

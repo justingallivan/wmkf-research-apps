@@ -106,8 +106,15 @@ eligible leads. The adapter's missing lifecycle filter and transaction-client
 retention during hydration were repaired and regression-tested; independent review
 confirmed the bounded repairs. See
 `docs/plans/data/expertise-roster/CONSUMER_TRANSPORT_2026-11-10.md`.
-Next: live v2 prompt provisioning/parity, full dependent-consumer write/UI checks,
-signed-in staff audit attribution, linked-person lifecycle and cutover/rollback.
+The next bounded write rehearsal passed feedback create/replay/edit/one-off/shared
+reads, native audit attribution for John/Beth/Jean via actual impersonated services,
+live v2 prompt publication/exact-byte readback and controlled fallback, and raw
+formatter parity. The editor inactive-create gap and HTTP-200 error propagation were
+repaired, Fable-cleared and live-canary verified (two 204 operations, stable replay,
+conflicting payload 409). See
+`docs/plans/data/expertise-roster/CONSUMER_WRITE_REHEARSAL_2026-11-10.md`.
+Next: independent signed-in browser UAT, attachments, linked-person lifecycle,
+full matching persistence and cutover/rollback. Component tests are not browser UAT.
 The local import fixture is not a full application schema; do not claim full app UAT.
 Justin approved the minimal matching contract: active explicitly lead-eligible staff
 with enabled User links only for lead; other active staff may be consulted; validated

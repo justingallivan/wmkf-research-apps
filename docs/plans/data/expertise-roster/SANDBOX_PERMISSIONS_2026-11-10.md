@@ -40,7 +40,7 @@ bounded effective-privilege/import-audit read, not the complete role-set compari
 Reapplying the declarative role is additive; always read the complete role privilege
 set afterward rather than inferring it from the requested five grants.
 
-## Remaining verification
+## Remaining verification at the permission checkpoint
 
 Signed-in staff editing, native end-user audit attribution, linked-person lifecycle,
 and full dependent-consumer testing remain open. The import audit probe confirms an
@@ -50,7 +50,13 @@ The later owner-approved minimal rehearsal transport and live consumer read proo
 are recorded in `CONSUMER_TRANSPORT_2026-11-10.md`. They do not close the signed-in
 staff-write or full-application gates above.
 
-## Bounded reconciliation
+## Subsequent service-write evidence
+
+The later `CONSUMER_WRITE_REHEARSAL_2026-11-10.md` supersedes the pending native
+actor claim above: actual impersonated writes and native audit confirm John, Beth
+and Jean. Independent browser sign-ins remain unverified. No role change was needed.
+
+## Bounded reconciliation (historical permission checkpoint)
 
 Sweep mode A: sandbox permission provisioning changed from pending to verified;
 end-user editing/audit remains pending. The Atlas now records this distinction.
