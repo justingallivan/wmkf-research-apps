@@ -69,3 +69,19 @@ test('an uncertain submission does not claim no drafts exist',async()=>{
 test('a newer result version refreshes terminal status before showing that result',async()=>{
   let reads=0;const value=makeJob({status:'complete',tasks:[task('proposal.executive-summary','validated',true)]});global.fetch=jest.fn(async url=>{if(url.includes('/results?')){reads++;return response({jobId,version:2,expiresAt:'2026-12-01',results:[{taskKey:'proposal.executive-summary',status:'available',text:'Latest draft'}]});}if(url.includes(`/${jobId}?`))return response({job:{...value,version:2}});return response({enabled:true,jobs:[value]});});mount();expect(await screen.findByText('Latest draft')).toBeInTheDocument();expect(reads).toBe(2);expect(global.fetch.mock.calls.some(([url])=>url.includes(`/${jobId}?`))).toBe(true);
 });
+
+test('a discovery version race retries serially without starting a job',async()=>{
+  jest.useFakeTimers();let count=0;
+  global.fetch=jest.fn(async()=>++count===1?response({code:'prompt_job_changed'},409):response({enabled:true,jobs:[makeJob()]}));
+  mount();await act(async()=>{});expect(count).toBe(1);
+  await act(async()=>{jest.advanceTimersByTime(5000);});
+  expect(screen.getByText('Draft generation is in progress.')).toBeInTheDocument();expect(count).toBe(2);
+  expect(global.fetch.mock.calls.every(([,options])=>!options.method||options.method==='GET')).toBe(true);
+});
+test('known source failure explains the repair and retains the same recovery key',async()=>{
+  global.fetch=jest.fn(async(url,options={})=>options.method==='POST'?response({code:'proposal_source_pi_missing'},409):response({enabled:true,jobs:[]}));
+  mount();await screen.findByText('AI drafts');fireEvent.click(screen.getByRole('button',{name:'Generate drafts'}));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Project Leader');expect(sessionStorage.getItem(storageKey)).toBe(key);
+  fireEvent.click(screen.getByRole('button',{name:'Retry draft request'}));await waitFor(()=>expect(global.fetch.mock.calls.filter(([,options])=>options.method==='POST')).toHaveLength(2));
+  expect(global.fetch.mock.calls.filter(([,options])=>options.method==='POST').map(([,options])=>options.headers['Idempotency-Key'])).toEqual([key,key]);
+});

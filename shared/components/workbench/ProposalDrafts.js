@@ -9,6 +9,15 @@ const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ACTIVE = new Set(['queued','running']);
 const TASK_LABELS = {queued:'Waiting',dispatching:'Generating',response_saved:'Validating',validated:'Draft ready',failed_pre_dispatch:'Could not start',failed_validation:'Draft could not be validated',unknown:'Needs attention',expired:'Expired'};
 const POLL_MS = 5000;
+const ADMISSION_ERRORS = Object.freeze({
+  proposal_source_missing:'The AI Materials proposal narrative is missing. Add the narrative before retrying this request.',
+  proposal_source_ambiguous:'More than one accepted proposal narrative is present. Resolve the duplicate before retrying this request.',
+  proposal_source_pi_missing:'The Request needs a Project Leader with a stored name before drafts can start.',
+  proposal_source_invalid_metadata:'The proposal source identity could not be verified. Ask an administrator to check the AI Materials folder.',
+  prompt_job_source_contract:'The published tasks do not match the proposal and PI source contract. Ask an administrator to check the configuration.',
+  prompt_job_profile_unavailable:'The pinned shared profile is unavailable. Ask an administrator to check the configuration.',
+  prompt_job_trial_limit:'This trial already has a job. Reload the Proposal tab to recover its status.',
+});
 const same = (left,right) => typeof left === 'string' && typeof right === 'string' && left.toLowerCase() === right.toLowerCase();
 function validJob(job, requestId) {
   return Boolean(job && typeof job === 'object' && GUID.test(job.id || '') && same(job.requestId,requestId)
@@ -67,21 +76,28 @@ function DraftPanel({requestId,profileId}) {
   }
   function denied() { generation.current++; controllers.current.forEach(controller => controller.abort()); jobRef.current = null; setJob(null); setResult(null); setResultError(''); setEnabled(false); setError(''); }
   useEffect(() => {
-    const epoch = generation.current, controller = new AbortController(), running = controllers.current; running.add(controller);
-    (async () => {
+    if (!visible) return undefined;
+    const epoch = generation.current, controller = new AbortController(), running = controllers.current;
+    let active = true, retryTimer;
+    const discover = async () => {
+      running.add(controller);
       try {
         const response = await requestEnvelope(url,{signal:controller.signal});
-        if (!current(epoch)) return;
+        if (!active || !current(epoch)) return;
         if ([401,403].includes(response.status)) { denied(); return; }
+        if (response.status === 409 && response.data?.code === 'prompt_job_changed') {
+          retryTimer = setTimeout(discover,POLL_MS); return;
+        }
         if (!response.ok || typeof response.data?.enabled !== 'boolean') throw new Error('unavailable');
         if (!response.data.enabled) { denied(); return; }
         const found = latestJob(response.data.jobs,requestId);
         setEnabled(true); setError(''); if (found) accept(found);
-      } catch (errorValue) { if (current(epoch) && errorValue?.name !== 'AbortError') { setEnabled(false); setError(''); } }
+      } catch (errorValue) { if (active && current(epoch) && errorValue?.name !== 'AbortError') { setEnabled(false); setError(''); } }
       finally { running.delete(controller); }
-    })();
-    return () => { controller.abort(); running.delete(controller); };
-  }, [requestId, url]);
+    };
+    discover();
+    return () => { active = false; clearTimeout(retryTimer); controller.abort(); running.delete(controller); };
+  }, [requestId, url, visible]);
   useEffect(() => {
     if (!enabled || !visible || !selectedJobId || !ACTIVE.has(selectedJobStatus)) return undefined;
     const epoch = generation.current, jobId = selectedJobId, running = controllers.current; let stopped = false, timer, controller;
@@ -139,6 +155,7 @@ function DraftPanel({requestId,profileId}) {
       const response = await requestEnvelope('/api/workbench/prompt-jobs',{method:'POST',headers:{'Idempotency-Key':requestKey},body:{requestId},signal:controller.signal});
       if (!current(epoch)) return;
       if ([401,403].includes(response.status)) { denied(); return; }
+      if (!response.ok && response.status === 409 && Object.hasOwn(ADMISSION_ERRORS,response.data?.code)) { setError(ADMISSION_ERRORS[response.data.code]); return; }
       if (!response.ok || !validJob(response.data?.job,requestId)) throw new Error('submission uncertain');
       try { window.sessionStorage.removeItem(key); if (window.sessionStorage.getItem(key) !== null) throw new Error('storage'); }
       catch { setStorage({available:false,value:requestKey,invalid:false}); setError('The request was accepted, but this browser could not clear its recovery key. Contact an administrator before starting another.'); accept(response.data.job); return; }

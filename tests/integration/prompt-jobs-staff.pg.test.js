@@ -180,7 +180,7 @@ describePg('staff proposal drafts with real PostgreSQL and the canonical Executo
 
   async function drain(trial) {
     for (let count = 0; count < 8; count += 1) {
-      if ((await trial.tick()).stage === 'idle') return;
+      if (['idle','complete','needs_attention','expired'].includes((await trial.tick()).stage)) return;
     }
     throw new Error('Staff draft worker did not settle');
   }
@@ -262,8 +262,8 @@ describePg('staff proposal drafts with real PostgreSQL and the canonical Executo
     await t.tick();
     mockComplete.mockReset().mockRejectedValueOnce(new Error('Transport interrupted after dispatch'));
     expect(await t.tick()).toEqual({ stage: 'unknown' });
-    expect(await t.tick()).toEqual({ stage: 'idle' });
-    expect(await t.tick()).toEqual({ stage: 'idle' });
+    expect(await t.tick()).toEqual({ stage: 'needs_attention' });
+    expect(await t.tick()).toEqual({ stage: 'needs_attention' });
     const status = (await t.read(job.id)).job;
     expect(status.status).toBe('needs_attention');
     expect(status.tasks.map(task => task.state)).toEqual(['unknown', 'queued']);
@@ -289,7 +289,7 @@ describePg('staff proposal drafts with real PostgreSQL and the canonical Executo
     const { job } = await t.admit();
     t.source.prepare.mockRejectedValueOnce(Object.assign(new Error('Synthetic extraction failed'), { code }));
     expect(await t.tick()).toEqual({ stage: 'failed_pre_dispatch' });
-    expect(await t.tick()).toEqual({ stage: 'idle' });
+    expect(await t.tick()).toEqual({ stage: 'needs_attention' });
     expect(t.source.prepare).toHaveBeenCalledTimes(1);
     expect(mockComplete).not.toHaveBeenCalled();
     const status = (await t.read(job.id)).job;
@@ -345,4 +345,14 @@ describePg('staff proposal drafts with real PostgreSQL and the canonical Executo
     expect((await t.list()).jobs).toHaveLength(1);
     expect(mockComplete).not.toHaveBeenCalled();
   });
+  test('source expiry stops preparation and keeps the one-job receipt',async()=>{
+    const t=fixture();const {job}=await t.admit();
+    await pool.query("UPDATE prompt_jobs SET source_expires_at=clock_timestamp()-interval '1 second' WHERE id=$1",[job.id]);
+    expect(await t.tick()).toEqual({stage:'expired'});
+    expect(t.source.prepare).not.toHaveBeenCalled();expect(mockComplete).not.toHaveBeenCalled();
+    expect((await t.read(job.id)).job.tasks.every(task=>task.state==='expired')).toBe(true);
+    expect(await t.tick()).toEqual({stage:'needs_attention'});
+    await expect(t.admit({idempotencyKey:randomUUID()})).rejects.toMatchObject({code:'prompt_job_trial_limit'});
+  });
+
 });

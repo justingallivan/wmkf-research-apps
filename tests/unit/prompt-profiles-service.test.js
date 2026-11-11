@@ -90,3 +90,12 @@ it('proposal definition publication requires an authoritative PI and the fixed s
   const metadata=JSON.parse(task.variables);metadata.variables.find(v=>v.name==='pi_name').required=true;task.variables=JSON.stringify(metadata);
   await expect(previewSharedTask({task},deps)).resolves.toMatchObject({sampleOnly:true});
 });
+
+it('the unpublished controlled-trial input artifact passes the real Admin preview contract',async()=>{
+  const candidate=require('../../docs/plans/SHARED_EXECUTOR_PROPOSAL_TRIAL_INPUTS_2026-11-11.json');
+  const{deps}=store();
+  expect(hashProfile(candidate.profile)).toBe(candidate.profileHash);
+  await publishPromptProfile({profile:candidate.profile,expectedVersion:0,requestId:id},deps);
+  for(const task of candidate.tasks)await expect(previewSharedTask({task},deps)).resolves.toMatchObject({sampleOnly:true});
+  expect((await getPromptProfiles(deps)).tasks.map(task=>task.name)).toEqual(['synthetic.executive-summary','synthetic.methodology','proposal.executive-summary','proposal.methodology']);
+});

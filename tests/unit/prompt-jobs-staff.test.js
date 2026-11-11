@@ -82,3 +82,9 @@ it('partial validation and unknown audit are surfaced without pretending the who
  view.tasks[1].state='validated';view.attempts[0].audit_state='pending';expect(projectStaffJob(view,results).status).toBe('running');
  view.attempts[0].audit_state='unknown';expect(projectStaffJob(view,results).status).toBe('needs_attention');
 });
+
+it.each(['proposal_source_missing','proposal_source_ambiguous','proposal_source_pi_missing','proposal_source_invalid_metadata'])('admission maps known %s failures without creating a job',async code=>{
+ const{deps,args}=setup();deps.store.listJobs.mockResolvedValue([]);deps.source.inspect.mockRejectedValue(Object.assign(new Error('private source detail'),{code}));
+ await expect(admitStaffJob({...args,idempotencyKey:trialId},deps)).rejects.toMatchObject({httpStatus:409,body:{error:code,code}});
+ expect(deps.store.admit).not.toHaveBeenCalled();
+});

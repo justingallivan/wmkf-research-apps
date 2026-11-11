@@ -2,7 +2,7 @@
 import { constantTimeEqual, verifyCronSecret } from '../../../lib/utils/cron-auth';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { runStaffJobTick } from '../../../lib/services/prompt-jobs/staff-worker';
-export const config = {maxDuration:90};
+export const config = {maxDuration:300};
 export default async function handler(req,res) {
   res.setHeader('Cache-Control','private, no-store');
   if (!['GET','POST'].includes(req.method)){res.setHeader('Allow','GET, POST');return res.status(405).json({error:'Method not allowed'});}

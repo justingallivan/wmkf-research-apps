@@ -152,3 +152,14 @@ test('a lease deadline exhausted by the last freshness check waits without a dis
     expect(f.state.tasks[0].state).toBe('queued');
   } finally { jest.restoreAllMocks(); }
 });
+
+test('expired source terminates queued tasks before preparation or any provider call',async()=>{
+ const f=fixture({two:true,operation:'generate-draft'});f.state.job.snapshot_content_id=null;f.state.job.source_expires_at=new Date(0);
+ f.args.prepareSnapshot=jest.fn();expect(await f.tick()).toEqual({stage:'expired'});
+ expect(f.args.prepareSnapshot).not.toHaveBeenCalled();expect(f.executePrompt).not.toHaveBeenCalled();expect(f.state.tasks.every(t=>t.state==='expired')).toBe(true);
+});
+test('expiry during snapshot persistence terminates preparation instead of downloading again',async()=>{
+ const f=fixture({operation:'generate-draft'});f.state.job.snapshot_content_id=null;f.args.prepareSnapshot=jest.fn(async()=>({}));
+ f.store.saveSnapshot=jest.fn(async()=>{throw Object.assign(new Error('expired'),{code:'prompt_job_source_expired'});});
+ expect(await f.tick()).toEqual({stage:'expired'});expect(await f.tick()).toEqual({stage:'needs_attention'});expect(f.args.prepareSnapshot).toHaveBeenCalledTimes(1);
+});
