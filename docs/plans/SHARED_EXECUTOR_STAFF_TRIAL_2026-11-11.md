@@ -72,7 +72,7 @@ configuration, audit or Request data. That read-only probe preceded the separate
 ## Authorized live trial
 
 The owner approved one `local-production` trial for Request 1003384, including
-the ledger migration, profile/task publication, up to two Sonnet 4.6
+profile/task publication, up to two Sonnet 4.6
 application calls at 1,536 output tokens each, retained validated drafts
 and content-free AI-run audit writes. The proposal SHA-256 above bound the
 approved source. The deployment and Request fields were outside the scope.
@@ -116,6 +116,8 @@ allowance. Actual billing depends on provider token accounting. The code
 caps call count and output tokens. [Sonnet 4.6 pricing](https://platform.claude.com/docs/en/models/sonnet-4-6/overview), [cache pricing](https://platform.claude.com/docs/en/build-with-claude/prompt-caching#pricing).
 
 ## Live generation outcome
+
+The [sanitized trial receipt](../audits/SHARED_EXECUTOR_CONTROLLED_TRIAL_2026-11-11.json) preserves the final state, usage, snapshot hash and audit readback without applicant text.
 
 [VERIFIED via the scoped PostgreSQL receipt and provider usage, 2026-11-11]
 Both Sonnet 4.6 Messages POSTs returned HTTP 200. The worker saved both

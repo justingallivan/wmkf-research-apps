@@ -47,6 +47,8 @@ spend. The owner explicitly approved the bounded live trial separately.
 
 ## Final live outcome review
 
+The [sanitized trial receipt](SHARED_EXECUTOR_CONTROLLED_TRIAL_2026-11-11.json) records the final metadata-only evidence.
+
 The targeted receipt review used Claude Opus 5.5 alone according to the
 review JSON's `modelUsage`. It confirmed **PARTIAL / `needs_attention`**,
 two approved provider calls, the cache hit, the truncation, and both
@@ -216,6 +218,6 @@ The required deadline fix is closed in source, and so are the cheap fixes you na
 
 Owner: Codex orchestrator. Branch: `codex/coordinated-start-2026-11-10-b`, isolated at `/private/tmp/wmkf-coordinated-start-2026-11-10-b`.
 
-Status: staff workflow, source adapter, controlled runner, Admin capability extension and scoped SQL reads/quota/expiry are committed and verified locally. Runtime closure is `5652c96dd`; follow-up evidence is this receipt. No push, merge, deployment, live generation, or Request write occurred. Documentation is committed with the receipt; the final worktree check must be clean.
+Status: staff workflow, source adapter, controlled runner, Admin capability extension and scoped SQL reads/quota/expiry are committed and verified locally. Runtime closure is `5652c96dd`; follow-up evidence is this receipt. No push, merge, deployment, or Request-field write occurred. The separately approved live generation and its limitations are recorded below. Documentation is committed with the receipt; the final worktree check must be clean.
 
 The owner-approved service-level trial used the verified narrative and process-scoped activation. It exercised two application calls and cache reuse. The Executive Summary passed format validation and requires PI-attribution review. The Methodology hit the output-token limit and failed validation. See the [live trial outcome](../plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md#live-generation-outcome).

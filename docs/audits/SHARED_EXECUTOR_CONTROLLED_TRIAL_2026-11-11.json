@@ -1,0 +1,140 @@
+{
+  "job": {
+    "id": "4640cd5c-6112-473a-9217-e8a58b525384",
+    "requestId": "15d8e475-02d3-f111-a05b-70a8a5b11800",
+    "version": 17,
+    "createdAt": "2026-11-11T18:35:20.600Z",
+    "status": "needs_attention",
+    "tasks": [
+      {
+        "taskKey": "proposal.executive-summary",
+        "state": "validated",
+        "resultAvailable": true,
+        "errorCode": null
+      },
+      {
+        "taskKey": "proposal.methodology",
+        "state": "failed_validation",
+        "resultAvailable": false,
+        "errorCode": "claude_output_truncated"
+      }
+    ]
+  },
+  "snapshotHash": "93684d56f4f4d87b477e230a3d303dd6810a84f0e2cc17e1e4b71a529d6baae8",
+  "approvedSnapshotHash": "93684d56f4f4d87b477e230a3d303dd6810a84f0e2cc17e1e4b71a529d6baae8",
+  "snapshotHashMatches": true,
+  "expiresAt": "2026-11-18T18:35:20.575Z",
+  "results": [
+    {
+      "taskKey": "proposal.executive-summary",
+      "status": "available",
+      "words": 199,
+      "chars": 1592,
+      "sha256": "99bcdf42d3243f1b75e9a0bea4ae6bcfc6d27981688dc2c0861b87f5af443240"
+    }
+  ],
+  "attempts": [
+    {
+      "id": "f25fc13c-bddb-4e6d-b806-27818ff0c529",
+      "taskId": "6b87fad6-9576-4a3b-846f-413f02712f31",
+      "state": "validated",
+      "auditRunId": "262a4fb2-af4a-4e8e-8ccd-d08f07008f93",
+      "auditState": "delivered",
+      "usage": {
+        "input_tokens": 370,
+        "output_tokens": 337,
+        "cache_read_input_tokens": 0,
+        "cache_creation_input_tokens": 21507
+      },
+      "usageComplete": true
+    },
+    {
+      "id": "4310fdcf-7f03-4215-889d-74b74f1afba5",
+      "taskId": "18e01ebb-71bf-47d8-965a-aa44a82406a8",
+      "state": "failed_validation",
+      "auditRunId": "7ba978ef-4ad5-4ae2-a402-77e8e16f0ea0",
+      "auditState": "delivered",
+      "usage": {
+        "input_tokens": 380,
+        "output_tokens": 1536,
+        "cache_read_input_tokens": 21507,
+        "cache_creation_input_tokens": 0
+      },
+      "usageComplete": true
+    }
+  ],
+  "providerPosts": 2,
+  "networkWrites": [
+    {
+      "kind": "profile_publication",
+      "at": "2026-11-11T18:34:58.688Z",
+      "status": 204
+    },
+    {
+      "kind": "task_publication",
+      "at": "2026-11-11T18:35:00.932Z",
+      "status": 201
+    },
+    {
+      "kind": "task_publication",
+      "at": "2026-11-11T18:35:02.169Z",
+      "status": 201
+    },
+    {
+      "kind": "anthropic_message",
+      "at": "2026-11-11T18:35:57.540Z",
+      "status": 200
+    },
+    {
+      "kind": "anthropic_message",
+      "at": "2026-11-11T18:36:44.361Z",
+      "status": 200
+    },
+    {
+      "kind": "contentfree_audit",
+      "at": "2026-11-11T18:38:24.023Z",
+      "status": 201
+    },
+    {
+      "kind": "contentfree_audit",
+      "at": "2026-11-11T18:38:52.636Z",
+      "status": 201
+    }
+  ],
+  "auditReadback": [
+    {
+      "id": "262a4fb2-af4a-4e8e-8ccd-d08f07008f93",
+      "status": 682090000,
+      "runSource": 682090001,
+      "model": "claude-sonnet-4-6",
+      "promptVersion": 1,
+      "promptId": "07203a95-fedd-f111-84ea-6045bd04539e",
+      "requestId": "15d8e475-02d3-f111-a05b-70a8a5b11800",
+      "createdBy": "29b0de0d-4ff7-ee11-a1fd-000d3a3621c7",
+      "createdOnBehalfBy": "53e97fb3-a006-f111-8406-000d3a352682",
+      "createdOn": "2026-11-11T18:38:24Z",
+      "rawOutputAbsent": true,
+      "promptOverrideAbsent": true,
+      "notes": "profiled=true; outcome=completed; code=none; stopReason=end_turn"
+    },
+    {
+      "id": "7ba978ef-4ad5-4ae2-a402-77e8e16f0ea0",
+      "status": 682090001,
+      "runSource": 682090001,
+      "model": "claude-sonnet-4-6",
+      "promptVersion": 1,
+      "promptId": "43ea739a-fedd-f111-84ea-000d3a361c1f",
+      "requestId": "15d8e475-02d3-f111-a05b-70a8a5b11800",
+      "createdBy": "29b0de0d-4ff7-ee11-a1fd-000d3a3621c7",
+      "createdOnBehalfBy": "53e97fb3-a006-f111-8406-000d3a352682",
+      "createdOn": "2026-11-11T18:38:52Z",
+      "rawOutputAbsent": true,
+      "promptOverrideAbsent": true,
+      "notes": "profiled=true; outcome=failed; code=claude_output_truncated; stopReason=max_tokens"
+    }
+  ],
+  "verificationScope": "Owner-approved service-level controlled trial; no live browser/UI proof, Request field writeback, or deployment.",
+  "qualityReview": "Summary passes structural limits but has an unverified stored-PI/document-affiliation association. Methodology was truncated and withheld. No draft is approved for publication.",
+  "estimatedUsdFromReportedUsage": 0.11744835,
+  "runnerSha256": "582497014398d05d222e181fb8cd31f17c38e1e84dd77b9d23519c8b0a8ce8e1"
+}
