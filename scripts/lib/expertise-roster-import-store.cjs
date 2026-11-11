@@ -91,6 +91,8 @@ function createStore({env, client, pg}) {
         await pg.query("SET LOCAL lock_timeout = '5s'");
         await pg.query('LOCK TABLE expertise_roster, expertise_roster_identity, expertise_roster_binding IN ACCESS EXCLUSIVE MODE');
         phase = 'prepare';
+        const lifecycle = (await pg.query("SELECT to_regclass('expertise_roster_cutover')::text AS name")).rows[0];
+        check(lifecycle && Object.hasOwn(lifecycle, 'name') && lifecycle.name === null, 'Import is refused after roster lifecycle preparation');
         const seq = (await pg.query("SELECT pg_get_serial_sequence('expertise_roster','id') AS name")).rows[0].name;
         check(seq === 'public.expertise_roster_id_seq', 'Unexpected legacy sequence');
         const oldHigh = Number((await pg.query('SELECT last_value FROM expertise_roster_id_seq')).rows[0].last_value);

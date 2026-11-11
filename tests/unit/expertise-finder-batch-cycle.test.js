@@ -7,7 +7,7 @@
  * @jest-environment jsdom
  */
 import React from 'react';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import ExpertiseFinderPage from '../../pages/expertise-finder';
 import { conventionalCycles, resolveWorkingCycle } from '../../lib/utils/cycle-code.js';
 
@@ -479,4 +479,77 @@ test('leaving history aborts the pending read', async () => {
   await waitFor(()=>expect(signal).toBeDefined());
   fireEvent.click(screen.getByRole('button',{name:/Match Proposal/}));
   expect(signal.aborted).toBe(true);
+});
+
+
+const REHEARSAL_MEMBER = { ...MEMBER, id: '11111111-1111-4111-8111-111111111111', etag: 'W/"1"' };
+const rehearsalRoster = (members) => ok({ members, backend: 'dataverse-rehearsal', users: [] });
+
+test('roster reconciliation warning survives reload after a saved edit', async () => {
+  const warning = 'Saved, but numeric roster reconciliation is incomplete.';
+  let saved = false;
+  global.fetch = routeFetch([
+    { test: (_u, m) => m === 'GET', respond: () => rehearsalRoster([{ ...REHEARSAL_MEMBER, role: saved ? 'Updated role' : MEMBER.role }]) },
+    { test: (_u, m) => m === 'PATCH', respond: () => { saved = true; return ok({ success: true, member: REHEARSAL_MEMBER, warning }); } },
+  ]);
+  render(<ExpertiseFinderPage />);
+  fireEvent.click(screen.getByText('Roster'));
+  fireEvent.click(await screen.findByText(MEMBER.name));
+  fireEvent.click(screen.getByText('Edit'));
+  fireEvent.click(screen.getByText('Save Changes'));
+  expect(await screen.findByText('Updated role', { exact: false })).toBeInTheDocument();
+  expect(screen.getByRole('status')).toHaveTextContent(warning);
+  expect(screen.queryByRole('button', { name: 'Save Changes' })).not.toBeInTheDocument();
+});
+
+test('paused roster editing retains the editable form after 503', async () => {
+  global.fetch = routeFetch([
+    { test: (_u, m) => m === 'GET', respond: () => rehearsalRoster([REHEARSAL_MEMBER]) },
+    { test: (_u, m) => m === 'PATCH', respond: () => fail({ error: 'Roster editing is paused for reconciliation.' }, 503) },
+  ]);
+  render(<ExpertiseFinderPage />);
+  fireEvent.click(screen.getByText('Roster'));
+  fireEvent.click(await screen.findByText(MEMBER.name));
+  fireEvent.click(screen.getByText('Edit'));
+  fireEvent.change(screen.getByPlaceholderText('e.g., Professor'), { target: { value: 'Unsaved role' } });
+  fireEvent.click(screen.getByText('Save Changes'));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Roster editing is paused');
+  expect(screen.getByRole('button', { name: 'Save Changes' })).toBeEnabled();
+  expect(screen.getByPlaceholderText('e.g., Professor')).toHaveValue('Unsaved role');
+});
+
+test('create reconciliation retry retains its mutation identity and disables cancellation during the request', async () => {
+  const originalUuid = crypto.randomUUID;
+  crypto.randomUUID = jest.fn().mockReturnValueOnce('22222222-2222-4222-8222-222222222222').mockReturnValueOnce('33333333-3333-4333-8333-333333333333');
+  try {
+    let settleFirst, created = false;
+    const payloads = [];
+    global.fetch = routeFetch([
+      { test: (_u, m) => m === 'GET', respond: () => rehearsalRoster(created ? [{ ...REHEARSAL_MEMBER, name: 'Synthetic member' }] : []) },
+      { test: (_u, m) => m === 'POST', respond: (options) => {
+        payloads.push(JSON.parse(options.body));
+        if (payloads.length === 1) return new Promise(resolve => { settleFirst = resolve; });
+        created = true;
+        return ok({ success: true, member: REHEARSAL_MEMBER }, 201);
+      } },
+    ]);
+    render(<ExpertiseFinderPage />);
+    fireEvent.click(screen.getByText('Roster'));
+    await waitFor(() => expect(screen.getByText('+ Add Member')).toBeEnabled());
+    fireEvent.click(screen.getByText('+ Add Member'));
+    fireEvent.change(within(screen.getByText('Name *').closest('div')).getByRole('textbox'), { target: { value: 'Synthetic member' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add Member' }));
+    await waitFor(() => expect(settleFirst).toBeDefined());
+    expect(screen.getAllByRole('button', { name: 'Cancel' })[0]).toBeDisabled();
+    await act(async () => settleFirst(fail({ error: 'Retry with the same creation identity.' }, 503)));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Retry with the same creation identity');
+    expect(screen.getByRole('button', { name: 'Add Member' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Add Member' }));
+    expect(await screen.findByText('Synthetic member')).toBeInTheDocument();
+    expect(payloads).toHaveLength(2);
+    expect(payloads[1]).toEqual(payloads[0]);
+    expect(payloads[0].mutation_id).toBe('22222222-2222-4222-8222-222222222222');
+    expect(crypto.randomUUID).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Add Member' })).not.toBeInTheDocument();
+  } finally { crypto.randomUUID = originalUuid; }
 });

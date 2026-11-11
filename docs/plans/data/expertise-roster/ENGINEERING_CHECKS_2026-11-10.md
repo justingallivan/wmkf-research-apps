@@ -40,10 +40,10 @@ on failure; a writer cleanup error cannot skip the owner's rollback/end.
 
 This proves lock/release mechanics only. It does not prove a persistent freeze,
 FK migration, post-edit data reconciliation, operational rollback or deployment
-admission/drain. Source search found no operational roster cutover/rollback command
-on this branch. The plan requires one; the existing synthetic bridge rehearsal is
-not that implementation. No numbered bridge migration or runtime allocator is
-present. Those are implementation/release prerequisites, not tests already passed.
+admission/drain. At that checkpoint, source search found no operational roster cutover/rollback
+command or runtime allocator. The November 10 allocator continuation below supersedes
+that implementation status. No numbered bridge migration is present; public
+promotion remains a separate release prerequisite.
 
 ## Editor form normalization
 
@@ -97,11 +97,34 @@ node --import ./scripts/lib/use-extensionless.mjs scripts/probe-roster-editor-em
 Never commit private environment or receipt directories. The SQL tests use controlled
 authentication/provider dependencies, not independent SSO or paid model execution.
 The full application/browser, actual attachment upload, linked-Contact lifecycle,
-new-profile numeric allocation and operational cutover/rollback gates remain open.
+public new-profile numeric allocation and operational cutover/rollback gates remain open.
 No push, deployment, Production mutation or shared-database write occurred.
 
 
-## Fable source review transcript
+## Allocator continuation — Slice A
+
+[VERIFIED via source and disposable-schema PostgreSQL tests] Runtime admission now
+uses a dedicated client and durable per-attempt intents; confirmed saves ensure a
+stable numeric binding under a control-row lock. Unknown writes remain pending.
+Create binding failures preserve retry identity; confirmed updates surface a saved
+reconciliation warning. The importer refuses lifecycle-controlled tables after its
+existing exclusive locks.
+
+Ten allocator tests pass, including concurrent same/different GUID saves, lost COMMIT
+response recovery, lost-session intent retention and freeze/sequence checks. Eight
+phase-command tests pass for prepare/activate/pause/resume/abort, drift refusal and
+lost-COMMIT reruns. Every fixture cleanup verifies the populated public fingerprint.
+Three UI regressions verify warning retention, stable create retries and paused edit
+retention; the existing disabled fieldset already prevents in-flight cancellation.
+
+The combined 97-test run and production build passed. Fable phase review failed with
+"out of usage credits"; runtime review is pending. Build review is incomplete.
+Rollback reconciliation is not built. No control table or phase is applied to public, and the CLI refuses
+public before connecting. Abandoning an uncertain create via explicit Cancel remains
+an accepted disposable-schema dead end; there is no force-clearing repair command.
+See `ALLOCATOR_CUTOVER_DESIGN_2026-11-10.md` for the accepted boundaries.
+
+## Historical Fable empty-text source review transcript
 
 **READY FOR BOUNDED SANDBOX CANARY** — no named blockers, with caveats below.
 

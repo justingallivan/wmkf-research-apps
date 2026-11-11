@@ -66,8 +66,9 @@ NAMED CHANGES. The repairs are incorporated; the original review and disposition
 are in `docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_2026-11-09.md`. Third Fable OAuth review confirmed B1–B5 and all six rehearsal gates resolved.
 Its two new cutover findings were addressed in the plan by requiring inert automatic
 migrations, a gated operational cutover script, and isolated v2 prompt/admission
-controls. The operational script and runtime allocator are not implemented on this
-branch; do not treat that plan review as execution evidence.
+controls. Those November 9 reviews were design evidence, not implementation evidence.
+The November 10 continuation now builds the allocator and disposable-schema phase
+commands; see the bounded implementation status below.
 See `docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_3_2026-11-09.md`. The final Fable plan check returned READY with no named repairs; see
 `docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_4_2026-11-09.md`.
 Roster continuation is on `codex/expertise-roster-import-2026-11-10` in
@@ -128,6 +129,14 @@ with original input preserved. History failures now show Retry rather than false
 empty history, with request cancellation. Evidence and the explicit
 operational implementation gaps are in
 `docs/plans/data/expertise-roster/ENGINEERING_CHECKS_2026-11-10.md`.
+[VERIFIED via branch source and isolated PostgreSQL tests] Slice A now includes
+dedicated-client write admission, durable write intents, numeric binding allocation,
+and disposable-schema prepare/activate/pause/resume/abort commands. Ten allocator and
+eight phase tests passed with unchanged public fingerprints. The combined 97-test run and production build passed. Fable phase review failed
+with "out of usage credits"; runtime review is pending. Build review is incomplete;
+rollback reconciliation is not built. Public phase execution is refused.
+The accepted design and remaining boundaries are in
+`docs/plans/data/expertise-roster/ALLOCATOR_CUTOVER_DESIGN_2026-11-10.md`.
 Next: independent signed-in browser UAT, attachments, linked-person lifecycle,
 full matching persistence and cutover/rollback. Component tests are not browser UAT.
 The local import fixture is not a full application schema; do not claim full app UAT.

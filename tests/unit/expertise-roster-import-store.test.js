@@ -4,6 +4,7 @@ const HOST='orgd9e66399.crm.dynamics.com',GUID='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaa
 function env(){const url='postgres://roster_rehearsal:synthetic@127.0.0.1:55439/roster_rehearsal';return {EXPERTISE_ROSTER_REHEARSAL:'on',DYNAMICS_URL:'https://'+HOST,DYNAMICS_SANDBOX_URL:'https://'+HOST,DATAVERSE_TARGET_INTERLOCK:'on',DATAVERSE_DAL_ENFORCEMENT:'on',POSTGRES_URL:url,DATABASE_URL:url,POSTGRES_URL_NON_POOLING:url,POSTGRES_PRISMA_URL:url};}
 function pgMock(){return {query:jest.fn(async sql=>{
  if(sql.includes('current_database'))return {rows:[{database:'roster_rehearsal',username:'roster_rehearsal'}]};
+ if(sql.includes("to_regclass('expertise_roster_cutover')"))return {rows:[{name:null}]};
  if(sql.includes('pg_get_serial_sequence'))return {rows:[{name:'public.expertise_roster_id_seq'}]};
  if(sql.includes('last_value'))return {rows:[{last_value:'50'}]};
  if(sql.includes('MAX(id)'))return {rows:[{n:sql.includes('expertise_roster_identity')?500:39}]};
@@ -105,4 +106,14 @@ test('unknown state fails closed without either write path',async()=>{
  const client={raw:jest.fn(),createInactiveExpertiseProfile:jest.fn()};
  await expect(createStore({env:env(),client,pg:pgMock()}).create({statecode:2})).rejects.toThrow('Invalid profile state');
  expect(client.raw).not.toHaveBeenCalled();expect(client.createInactiveExpertiseProfile).not.toHaveBeenCalled();
+});
+
+test.each([{name:'expertise_roster_cutover'},undefined,{}])('lifecycle state or inconclusive presence refuses importer before work',async row=>{
+ const pg=pgMock(),base=pg.query.getMockImplementation();
+ pg.query.mockImplementation(sql=>sql.includes("to_regclass('expertise_roster_cutover')")?Promise.resolve({rows:row?[row]:[]}):base(sql));
+ const work=jest.fn();
+ await expect(createStore({env:env(),pg,client:{}}).bridgeTransaction(90,work)).rejects.toThrow('Import is refused');
+ expect(work).not.toHaveBeenCalled();expect(pg.query).toHaveBeenLastCalledWith('ROLLBACK');
+ const calls=pg.query.mock.calls.map(([sql])=>sql);
+ expect(calls.findIndex(sql=>sql.includes('to_regclass'))).toBeGreaterThan(calls.findIndex(sql=>sql.startsWith('LOCK TABLE')));
 });

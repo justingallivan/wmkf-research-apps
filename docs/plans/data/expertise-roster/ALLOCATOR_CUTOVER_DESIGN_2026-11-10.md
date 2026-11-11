@@ -15,11 +15,19 @@ Real SQL rehearsals use synthetic data in a disposable schema on the existing pi
 local database; public before/after snapshots must match. Public receives no phase
 transition, FK change, binding, allocation or sequence change from these tests.
 
-Verified source baseline: the GUID editor performs keyed create/readback but does
+Historical pre-implementation source baseline: the GUID editor performs keyed create/readback but does
 not bind IDs; numeric consumers read target-scoped bridge rows. The importer uses
 exclusive old/identity/binding table locks and manual high-water allocation. Existing
 legacy writes use normal INSERT/UPDATE/DELETE statements. No operational command
 or runtime allocator exists. Existing full-import receipts remain immutable evidence.
+
+## Implementation checkpoint
+
+[VERIFIED via source and isolated SQL tests] Slice A runtime and operational commands
+are source-built. Ten allocator and eight phase tests pass against disposable schemas
+with unchanged public fingerprints. The combined 97-test run and production build passed. Fable phase review failed with
+"out of usage credits"; runtime review is pending. Build review is incomplete.
+Slice B remains unbuilt; no public phase or runtime allocation canary ran.
 
 ## Invariants
 

@@ -3,18 +3,23 @@ jest.mock('../../lib/dataverse/adapters/expertise-profile', () => ({ get: jest.f
 jest.mock('../../lib/dataverse/adapters/system-user', () => ({ getById: jest.fn() }));
 jest.mock('../../lib/dataverse/adapters/contact', () => ({ getByIdWithSelect: jest.fn() }));
 jest.mock('../../lib/services/expertise-finder/roster-rehearsal-target.cjs', () => ({ assertTarget: jest.fn() }));
+jest.mock('../../lib/services/expertise-finder/roster-lifecycle.cjs', () => ({ withRosterWrite: jest.fn() }));
 import * as profiles from '../../lib/dataverse/adapters/expertise-profile';
 import * as users from '../../lib/dataverse/adapters/system-user';
 import { saveRoster, listRoster } from '../../lib/services/expertise-finder/roster-service';
 import { processAnnotations } from '../../lib/services/dynamics/annotations';
 const contract = require('../../lib/services/expertise-finder/roster-contract.cjs');
+const lifecycle = require('../../lib/services/expertise-finder/roster-lifecycle.cjs');
+const lease = {beforeMutation:jest.fn(), rejectMutation:jest.fn(), complete:jest.fn()};
 const ID = '11111111-1111-4111-8111-111111111111';
 const USER = '22222222-2222-4222-8222-222222222222';
 const ACTOR = '33333333-3333-4333-8333-333333333333';
 let row;
 const oldImpersonation = process.env.DYNAMICS_IMPERSONATION_ENABLED;
 beforeEach(() => {
- jest.resetAllMocks(); process.env.DYNAMICS_IMPERSONATION_ENABLED = 'true';
+ jest.resetAllMocks(); lifecycle.withRosterWrite.mockImplementation(work => work(lease));
+ lease.beforeMutation.mockResolvedValue('44444444-4444-4444-8444-444444444444'); lease.complete.mockResolvedValue(1);
+ process.env.DYNAMICS_IMPERSONATION_ENABLED = 'true';
  row = processAnnotations({wmkf_expertiseprofileid:ID,wmkf_name:'Test Staff',wmkf_category:contract.CATEGORIES['Research Program Staff'],statecode:0,wmkf_leadpdeligible:true,_wmkf_staffuser_value:USER,'@odata.etag':'W/"123"'});
  profiles.get.mockImplementation(async () => row); profiles.update.mockResolvedValue();
  users.getById.mockResolvedValue({isdisabled:false});
@@ -26,9 +31,9 @@ test('transport ETag survives list decoding and conditional edit', async () => {
  await saveRoster({...listed.members[0], name:'Renamed'}, ACTOR);
  expect(profiles.update).toHaveBeenCalledWith(ID,expect.objectContaining({wmkf_name:'Renamed'}),'W/"123"',ACTOR);
 });
-test.each([undefined,'W/"122"'])('missing/stale ETag %s refuses writes', async etag => {
+test.each([undefined,'W/"122"','*','W/"abc"'])('missing/stale ETag %s refuses writes', async etag => {
  await expect(saveRoster({id:ID,etag,name:'Renamed'},ACTOR)).rejects.toMatchObject({status:409});
- expect(profiles.update).not.toHaveBeenCalled();
+ expect(profiles.update).not.toHaveBeenCalled(); expect(lease.beforeMutation).not.toHaveBeenCalled();
 });
 test('deactivation retains disabled historical User and clears eligibility', async () => {
  users.getById.mockResolvedValue({isdisabled:true});
@@ -78,4 +83,52 @@ test.each([true,false])('blank form text creates and replays canonically (active
 test('optional text normalization preserves nonempty whitespace and names',()=>{
  const value=contract.normalize({name:' Name ',role:' ',expertise:' original source '});
  expect(value.name).toBe(' Name ');expect(value.role).toBe(' ');expect(value.expertise).toBe(' original source ');
+});
+
+
+test('records update intent before the remote mutation and binds the trusted stored key', async () => {
+ row.wmkf_creationkey='direct_'+ID;
+ await saveRoster({id:ID,etag:'W/"123"',name:'Renamed'},ACTOR);
+ expect(lease.beforeMutation).toHaveBeenCalledWith({kind:'update',profileGuid:ID,etag:'W/"123"'});
+ expect(lease.beforeMutation.mock.invocationCallOrder[0]).toBeLessThan(profiles.update.mock.invocationCallOrder[0]);
+ expect(lease.complete).toHaveBeenCalledWith({profileGuid:ID,creationKey:'direct_'+ID,attemptId:'44444444-4444-4444-8444-444444444444'});
+ expect(profiles.update.mock.calls[0][1]).not.toHaveProperty('wmkf_creationkey');
+});
+
+test('classifies the mutation error, not a subsequent recovery read error', async () => {
+ const mutationError=Object.assign(new Error('write uncertain'),{status:503});
+ const readError=new Error('recovery read failed');
+ profiles.byCreationKey.mockResolvedValueOnce(null).mockRejectedValueOnce(readError);
+ profiles.create.mockRejectedValueOnce(mutationError);
+ await expect(saveRoster({name:'Synthetic inactive',role_type:'Consultant',is_active:false,mutation_id:ID},ACTOR,{create:true})).rejects.toBe(readError);
+ expect(lease.rejectMutation).toHaveBeenCalledTimes(1);
+ expect(lease.rejectMutation).toHaveBeenCalledWith('44444444-4444-4444-8444-444444444444',mutationError);
+ expect(lease.beforeMutation.mock.invocationCallOrder[0]).toBeLessThan(profiles.create.mock.invocationCallOrder[0]);
+});
+
+test('retries a confirmed create after binding failure without creating again', async () => {
+ const input={name:'Synthetic inactive',role_type:'Consultant',is_active:false,mutation_id:ID};
+ const stored={...contract.encode(contract.normalize({name:input.name,role_type:input.role_type,is_active:false})),wmkf_expertiseprofileid:ID,wmkf_creationkey:'app_'+ID,_etag:'W/"9"'};
+ profiles.byCreationKey.mockResolvedValueOnce(null).mockResolvedValue(stored);
+ lease.complete.mockRejectedValueOnce(new Error('bridge unavailable')).mockResolvedValueOnce(1);
+ await expect(saveRoster(input,ACTOR,{create:true})).rejects.toThrow('bridge unavailable');
+ const result=await saveRoster(input,ACTOR,{create:true});
+ expect(result.member.id).toBe(ID);
+ expect(profiles.create).toHaveBeenCalledTimes(1);
+ expect(profiles.create.mock.calls[0][0].wmkf_creationkey).toBe('app_'+ID);
+ expect(lease.complete).toHaveBeenLastCalledWith({profileGuid:ID,creationKey:'app_'+ID,attemptId:null});
+});
+
+test('confirmed update with binding failure returns a saved warning', async () => {
+ row.wmkf_creationkey='direct_'+ID;
+ lease.complete.mockRejectedValueOnce(new Error('bridge unavailable'));
+ const result=await saveRoster({id:ID,etag:'W/"123"',name:'Renamed'},ACTOR);
+ expect(result).toMatchObject({success:true,warning:expect.stringContaining('numeric roster reconciliation')});
+ expect(profiles.update).toHaveBeenCalledTimes(1);
+ expect(lease.rejectMutation).not.toHaveBeenCalled();
+});
+
+test('request cannot choose a creation key', async () => {
+ await expect(saveRoster({name:'Synthetic',role_type:'Consultant',is_active:false,mutation_id:ID,wmkf_creationkey:'app_'+USER},ACTOR,{create:true})).rejects.toMatchObject({status:400});
+ expect(profiles.create).not.toHaveBeenCalled(); expect(lease.beforeMutation).not.toHaveBeenCalled();
 });
