@@ -235,6 +235,12 @@ obligations. See `docs/plans/data/expertise-roster/ROSTER_FRESHNESS_CONTRACT_BUI
 Machine audit attribution, revocation-safe cleanup, PA operations and roster cutover
 remain release gates; the initial source is selected but broader future placement remains open.
 
+The pure compiler-2 native output-schema builder and shared integration passed
+bounded offline checks; domain Opus PASS and shared execution-evidence condition
+locally resolved. The domain validator is unchanged, local size guards are not
+provider guarantees, and no fourth trial/publication/admission extension occurred.
+See `docs/plans/data/expertise-roster/RECOMMENDATIONS_OUTPUT_SCHEMA_BUILD_2026-11-11.md`.
+
 The shared infrastructure owner confirmed clean runtime baseline `0c4b8d39c` and retains
 common source/cache contracts, PA authentication, typed storage/results, worker,
 recovery and operations. The roster stream owns expertise semantics/validation and

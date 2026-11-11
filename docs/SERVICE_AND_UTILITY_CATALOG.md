@@ -51,6 +51,8 @@ If you're touching a service or utility, read its header before this catalog. If
 
 ### Expertise roster rehearsal
 
+- **`expertise-finder/recommendations-output-schema.js`** — Pure compiler-2 native schema over revalidated frozen roster context: role-specific GUID enums, closed direct recommendations, omitted empty categories with existing default arrays and null-only empty leads. Preserves all identified conflicts. Local 512-entry/64 KiB guards are not provider guarantees; the existing validator remains authoritative. No I/O or authorization. See `docs/plans/data/expertise-roster/RECOMMENDATIONS_OUTPUT_SCHEMA_BUILD_2026-11-11.md`.
+
 - **`lib/dataverse/adapters/expertise-recommendations-read.js`** — No-selector, read-only sandbox projection under caller-established trusted DAL context; strict target/pagination/User reads and complete DTO validation feed the pure recommendations builder. It does not establish Request authorization or Production admission. Source-built with 207 combined tests and one-page live read proof; Opus returned READY WITH NAMED CHANGES; named tests passed and focused closure READY. See `docs/plans/data/expertise-roster/SANDBOX_ROSTER_READ_ADAPTER_BUILD_2026-11-11.md`.
 
 - **`expertise-finder/roster-match-validation.js`** — Pure shared frozen-roster schema and GUID/category/lead validator, extracted unchanged for recommendations; legacy `roster-match-contract.js` re-exports retain the same caller contract. No data reads or DAL imports.

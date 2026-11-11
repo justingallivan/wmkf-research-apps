@@ -444,3 +444,14 @@ Both owners agree the next dependency is bounded sandbox producer/admission and
 compatible-job delivery proof before PA wiring. That requires a separately reviewed
 trial and any needed paid-call authorization; no activation has started. Shared
 final docs `f9b3dd1b4` follow test-only `ef5507ab8`; runtime remains `6fe01c88e`.
+
+## Compiler-2 native generation schema checkpoint
+
+The pure role-enum output-schema builder is source-built at `94b361c04`, with
+conflict-preservation wording in `c4857ce9b`. Opus returned domain PASS; shared
+compiler-2 integration's only review condition was execution evidence, locally
+resolved by 225 unit/nine suites and 90 real PG/three suites plus build/gates.
+The unchanged domain validator remains authoritative. Local 512-enum/64 KiB
+bounds do not prove provider acceptance. No fourth trial, prompt publication or
+admission extension occurred. See
+[the scoped build receipt](RECOMMENDATIONS_OUTPUT_SCHEMA_BUILD_2026-11-11.md).
