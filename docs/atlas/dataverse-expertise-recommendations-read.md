@@ -30,11 +30,12 @@ The approved PDF copy was verified in Sandbox Request 1000339. The local
 operator trial published one scoped profile and prompt, admitted the
 job on shared PostgreSQL, and delivered one content-free failure audit
 in Sandbox Dataverse. The response failed domain validation and the job
-retained no recommendations. The successor reused the profile, published
-v2 as sole current, and delivered a separate Sandbox failure audit
-after its response truncated. Both normal Microsoft OAuth GET checks
-showed only unavailable/unknown metadata. An available/current response
-through the signed route remains unverified.
+retained no recommendations. Both successors reused the profile and
+delivered separate failure audits. The v2 response truncated and v3,
+now sole current, produced complete JSON with an invalid top-level
+shape. All three normal Microsoft OAuth GET checks showed only
+unavailable/unknown metadata. An available/current response through
+the signed route remains unverified.
 
 [Local trial contract](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#local-sandbox-recommendations-trial),
 [Recommendation read contract](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#sandbox-recommendations-read),

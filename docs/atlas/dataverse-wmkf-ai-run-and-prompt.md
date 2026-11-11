@@ -71,9 +71,12 @@ invocations. Request linkage is present only when the Executor caller supplies
   prompt, backend app creator, and empty raw output and override fields.
   This used app-native attribution. The role-prompt successor also read
   back content-free failure audit `60b9bab4-d197-4043-a3ed-0dd5b97bbfab`
-  for v2 after the response truncated.
+  for v2 after the response truncated. The v3 response-length trial read
+  back content-free failure audit `35ce89a3-5ae2-479c-ba53-9df8c449333a`
+  after the complete JSON failed the closed output schema.
   [First Sandbox trial](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#live-sandbox-trial-outcome),
-  [successor](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#live-successor-outcome).
+  [second trial](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#live-successor-outcome),
+  [third trial](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#live-response-length-trial-outcome).
 - `pages/api/phase-i-dynamics/summarize.js` — Phase I summarization
 - `pages/api/grant-reporting/extract.js` — Grant Reporting extraction and goals assessment; writes a best-effort `wmkf_ai_run` audit row, not extracted values to `akoya_request` (`lib/services/grant-reporting/extract-service.js`)
 - `scripts/probe-impersonation-resmoke.js`, `scripts/probe-impersonation-as-user.js` — write sentinel rows during impersonation testing (S135). Filter `wmkf_ai_model='impersonation-resmoke'` to find them.

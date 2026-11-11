@@ -158,6 +158,14 @@ test.each([
     .toThrow(expect.objectContaining({ code: 'profile_output_invalid' }));
 });
 
+test('withholds a metadata-wrapped response even when its inner recommendations are valid', () => {
+  const fixture = buildRecommendationsSnapshot(input());
+  const modelOutput = { staff_assignment: { primary: { profile_guid: guid(2) }, secondary: null } };
+  expect(() => validateRecommendationsOutput(modelOutput, fixture)).not.toThrow();
+  expect(() => validateRecommendationsOutput({ resultContract: 'expertise-recommendations-v1', modelOutput }, fixture))
+    .toThrow('Recommendations output does not match the closed schema.');
+});
+
 test('withholds a valid Board identity placed in consultant overlap', () => {
   const fixture = buildRecommendationsSnapshot(input());
   const board = { profile_guid: guid(4), rationale: 'Relevant scientific expertise' };

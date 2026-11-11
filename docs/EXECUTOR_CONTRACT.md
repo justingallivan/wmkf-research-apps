@@ -676,11 +676,13 @@ registered Sandbox target, ledger database identity, staff/app scope
 and current prompt/profile definition before admitting a sole
 `expertise.recommendations` draft. A durable admission fence counts every
 Sandbox recommendations receipt across both Sandbox environment labels.
-The only second job allowed is the authorized successor to the exact
-first failed-validation job with a delivered audit and verified retained
-configuration. It uses the same actor/app, Request, source, profile and
-database and a new scope, key and prompt revision. The fence refuses a
-third job. Exact authorized replay keeps the original frozen job.
+The only successors are the two authorized jobs in the exact retained
+lineage. Fresh admission requires the pinned prior job or jobs, their
+specific terminal validation failures, delivered audits and unexpired
+configurations. Each uses the same actor/app, Request, source, profile
+and database, plus a new scope, key and prompt revision. All three
+receipts count after expiry, so the fence refuses a fourth job. Exact
+authorized replay keeps the original frozen job.
 The source producer extracts the same bounded PDF bytes it hashes, with
 no PI lookup. The v2 snapshot seals the proof and exact roster. The
 target-bound source proof retains its `ai-materials-combined-pdf-v1`

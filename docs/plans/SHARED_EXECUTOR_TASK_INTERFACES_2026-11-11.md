@@ -1,6 +1,6 @@
 # Shared Executor task interfaces
 
-**Status [BRANCH-BUILT, offline fixture and default-off Sandbox runtime], [LIVE-VERIFIED, two bounded trials through authenticated withholding], and [PLANNED, broader caller integration].**
+**Status [BRANCH-BUILT, offline fixture and default-off Sandbox runtime], [LIVE-VERIFIED, three bounded trials through authenticated withholding], and [PLANNED, broader caller integration].**
 This checkpoint coordinates the proposal-draft and expertise recommendation
 streams. The shared infrastructure owner controls the capability
 registry, Admin compiler, authorization, Executor, worker and ledger. The roster
@@ -137,9 +137,9 @@ exact prompt, profile, combined PDF, complete roster and budget before
 new admission. A transaction lock spans both Sandbox environment labels
 in the pinned database. Exact replay precedes the admission quota, which
 counts every existing Sandbox recommendations job, including expired or
-terminal jobs. The first job used the singleton rule. The sole successor
-exception is defined below. Each job has one typed draft task without a
-destination.
+terminal jobs. The first job used the singleton rule. The authorized
+successors require the exact audited predecessor lineage described below.
+Each job has one typed draft task without a destination.
 
 The producer extracts text from the exact verified PDF bytes and
 freezes the source proof and roster digest. The worker rechecks
@@ -249,13 +249,13 @@ the same. The candidate and role regression are in `8fb8dd00d`.
 The 67 focused candidate and role-contract tests passed.
 
 [VERIFIED via branch source at `2ae930fe2` and loopback PostgreSQL]
-The successor admission follows these invariants.
+The second trial's admission followed these invariants.
 
 | Boundary | Contract |
 | --- | --- |
 | Owner and quota | The same database-wide Sandbox transaction lock covers exact replay, count and insert. A fresh successor requires exactly one existing Sandbox recommendations job across both Sandbox environments and all owners. It must be the pinned first job, with its sole task and one attempt in `failed_validation` / `profile_output_invalid` and the audit delivered. |
 | Frozen pins | The service verifies current access, prompt/profile, exact combined PDF, complete roster and budget. The store reconstructs the first command hash from its receipt and retained configuration using the same Request, staff actor, backend app, database, source and profile. New admission requires the first configuration to remain unexpired. |
-| Successor identity | A new scope UUID, idempotency key, prompt GUID and the next prompt version distinguish the successor. Its exact replay returns the admitted job even after the first configuration expires. Both receipts remain quota-bearing. The transaction refuses a third job. |
+| Successor identity | A new scope UUID, idempotency key, prompt GUID and the next prompt version distinguish the successor. Its exact replay returns the admitted job even after the first configuration expires. Both receipts remain quota-bearing. The transaction refused a third job at this revision. |
 | Paid dispatch and retention | The successor has one draft-only task and at most one Sonnet 4.6 request at the existing 4,096-output-token cap. The same preflight cost, dispatch, checkpoint, audit and result guards apply. Source/response and configuration/result/audit expiry remain 24 hours and seven days respectively for each job. |
 
 The 89-test regression across four suites, including all three real
@@ -319,12 +319,10 @@ with `status: unavailable` and `freshness: unknown`. The separate
 anonymous GET returned 307 to sign-in. The local server was stopped
 after the check. The two trials verify withholding on distinct validation
 failures. An available, current recommendation has yet to be verified
-live. The trial made no Request-field writes or deployment. The admission
-quota still counts both receipts and denies a third job.
-
-A future candidate should bound rationale length and total output
-before another separately authorized trial. Keep the closed JSON and
-role validator in place.
+live. The trial made no Request-field writes or deployment. At the time
+of this run, both receipts counted against the two-job quota. The
+separately approved third trial below tests a tighter response-length
+instruction while keeping the closed JSON and role validator.
 
 ### Successor retention
 
@@ -340,6 +338,159 @@ node scripts/run-expertise-sandbox-trial-1000339.cjs expire /private/tmp/wmkf-ex
 
 These deadlines are separate from the first job's deadlines. The
 approved SharePoint PDF and both quota-bearing receipts remain in place.
+
+### Authorized response-length trial
+
+The owner approved one bounded third trial after the second response
+truncated. The [v3 candidate](EXPERTISE_SANDBOX_1000339_CANDIDATE_V3_2026-11-11.json)
+has SHA-256 `0c5ae42ab2b1023b2c2e04200b2a4f71ac48f01b4892f15d23500904e99d9889`.
+It changes only the task body, keeping the profile, typed output schema,
+roster validator, model and 4,096-token output cap. The prompt requests
+compact complete JSON within an 8,000-character target. It caps the
+shortlist at three staff consultations, five consultant overlaps and
+three Board recommendations. Rationales target at most 25 words and
+160 characters, Board notes and conflict reasons 12 words and 80
+characters, and the expertise gap 60 words and 400 characters. The
+instructions preserve both lead slots, all identified visible-roster
+conflicts, and material gaps. These are prompt instructions. The tests
+show that the intended envelope can fit with fabricated responses, and
+the live model's completeness remains to be measured.
+
+[VERIFIED via branch source at `aaac59d2f` and loopback PostgreSQL]
+The third trial uses the same default-off operator and shared-ledger
+boundary.
+
+| Boundary | Contract |
+| --- | --- |
+| Exact lineage | Under the same Sandbox-wide transaction lock, fresh admission requires the two exact prior jobs and no other Sandbox recommendations job. Each has one terminal task and attempt and a delivered audit. The v1 error must be `profile_output_invalid` and the v2 error `claude_output_truncated`. |
+| Frozen pins | Both retained configurations must be unexpired. The store reconstructs the v1 and v2 command hashes from the exact receipts and requires the same Request, staff actor, backend app, database, source and profile pins. |
+| Identity and quota | The third job uses a new scope, idempotency key and prompt GUID at version 3. Exact replay precedes new admission checks. All three receipts remain quota-bearing after cleanup, and the fence rejects a fourth job. |
+| Publication | The operator verifies the unchanged profile and the exact two-row prompt history, with v1 noncurrent and v2 current. It creates v3 noncurrent, conditionally demotes v2 and promotes v3 with same-observation ETags and persisted write intents, and reads back sole-current v3. The earlier prompt bodies and v1 state remain intact. Uncertain publication stops for inspection. |
+| Dispatch and retention | One draft task permits at most one Sonnet 4.6 call after the existing source/roster, access and spend checks. The same checkpoint, validator, audit and read guards apply. Source/response expiry remains 24 hours and configuration/result/audit expiry seven days for the third job. |
+
+The admission regression passed 90 tests across four suites, including
+all three real loopback PostgreSQL job suites. The candidate/contract
+run passed 74 tests, including seven compact-envelope feasibility cases.
+The largest disjoint-conflict fixture combines 13 recommendations and
+27 conflicts.
+
+[VERIFIED via the plan review receipt] The 42,565-byte ordinary OAuth
+plan review packet had SHA-256
+`08654398ecf6a8d0b00bceccefb1e3f47a87bcb8cc3c3f66d34120aa06804a64`.
+The one-turn review reported only `claude-opus-5-5` and returned
+NAMED CHANGES. Its brevity feedback led to the full-shortlist and
+disjoint-conflict fixture and clarified that both lead keys must be
+included. An ambiguous publication intent requires a stop, a fresh GET
+of complete history and ETags, and reconciliation against the recorded
+receipt before a separately authorized corrective write. The runner
+does not automatically retry or roll back that switch.
+
+[VERIFIED via the compiled contract and source] The appended 2,775-byte
+contract had SHA-256
+`8d11c79bf021c4dfd6eeea47268defe9d7ebb1924b3f7f3ee6ae603cdf40efd8`.
+It specifies the same seven fields, uses GUIDs without name fields,
+allows an empty proposal summary and permits the shorter rationale
+target. The composer places proposal text inside its nonce-framed
+untrusted-document block. The shared provider path disables retries,
+parameter repair, fallback and redirects. The operator saves the
+provider intent before transport, and the store checks the quota
+and writes the admission in one transaction. Publication targets
+Sandbox Dataverse and exact prompt versions. The combined contract,
+route and source run passed 94 tests across three suites.
+
+The trial's primary pass criteria are `end_turn`, complete JSON,
+closed validator pass and zero category violations. Secondary targets
+are at most 3,000 output tokens and 8,000 JSON characters, compliance
+with the requested per-field caps, and no duplicate recommendations.
+Record only content-free diagnostics: stop reason, usage, parse and
+validator status, issue paths, category, field counts, lengths,
+duplicates and conflicted recommendation counts. A pass on this
+proposal and roster supports the execution contract. Scientific
+suitability and conflict-of-interest clearance require separate
+review.
+
+[VERIFIED via the source review receipt] The 214,589-byte ordinary OAuth
+source packet had SHA-256
+`64d581c7fc20f8c3356c19bb2796c9faceff0ec7bba97b264039a7bbcd4cb897`.
+The one-turn review reported only `claude-opus-5-5` and 219,698 ms
+elapsed. It passed the admission and replay changes and conditionally
+passed the runner pending proof that an incomplete publication cannot
+admit a noncurrent prompt. The exact-ID loader checks the pinned Sandbox
+origin, the prompt GUID, current and published flags, and all required
+fields. The trial service uses that loader and checks the frozen
+definition. The Executor rechecks the budget before dispatch. These
+source checks resolved the condition without a runtime change. The
+runner enforces the body-only candidate comparison. Roster freshness is
+checked within each run. The final digest and additional fixture were
+verified locally after the reviewed packet. The external review was
+not rerun.
+
+### Live response-length trial outcome
+
+[VERIFIED via scoped Sandbox readback, shared-ledger receipt, checkpoint
+diagnostics, and signed GET] Sandbox prompt
+`d4a0677b-58a9-46f7-a742-f9da5273cf62` became sole-current v3. The
+operator reused the original profile. The shared ledger admitted
+`21af0399-0fd7-4d5f-9eb2-b5a77d4ff1fd` and saved the sealed snapshot.
+The frozen roster hash was unchanged across the comparison:
+`479ef02955ff983bf1d60faa1fec281603d243988ee431ee3c25243f30b3ec81`.
+The operator verified the private state directory had neither a lock
+nor a pending state file before generation.
+
+| Receipt | Value |
+| --- | --- |
+| Preflight | 127,266 encoded-input bound, 4,096 output tokens, $1.128648 estimated ceiling |
+| Provider | One Sonnet 4.6 request, 14,806 input, 637 output, 21,369 cache-write and zero cache-read tokens |
+| Cost | $0.13410675 estimated from usage |
+| Sandbox failure audit | `35ce89a3-5ae2-479c-ba53-9df8c449333a`, delivered and read back |
+
+The response stopped at `end_turn` and parsed as complete JSON at
+2,074 characters. It met the total length targets. The task recorded
+`failed_validation` / `profile_output_invalid` because the response's
+top-level `resultContract` and `modelOutput` keys matched the
+compiler's explanatory metadata wrapper instead of the closed model
+output shape. The earlier compiled-schema check established that the
+inner shape was compatible with the prompt, but left the wrapper
+ambiguous. The live check establishes the mismatch, not why the model
+chose that form.
+
+A private diagnostic-only check of the inner object found unknown GUIDs
+at `staff_assignment.secondary` and `board_interest[0]`, and a Board
+candidate in `consultant_overlap[2]`. It counted two lead slots, zero
+staff consultations, three consultant overlaps, one Board entry and
+one conflict. Maximum rationale length was 19 words and 144 characters.
+The gap was 337 characters and the Board note 44 characters. The
+123-character conflict reason exceeded the 80-character target. The
+diagnostic counted zero duplicate recommendations or recommendations
+also listed as conflicts. The original checkpoint remained unchanged
+and no validated result was retained. The trial met the completeness
+and total-length targets and failed the schema and role criteria.
+
+The normal Microsoft OAuth browser session displayed only the exact
+job's metadata with `status: unavailable` and `freshness: unknown`.
+An anonymous GET returned 307 to sign-in. The local server was stopped
+after verification. The trial made no Request-field writes or
+deployment. The ledger retains all three receipts and denies a fourth
+job. The compiler's model-facing wrapper and GUID/category compliance
+remain open follow-up work. A post-trial regression confirms that the
+validator accepts a valid inner recommendation object and rejects the
+same object under the metadata wrapper. The focused contract suite
+passed 75 tests, and the combined contract, route and source run
+passed 95 across three suites. Runtime and prompt code remained as
+tested in the live run.
+
+### Third-trial retention
+
+Run exact-job expiry after **2026-11-12 23:10:27.154 UTC** for the third
+job's source and response and again after **2026-11-18 23:10:27.154 UTC**
+for configuration and audit content. This job has no retained result.
+
+```sh
+node scripts/run-expertise-sandbox-trial-1000339.cjs expire /private/tmp/wmkf-expertise-sandbox-trial-1000339-v3-20261111
+```
+
+The deletion checks remain due. The SharePoint PDF and all three
+quota-bearing receipts remain in place.
 
 ## Capability and result path
 
