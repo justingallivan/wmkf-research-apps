@@ -19,6 +19,7 @@ import PublishForm from './PromptPublishForm';
 import PromptCatalogForm from './PromptCatalogForm';
 import AddPromptForm from './AddPromptForm';
 import ManagePromptGroupsPanel from './ManagePromptGroupsPanel';
+import SharedPromptEditor from './SharedPromptEditor';
 import { ADMIN_PROMPT_GROUPS, getAdminPromptDescription, resolveAdminPromptDescription } from '../../config/adminPromptCatalog';
 import { describePromptDestinations } from '../../config/adminPromptDestinations';
 
@@ -61,6 +62,10 @@ const STATUS_COPY = {
   invalid_input:         { tone: 'red',   text: 'The prompt could not be created.' },
 };
 export default function PromptTemplatesSection() {
+  return <><SharedPromptEditor /><LegacyPromptTemplatesSection /></>;
+}
+
+function LegacyPromptTemplatesSection() {
   const [prompts, setPrompts] = useState(null);
   const [modelCatalog, setModelCatalog] = useState(null);
   const [executorBudgetConfig, setExecutorBudgetConfig] = useState(null);
@@ -130,13 +135,14 @@ export default function PromptTemplatesSection() {
   if (!prompts || prompts.length === 0) return <div className="text-gray-500 text-sm">No prompts found.</div>;
 
   const allGroups = groupState.groups;
-  const activePrompts = prompts.filter(prompt => !prompt.isRetired);
-  const retiredPrompts = prompts.filter(prompt => prompt.isRetired);
+  const legacyPrompts = prompts.filter(prompt => !['synthetic.executive-summary','synthetic.methodology'].includes(prompt.name));
+  const activePrompts = legacyPrompts.filter(prompt => !prompt.isRetired);
+  const retiredPrompts = legacyPrompts.filter(prompt => prompt.isRetired);
   const groups = allGroups.map(group => ({
     ...group, prompts: activePrompts.filter(prompt => resolveAdminPromptDescription(prompt, allGroups).group === group.id),
   })).filter(group => group.prompts.length > 0);
   const terms = search.toLowerCase().trim().split(/\s+/).filter(Boolean);
-  const matchingNames = new Set(prompts.filter(prompt => {
+  const matchingNames = new Set(legacyPrompts.filter(prompt => {
     const { title, description, usedBy, group: groupId, section: sectionId } = resolveAdminPromptDescription(prompt, allGroups);
     const group = allGroups.find(candidate => candidate.id === groupId);
     const section = group?.sections?.find(candidate => candidate.id === sectionId);
@@ -231,7 +237,7 @@ export default function PromptTemplatesSection() {
           />
           {search && <button type="button" onClick={() => { setSearch(''); setExpandedGroups({}); }} className="shrink-0 text-sm text-gray-600 underline">Clear search</button>}
         </div>
-        <p role="status" className="mt-1 text-xs text-gray-500">{matchingNames.size} of {prompts.length} prompts</p>
+        <p role="status" className="mt-1 text-xs text-gray-500">{matchingNames.size} of {legacyPrompts.length} prompts</p>
       </div>
       <div className="space-y-6">
         {matchingNames.size === 0 && <p className="text-sm text-gray-600">No prompts match your search.</p>}
