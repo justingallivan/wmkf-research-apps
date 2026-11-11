@@ -158,6 +158,16 @@ test.each([
     .toThrow(expect.objectContaining({ code: 'profile_output_invalid' }));
 });
 
+test('withholds a valid Board identity placed in consultant overlap', () => {
+  const fixture = buildRecommendationsSnapshot(input());
+  const board = { profile_guid: guid(4), rationale: 'Relevant scientific expertise' };
+  expect(validateRecommendationsOutput({ staff_assignment: {}, board_interest: [board] }, fixture)
+    .board_interest[0].profile_guid).toBe(guid(4));
+  expect(() => validateRecommendationsOutput({
+    staff_assignment: {}, consultant_overlap: [{ ...board, relevance: 'strong' }],
+  }, fixture)).toThrow('Recommendations contain an unavailable or ineligible profile identity.');
+});
+
 test('requires canonical lowercase model GUIDs', () => {
   const request = input();
   const profileGuid = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';

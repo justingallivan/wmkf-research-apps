@@ -462,7 +462,9 @@ async function liveStage(mode, directory) {
           try { fs.writeFileSync(fd, JSON.stringify(result)); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
         }
         return { stage: 'inspected', validation: 'stored-contract', currentFreshness: 'not-checked', httpE2e: false, resultAvailable: Boolean(result?.results?.some(item => item.status === 'available')), providerPosts: state.providerPosts,
-          taskStates: views[0].tasks.map(x => x.state), auditStates: views[0].attempts.map(x => x.audit_state) };
+          jobId: state.jobId, sourceExpiresAt: views[0].job.source_expires_at, resultExpiresAt: views[0].job.result_expires_at,
+          tasks: views[0].tasks.map(x => ({ state: x.state, errorCode: x.error_code })),
+          attempts: views[0].attempts.map(x => ({ state: x.state, auditState: x.audit_state, auditRunId: x.audit_run_id, errorCode: x.error_code, usage: x.usage, usageComplete: x.usage_complete })) };
       }
       if (mode === 'expire') {
         const sourceExpiry = new Date(views[0].job.source_expires_at).getTime();
