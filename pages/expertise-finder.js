@@ -1091,24 +1091,32 @@ function HistoryTab() {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
+  const [error, setError] = useState(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    const controller = new AbortController();
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
     async function fetchHistory() {
       try {
-        const { ok, data } = await requestEnvelope('/api/expertise-finder/history');
-        if (ok) {
-          setMatches(data.matches || []);
-        }
-      } catch (err) {
-        console.error('Failed to fetch match history:', err);
+        const { ok, data } = await requestEnvelope('/api/expertise-finder/history', { signal: controller.signal });
+        if (cancelled) return;
+        if (!ok) throw new Error(data?.error || 'History is temporarily unavailable.');
+        setMatches(data.matches || []);
+      } catch {
+        if (!cancelled) setError('Matching history could not be loaded. Please try again.');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
     fetchHistory();
-  }, []);
+    return () => { cancelled = true; controller.abort(); };
+  }, [attempt]);
 
   if (loading) return <p className="text-sm text-gray-400 py-8 text-center">Loading history...</p>;
+  if (error) return <Card><p role="alert">{error}</p><button type="button" onClick={() => setAttempt(value => value + 1)}>Retry history</button></Card>;
 
   if (matches.length === 0) {
     return (

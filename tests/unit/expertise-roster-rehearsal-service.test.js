@@ -63,3 +63,19 @@ test('inactive creation recovers an uncertain commit by exact creation key and v
  expect(profiles.byCreationKey).toHaveBeenNthCalledWith(2,'app_'+ID);
  expect(profiles.create).toHaveBeenCalledTimes(1);
 });
+
+
+test.each([true,false])('blank form text creates and replays canonically (active=%s)',async active=>{
+ const input={name:'Synthetic blank form',role_type:'Consultant',is_active:active,mutation_id:ID,...Object.fromEntries(contract.TEXT.map(k=>[k,'']))};
+ const original=structuredClone(input);
+ const stored={wmkf_expertiseprofileid:ID,wmkf_name:input.name,wmkf_category:contract.CATEGORIES.Consultant,statecode:active?0:1,wmkf_leadpdeligible:false,_etag:'W/"9"',...Object.fromEntries(contract.TEXT.map(k=>[contract.column(k),null]))};
+ profiles.byCreationKey.mockResolvedValueOnce(null).mockResolvedValue(stored);
+ const first=await saveRoster(input,ACTOR,{create:true});const replay=await saveRoster(input,ACTOR,{create:true});
+ expect(first.member.id).toBe(replay.member.id);expect(profiles.create).toHaveBeenCalledTimes(1);
+ for(const k of contract.TEXT)expect(profiles.create.mock.calls[0][0][contract.column(k)]).toBeNull();
+ expect(input).toEqual(original);
+});
+test('optional text normalization preserves nonempty whitespace and names',()=>{
+ const value=contract.normalize({name:' Name ',role:' ',expertise:' original source '});
+ expect(value.name).toBe(' Name ');expect(value.role).toBe(' ');expect(value.expertise).toBe(' original source ');
+});

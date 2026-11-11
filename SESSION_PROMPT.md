@@ -64,8 +64,10 @@ Amy staged inactive without a User. See
 `docs/plans/data/expertise-roster/OWNER_MAPPING_DECISIONS_2026-11-09.md`. Claude Fable 5.2 reviewed the plan via approved OAuth and returned READY WITH
 NAMED CHANGES. The repairs are incorporated; the original review and disposition
 are in `docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_2026-11-09.md`. Third Fable OAuth review confirmed B1–B5 and all six rehearsal gates resolved.
-Its two new cutover findings were repaired with inert automatic migrations, a
-gated operational cutover script, and isolated v2 prompt/admission controls.
+Its two new cutover findings were addressed in the plan by requiring inert automatic
+migrations, a gated operational cutover script, and isolated v2 prompt/admission
+controls. The operational script and runtime allocator are not implemented on this
+branch; do not treat that plan review as execution evidence.
 See `docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_3_2026-11-09.md`. The final Fable plan check returned READY with no named repairs; see
 `docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_4_2026-11-09.md`.
 Roster continuation is on `codex/expertise-roster-import-2026-11-10` in
@@ -117,6 +119,15 @@ Autonomous follow-up repaired dropped recipient-exclusion warnings through the
 Workbench hook into the actual composer dialog. A stale-response regression and
 attachment roster-outage/retry regression pass; 213 tests across six suites and
 independent review pass. These close bounded failure-path checks, not live uploads.
+Further engineering checks found and repaired history using the wrong rehearsal SQL
+transport and blank editor optional text causing a post-create conflict. Real local
+SQL tests now cover matching persistence/history with controlled provider/auth inputs
+and maintenance lock/release with unchanged fixture state. Fable cleared the
+empty-form repair and its inactive live canary passed creation/replay/null readback
+with original input preserved. History failures now show Retry rather than false
+empty history, with request cancellation. Evidence and the explicit
+operational implementation gaps are in
+`docs/plans/data/expertise-roster/ENGINEERING_CHECKS_2026-11-10.md`.
 Next: independent signed-in browser UAT, attachments, linked-person lifecycle,
 full matching persistence and cutover/rollback. Component tests are not browser UAT.
 The local import fixture is not a full application schema; do not claim full app UAT.

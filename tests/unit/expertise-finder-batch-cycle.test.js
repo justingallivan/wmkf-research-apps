@@ -421,7 +421,7 @@ test('T2: HistoryTab fetchHistory — success renders matches from the response'
   expect(await screen.findByText(/A studied proposal/)).toBeInTheDocument();
 });
 
-test('T2: HistoryTab fetchHistory — non-2xx silently leaves matches empty (site never checks !ok to throw)', async () => {
+test('HistoryTab fetchHistory — non-2xx reports unavailable rather than empty', async () => {
   global.fetch = jest.fn(async (url) => (
     String(url).includes('/api/expertise-finder/history')
       ? fail({ error: 'boom' }, 500)
@@ -429,17 +429,17 @@ test('T2: HistoryTab fetchHistory — non-2xx silently leaves matches empty (sit
   ));
   render(<ExpertiseFinderPage />);
   fireEvent.click(screen.getByText('History'));
-  expect(await screen.findByText(/No matching history yet/i)).toBeInTheDocument();
+  expect(await screen.findByRole('alert')).toHaveTextContent('Matching history could not be loaded');
+  expect(screen.queryByText(/No matching history yet/i)).not.toBeInTheDocument();
   expect(screen.queryByText('boom')).not.toBeInTheDocument();
 });
 
-test('T2: HistoryTab fetchHistory — network rejection is swallowed (console.error only), never a thrown alert', async () => {
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+test('HistoryTab fetchHistory — network rejection is visible and retryable', async () => {
   global.fetch = jest.fn(async () => { throw new TypeError('Failed to fetch'); });
   render(<ExpertiseFinderPage />);
   fireEvent.click(screen.getByText('History'));
-  await waitFor(() => expect(console.error).toHaveBeenCalled());
-  console.error.mockRestore();
+  expect(await screen.findByRole('alert')).toHaveTextContent('Matching history could not be loaded');
+  expect(screen.getByRole('button',{name:'Retry history'})).toBeInTheDocument();
 });
 
 test('v2 matching renders no-lead, exclusions and non-lead staff consultation', async () => {
@@ -458,4 +458,25 @@ test('v2 matching renders no-lead, exclusions and non-lead staff consultation', 
   expect(screen.getByText('An invalid profile was excluded.')).toBeInTheDocument();
   expect(screen.getByText('Staff consultation')).toBeInTheDocument();
   expect(screen.getByText('Synthetic consultant staff')).toBeInTheDocument();
+});
+
+
+test('history failure is visible rather than empty and can be retried', async () => {
+  global.fetch=jest.fn().mockResolvedValueOnce({ok:false,status:503,json:async()=>({error:'Unavailable'})}).mockResolvedValueOnce({ok:true,status:200,json:async()=>({matches:[]})});
+  render(<ExpertiseFinderPage />);
+  fireEvent.click(screen.getByRole('button',{name:/History/}));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Matching history could not be loaded');
+  expect(screen.queryByText(/No matching history yet/)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button',{name:'Retry history'}));
+  expect(await screen.findByText(/No matching history yet/)).toBeInTheDocument();
+});
+
+test('leaving history aborts the pending read', async () => {
+  let signal;
+  global.fetch=jest.fn((_url,options)=>{signal=options.signal;return new Promise(()=>{});});
+  render(<ExpertiseFinderPage />);
+  fireEvent.click(screen.getByRole('button',{name:/History/}));
+  await waitFor(()=>expect(signal).toBeDefined());
+  fireEvent.click(screen.getByRole('button',{name:/Match Proposal/}));
+  expect(signal.aborted).toBe(true);
 });

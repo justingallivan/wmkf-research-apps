@@ -34,7 +34,7 @@ Dataverse writes occurred in the normalization run/replay. Old plans fail closed
 and existing profiles must match canonical planned values exactly.
 Private evidence is now in `/Users/gallivan/.local/share/wmkf-roster/canary-20261110`;
 temporary inputs were recovered against original content hashes (see README).
-A separately authorized fresh November 10 export now has 39 imported profiles in
+At the full-import checkpoint, a separately authorized fresh November 10 export had 39 imported profiles in
 sandbox (37 active, two inactive), plus the four retained synthetic profiles.
 The separate full-import local fixture has 40 identities, 39 bindings, seven original
 feedback references with synthetic bodies, and sequence 40. ID 35 is identity-only;
@@ -59,9 +59,23 @@ verified scope, retained fixtures and remaining gates.
 [VERIFIED via service probes] Feedback create/replay/edit/one-off/shared reads,
 native staff audit, isolated live v2 prompt/fallback bytes and formatter parity pass.
 Two additional inactive synthetic editor profiles are retained and unbound; the final
-complete adapter census verifies 45 sandbox profiles. Two new local feedback records
+complete adapter census at that checkpoint verified 45 sandbox profiles. Two new local feedback records
 bring that fixture to nine, with the original seven unchanged. Fable cleared the
 inactive editor repair; the live atomic canary confirmed two 204 operations,
 unchanged replay GUID/ETag and conflicting payload 409. Evidence and remaining
 browser/auth/attachment/matching/cutover gates:
 `docs/plans/data/expertise-roster/CONSUMER_WRITE_REHEARSAL_2026-11-10.md`.
+
+
+## Later engineering checks
+
+History now shares the guarded rehearsal SQL transport with matching. Controlled
+single/batch/history tests passed against rollback-only temporary SQL tables;
+these do not provision the fixture's full application schema. The real populated
+fixture's bounded writer lock/release check preserved counts, sequence and FKs.
+Editor exact-empty optional text is now normalized in a copied DTO; a Fable-cleared
+blank-form inactive create/replay canary retained one more unbound synthetic profile
+(`b34e680b-849c-4207-a2c5-689defd79aa7`), with null readback and original input preserved.
+Expected total is 46 after that allocation; the last full census was 45 before it.
+Operational cutover/rollback and runtime ID allocation remain unimplemented here.
+See `docs/plans/data/expertise-roster/ENGINEERING_CHECKS_2026-11-10.md`.
