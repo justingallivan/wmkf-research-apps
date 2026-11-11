@@ -30,6 +30,18 @@ function checkDatabaseUrl(value, ledger) {
     || keys.some(key => !['sslmode', 'channel_binding'].includes(key))
     || new Set(keys).size !== keys.length) throw new Error('Database target mismatch');
 }
+const NEON_READ_ENDPOINT = 'https://api.c-2.us-west-2.aws.neon.tech/sql';
+const STAFF_PROFILE_QUERY = 'SELECT id, azure_id, is_active, needs_linking, dynamics_systemuser_id FROM user_profiles WHERE id=$1';
+function allowedStaffProfileRead(url, method, body, headers, connectionString, profileId) {
+  const keys = [...headers.keys()].sort();
+  return method === 'POST' && url.href === NEON_READ_ENDPOINT && profileId === 2
+    && keys.join(',') === 'neon-array-mode,neon-connection-string,neon-raw-text-output'
+    && headers.get('neon-connection-string') === connectionString
+    && headers.get('neon-array-mode') === 'true' && headers.get('neon-raw-text-output') === 'true'
+    && body !== null && typeof body === 'object' && !Array.isArray(body)
+    && Object.keys(body).sort().join(',') === 'params,query' && body.query === STAFF_PROFILE_QUERY
+    && Array.isArray(body.params) && body.params.length === 1 && body.params[0] === '2';
+}
 function reserveAuditIntent(state, runId) {
   if (state.auditRunId || typeof runId !== 'string' || !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(runId)) {
     throw new Error('Audit outcome needs reconciliation');
@@ -55,6 +67,20 @@ function checkGuards() {
   }
   let requestDenied = false; try { fetchUrl(new Request('https://graph.microsoft.com/v1.0/me', { method: 'POST' })); } catch { requestDenied = true; }
   if (!requestDenied) throw new Error('Request object guard self-test failed');
+  const neonHeaders = new Headers({ 'Neon-Connection-String': validUrl, 'Neon-Raw-Text-Output': 'true', 'Neon-Array-Mode': 'true' });
+  const query = { query: STAFF_PROFILE_QUERY, params: ['2'] };
+  const allowed = (url, method, body, headers, connection = validUrl, profileId = 2) =>
+    allowedStaffProfileRead(new URL(url), method, body, headers, connection, profileId);
+  if (!allowed(NEON_READ_ENDPOINT, 'POST', query, neonHeaders)
+    || allowed(NEON_READ_ENDPOINT, 'POST', { ...query, query: 'SELECT 1' }, neonHeaders)
+    || allowed(NEON_READ_ENDPOINT, 'POST', { ...query, params: ['3'] }, neonHeaders)
+    || allowed(NEON_READ_ENDPOINT, 'POST', { queries: [query] }, neonHeaders)
+    || allowed(NEON_READ_ENDPOINT, 'POST', { ...query, extra: true }, neonHeaders)
+    || allowed(NEON_READ_ENDPOINT, 'POST', query, new Headers({ ...Object.fromEntries(neonHeaders), 'neon-connection-string': 'other' }))
+    || allowed('https://other.example/sql', 'POST', query, neonHeaders)
+    || allowed(`${NEON_READ_ENDPOINT}?extra=1`, 'POST', query, neonHeaders)
+    || allowed(NEON_READ_ENDPOINT, 'GET', query, neonHeaders)
+    || allowed(NEON_READ_ENDPOINT, 'POST', query, neonHeaders, validUrl, 3)) throw new Error('Staff read guard self-test failed');
   const auditState = {}; const runId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
   reserveAuditIntent(auditState, runId);
   let retryDenied = false; try { reserveAuditIntent(auditState, runId); } catch { retryDenied = true; }
@@ -316,6 +342,9 @@ async function liveStage(mode, directory) {
       if (allowedRead(url, method)) return originalFetch(input, { ...options, redirect: 'manual' });
       let body; try { body = JSON.parse(options.body); } catch { throw new Error('Unexpected network request'); }
       const headers = new Headers(options.headers);
+      if (allowedStaffProfileRead(url, method, body, headers, app.POSTGRES_URL, state.profileId)) {
+        return originalFetch(input, { ...options, redirect: 'manual' });
+      }
       if (headers.has('MSCRMCallerID') || headers.has('CallerObjectId')) throw new Error('Unexpected impersonation');
       let intent;
       if (mode === 'publish' && method === 'POST' && url.origin === 'https://orgd9e66399.crm.dynamics.com'
@@ -457,4 +486,8 @@ async function main() {
   else throw new Error('Invalid trial stage');
   process.stdout.write(`${JSON.stringify(result)}\n`);
 }
-main().catch(() => { process.stderr.write('STOP: trial stage failed\n'); process.exitCode = 1; });
+main().catch(error => {
+  const frames = [...String(error.stack || '').matchAll(/([\w.-]+\.(?:c?js|mjs)):(\d+):(\d+)/g)].slice(0, 4).map(match => match[0]);
+  process.stderr.write(JSON.stringify({ stageFailed: true, frames }) + '\n');
+  process.exitCode = 1;
+});
