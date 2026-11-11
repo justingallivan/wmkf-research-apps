@@ -196,7 +196,13 @@ test('J27 opens on one roster with invitation, response and review progress, and
     return originalFetch(url);
   });
 
-  const { rerender } = render(<ReviewersTab requestId={REQ} rosterFirst />);
+  const { rerender } = render(<ReviewersTab requestId={REQ} phaseLayout />);
+  // With no view in the address it opens where work is waiting: reviews are out, so Track.
+  const views = await screen.findByRole('navigation', { name: 'Reviewer panel views' });
+  await waitFor(() => expect(within(views).getByRole('button', { name: /^Track/ })).toHaveAttribute('aria-current', 'page'));
+  expect(screen.queryByRole('table', { name: 'Reviewer roster' })).toBeNull();
+  router.query = { ...router.query, sub: 'roster' };
+  rerender(<ReviewersTab requestId={REQ} phaseLayout />);
   const table = await screen.findByRole('table', { name: 'Reviewer roster' });
   const cells = (name) => within(within(table).getByRole('row', { name })).getAllByRole('cell').map((cell) => cell.textContent);
   expect(cells(/Pending reviewer/)).toEqual(['Invited', 'Awaiting response', '—']);
@@ -208,25 +214,26 @@ test('J27 opens on one roster with invitation, response and review progress, and
 
   const navigation = screen.getByRole('navigation', { name: 'Reviewer panel views' });
   const order = () => within(navigation).getAllByRole('button').map(button => button.firstChild.textContent);
-  expect(order()).toEqual(['Reviewer roster', 'Find reviewers', 'Invite reviewers', 'Track reviewers']);
-  expect(within(navigation).getByRole('button', { name: 'Invite reviewers 1' })).toBeInTheDocument();
-  expect(within(navigation).getByRole('button', { name: 'Reviewer roster' })).toHaveAttribute('aria-current', 'page');
+  // Owner, 2026-11-11: the work views in order, then the read-only roster summary.
+  expect(order()).toEqual(['Find', 'Invite', 'Track', 'Roster']);
+  expect(within(navigation).getByRole('button', { name: 'Invite 1' })).toBeInTheDocument();
+  expect(within(navigation).getByRole('button', { name: 'Roster' })).toHaveAttribute('aria-current', 'page');
 
-  fireEvent.click(within(navigation).getByRole('button', { name: 'Find reviewers' }));
+  fireEvent.click(within(navigation).getByRole('button', { name: 'Find' }));
   const [{ query }] = router.push.mock.lastCall;
   expect(query).toEqual({ ...router.query, sub: 'find' });
 
   router.query = query;
-  rerender(<ReviewersTab requestId={REQ} rosterFirst />);
+  rerender(<ReviewersTab requestId={REQ} phaseLayout />);
   expect(await screen.findByTestId('persist-proposal')).toHaveAttribute('data-file-key', existingKey);
-  expect(order()).toEqual(['Reviewer roster', 'Find reviewers', 'Invite reviewers', 'Track reviewers']);
-  expect(within(navigation).getByRole('button', { name: 'Find reviewers' })).toHaveAttribute('aria-current', 'page');
+  expect(order()).toEqual(['Find', 'Invite', 'Track', 'Roster']);
+  expect(within(navigation).getByRole('button', { name: 'Find' })).toHaveAttribute('aria-current', 'page');
   expect(screen.queryByRole('button', { name: /Campaign settings/ })).toBeNull();
-  fireEvent.click(within(navigation).getByRole('button', { name: 'Reviewer roster' }));
+  fireEvent.click(within(navigation).getByRole('button', { name: 'Roster' }));
   expect(router.push.mock.lastCall[0].query).toEqual({
-    requestId: REQ, tab: 'peer-review', section: 'panel', proposalFile: existingKey,
+    requestId: REQ, tab: 'peer-review', section: 'panel', proposalFile: existingKey, sub: 'roster',
   });
   router.query = { ...router.query, sub: 'candidates' };
-  rerender(<ReviewersTab requestId={REQ} rosterFirst />);
+  rerender(<ReviewersTab requestId={REQ} phaseLayout />);
   expect(invitePanelProps.candidates.map((candidate) => candidate.suggestionId)).toEqual(['p', 'd', 's', 'a']);
 });

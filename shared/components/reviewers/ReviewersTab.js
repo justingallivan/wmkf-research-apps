@@ -47,13 +47,17 @@ const SUB_TABS = [
   { key: 'candidates', label: 'Invite Reviewers' },
   { key: 'track', label: 'Track Reviewers' },
 ];
+// Phase layout (J27 onward): the three work views in the order the work
+// happens, then the read-only roster summary (owner, 2026-11-11: a summary
+// should not be the first thing seen before anyone is found or invited).
 const PANEL_TABS = [
-  { key: 'roster', label: 'Reviewer roster' },
-  { key: 'find', label: 'Find reviewers' },
-  { key: 'candidates', label: 'Invite reviewers' },
-  { key: 'track', label: 'Track reviewers' },
+  { key: 'find', label: 'Find' },
+  { key: 'candidates', label: 'Invite' },
+  { key: 'track', label: 'Track' },
+  { key: 'roster', label: 'Roster' },
 ];
 const SUB_TAB_KEYS = new Set(SUB_TABS.map((t) => t.key));
+const PANEL_TAB_KEYS = new Set(PANEL_TABS.map((t) => t.key));
 
 // How long a confirmed-invite overlay is allowed to stand before a plain
 // refetch repaints pure server truth. The overlay asserts a PAST fact (the
@@ -82,7 +86,7 @@ export default function ReviewersTab({
   deadlineActorContext = null,
   settings = {},
   previewReadOnly = false,
-  rosterFirst = false,
+  phaseLayout = false,
 }) {
   const router = useRouter();
   const [proposal, setProposal] = useState(null);
@@ -144,7 +148,8 @@ export default function ReviewersTab({
 
   const subParam = typeof router.query.sub === 'string' ? router.query.sub : null;
   const normalizedSubParam = subParam === 'invite' || subParam === 'completed' ? 'track' : subParam;
-  const activeSub = normalizedSubParam && SUB_TAB_KEYS.has(normalizedSubParam) ? normalizedSubParam : null;
+  const activeSub = normalizedSubParam && (phaseLayout ? PANEL_TAB_KEYS : SUB_TAB_KEYS).has(normalizedSubParam)
+    ? normalizedSubParam : null;
   const proposalFileKey = typeof router.query.proposalFile === 'string'
     ? router.query.proposalFile
     : null;
@@ -320,7 +325,6 @@ export default function ReviewersTab({
   const selectSub = (key) => {
     const query = { ...router.query, sub: key };
     if (key === 'roster') {
-      delete query.sub;
       delete query.repairCandidate;
       delete query.repairSuggestion;
     }
@@ -462,9 +466,9 @@ export default function ReviewersTab({
     });
   };
 
-  // Explicit sub-tab links retain their tools. J27 opens on the roster;
-  // the legacy default waits for reviewer data before choosing a tool.
-  const current = activeSub || (rosterFirst ? 'roster' : loading ? null : computeDefaultSub(reviewers));
+  // Explicit sub-tab links retain their tools. Otherwise every layout opens on
+  // the step with work waiting, once reviewer data has loaded.
+  const current = activeSub || (loading ? null : computeDefaultSub(reviewers));
   const pendingReviewDocumentKey = current === 'track'
     ? reviewers
       .filter(reviewerDocumentIsPending)
@@ -509,16 +513,16 @@ export default function ReviewersTab({
 
   return (
     <div className="space-y-4">
-      <div className={rosterFirst ? 'space-y-3' : 'border-b border-gray-200 flex flex-wrap items-center justify-between'}>
-        <nav className={`flex flex-wrap gap-x-2 ${rosterFirst ? 'border-b border-gray-200' : ''}`}
-          aria-label={rosterFirst ? 'Reviewer panel views' : 'Reviewer tools'}>
-          {(rosterFirst ? PANEL_TABS : SUB_TABS).map((t) => (
+      <div className={phaseLayout ? 'space-y-3' : 'border-b border-gray-200 flex flex-wrap items-center justify-between'}>
+        <nav className={`flex flex-wrap gap-x-2 ${phaseLayout ? 'border-b border-gray-200' : ''}`}
+          aria-label={phaseLayout ? 'Reviewer panel views' : 'Reviewer tools'}>
+          {(phaseLayout ? PANEL_TABS : SUB_TABS).map((t) => (
             <button
               key={t.key}
               type="button"
               onClick={() => selectSub(t.key)}
               aria-current={current === t.key ? 'page' : undefined}
-              className={`flex items-center py-2 text-sm font-medium border-b-2 ${rosterFirst ? 'min-h-11 px-3' : 'px-4'} ${
+              className={`flex items-center py-2 text-sm font-medium border-b-2 ${phaseLayout ? 'min-h-11 px-3' : 'px-4'} ${
                 current === t.key
                   ? 'border-gray-900 text-gray-900'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -540,7 +544,7 @@ export default function ReviewersTab({
             </button>
           ))}
         </nav>
-        {(!rosterFirst || current === 'candidates') && (
+        {(!phaseLayout || current === 'candidates') && (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1" aria-label="Invitation settings">
             <button
               type="button"

@@ -403,7 +403,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
           canManage={canManage}
           settings={reviewerSettings}
           previewReadOnly={reviewerSurfaceReadOnly}
-          rosterFirst={phaseLayout}
+          phaseLayout={phaseLayout}
         />
       ) : activeTab === 'proposal' ? (
         <>
