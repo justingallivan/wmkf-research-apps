@@ -266,4 +266,48 @@ node scripts/run-proposal-trial-1003384-v2.cjs --approved-request-1003384-v2 exp
 
 Opus 5.5's build review requested a larger timing window. The staff worker now uses a 240-second coordination lease within a 300-second function limit, preserving the existing model timeout and persisted prompt output budget. Source expiry now terminates before preparation; a race at snapshot persistence also terminates. Known source admission failures have safe actionable responses. Discovery retries a version race. The drain reports terminal receipt state, and the CLI treats only `complete` as exit zero. Targeted and integrated regression tests pass. The [Opus review receipt](../audits/SHARED_EXECUTOR_STAFF_OPUS55_REVIEW_2026-11-11.md) records the READY follow-up, dispositions and verification limits.
 
-The branch remains undeployed. Both scoped runs exercised the provider, cache, validator, result readback and impersonated audit delivery. The next bounded work is offline Methodology length and grounding review using saved evidence. Another live cohort or additional generation calls require separate approval. Keep each cohort’s private cleanup state until both of its expiry steps are verified.
+The branch remains undeployed. Both scoped runs exercised the provider, cache,
+validator, result readback and impersonated audit delivery. Another live
+cohort or additional generation calls require separate approval. Keep each
+cohort's private cleanup state until both of its expiry steps are verified.
+
+## Offline Methodology follow-up
+
+[VERIFIED via local test] The unpublished Methodology v3 candidate changes
+only the Methodology instructions from the published v2 definition.
+It expects current task version 2 and keeps profile revision 1, Sonnet 4.6,
+the 1,536-token budget, the 400-word ceiling and the 12,000-character limit.
+It asks for up to four short paragraphs and aims for 220–280 words. It
+requires attribution to the proposal, limits ranges to the experiments
+they describe, and distinguishes existing materials, planned methods,
+fallbacks and review inferences. One optional final review sentence can
+identify a specific omission and a possible implication. It keeps the frozen PI context required
+by the current profile contract and instructs the model to omit identity
+from the draft. [Unpublished candidate](SHARED_EXECUTOR_PROPOSAL_METHODOLOGY_V3_CANDIDATE_2026-11-11.json).
+
+The offline command runs the Admin sample preview and output-format validator.
+
+```sh
+npx jest tests/unit/prompt-jobs-methodology-offline.test.js --runInBand --silent
+```
+
+Preview uses a fabricated document and an injected profile read. The
+validator accepts 400 words and rejects 401 and a synthetic 419-word case,
+as well as text above the character limit. The synthetic grounding
+challenge provides source excerpts, draft claims and human review
+annotations for unsupported ranges, primary versus fallback synthesis,
+overstated dependencies and missing information treated as a negative
+finding. [Synthetic grounding challenge](../../tests/fixtures/prompt-jobs-methodology-grounding.synthetic.json).
+All of those drafts can pass the format validator. Reviewers must compare
+the claims to the source manually. The offline check establishes
+configuration and format behavior. Generation behavior and grounding
+under the revised instructions remain unverified. No applicant content
+was recovered for this work, and the candidate was not published or run.
+
+
+The read-only Opus 5.5 subscription OAuth review returned READY for the
+offline contract. Its model-usage receipt named only `claude-opus-5-5`.
+The follow-up confined any inference to the single review sentence, made
+the feasibility boundary explicit, and strengthened the test to check
+that the Admin preview contains the revised body and resolves the PI
+placeholder. Local tests were rerun after those changes.

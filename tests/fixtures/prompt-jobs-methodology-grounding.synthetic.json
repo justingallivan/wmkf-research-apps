@@ -1,0 +1,54 @@
+{
+  "description": "Fabricated materials-study evidence for human comparison. The verdicts are reviewer annotations. They are not executable grounding rules.",
+  "source": [
+    {
+      "id": "optical-aim",
+      "text": "The proposal will test how layering affects optical contrast. It plans microscopy on panels with 2–8 layers and a separate scattering study. The scattering series has no specified layer range."
+    },
+    {
+      "id": "prototype-aim",
+      "text": "A small reference panel made by chemical synthesis is already in hand and will be used in the primary calibration workflow. A different synthetic route is a fallback for the larger reference panel. The proposal identifies phase recovery as a risk because there is no matching reference model. It proposes two alternative calibration methods."
+    },
+    {
+      "id": "durability-aim",
+      "text": "The durability aim uses commercially available panels and tests contrast after repeated handling independently of the reference-panel synthesis. The proposal specifies an untreated control. It gives no yield estimate for the larger reference panel."
+    }
+  ],
+  "reviewCases": [
+    {
+      "id": "source-scoped-and-attributed",
+      "reviewVerdict": "supported",
+      "evidenceIds": ["optical-aim", "prototype-aim", "durability-aim"],
+      "output": "The proposal plans microscopy on panels with 2–8 layers to test how layering affects optical contrast. It also proposes a separate scattering study without specifying a layer range. A chemically synthesized reference panel is already in hand for primary calibration. A different synthetic route is a fallback for the larger panel. The independent durability aim uses commercial panels and an untreated control. As a review consideration, the proposal does not specify the expected yield of the larger reference panel.",
+      "reviewerCheck": "The range applies only to microscopy, the existing panel is part of the primary method, and the missing yield is limited to the larger panel."
+    },
+    {
+      "id": "unsupported-range",
+      "reviewVerdict": "unsupported",
+      "evidenceIds": ["optical-aim"],
+      "output": "The microscopy and scattering experiments will each use panels spanning 2–24 layers.",
+      "reviewerCheck": "The source gives 2–8 layers for microscopy and no range for scattering. Reject the unsupported range and its extension to both experiments."
+    },
+    {
+      "id": "primary-method-contradiction",
+      "reviewVerdict": "unsupported",
+      "evidenceIds": ["prototype-aim"],
+      "output": "Chemical synthesis is outside the primary workflow and appears only as a contingency.",
+      "reviewerCheck": "The primary calibration uses a chemically synthesized panel that already exists. Only the alternative route for the larger panel is a fallback."
+    },
+    {
+      "id": "overstated-risk-and-dependency",
+      "reviewVerdict": "unsupported",
+      "evidenceIds": ["prototype-aim", "durability-aim"],
+      "output": "Phase recovery has no precedent, and the entire program depends on successful synthesis of the larger panel.",
+      "reviewerCheck": "A missing matching reference model does not establish absence of precedent. The proposal lists alternatives, and the durability aim is independent of synthesis."
+    },
+    {
+      "id": "missing-information-as-negative-finding",
+      "reviewVerdict": "unsupported",
+      "evidenceIds": ["durability-aim"],
+      "output": "The larger panel cannot be made at usable yield.",
+      "reviewerCheck": "The proposal omits a yield estimate. Report that omission as a review consideration without inferring an unusable yield."
+    }
+  ]
+}
