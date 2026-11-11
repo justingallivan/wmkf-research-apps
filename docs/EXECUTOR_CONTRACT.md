@@ -651,7 +651,8 @@ The worker verifies the complete source and PI identity, downloads at most
 20 MiB, checks both accepted filename aliases and PI again, and freezes
 `proposal` and `pi_name` in one snapshot. It rechecks authorization and
 source freshness before dispatch. The adapter refuses missing, ambiguous,
-changed, or oversized inputs.
+changed, or oversized inputs. Known source-admission failures return safe
+409 codes. An expired source window ends preparation before download.
 
 The unscheduled `/api/cron/drain-prompt-jobs` endpoint requires the cron bearer
 in every environment and advances one server-selected stage. The worker
@@ -664,9 +665,12 @@ before rechecking the actor and preserves receipts. See the
 [staff trial plan](plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md) and
 [configuration contract](CREDENTIALS_RUNBOOK.md#optional--shared-executor-staff-draft-trial).
 
-No live trial access, activation, publication, provider call, or deployment is
-verified. The exact Request, candidate source, live access, and application
-model-cost approval are pending.
+[VERIFIED via owner-authorized read-only inspection] Candidate Request
+1003384 had a linked Project Leader with a populated name and no AI Materials
+folder. The PDFs inspected under Submission Documents did not establish a
+suitable narrative. The source policy is unchanged. Suitable source confirmation,
+activation, live execution and model-cost approval remain pending. The
+inspection made no writes or provider calls.
 
 ### Admin authoring and sample preview
 

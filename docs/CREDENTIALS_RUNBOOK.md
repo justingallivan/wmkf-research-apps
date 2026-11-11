@@ -229,8 +229,9 @@ the post-flip Workbench smoke emitted `mode=on` and no denial.
 
 **[VERIFIED via branch source, 2026-11-11]** The staff proposal draft trial
 defaults off. No live configuration, scheduling, or deployment has been
-verified. The exact Request, source choice, live access and application
-model-cost approval remain pending. See the [staff trial plan](plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md).
+verified. Read-only inspection of candidate Request 1003384 found no AI Materials
+folder. Suitable source confirmation, live execution and application model-cost
+approval remain pending. See the [staff trial plan](plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md).
 
 | Variable | Purpose | Contract |
 |---|---|---|
@@ -242,11 +243,17 @@ model-cost approval remain pending. See the [staff trial plan](plans/SHARED_EXEC
 Trial scope derives from deployment and the actual `DYNAMICS_URL` target.
 The allowlist is `local-production`, `local-sandbox`, and `preview-sandbox`.
 A sandbox URL override does not establish trial scope. The existing Dataverse
-target/write interlock still governs the actual operation. A valid configured drain deletes only expired
-content in that exact scope, before rechecking the actor. Disabled or malformed
+target/write interlock still governs the actual operation. A valid configured
+drain deletes only expired content in that exact scope before rechecking the actor. Disabled or malformed
 policy does no database work. Keep the trial policy available through the
 seven-day expiry and authorized cleanup, or arrange explicit scoped cleanup
 before deactivating. No operational cleanup has been run.
+
+The controlled loopback runner, `scripts/run-prompt-job-trial.mjs`, advances
+an existing configured job through the protected drain. It requires
+`--run` and a process-environment `CRON_SECRET`. It does not load environment
+files or admit a job. A drain run exits zero only for a confirmed `complete` stage.
+Disabled or empty idle stages exit two.
 
 ### Optional — Research APIs
 
