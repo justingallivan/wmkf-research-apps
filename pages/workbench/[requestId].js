@@ -22,6 +22,7 @@ import RequireAppAccess from '../../shared/components/RequireAppAccess';
 import TestRequestBadge from '../../shared/components/TestRequestBadge';
 import J27StageStrip from '../../shared/components/workbench/J27StageStrip';
 import { deriveJ27PageStage } from '../../shared/utils/j27PageStage';
+import { isJ27ScopeCycle } from '../../lib/services/workbench/j27-read-model';
 import { useAppAccess } from '../../shared/context/AppAccessContext';
 import { useProfile } from '../../shared/context/ProfileContext';
 import { readEmailSignaturePreference } from '../../shared/config/reviewerFinderPreferences';
@@ -123,7 +124,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
     : null;
 
   // The redesigned shell follows the same sandbox boundary as the tested fields.
-  const phaseLayout = staffReviewSummary && visibleContext?.cycleCode === 'J27';
+  const phaseLayout = staffReviewSummary && isJ27ScopeCycle(visibleContext?.cycleCode);
   const showInitialRationale = phaseLayout && initialRationaleEnabled;
   const rehearsalIds = chairsRecommendationRehearsalRequestId ? [chairsRecommendationRehearsalRequestId] : integritySimulationIds;
   const showChairsRecommendation = showInitialRationale && chairsRecommendationEnabled && (rehearsalIds.length
@@ -399,7 +400,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
         />
       ) : activeTab === 'proposal' ? (
         <>
-          {visibleContext?.cycleCode === 'J27' && (
+          {isJ27ScopeCycle(visibleContext?.cycleCode) && (
             <ScoringCard
               key={`scoring:${routeRequestId}`}
               context={visibleContext}
@@ -443,7 +444,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
           key={typeof requestId === 'string' ? requestId : ''}
           requestId={typeof requestId === 'string' ? requestId : ''}
           previewReadOnly={reviewerSurfaceReadOnly}
-          showStaffReviewSummary={staffReviewSummary && visibleContext?.cycleCode === 'J27'}
+          showStaffReviewSummary={staffReviewSummary && isJ27ScopeCycle(visibleContext?.cycleCode)}
         />
       ) : activeTab === 'review-panel' ? (
         <ReviewPanelTab

@@ -19,6 +19,7 @@ import { TOOLBAR_CONTROL_HEIGHT_CLASS } from '../ToolbarSelect';
 import ScopeSegment from './ScopeSegment';
 import { TRIAGE_STATUS } from '../../config/triageStatus';
 import TestRequestBadge from '../TestRequestBadge';
+import { isJ27ScopeCycle } from '../../../lib/services/workbench/j27-read-model';
 
 // `done` means the request has enough completed reviews (REVIEWERS_NEEDED in
 // lib/services/reviewer-rollup.js), not that every accepted reviewer has
@@ -221,7 +222,7 @@ export default function RequestListPanel({
   const visibleProposals = hasCurrentSnapshot ? proposals : [];
   const visibleRollup = hasCurrentSnapshot ? rollup : null;
   const visibleError = errorKey === currentKey ? error : null;
-  const showLegacyTriage = cycleCode !== 'J27';
+  const showLegacyTriage = !isJ27ScopeCycle(cycleCode);
 
   // Flip a request's triage status, then refetch (a row may drop out of the
   // default view once Set aside). The server enforces the hard manage gate.

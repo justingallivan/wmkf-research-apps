@@ -29,7 +29,7 @@ function response() {
 
 beforeEach(() => {
   jest.resetAllMocks();
-  process.env = { ...originalEnv, J27_INITIAL_RATIONALE_SCHEMA_READY: 'on', VERCEL_ENV: 'preview', DYNAMICS_IMPERSONATION_ENABLED: 'true', DYNAMICS_URL: 'https://orgd9e66399.crm.dynamics.com' };
+  process.env = { ...originalEnv, INITIAL_RATIONALE_SCHEMA_READY: 'on', VERCEL_ENV: 'preview', DYNAMICS_IMPERSONATION_ENABLED: 'true', DYNAMICS_URL: 'https://orgd9e66399.crm.dynamics.com' };
   requireAppAccess.mockResolvedValue({ session: { user: { dynamicsSystemuserId: actor } } });
   getById.mockResolvedValue(row);
 });
@@ -98,13 +98,22 @@ test('saving the same rationale with a current version succeeds without another 
 });
 
 test('unprovisioned schema and production deployment refuse access before Dataverse', async () => {
-  delete process.env.J27_INITIAL_RATIONALE_SCHEMA_READY;
+  delete process.env.INITIAL_RATIONALE_SCHEMA_READY;
   const res = response();
   await handler({ method: 'GET', query: { requestId } }, res);
-  process.env.J27_INITIAL_RATIONALE_SCHEMA_READY = 'on';
+  process.env.INITIAL_RATIONALE_SCHEMA_READY = 'on';
   process.env.VERCEL_ENV = 'production';
   await handler({ method: 'POST', body }, res);
   expect(res.status.mock.calls).toEqual([[404], [404]]);
   expect(getById).not.toHaveBeenCalled();
   expect(updateById).not.toHaveBeenCalled();
+});
+
+// The step belongs to every cycle from J27 on, not to the cycle named J27.
+test.each(['D27', 'J28'])('a later cycle (%s) is read like J27', async (cycleCode) => {
+  getById.mockResolvedValue({ ...row, cycleCode });
+  const res = response();
+  await handler({ method: 'GET', query: { requestId } }, res);
+  expect(res.status).not.toHaveBeenCalledWith(404);
+  expect(res.json).toHaveBeenCalled();
 });

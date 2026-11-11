@@ -13,14 +13,14 @@ current Dataverse ETag. The decision replaces the scoring decision in the same
 `akoya_request.wmkf_phaseistatus` field. There is no separate decision field.
 A ready factory run must bind the test request, run ID, and sandbox hostname
 before the save. This protects the shared screening history from copied
-Production request GUIDs. `J27_CHAIRS_RECOMMENDATION_ENABLED=on` also requires the
+Production request GUIDs. `CHAIRS_RECOMMENDATION_ENABLED=on` also requires the
 existing rationale and test-isolation gates. For a dropdown-only Preview,
-`J27_CHAIRS_RECOMMENDATION_REHEARSAL_REQUEST_ID` admits exactly the designated sandbox
-request while `J27_AUTOMATIC_INTEGRITY` is explicitly `off`. This path does
+`CHAIRS_RECOMMENDATION_REHEARSAL_REQUEST_ID` admits exactly the designated sandbox
+request while `AUTOMATIC_INTEGRITY_SCREENING` is explicitly `off`. This path does
 not reach the Factory lookup or screen queue. The automatic path still
 needs a verified connection to the separate sandbox Factory ledger.
 
-With `J27_AUTOMATIC_INTEGRITY=on`, a changed Yes reserves a row keyed by target
+With `AUTOMATIC_INTEGRITY_SCREENING=on`, a changed Yes reserves a row keyed by target
 hostname and request GUID and starts a durable Vercel workflow. Only the exact
 successful conditional save confirms its reservation. An unconfirmed reservation
 cannot start screening. A dispatch or confirmation failure does not prevent

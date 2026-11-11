@@ -53,7 +53,7 @@ async function call(method, body, query = {}) {
 
 beforeEach(() => {
   jest.resetAllMocks();
-  process.env = { ...env, VERCEL_ENV: 'preview', J27_MEETING_ROSTER_SCHEMA_READY: 'on', DYNAMICS_URL: 'https://orgd9e66399.crm.dynamics.com',
+  process.env = { ...env, VERCEL_ENV: 'preview', MEETING_ROSTER_SCHEMA_READY: 'on', DYNAMICS_URL: 'https://orgd9e66399.crm.dynamics.com',
     DYNAMICS_IMPERSONATION_ENABLED: 'true' };
   requireAppAccess.mockResolvedValue({ session: { user: { dynamicsSystemuserId: actor } } });
   getById.mockResolvedValue({ akoya_requestid: requestId, cycleCode: 'J27', _etag: visit._etag });
@@ -117,7 +117,7 @@ test('suggestions use only in-meeting presence that overlaps the presentation', 
 });
 
 test('sandbox refuses the roster before its schema is enabled', async () => {
-  delete process.env.J27_MEETING_ROSTER_SCHEMA_READY;
+  delete process.env.MEETING_ROSTER_SCHEMA_READY;
   expect((await call('GET'))[0]).toBe(404);
   expect(getById).not.toHaveBeenCalled();
 });
@@ -154,4 +154,11 @@ test('does not guess which presentation to use when multiple occurrences are eli
   ] });
   expect((await call('GET'))[0]).toBe(409);
   expect(updateById).not.toHaveBeenCalled();
+});
+
+// The step belongs to every cycle from J27 on, not to the cycle named J27.
+test.each([['D27', 200], ['D26', 404]])('cycle %s reads with status %s', async (cycleCode, expected) => {
+  getById.mockResolvedValue({ akoya_requestid: requestId, cycleCode, _etag: visit._etag });
+  const [status] = await call('GET');
+  expect(status).toBe(expected);
 });

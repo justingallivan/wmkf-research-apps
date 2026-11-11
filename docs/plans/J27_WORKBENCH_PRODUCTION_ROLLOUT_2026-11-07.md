@@ -30,6 +30,41 @@ Source checks: [Workbench shell](../../pages/workbench/%5BrequestId%5D.js), [sum
 
 ## Admission to implement
 
+**Amendment, 2026-11-10 (owner; alignment log D64).** Nothing in this
+release is to be tied to the cycle named J27. Read the section below with
+these changes:
+
+- "A linked Grant Cycle code of `J27`" and "whose linked cycle is J27" mean
+  a cycle of 2027 or later (`isJ27ScopeCycle`). The twelve code tests for
+  the literal were replaced on `claude/j27-cycle-page` on 2026-11-10.
+- The proposed switch and cohort setting take cycle-free names when they
+  are built: `WORKBENCH_PRODUCTION_SCHEMA_READY` and
+  `workbench.phase_rollout`, not the `J27_`-named ones written below.
+- The seven existing settings were renamed the same day. None was set in
+  any Vercel environment `[VERIFIED via vercel env ls, 2026-11-10]`, so
+  nothing needed migrating.
+
+| Setting | Gates | After go-live |
+|---|---|---|
+| `INITIAL_RATIONALE_SCHEMA_READY` | Staff rationale field; required by the Recommendation step | Stays while a target could lack the field |
+| `MEETING_ROSTER_SCHEMA_READY` | Confirmed attendance field | Stays while a target could lack the field |
+| `CHAIRS_RECOMMENDATION_ENABLED` | Recommendation to Chairs step | Delete: the step is part of the flow |
+| `AUTOMATIC_INTEGRITY_SCREENING` (`on`, `off`, `simulate`) | Integrity screening after a recommendation | Delete once screening is always on |
+| `CHAIRS_RECOMMENDATION_REHEARSAL_REQUEST_ID`, `INTEGRITY_SIMULATION_REQUEST_IDS`, `INTEGRITY_SIMULATION_DB_URL` | Preview rehearsal only | Delete |
+
+- **Preview state, 2026-11-10.** The branch-scoped Preview has three
+  settings of its own (`DYNAMICS_URL`, `POSTGRES_URL`, `DATABASE_URL`). The
+  phase layout, review summary and presentation assessment need no setting
+  there. The rationale, confirmed attendance and Recommendation to Chairs
+  are off because their settings are absent. To rehearse them the owner
+  adds the first three settings in the table, scoped to the Preview branch,
+  after a read-only check that the sandbox has the two fields.
+- **Still true below:** the rationale and attendance gates refuse a
+  Production deployment whatever the setting says
+  (`lib/utils/initial-assessment-rationale-readiness.js`,
+  `lib/utils/meeting-roster-readiness.js`). Promotion has to lift that
+  deliberately; a merge alone does not turn these on.
+
 **[PLANNED]** Use a single server policy shared by the request context and all four new Workbench field endpoints. The production branch of the policy requires a production deployment, the registered production Dataverse target, the proposed `J27_WORKBENCH_PRODUCTION_SCHEMA_READY` switch set to literal `on`, and a fresh, authoritative linked Grant Cycle code of `J27`. The existing isolated sandbox admission remains available for rehearsal. Other deployment and target pairings cannot qualify for the production branch.
 
 Use a dedicated, non-secret Dataverse application setting such as `workbench.j27_rollout` for the cohort. Reuse the existing strict setting read and revision-checked write contract. The operator write path is a prerequisite to build and rehearse, with a superuser-only, single-key allowlist and an auditable actor. Store the setting as a JSON object and accept exactly these forms.

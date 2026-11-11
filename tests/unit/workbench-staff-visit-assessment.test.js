@@ -96,3 +96,12 @@ test('saving the same assessment with a current version succeeds without another
   expect(res.status).toHaveBeenCalledWith(200);
   expect(updateById).not.toHaveBeenCalled();
 });
+
+// The step belongs to every cycle from J27 on, not to the cycle named J27.
+test.each(['D27', 'J28'])('a later cycle (%s) is read like J27', async (cycleCode) => {
+  getById.mockResolvedValue({ ...row, cycleCode });
+  const res = response();
+  await handler({ method: 'GET', query: { requestId } }, res);
+  expect(res.status).not.toHaveBeenCalledWith(404);
+  expect(res.json).toHaveBeenCalled();
+});

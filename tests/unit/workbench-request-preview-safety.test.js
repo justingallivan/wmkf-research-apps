@@ -112,21 +112,21 @@ test('the exact dropdown rehearsal is admitted only in sandbox Preview with scre
     ...process.env,
     VERCEL_ENV: 'preview',
     DYNAMICS_URL: `https://${SANDBOX_HOSTS[0]}`,
-    J27_CHAIRS_RECOMMENDATION_ENABLED: 'on',
-    J27_INITIAL_RATIONALE_SCHEMA_READY: 'on',
+    CHAIRS_RECOMMENDATION_ENABLED: 'on',
+    INITIAL_RATIONALE_SCHEMA_READY: 'on',
     TEST_REQUEST_ISOLATION: 'on',
-    J27_AUTOMATIC_INTEGRITY: 'off',
-    J27_CHAIRS_RECOMMENDATION_REHEARSAL_REQUEST_ID: id.toUpperCase(),
+    AUTOMATIC_INTEGRITY_SCREENING: 'off',
+    CHAIRS_RECOMMENDATION_REHEARSAL_REQUEST_ID: id.toUpperCase(),
   });
   try {
     await expect(getServerSideProps()).resolves.toMatchObject({ props: {
       chairsRecommendationEnabled: true, chairsRecommendationRehearsalRequestId: id, automaticIntegrityEnabled: false,
     } });
-    process.env.J27_AUTOMATIC_INTEGRITY = 'on';
+    process.env.AUTOMATIC_INTEGRITY_SCREENING = 'on';
     await expect(getServerSideProps()).resolves.toMatchObject({ props: {
       chairsRecommendationRehearsalRequestId: null, automaticIntegrityEnabled: true,
     } });
-    process.env.J27_AUTOMATIC_INTEGRITY = 'off';
+    process.env.AUTOMATIC_INTEGRITY_SCREENING = 'off';
     process.env.VERCEL_ENV = 'production';
     await expect(getServerSideProps()).resolves.toMatchObject({ props: {
       chairsRecommendationEnabled: false, chairsRecommendationRehearsalRequestId: null, automaticIntegrityEnabled: false,

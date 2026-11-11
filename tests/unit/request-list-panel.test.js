@@ -64,14 +64,14 @@ beforeEach(() => {
   global.fetch = jest.fn();
 });
 
-test('shows J27 requests without the legacy Advancing controls', async () => {
+test.each(['J27', 'D27'])('shows %s requests without the legacy Advancing controls', async (cycleCode) => {
   global.fetch.mockResolvedValueOnce(response({
-    cycleCode: 'J27',
+    cycleCode,
     proposals: [row({ advancing: true })],
     rollup: { total: 1, stages: { find: 1 } },
   }));
 
-  renderPanel({ cycleCode: 'J27' });
+  renderPanel({ cycleCode });
 
   expect(await screen.findByRole('link', { name: '#1001' })).toBeInTheDocument();
   expect(screen.queryByRole('combobox', { name: 'Triage status for request 1001' })).not.toBeInTheDocument();

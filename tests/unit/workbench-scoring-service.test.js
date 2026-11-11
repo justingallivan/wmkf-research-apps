@@ -184,3 +184,9 @@ describe('sandbox recommendation to Chairs', () => {
     expect(updateById).not.toHaveBeenCalled();
   });
 });
+
+// The step belongs to every cycle from J27 on, not to the cycle named J27.
+test.each(['D27', 'J28'])('a later cycle (%s) is scored like J27', async (code) => {
+  getById.mockResolvedValue({ ...row, wmkf_GrantCycle: { wmkf_cyclecode: code } });
+  await expect(saveScoring(input)).resolves.toEqual({ success: true });
+});

@@ -293,3 +293,13 @@ test('J27 Initial Assessment hides the Word option and keeps the rationale draft
   view.rerender(<WorkbenchRequest staffReviewSummary initialRationaleEnabled />);
   expect(screen.getByRole('textbox', { name: 'Staff rationale' })).toHaveValue('Unsaved rationale');
 });
+
+// The phase layout belongs to every cycle from J27 on, not to the cycle named J27.
+test.each([['J27', true], ['D27', true], ['D26', false]])('cycle %s uses the phase layout: %s', async (cycleCode, expected) => {
+  tabName = 'overview';
+  render(<WorkbenchRequest staffReviewSummary />);
+  await act(async () => pending.get('/api/workbench/resolve-request?requestId=request-a')({
+    ok: true, json: async () => ({ success: true, requestId: 'request-a', cycleCode }),
+  }));
+  expect(screen.queryAllByText('Peer Review').length > 0).toBe(expected);
+});
