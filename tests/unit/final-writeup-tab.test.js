@@ -786,3 +786,38 @@ test('step E: reports the loaded state, or the coded failure, to the page', asyn
   render(<FinalWriteupTab requestId={FINAL_ID} onJ27Facts={onJ27Facts} />);
   await waitFor(() => expect(onJ27Facts).toHaveBeenCalledWith(FINAL_ID, { finalWriteup: { error: true, code: 'final_writeup_source_missing' } }));
 });
+
+
+test.each([false, true])('an offramped draft explains the refusal (Board draft view: %s)', async (renderBoardDraft) => {
+  global.fetch.mockResolvedValue(response({ ...readyStatus(false), startBlockedReason: 'final_writeup_offramped' }));
+  render(<FinalWriteupTab requestId={REQUEST_ID} renderBoardDraft={renderBoardDraft ? () => null : undefined} />);
+  expect(await screen.findByText(/This request has been offramped and will not go to the Board/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Ready for group review' })).not.toBeInTheDocument();
+  expect(screen.queryByText(/Waiting for a verified presentation end/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/schedule could not be verified/)).not.toBeInTheDocument();
+});
+
+test('an offramped group review explains why leadership is unavailable', async () => {
+  global.fetch.mockResolvedValueOnce(response({ ...groupReviewStatus(false), advanceBlockedReason: 'final_writeup_offramped' }))
+    .mockResolvedValue(response(acknowledgementState()));
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+  expect(await screen.findByText(/This request has been offramped and will not go to the Board/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Send to leadership' })).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Edit final writeup in Word' })).toBeInTheDocument();
+});
+
+test.each(['group', 'leadership'])('a %s transition refused for offramp closes confirmation and removes the action', async (stage) => {
+  const buttonName = stage === 'group' ? 'Ready for group review' : 'Send to leadership';
+  global.fetch.mockImplementation(async (url, options) => {
+    if (options?.method === 'POST') return response({ code: 'final_writeup_offramped', error: 'Offramped.' }, 409);
+    if (url.includes('/acknowledgement')) return response(acknowledgementState());
+    return response(stage === 'group' ? readyStatus(true) : groupReviewStatus(true));
+  });
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: buttonName }));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: buttonName }));
+  expect(await screen.findByText(/This request has been offramped and will not go to the Board/)).toBeInTheDocument();
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: buttonName })).not.toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});

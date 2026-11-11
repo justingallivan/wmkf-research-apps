@@ -1587,6 +1587,7 @@ test('post-visit drafting: an in-progress start (202) shows Starting group revie
 
 test.each([
   [{ canStart: false, startBlockedReason: null }, 'The lead Program Director marks this ready for group review when the draft is done.'],
+  [{ canStart: false, startBlockedReason: 'final_writeup_offramped' }, 'This request has been offramped and will not go to the Board. Group review is unavailable.'],
   [{ canStart: false, startBlockedReason: 'final_writeup_site_visit_not_ended' }, 'Group review becomes available after the scheduled presentation ends.'],
   [{ canStart: false, startBlockedReason: 'final_writeup_schedule_unavailable' }, /presentation schedule could not be verified/],
 ])('post-visit drafting without start permission explains who hands off (%o)', async (overrides, note) => {

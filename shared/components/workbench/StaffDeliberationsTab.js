@@ -1406,6 +1406,8 @@ export default function StaffDeliberationsTab({
     && !regenerationPending;
   const handOffNote = !handOffOpen ? null
     : canHandOff ? 'When the draft is ready for colleagues, choose Ready for group review. They’ll edit this same file.'
+      : finalReview.startBlockedReason === 'final_writeup_offramped'
+        ? 'This request has been offramped and will not go to the Board. Group review is unavailable.'
       : finalReview.startBlockedReason === 'final_writeup_site_visit_not_ended'
         ? 'Group review becomes available after the scheduled presentation ends.'
         : finalReview.startBlockedReason

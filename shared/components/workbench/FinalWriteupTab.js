@@ -15,6 +15,8 @@ import {
   isFinalWriteupSignedOff,
 } from '../../config/finalWriteupSignOff';
 
+const OFFRAMP_CODE = 'final_writeup_offramped';
+const OFFRAMP_MESSAGE = 'This request has been offramped and will not go to the Board. Group review and leadership review are unavailable.';
 const POLL_INTERVAL_MS = 2000;
 const POLL_ATTEMPTS = 10;
 const ACKNOWLEDGEMENT_SCHEMA_NOT_READY = 'final_writeup_acknowledgement_schema_not_ready';
@@ -447,7 +449,13 @@ export default function FinalWriteupTab({ requestId, renderBoardDraft = null, on
       }
     } catch (startError) {
       if (activeController.current === controller && startError?.name !== 'AbortError') {
-        setError(transitionErrorMessage(startError, boardDraftAvailable));
+        if (startError.code === OFFRAMP_CODE) {
+          setConfirming(null);
+          setStatus((current) => ({ ...current, canStart: false, canAdvance: false,
+            startBlockedReason: OFFRAMP_CODE, advanceBlockedReason: OFFRAMP_CODE }));
+        } else {
+          setError(transitionErrorMessage(startError, boardDraftAvailable));
+        }
       }
     } finally {
       if (activeController.current === controller) {
@@ -473,7 +481,9 @@ export default function FinalWriteupTab({ requestId, renderBoardDraft = null, on
         tolerantBody: true,
       });
       if (!ok) {
-        throw new Error(body.error || `Leadership review transition failed (${httpStatus})`);
+        const failure = new Error(body.error || `Leadership review transition failed (${httpStatus})`);
+        failure.code = body.code || null;
+        throw failure;
       }
       if (activeController.current !== controller) return;
       if (body.artifact?.artifactId !== finalArtifactId) {
@@ -490,7 +500,13 @@ export default function FinalWriteupTab({ requestId, renderBoardDraft = null, on
       setAcknowledgementReload((value) => value + 1);
     } catch (advanceError) {
       if (activeController.current === controller && advanceError?.name !== 'AbortError') {
-        setError(advanceError.message);
+        if (advanceError.code === OFFRAMP_CODE) {
+          setConfirming(null);
+          setStatus((current) => ({ ...current, canStart: false, canAdvance: false,
+            startBlockedReason: OFFRAMP_CODE, advanceBlockedReason: OFFRAMP_CODE }));
+        } else {
+          setError(advanceError.message);
+        }
       }
     } finally {
       if (activeController.current === controller) {
@@ -564,6 +580,7 @@ export default function FinalWriteupTab({ requestId, renderBoardDraft = null, on
   const draftVisible = status?.sourceFileHidden !== true && Boolean(status?.sourceFile?.webUrl);
   const presentationSchedule = status?.presentationSchedule
     || (status?.startBlockedReason ? 'unverified' : 'not_checked');
+  const offramped = status?.startBlockedReason === OFFRAMP_CODE || status?.advanceBlockedReason === OFFRAMP_CODE;
   const showScheduleLink = presentationSchedule === 'missing' || presentationSchedule === 'unverified';
 
   return (
@@ -581,6 +598,11 @@ export default function FinalWriteupTab({ requestId, renderBoardDraft = null, on
         </div>
       )}
 
+      {offramped && (
+        <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+          {OFFRAMP_MESSAGE}
+        </p>
+      )}
       <Card hover={false}>
         <div className="max-w-3xl">
           <h2 className="text-xl font-semibold tracking-tight text-gray-900">{boardDraftAvailable ? 'Draft Writeup' : 'Final writeup'}</h2>
@@ -737,8 +759,8 @@ export default function FinalWriteupTab({ requestId, renderBoardDraft = null, on
         ) : status?.phase === 'ready' ? (
           <div className="mt-6 flex flex-col gap-5 rounded-xl border border-gray-200 bg-gray-50 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="max-w-2xl">
-              <h3 className="text-lg font-semibold text-gray-900">{status.startBlockedReason ? 'Group review is not available yet' : 'Group review has not started'}</h3>
-              {(!boardDraftAvailable || status.canStart) && (
+              <h3 className="text-lg font-semibold text-gray-900">{offramped ? 'Group review is unavailable' : status.startBlockedReason ? 'Group review is not available yet' : 'Group review has not started'}</h3>
+              {!offramped && (!boardDraftAvailable || status.canStart) && (
                 <p className="mt-1 text-sm leading-6 text-gray-600">
                   Mark the writeup ready for group review when colleagues should see it. This records the current Word version.
                   {status.handoffEmailEnabled === true
@@ -754,7 +776,7 @@ export default function FinalWriteupTab({ requestId, renderBoardDraft = null, on
                       ? (status.sourceFile.name || 'Available to open.')
                       : status.sourceFileHidden ? 'The draft is unavailable to you.' : 'No Word link is available.'}</dd>
                   </div>
-                  <div>
+                  {!offramped && <div>
                     <dt className="font-semibold text-gray-900">Presentation schedule</dt>
                     <dd className="text-gray-700">
                       {PRESENTATION_SCHEDULE_LABEL[presentationSchedule] || PRESENTATION_SCHEDULE_LABEL.not_checked}
@@ -763,10 +785,10 @@ export default function FinalWriteupTab({ requestId, renderBoardDraft = null, on
                           href={`/meeting-tracker/visits/${encodeURIComponent(requestId)}`}>Open meeting record</a></>
                       )}
                     </dd>
-                  </div>
+                  </div>}
                   <div>
                     <dt className="font-semibold text-gray-900">Group review</dt>
-                    <dd className="text-gray-700">{status.canStart ? 'Ready to start when the draft is complete.'
+                    <dd className="text-gray-700">{offramped ? 'Unavailable for an offramped request.' : status.canStart ? 'Ready to start when the draft is complete.'
                       : presentationSchedule === 'upcoming' ? 'Waiting for the presentation to end.'
                         : status.startBlockedReason ? 'Waiting for a verified presentation end.'
                           : 'The lead Program Director or a superuser can start group review.'}</dd>
@@ -780,7 +802,7 @@ export default function FinalWriteupTab({ requestId, renderBoardDraft = null, on
                   {status.startCompatibilityReason === 'legacy_review_schedule_unverified' && (
                     <p className="mt-3 text-sm text-amber-800">This uses the existing completed writeup. Presentation timing has not been verified.</p>
                   )}
-                  {!status.canStart && (
+                  {!offramped && !status.canStart && (
                     <p className="mt-3 text-sm font-medium text-amber-800">
                       {status.startBlockedReason === 'final_writeup_site_visit_not_ended'
                         ? 'Group review becomes available after the scheduled presentation ends.'

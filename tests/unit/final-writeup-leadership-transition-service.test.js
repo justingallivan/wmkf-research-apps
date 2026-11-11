@@ -525,3 +525,20 @@ describe('advanceToLeadershipReview', () => {
     expect(harness.dependencies.getRequest).not.toHaveBeenCalled();
   });
 });
+
+
+test.each([1, 2])('offramp during group review refuses leadership at request read %s', async (readNumber) => {
+  const h = createHarness();
+  const read = h.dependencies.getRequest.getMockImplementation();
+  h.dependencies.getRequest.mockImplementation(async () => {
+    if (h.dependencies.getRequest.mock.calls.length === readNumber) h.request.wmkf_phaseiistatus = 682090001;
+    return read();
+  });
+  await expect(advance(h)).rejects.toMatchObject({ code: 'final_writeup_offramped', httpStatus: 409,
+    message: expect.stringContaining('will not go to the Board') });
+  expectNoWrite(h);
+  expect(h.final.wmkf_lifecyclestate).toBe(REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW);
+  expect(await getFinalWriteupStatus({ requestId: REQUEST_ID, actingUserSystemId: LEAD_PD_ID }, h.dependencies))
+    .toMatchObject({ phase: 'group-review', canStart: false, canAdvance: false,
+      startBlockedReason: 'final_writeup_offramped', advanceBlockedReason: 'final_writeup_offramped' });
+});
