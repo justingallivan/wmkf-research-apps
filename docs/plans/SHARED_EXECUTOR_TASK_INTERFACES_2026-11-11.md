@@ -1,14 +1,15 @@
 # Shared Executor task interfaces
 
-**Status [PLANNED].** This checkpoint coordinates the proposal-draft and expertise
-recommendation streams. The shared infrastructure owner controls the capability
+**Status [BRANCH-BUILT, offline fixture] and [PLANNED, caller integration].**
+This checkpoint coordinates the proposal-draft and expertise recommendation
+streams. The shared infrastructure owner controls the capability
 registry, Admin compiler, authorization, Executor, worker and ledger. The roster
 owner controls expertise inputs, validator semantics and staff presentation. Pin
 both branch revisions before handing off changes to shared modules.
 
 ## Verified branch baseline
 
-[VERIFIED via source at `0c4b8d39c`] The proposal branch has four registered
+[HISTORICAL BASELINE, VERIFIED via source at `0c4b8d39c`] The proposal branch had four registered
 capabilities, two synthetic and two staff proposal tasks. The staff flow is a
 restricted, default-off trial. Its drain is unscheduled. `parseExecutionSpec`
 allows raw or JSON parsing, but `validateProfileOutput`, the worker's selected
@@ -26,6 +27,34 @@ has a sandbox/local target guard. Its single and batch rehearsals cover the
 separate runner. Shared-worker integration and Production cutover remain planned. The roster stream's
 `docs/plans/data/expertise-roster/POWER_AUTOMATE_RECOMMENDATIONS_PLAN_2026-11-11.md`
 contains the proposed domain schema and read envelope.
+
+## Offline shared runtime implementation
+
+[VERIFIED via branch source and loopback PostgreSQL] The shared runtime uses
+the frozen pure recommendations contract in an internal fixture. Admission
+requires `environment:'test'`, an `expertise-fixture:<lowercase GUID>`
+authorization scope, and one `expertise.recommendations` `generate-draft`
+task. It has no business writer. The fixture pins execution metadata v2,
+compiler version 1 and `expertise-recommendations-v1`. It caps the
+configured and effective output at 4,096 tokens. Existing text tasks
+keep their 1,536-token cap, v1 seal/checkpoint binding and result shape.
+
+The fixture prepares a v2 HMAC-sealed snapshot, checks the visible roster
+record against the private roster, and wraps the visible record once
+after the document cache boundary. The response checkpoint binds the
+effective budget and frozen contract and seal. The Executor validates
+the closed recommendations JSON against the frozen roster before the
+worker commits a typed result and separate content-free audit. Migration
+097's existing content rows and lease fences persist both. The internal
+five-part owner-scoped reader checks retained content integrity, expiry
+and type. It provides no live freshness assertion.
+
+Admin preview and publication reject the fixture capability. No HTTP
+route or client DTO, real source adapter, live audit attribution,
+machine authorization, PA integration, schedule or deployment is part
+of the fixture. The remaining sections describe the planned caller
+and domain integration. [Executor contract](../EXECUTOR_CONTRACT.md#typed-recommendations-fixture),
+[ledger](../atlas/postgres-prompt-jobs.md#typed-recommendations-fixture).
 
 ## Capability and result path
 
@@ -193,11 +222,53 @@ alongside PA connector proof, worker scheduling, recovery and roster cutover.
 Contract reconciliation covers transition invariants and consumers above. The
 planned ledger change reuses existing tables; verify migration/setup/Atlas parity
 if reviewed implementation adds a schema change. No business writer is in scope.
-This checkpoint adds no runtime changes or live verification claims.
+The checked-in shared runtime establishes the offline fixture described above.
+The remaining integration gates apply before enabling any live caller.
 
 ## Review
 
-Ordinary Claude Opus 5.5 subscription review returned READY WITH NAMED CHANGES.
-The follow-up verified both plans and closed the findings. Both receipts report
-only `claude-opus-5-5` model usage. The shared machine audit and cleanup gates
-remain open for implementation.
+Ordinary Claude Opus 5.5 subscription review of the interface plan returned
+READY WITH NAMED CHANGES. The follow-up verified both plans and closed the
+findings. Both receipts report only `claude-opus-5-5` model usage. The shared
+machine audit and cleanup gates remain open for implementation.
+
+## Offline implementation verification
+
+The shared runtime is recorded in commit `7d0cf0392`. It imported the
+reviewed six-file pure contract subset
+from roster commit `f93f88478`, plus the jsdom schema-import correction and
+regression from `9cc1dbd4e`. That import adds no roster service, route,
+write adapter or production integration.
+
+The initial ordinary Claude Code OAuth build-review attempt hit its turn
+limit and returned no verdict. A bounded patch review returned READY WITH
+NAMED CHANGES. Both receipts report only `claude-opus-5-5` model usage.
+The review requested typed-only terminal preparation errors, an
+order-independent store snapshot guard, tighter normalized-result shape
+checks and verification of all text result readers. It also called for
+negative coverage across snapshot versions, checkpoint audit recovery,
+Admin publication and the existing text token cap. The follow-up code scopes
+terminal preparation errors to the expertise fixture and identifies its
+single task independently of row order. Commit and read checks require
+the normalized result's closed top-level keys and field types. The
+Executor separately checks domain eligibility against the sealed roster.
+The caller search found two readers that request result content by kind.
+The scoped result reader enforces the selected contract, and fixture
+publication requires text and its registered synthetic destination. The final
+targeted Opus 5.5 review returned READY and closed all four findings. Its
+model-usage receipt named only `claude-opus-5-5`.
+
+[VERIFIED via local commands] The focused regression run passed 380 tests
+across 25 suites, including all three real PostgreSQL job suites in disposable
+loopback schemas. Added cases cover legacy text binding and cap parity,
+snapshot-version and roster-fingerprint mismatches, checkpoint rejection
+through audit delivery, closed result envelopes, owner-scope reads and
+result retention after source cleanup. Provider and audit effects used
+test doubles.
+
+The first local application build passed after loading the worktree's
+ignored `.env.local`. The final build superseded it and exited zero in a
+temporary current-source copy without environment files or application
+credentials, with a loopback-only Node socket guard. It retained four
+existing DOCX tracing warnings and the `_app` static-optimization warning.
+This is local build evidence.

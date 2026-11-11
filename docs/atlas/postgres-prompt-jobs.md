@@ -36,6 +36,26 @@ A second initialization job cannot capture its Request ETag while an earlier ini
 
 Audit exceptions are unknown unless the adapter explicitly proves a definitive rejection. Neither unknown nor failed delivery is automatically resent, and both block publication. A publication waits for all tasks to reach a known terminal generation state and cannot proceed while a contributing audit dispatch is in flight or uncertain. It coalesces eligible validated outputs into one immutable command and records the contributing IDs. Confirmed outcomes update all contributing task receipts together. Draft-only work has no Request writeback. Known pre-dispatch or validation failures release only their eligible slots before a physical publication exists. A field already holding staff content stays protected.
 
+## Typed recommendations fixture
+
+[VERIFIED via branch source and loopback PostgreSQL] The fixture adds no
+tables or persisted states. A `test` job under `expertise-fixture:<lowercase GUID>`
+admits exactly one `expertise.recommendations` draft task and has no
+destination or publication reservation. Configuration freezes the roster
+fingerprint. The private roster is part of the v2 sealed snapshot and
+expires with source content. The v2 response checkpoint remains private.
+The worker atomically attaches the `{contractVersion,result}` envelope
+and the deferred audit through the existing attempt fence.
+
+`readValidatedRecommendations` requires environment, principal, authorization
+scope, Request and job identity. It checks result kind, retained expiry,
+hash, byte size and envelope. The Executor already ran domain validation
+against the frozen roster before persistence. The internal reader can
+return an unexpired validated result after source cleanup. It does not
+assert current source or roster freshness. The text reader and fixture
+publication consume text only. Public and staff recommendations read
+surfaces remain planned. [Shared task interfaces](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md).
+
 ## Synthetic safeguard follow-up (2026-11-11)
 
 [VERIFIED via branch store, Executor, and worker source] The follow-up

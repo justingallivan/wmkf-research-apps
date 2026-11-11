@@ -24,10 +24,11 @@ field-primer, and review services.
 **Branch-built [VERIFIED via Executor, job worker, and ledger source]:** The
 [internal profiled job mode](#internal-profiled-job-mode) uses the same
 Executor transport and parser with frozen inputs, awaited checkpoints, and
-deferred audit. The branch includes a synthetic fixture and a default-off
-[staff proposal draft trial](#staff-proposal-draft-trial). Admin can author
-immutable profile revisions and registered task versions and render a fabricated
-sample.
+deferred audit. The branch includes synthetic text fixtures, a default-off
+staff proposal draft trial, and an offline typed recommendations fixture.
+Admin can author immutable profile revisions and registered text task versions
+and render a fabricated sample. [Staff trial](#staff-proposal-draft-trial),
+[typed fixture](#typed-recommendations-fixture).
 
 **Planned (owner decision, 2026-11-10):** Power Automate will submit and poll
 jobs through authenticated endpoints. PA routes, Entra authorization,
@@ -35,7 +36,7 @@ real Request-field destinations, and broader task enablement remain planned.
 See the [shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md).
 
 **Created:** 2026-04-24 (Session 109, reconciliation pass)
-**Last status update:** 2026-11-11 (staff proposal draft branch source)
+**Last status update:** 2026-11-11 (staff proposal trial and typed fixture)
 **Owners:** Justin (backend Executor); Connor (Power Automate trigger and follow-up flows)
 **Related docs:** `docs/PROMPT_STORAGE_DESIGN.md`, `docs/BACKEND_AUTOMATION_PLAN.md`, `docs/WORKFLOW_CHAINING_DESIGN.md`, `docs/GRANT_CYCLE_LIFECYCLE.md`
 
@@ -553,8 +554,9 @@ A prompt row with `guard: "always-overwrite"` on every output ignores `forceOver
 
 **[BRANCH-BUILT]** `executePrompt()` accepts the
 `shared-document-task` execution mode from an internal worker. The prompt's
-variables JSON carries `contractVersion:1` and a profile reference pinned by
-key, revision, and SHA-256. The row has an empty system template and a task
+text-task variables JSON carries `contractVersion:1` and a profile reference
+pinned by key, revision, and SHA-256. The typed fixture uses a separate v2
+contract. The row has an empty system template and a task
 body. It declares one required `prepared_context` and can declare
 `frozen_record` slots. The profile composer verifies the snapshot's scope
 and integrity, wraps documents and records as untrusted data, and enforces
@@ -563,8 +565,9 @@ bounded sizes and required fields. Extracted document text is capped at
 capped at 4 MiB, including escaping, the protected block, and record content. Record values are authoritative for
 declared fields and missing values stay explicit. The reviewed model must
 be a concrete Anthropic model. The worker supplies the frozen inputs,
-including the model, token budget, and temperature. The frozen and effective
-output budgets are capped at 1,536 tokens, subject to the reviewed model ceiling.
+including the model, token budget, and temperature. Text tasks cap frozen and
+effective output budgets at 1,536 tokens, subject to the reviewed model ceiling.
+The test-only recommendations capability caps both budgets at 4,096.
 The Executor reads these inputs directly and resolves capabilities from the
 reviewed local registry. Live model-list, prompt, Request, and SharePoint reads are absent
 from this path.
@@ -606,8 +609,8 @@ worker context. These arguments are internal server data.
    frozen prompt, snapshot integrity, Request, and effective token budget and
    resumes validation without another provider call.
 3. The shared parser checks termination and output shape. The profiled mode
-   also enforces the registered text and length contract and a 128 KiB
-   canonical result limit. It returns
+   also enforces the registered result contract and a 128 KiB canonical result
+   limit, including the typed result wrapper where applicable. It returns
    `runId:null`, skipped write results, and a content-free `deferredAudit`
    on success. A classified validation failure carries deferred audit
    metadata too. The Executor performs no inline audit or target write.
@@ -628,6 +631,35 @@ worker context. These arguments are internal server data.
 
 See [Service & Utility Catalog](SERVICE_AND_UTILITY_CATALOG.md) for the profile,
 context, task capabilities, worker, and store entries.
+
+### Typed recommendations fixture
+
+**[BRANCH-BUILT, offline only]** `expertise.recommendations` runs as a single
+`generate-draft` task in `environment:'test'` with an authorization scope
+of `expertise-fixture:<lowercase GUID>`. The capability rejects initialization
+and has no destination. It is excluded from Admin authoring and rejected by
+Admin preview and publication. The existing text-task catalog, v1 seal, v1
+checkpoint binding and text result shape continue to apply to text tasks.
+
+The task pins `contractVersion:2`, compiler version 1 and the code-owned
+`expertise-recommendations-v1` result contract. Admission freezes the roster
+fingerprint. The v2 sealed snapshot carries private roster context for
+validation. The composer rebuilds the visible `roster_block` from that
+context and verifies exact equality before rendering it once as wrapped
+data after the document cache marker. The private extension stays out
+of the provider payload. The v2 checkpoint binds the capability, result
+contract, compiler, effective budget, Request, frozen prompt and snapshot
+integrity. Recovery validates the saved response without a provider call.
+
+The Executor checks the model JSON against the closed roster contract
+before projection and derives canonical recommendation fields from the
+frozen roster. The worker retains a result envelope with the contract
+version and validated object. The store verifies scope, expiry, kind,
+hash, encoded byte length and envelope when it reads the retained object.
+`readValidatedRecommendations` is an internal fixture reader. Existing
+staff result endpoints continue to return text only. A real source adapter,
+staff result facade with read-time freshness, and PA admission remain
+planned. [Shared task interfaces](plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md).
 
 ### Staff proposal draft trial
 

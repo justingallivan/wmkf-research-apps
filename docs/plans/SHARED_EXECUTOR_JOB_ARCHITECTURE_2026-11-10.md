@@ -1,6 +1,8 @@
 # Shared Executor and durable prompt jobs
 
-Status: **SYNTHETIC FOUNDATION, ADMIN AUTHORING, AND DEFAULT-OFF STAFF PROPOSAL DRAFT TRIAL BUILT ON THE BRANCH.** The synthetic and Admin increments have local integration evidence. The staff trial passed local integrated verification and read-only source preparation. Two separately approved Request 1003384 trials used controlled local processes and settled at `needs_attention`. Deployed staff and Power Automate integration remain planned.
+Status: **SYNTHETIC FOUNDATION, ADMIN AUTHORING, AND DEFAULT-OFF STAFF PROPOSAL DRAFT TRIAL BUILT ON THE BRANCH.** The synthetic and Admin increments have local integration evidence. The staff trial passed local integrated verification and read-only source preparation. Two separately approved Request 1003384 trials used controlled local processes and settled at `needs_attention`. The shared typed recommendations path is verified only with offline fixtures.
+Deployed staff and Power Automate integration remain planned.
+[Shared task interfaces](SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#offline-shared-runtime-implementation).
 Owner: Justin. Design branch: `codex/coordinated-start-2026-11-10-b`.
 Evidence baseline: `a20e5f749`; source inspected on 2026-11-10 Pacific.
 
