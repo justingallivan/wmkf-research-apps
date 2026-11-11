@@ -782,6 +782,16 @@ suite('shared prompt job synthetic vertical trial',()=>{
 
   test('Sandbox read rejects each incompatible frozen binding and keeps the fixture reader separate', async () => {
     const t = await sandboxReceipt();
+    const available = { status: 'available', freshness: 'current', result: t.result };
+    const validBinding = { configuration: t.configuration, profileHash: hashProfile(t.configuration.profile), model: t.promptRow.wmkf_ai_model };
+    async function replaceBinding({ configuration, profileHash, model, promptHash = sha256(canonical(configuration.promptRow)) }) {
+      const cfgHash = await replacePayload(t.cfg.id, configuration);
+      await pool.query('UPDATE prompt_job_tasks SET configuration_hash=$2,prompt_hash=$3,profile_hash=$4,model=$5 WHERE id=$1',
+        [t.taskId, cfgHash, promptHash, profileHash, model]);
+    }
+    expect(await t.read()).toMatchObject(available);
+    t.deps.observeSource.mockClear();
+    t.deps.observeRoster.mockClear();
     function changePin(promptRow, patch) {
       const metadata = JSON.parse(promptRow.wmkf_ai_promptvariables);
       Object.assign(metadata.execution.profile, patch);
@@ -801,17 +811,17 @@ suite('shared prompt job synthetic vertical trial',()=>{
     ];
     const observations = [];
     for (const [label, change] of cases) {
-      const state = { configuration: JSON.parse(canonical(t.configuration)), profileHash: hashProfile(t.configuration.profile), model: t.promptRow.wmkf_ai_model };
+      const state = { ...validBinding, configuration: JSON.parse(canonical(validBinding.configuration)) };
       change(state);
-      const cfgHash = await replacePayload(t.cfg.id, state.configuration);
-      await pool.query('UPDATE prompt_job_tasks SET configuration_hash=$2,prompt_hash=$3,profile_hash=$4,model=$5 WHERE id=$1',
-        [t.taskId, cfgHash, state.promptHash || sha256(canonical(state.configuration.promptRow)), state.profileHash, state.model]);
+      await replaceBinding(state);
       const value = await t.read();
       observations.push([label, value?.status, value?.freshness, value && Object.hasOwn(value, 'result')]);
     }
     expect(observations).toEqual(cases.map(([label]) => [label, 'unavailable', 'unknown', false]));
     expect(t.deps.observeSource).not.toHaveBeenCalled();
     expect(t.deps.observeRoster).not.toHaveBeenCalled();
+    await replaceBinding(validBinding);
+    expect(await t.read()).toMatchObject(available);
     expect(await store.readRecommendationState(t.policy, { includeProof: true })).toBeNull();
     expect(await store.readValidatedRecommendations(t.policy)).toBeNull();
     const fixture = await readyRecommendation();
