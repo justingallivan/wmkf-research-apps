@@ -93,4 +93,23 @@ selection, and action controls remained absent. No Preview write acknowledgement
 or rehearsal grant was added. Remove both the exact branch callback and the
 branch-scoped read variable when this UAT branch is retired.
 
+**HAZARD, 2026-11-11 (Session 673): `vercel env run` can deploy instead of run.**
+With Vercel CLI 65.14, `vercel env run --environment production -- node <path-to-script>`
+did not run the script: it created a new Vercel project named after the file and
+deployed that file, once to Production and once to Preview. Deleted the same day
+with owner approval (`vercel project delete <name> --confirm-name <name> --scope
+justin-gallivans-projects`). Do not use `vercel env run` to read a value. To copy
+one Config value, `vercel env pull <scratch-file> --environment <env>
+[--git-branch <branch>] --yes`, extract the one key, delete the file at once.
+Add branch-scoped Preview settings with `vercel env add <NAME> --environment
+preview --git-branch <branch> --value <v> --no-sensitive --yes` (or stdin for a
+JSON value) so they stay readable as Config.
+
+**VERIFIED 2026-11-11:** the J27 Preview was moved by fast-forwarding
+`claude/j27-read-model` to `01a798524`; deployment
+`dpl_EQFqtn7LtKy9G3XyNuspzzquvo6z` was attested (branch, commit, Ready) through
+`vercel api /v13/deployments/<id>` meta, and the stable alias was moved to it
+from `dpl_2GaUBQnXmXsYd2WdYEnxAKfppSxV`. The branch's code accepts the alias as a
+CSRF origin and the alias callback was already in Entra, so no URI change.
+
 Related: [[project-vercel-sensitive-env-pull-empty]], [[project-dev-environment]], [[project-local-dev-auth-setup]], [[project-branded-domains]].

@@ -11,7 +11,7 @@ other two streams are not yours to change.
 
 | Stream | Last worked by | Resume in | Read first | First step |
 |---|---|---|---|---|
-| **A. J27 cycle page and request page** | Claude, Session 673 (2026-11-11) | `/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model`, on `claude/j27-cycle-page` at `01a798524`, pushed. `claude/j27-read-model` (the sandbox Preview branch) is still at `393da5dde`, far behind | Stream A below; `docs/plans/J27_LATER_PHASE_LISTS_PLAN_2026-11-10.md` section 6 (on `main`) | Owner moves the Preview and adds its settings (Stream A, Verified Open 1), then a browser walk-through |
+| **A. J27 cycle page and request page** | Claude, Session 673 (2026-11-11) | `/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model`, on `claude/j27-cycle-page` at `01a798524`, pushed. `claude/j27-read-model` (the sandbox Preview branch) fast-forwarded to the same commit and deployed; the stable alias points at it | Stream A below; `docs/plans/J27_LATER_PHASE_LISTS_PLAN_2026-11-10.md` section 6 (on `main`) | Owner's browser walk-through on the Preview (Stream A, Verified Open 1) |
 | **B. Expertise roster** | Codex, Session 670; Codex again 2026-11-10 | **Observed 2026-11-11 by Claude, not Codex's own record:** active work is on `codex/expertise-roster-import-2026-11-10` at `e59d1ecb6` in `/Users/gallivan/Code/WMKF_Apps-codex-roster-import`, clean, **not pushed** (no remote branch). Codex's own section below still names the 2026-11-09 branch | Stream B below; `docs/plans/EXPERTISE_ROSTER_HANDOFF_2026-11-09.md`; that branch's own handoff commits | Ask Codex or the owner for the current boundary; do not resume from the 2026-11-09 text alone |
 | **C. Request narratives** | Codex, Session 669 | `codex/request-narratives-2026-11-09` at `06e1ba6a4`, pushed and verified. Recorded worktree `/private/tmp/wmkf-request-narratives` is gone from disk | Stream C below; `docs/plans/REQUEST_NARRATIVES_HANDOFF_2026-11-09.md` | Power Automate initialization contract with Connor, then the J27 integration review |
 
@@ -53,9 +53,12 @@ session is 674 whichever stream it takes. Earlier handoffs:
    sandbox `DYNAMICS_URL` and its own Postgres database (Neon branch
    `j27-preview`). Staff sign-in works only through
    `wmkfresearchapps-preview.vercel.app`; the owner signs in and repoints that
-   alias himself. It pointed at
-   `wmkfresearchapps-ksb8kwki6-justin-gallivans-projects.vercel.app`
-   (`393da5dde`) on 2026-11-11 `[VERIFIED via vercel inspect]`.
+   alias himself, or Claude does at his request. **Since 2026-11-11 it points
+   at `wmkfresearchapps-e5t3tam4d-justin-gallivans-projects.vercel.app`
+   (`dpl_EQFqtn7LtKy9G3XyNuspzzquvo6z`, `claude/j27-read-model` at
+   `01a798524`)** `[VERIFIED via vercel inspect and the deployment's API
+   meta]`. Previous target, to restore if needed:
+   `dpl_2GaUBQnXmXsYd2WdYEnxAKfppSxV` (`ksb8kwki6`, `393da5dde`).
 5. **Preserve:** sandbox fixtures 1000368 to 1000387; the untracked
    `docs/plans/J27_WORKBENCH_DEVELOPMENT_BRIEF_2026-11-06.md` in the main
    checkout (Codex's); the uncommitted `package-lock.json` in the J27,
@@ -144,17 +147,17 @@ including the later-phase lists plan and this handoff.
 
 #### Verified Open
 
-1. **Move the Preview and rehearse in a browser (owner steps).** Fast-forward
-   `claude/j27-read-model` to `claude/j27-cycle-page` (Claude pushes, with
-   the owner's go), the owner repoints the alias, and adds for the
-   `claude/j27-read-model` Preview branch: `INITIAL_RATIONALE_SCHEMA_READY=on`,
-   `MEETING_ROSTER_SCHEMA_READY=on`, `CHAIRS_RECOMMENDATION_ENABLED=on`,
-   `FINAL_WRITEUP_SCHEMA_READY=on`, and
-   `STAFF_DELIBERATIONS_SITE_VISIT_STATE_STATUS_PAIRS` (copy Production's
-   value). Evidence: rollout plan "Admission to implement" amendment;
-   `vercel env ls` 2026-11-11. Without the pairs setting no presentation's
-   end is known on the Preview, so nobody can start group review there.
-   Then walk every tab and a request in each phase, and time the feed.
+1. **Browser walk-through on the Preview (owner signs in).** Done
+   2026-11-11 at the owner's request: `claude/j27-read-model` fast-forwarded
+   to `01a798524`, five Config settings added for that Preview branch
+   (`INITIAL_RATIONALE_SCHEMA_READY`, `MEETING_ROSTER_SCHEMA_READY`,
+   `CHAIRS_RECOMMENDATION_ENABLED`, `FINAL_WRITEUP_SCHEMA_READY` all `on`;
+   `STAFF_DELIBERATIONS_SITE_VISIT_STATE_STATUS_PAIRS` copied from Production,
+   `[[0,1,true],[1,2,true],[2,3,false],[3,4,true]]`), all read back from
+   Vercel; the build was attested and the alias moved (rule 4). **Not yet
+   done:** signing in and walking every tab, a request in each phase, and
+   timing the feed. Note that `CHAIRS_RECOMMENDATION_ENABLED` still limits the
+   step to test requests or the rehearsal request id.
 2. **Confirm one behaviour on the request page** (owner): the stage strip,
    like the list, shows no next step in Deliberations until the presentation
    has ended. His decision was about the list row.
@@ -207,7 +210,7 @@ including the later-phase lists plan and this handoff.
    "unavailable" under step E), to match the server.
 4. **Preview settings to remove at promotion or retirement:** the
    branch-scoped `DYNAMICS_URL`, `POSTGRES_URL`, `DATABASE_URL`, the five
-   settings in Verified Open 1, and the Neon branch `j27-preview` (a copy of
+   Config settings added 2026-11-11 (Verified Open 1), and the Neon branch `j27-preview` (a copy of
    Production data; treat its connection string as a Production secret).
 5. **Applying a migration with a pasted connection string:** use
    `read -s POSTGRES_URL`, export, print the host, then run
