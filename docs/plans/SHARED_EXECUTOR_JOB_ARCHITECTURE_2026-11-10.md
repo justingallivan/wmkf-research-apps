@@ -429,4 +429,11 @@ oversize follow-up behavior, and PostgreSQL-only rejection audit boundary.
 The editor retains an uncertain profile publication's payload and UUID
 across a history refresh (`a69da2ae3`). Shared task preview and publication
 use consistent validation for hyphenated frozen record names (`20f781474`).
-Final integrated test and build results are pending in this receipt.
+[VERIFIED via local commands] The final branch source through `30d15803f`
+passed 972 tests across 40 suites, including both required loopback
+PostgreSQL integration suites. The application build exited zero. The
+orchestrator closed this review round after verifying the named changes,
+with the PostgreSQL-only rejection audit boundary retained. The command,
+build warnings, and limits are recorded in the [integrated verification
+receipt](../audits/SHARED_EXECUTOR_ADMIN_OPUS55_BUILD_REVIEW_2026-11-11.md#integrated-verification).
+No live writes, provider inference, or deployment were part of that run.

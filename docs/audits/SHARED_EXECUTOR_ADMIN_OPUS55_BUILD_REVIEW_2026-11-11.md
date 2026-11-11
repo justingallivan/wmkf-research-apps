@@ -62,15 +62,16 @@ tests or provider inference. The response below is preserved verbatim.
 
 ## Dispositions
 
-- **M1 — accepted.** The branch editor handles `partial`, and
-  `failed` or `concurrency_conflict` with a `newPromptId), as
-  publication reconciliation. It retains the draft, invalidates its
+- **M1 — accepted.** The branch editor treats `partial` as a publication
+  reconciliation case. It applies the same rule to `failed` and
+  `concurrency_conflict` when the response carries a `newPromptId`. It retains the draft, invalidates its
   preview, and reloads the task. Publication stays blocked until readback
   confirms the intended sole current version and the editor chooses to use
   that version as the base. A subsequent publish requires a fresh preview.
   This avoids replaying a recorded failure as if it were a new attempt.
   The counterexamples in `tests/unit/shared-prompt-editor.test.js` cover
-  each status and a duplicate-current readback. Integrated verification is pending.
+  each status and a duplicate-current readback. Those cases passed in the
+  integrated run below.
 - **L1 — accepted.** If the late dispatch check consumes the remaining
   lease window, `lib/services/prompt-jobs/worker.js` tags the deadline
   as `dispatch_check_unavailable`. That tick returns `waiting` before
@@ -95,5 +96,45 @@ tests or provider inference. The response below is preserved verbatim.
 
 The profile revision race depends on the setting-key alternate key and
 exact readback. Live index activation and Dataverse round-trip behavior
-remain outside the branch proof. Final integrated tests and the application
-build have a separate verification receipt.
+remain outside the branch proof. The accepted L3 audit boundary remains
+in force.
+
+## Integrated verification
+
+[VERIFIED via local commands] The final runtime source through `30d15803f`
+and documentation through `c9cc329aa` passed **972 tests across 40 suites**.
+Both PostgreSQL integration suites ran with their require flags enabled
+against the disposable loopback PostgreSQL instance on port 55440. The
+run used synthetic data and doubles for model and remote write adapters.
+
+```sh
+TEST_REQUEST_LEDGER_TEST_URL=postgresql://postgres@127.0.0.1:55440/executor_trial \
+TEST_REQUEST_LEDGER_REQUIRE=1 \
+PROMPT_JOB_PG_TEST_URL=postgresql://postgres@127.0.0.1:55440/executor_trial \
+PROMPT_JOB_PG_TEST_REQUIRE=1 \
+npx jest \
+  tests/unit/execute-prompt- tests/unit/utils/ai-payload-boundary.test.js \
+  tests/unit/prompt-jobs- tests/unit/llm-client.test.js \
+  tests/unit/tool-prompt-parity tests/unit/tool-prompt-composer.test.js \
+  tests/integration/prompt-jobs-executor.pg.test.js tests/integration/prompt-jobs.pg.test.js \
+  tests/unit/prompts- tests/unit/admin-prompts- tests/unit/admin-prompt-profiles.test.js \
+  tests/unit/prompt-profiles-service.test.js tests/unit/shared-task-publication.test.js \
+  tests/unit/shared-prompt-editor.test.js tests/unit/prompt-templates- \
+  tests/unit/dataverse-settings-service-odata-escape.test.js tests/unit/executor-budget-service.test.js \
+  --runInBand --silent
+npm run build
+```
+
+The application build exited zero and compiled in 9.6 seconds. It emitted
+four existing DOCX filesystem-tracing warnings and the existing
+`pages/_app` static-optimization warning. Scoped route security, Atlas,
+canonical facts, status, DAL, GUID, and documentation checks passed with
+their applicable self-tests. The browser fixture used the repository's
+shared Button and Tailwind styles at desktop width and 390 px. The narrow
+fixture's document scroll width was 390 px. The local fixture server was
+stopped after verification.
+
+The named changes are resolved for this synthetic slice. The orchestrator
+closed this review round after the integrated checks. Live Dataverse
+writes, provider inference, deployment, and production enablement were
+outside this verification.
