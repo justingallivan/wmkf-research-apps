@@ -9,6 +9,29 @@ const candidatePath = path.join(root, 'docs/plans/EXPERTISE_SANDBOX_1000339_CAND
 const candidateDigest = '5060ea160f58ec90ab54736e40180cbddb61d8073089faa930e1cb8eb3d44679';
 const sha256 = value => crypto.createHash('sha256').update(value).digest('hex');
 const req = createRequire(path.join(root, 'package.json'));
+function allowedRead(url, method) {
+  return ['GET', 'HEAD'].includes(method) && ['https://graph.microsoft.com',
+    'https://orgd9e66399.crm.dynamics.com', 'https://appriver3651007194.sharepoint.com'].includes(url.origin);
+}
+function providerIntent(url, method, mode, body, posts) {
+  return mode === 'tick' && method === 'POST' && url.origin === 'https://api.anthropic.com'
+    && url.pathname === '/v1/messages' && body?.model === 'claude-sonnet-4-6'
+    && body?.max_tokens === 4096 && posts === 0;
+}
+function checkGuards() {
+  const provider = new URL('https://api.anthropic.com/v1/messages');
+  const good = { model: 'claude-sonnet-4-6', max_tokens: 4096 };
+  if (!providerIntent(provider, 'POST', 'tick', good, 0)
+    || providerIntent(provider, 'POST', 'tick', good, 1)
+    || providerIntent(provider, 'POST', 'tick', { ...good, max_tokens: 4095 }, 0)
+    || providerIntent(new URL('https://other.example/v1/messages'), 'POST', 'tick', good, 0)
+    || providerIntent(provider, 'POST', 'preflight', good, 0)
+    || providerIntent(provider, 'POST', 'recover', good, 0)
+    || allowedRead(new URL('https://wmkf.crm.dynamics.com/api/data/v9.2/'), 'GET')
+    || allowedRead(new URL('https://graph.microsoft.com/v1.0/me'), 'POST')
+    || !allowedRead(new URL('https://graph.microsoft.com/v1.0/me'), 'GET')) throw new Error('Guard self-test failed');
+  return { guards: 'passed', providerLimit: 1 };
+}
 registerHooks({ resolve(specifier, context, next) {
   try { return next(specifier, context); } catch (error) {
     if (specifier.startsWith('.') && !/\.[a-z]+$/i.test(specifier)) return next(`${specifier}.js`, context);
@@ -95,6 +118,8 @@ function initialize(directory) {
 // The only network-capable preparatory operation is read-only. It observes the
 // current governed source and checks it against the approved copy journal.
 async function prepareSource(directory) {
+  // Libraries can log remote response bodies and source paths on errors.
+  console.log = console.warn = console.error = () => {};
   const dirStat = fs.lstatSync(directory);
   if (!path.isAbsolute(directory) || !directory.startsWith('/private/tmp/') || fs.realpathSync(directory) !== directory
     || !dirStat.isDirectory() || dirStat.uid !== process.getuid() || (dirStat.mode & 0o777) !== 0o700) throw new Error('Invalid state directory');
@@ -117,14 +142,15 @@ async function prepareSource(directory) {
       || verified.bytes !== intent.bytes || created.size !== intent.bytes || verified.complete !== true
       || created.id !== verified.id || created.eTag !== verified.eTag || created.siteId !== intent.siteId
       || created.driveId !== intent.driveId || created.name !== intent.filename) throw new Error('Invalid copy receipt');
-    if (fs.existsSync(path.join(root, '.env.local')) || process.env.VERCEL || process.env.VERCEL_ENV) throw new Error('Unexpected local configuration');
+    if (process.env.NODE_OPTIONS || process.env.VERCEL !== undefined || process.env.VERCEL_ENV !== undefined) throw new Error('Unexpected local configuration');
     const dotenv = req('dotenv');
     const env = dotenv.parse(fs.readFileSync('/Users/gallivan/.local/share/wmkf-roster/full-import-20261110/full.env'));
     for (const key of Object.keys(process.env)) if (/^(DYNAMICS_|DATAVERSE_|SHAREPOINT_|EXPERTISE_RECOMMENDATIONS_)/.test(key)) delete process.env[key];
-    for (const key of ['DYNAMICS_URL','DYNAMICS_TENANT_ID','DYNAMICS_CLIENT_ID','DYNAMICS_CLIENT_SECRET','SHAREPOINT_SITE_URL']) {
+    for (const key of ['DYNAMICS_URL','DYNAMICS_TENANT_ID','DYNAMICS_CLIENT_ID','DYNAMICS_CLIENT_SECRET']) {
       if (!env[key]) throw new Error('Required Sandbox configuration missing');
       process.env[key] = env[key];
     }
+    process.env.SHAREPOINT_SITE_URL = env.SHAREPOINT_SITE_URL || 'https://appriver3651007194.sharepoint.com/sites/akoyaGO';
     if (process.env.DYNAMICS_URL !== 'https://orgd9e66399.crm.dynamics.com' || process.env.DYNAMICS_CLIENT_ID !== state.applicationId
       || process.env.SHAREPOINT_SITE_URL !== 'https://appriver3651007194.sharepoint.com/sites/akoyaGO') throw new Error('Sandbox target mismatch');
     process.env.DATAVERSE_DAL_ENFORCEMENT = 'on'; process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
@@ -139,8 +165,7 @@ async function prepareSource(directory) {
         const body = new URLSearchParams(options.body);
         if (body.get('grant_type') !== 'client_credentials' || body.get('client_id') !== state.applicationId
           || !['https://graph.microsoft.com/.default','https://orgd9e66399.crm.dynamics.com/.default'].includes(body.get('scope'))) throw new Error('Unexpected token scope');
-      } else if (!['GET','HEAD'].includes(method) || !['https://graph.microsoft.com','https://orgd9e66399.crm.dynamics.com',
-        'https://appriver3651007194.sharepoint.com'].includes(url.origin)) throw new Error('Read-only network guard blocked request');
+      } else if (!allowedRead(url, method)) throw new Error('Read-only network guard blocked request');
       return originalFetch(input, { ...options, redirect: 'manual' });
     };
     const { withDalContext } = req('./lib/dataverse/core/context.js');
@@ -165,7 +190,9 @@ async function prepareSource(directory) {
     const identity = { requestId: state.requestId, library, folder, filename, siteId: metadata.siteId,
       driveId: metadata.driveId, itemId: metadata.id };
     const doc = observation.documents?.[0];
-    if (observation.documents?.length !== 1 || doc.id !== sha256(canonical(identity)) || doc.sha256 !== intent.sha256
+    if (observation.requestId !== state.requestId || observation.version !== SANDBOX_RECOMMENDATIONS_SOURCE_VERSION
+      || observation.complete !== true || observation.targetHost !== 'orgd9e66399.crm.dynamics.com'
+      || observation.documents?.length !== 1 || doc.id !== sha256(canonical(identity)) || doc.sha256 !== intent.sha256
       || doc.version !== canonical([metadata.versionId, metadata.eTag]) || doc.role !== 'proposal') throw new Error('Source observation mismatch');
     const proof = sandboxRecommendationSourceProof('orgd9e66399.crm.dynamics.com', ['proposal'], observation.documents);
     const pin = { siteId: intent.siteId, driveId: intent.driveId, hash: proof.hash };
@@ -182,12 +209,202 @@ async function prepareSource(directory) {
   } finally { fs.closeSync(lock); fs.unlinkSync(lockPath); }
 }
 
+async function liveStage(mode, directory) {
+  console.log = console.warn = console.error = () => {};
+  const stat = fs.lstatSync(directory);
+  if (!path.isAbsolute(directory) || !directory.startsWith('/private/tmp/') || fs.realpathSync(directory) !== directory
+    || !stat.isDirectory() || stat.uid !== process.getuid() || (stat.mode & 0o777) !== 0o700) throw new Error('Invalid state directory');
+  const lockPath = path.join(directory, 'lock');
+  const lock = fs.openSync(lockPath, 'wx', 0o600);
+  try {
+    const statePath = path.join(directory, 'state.json');
+    const state = readPrivateJson(statePath);
+    const staff = readPrivateJson('/private/tmp/wmkf-expertise-sandbox-staff-binding-20261111.json');
+    const ledger = readPrivateJson('/private/tmp/wmkf-expertise-sandbox-ledger-binding-20261111.json');
+    if (state.version !== 1 || state.candidateDigest !== candidateDigest || state.requestId !== '63dab4af-178f-4bbc-b24d-3ccbaf74cbfc'
+      || state.profileId !== 2 || ['systemUserId','azureId','applicationId'].some(k => state[k] !== staff[k])
+      || state.databaseIdentity !== ledger.databaseIdentity || !state.sourceProof || !Number.isInteger(state.providerPosts)
+      || state.providerPosts < 0 || state.providerPosts > 1) throw new Error('Trial state mismatch');
+    checkCandidate();
+    const candidate = JSON.parse(fs.readFileSync(candidatePath));
+    const { canonical } = req('./lib/services/prompt-jobs/profile.js');
+    const task = candidate.task;
+    const row = { wmkf_ai_promptid: state.promptId, wmkf_ai_promptname: task.name, wmkf_ai_systemprompt: task.systemPrompt,
+      wmkf_ai_promptbody: task.body, wmkf_ai_promptvariables: task.variables, wmkf_ai_promptoutputschema: task.outputSchema,
+      wmkf_ai_model: task.model, wmkf_ai_temperature: task.temperature, wmkf_ai_maxtokens: task.maxTokens, wmkf_promptversion: 1 };
+    const save = () => {
+      const next = path.join(directory, 'state.next');
+      const fd = fs.openSync(next, 'wx', 0o600);
+      try { fs.writeFileSync(fd, JSON.stringify(state)); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+      fs.renameSync(next, statePath);
+      const dfd = fs.openSync(directory, 'r'); try { fs.fsyncSync(dfd); } finally { fs.closeSync(dfd); }
+    };
+    if (process.env.NODE_OPTIONS || process.env.VERCEL !== undefined || process.env.VERCEL_ENV !== undefined) throw new Error('Unexpected local configuration');
+    const dotenv = req('dotenv');
+    const sandbox = dotenv.parse(fs.readFileSync('/Users/gallivan/.local/share/wmkf-roster/full-import-20261110/full.env'));
+    const app = dotenv.parse(fs.readFileSync('/Users/gallivan/Code/WMKF_Apps/.env.local'));
+    for (const key of Object.keys(process.env)) if (/^(DYNAMICS_|DATAVERSE_|SHAREPOINT_|EXPERTISE_RECOMMENDATIONS_|POSTGRES_|CLAUDE_|PROMPT_JOB_)/.test(key)) delete process.env[key];
+    for (const key of ['DYNAMICS_URL','DYNAMICS_TENANT_ID','DYNAMICS_CLIENT_ID','DYNAMICS_CLIENT_SECRET']) {
+      if (!sandbox[key]) throw new Error('Sandbox configuration missing'); process.env[key] = sandbox[key];
+    }
+    process.env.SHAREPOINT_SITE_URL = sandbox.SHAREPOINT_SITE_URL || 'https://appriver3651007194.sharepoint.com/sites/akoyaGO';
+    if (!app.POSTGRES_URL || !app.CLAUDE_API_KEY) throw new Error('Application configuration missing');
+    process.env.POSTGRES_URL = app.POSTGRES_URL; process.env.CLAUDE_API_KEY = app.CLAUDE_API_KEY;
+    if (process.env.DYNAMICS_URL !== 'https://orgd9e66399.crm.dynamics.com' || process.env.DYNAMICS_CLIENT_ID !== state.applicationId
+      || process.env.SHAREPOINT_SITE_URL !== 'https://appriver3651007194.sharepoint.com/sites/akoyaGO') throw new Error('Sandbox target mismatch');
+    Object.assign(process.env, { DATAVERSE_DAL_ENFORCEMENT: 'on', DATAVERSE_TARGET_INTERLOCK: 'on', DYNAMICS_IMPERSONATION_ENABLED: 'false',
+      NODE_ENV: 'development', PROMPT_JOB_NONCE_SECRET: state.nonceSecret, EXPERTISE_RECOMMENDATIONS_TRIAL: 'on',
+      EXPERTISE_RECOMMENDATIONS_TRIAL_ACCESS: JSON.stringify({ requestId: state.requestId, profileId: state.profileId,
+        systemUserId: state.systemUserId, azureId: state.azureId, applicationId: state.applicationId, scopeId: state.scopeId,
+        idempotencyKey: state.idempotencyKey, promptId: state.promptId, promptHash: sha256(canonical(row)), profileHash: candidate.profileHash,
+        sourceSiteId: state.sourceProof.siteId, sourceDriveId: state.sourceProof.driveId, sourceHash: state.sourceProof.hash,
+        databaseIdentity: state.databaseIdentity }) });
+    const originalFetch = globalThis.fetch;
+    let allowedAuditRunId = null;
+    globalThis.fetch = async (input, options = {}) => {
+      const url = new URL(typeof input === 'string' ? input : input.url);
+      const method = (options.method || 'GET').toUpperCase();
+      if (method === 'POST' && url.origin === 'https://login.microsoftonline.com'
+        && url.pathname === `/${process.env.DYNAMICS_TENANT_ID}/oauth2/v2.0/token`) {
+        const body = new URLSearchParams(options.body);
+        if (body.get('grant_type') !== 'client_credentials' || body.get('client_id') !== state.applicationId
+          || !['https://graph.microsoft.com/.default','https://orgd9e66399.crm.dynamics.com/.default'].includes(body.get('scope'))) throw new Error('Token scope rejected');
+        return originalFetch(input, { ...options, redirect: 'manual' });
+      }
+      if (allowedRead(url, method)) return originalFetch(input, { ...options, redirect: 'manual' });
+      let body; try { body = JSON.parse(options.body); } catch { throw new Error('Unexpected network request'); }
+      const headers = new Headers(options.headers);
+      if (headers.has('MSCRMCallerID') || headers.has('CallerObjectId')) throw new Error('Unexpected impersonation');
+      let intent;
+      if (mode === 'publish' && method === 'POST' && url.origin === 'https://orgd9e66399.crm.dynamics.com'
+        && url.pathname === '/api/data/v9.2/wmkf_appsystemsettings') {
+        const value = JSON.parse(body.wmkf_settingvalue);
+        if (Object.keys(body).sort().join(',') !== 'wmkf_settingkey,wmkf_settingvalue'
+          || body.wmkf_settingkey !== `executor.profiles.${candidate.profile.key}.v000001`
+          || Object.keys(value).sort().join(',') !== 'profile,publishedAt,requestId,schemaVersion,sha256'
+          || value.schemaVersion !== 1 || canonical(value.profile) !== canonical(candidate.profile)
+          || value.sha256 !== candidate.profileHash || value.requestId !== state.profilePublicationId
+          || !Number.isFinite(Date.parse(value.publishedAt)) || state.profileWriteIntent) throw new Error('Profile write rejected');
+        state.profileWriteIntent = true; intent = 'profile';
+      } else if (mode === 'publish' && method === 'POST' && url.origin === 'https://orgd9e66399.crm.dynamics.com'
+        && url.pathname === '/api/data/v9.2/wmkf_ai_prompts') {
+        if (canonical(body) !== canonical({ ...row, wmkf_ai_iscurrent: true, wmkf_ai_promptstatus: 682090001 })
+          || state.promptWriteIntent) throw new Error('Prompt write rejected');
+        state.promptWriteIntent = true; intent = 'prompt';
+      } else if (providerIntent(url, method, mode, body, state.providerPosts)) {
+        state.providerPosts = 1; intent = 'provider';
+      } else if (mode === 'tick' && method === 'POST' && url.origin === 'https://orgd9e66399.crm.dynamics.com'
+        && url.pathname === '/api/data/v9.2/wmkf_ai_runs') {
+        const auditKeys = ['wmkf_ai_runid','wmkf_ai_status','wmkf_ai_runsource','wmkf_ai_model','wmkf_ai_Prompt@odata.bind',
+          'wmkf_ai_promptversion','wmkf_ai_Request@odata.bind','wmkf_ai_promptoverridden','wmkf_ai_notes'];
+        if (Object.keys(body).length !== auditKeys.length || Object.keys(body).some(key => !auditKeys.includes(key))
+          || ![682090000,682090001].includes(body.wmkf_ai_status) || body.wmkf_ai_runsource !== 682090002
+          || body.wmkf_ai_model !== task.model || body.wmkf_ai_promptversion !== 1 || body.wmkf_ai_promptoverridden !== false
+          || typeof body.wmkf_ai_notes !== 'string' || !/^profiled=true; outcome=(completed|failed); code=(none|profile_inputs_changed_after_dispatch|profile_checkpoint_mismatch|profile_response_too_large|profile_response_model_mismatch|profile_execution_failed|claude_output_refused|claude_output_truncated|claude_context_window_exceeded|claude_output_incomplete|claude_output_empty|claude_output_invalid_json|claude_output_missing_field|claude_output_schema_invalid|profile_output_invalid); stopReason=(end_turn|refusal|max_tokens|model_context_window_exceeded|unknown)$/.test(body.wmkf_ai_notes)
+          || !allowedAuditRunId || body.wmkf_ai_runid !== allowedAuditRunId || body['wmkf_ai_Request@odata.bind'] !== `/akoya_requests(${state.requestId})`
+          || body['wmkf_ai_Prompt@odata.bind'] !== `/wmkf_ai_prompts(${state.promptId})` || body.wmkf_ai_rawoutput != null
+          || body.wmkf_ai_promptoverride != null) throw new Error('Audit scope rejected');
+        allowedAuditRunId = null; intent = 'audit';
+      } else throw new Error('Network write rejected');
+      state.lastWriteIntent = intent; save();
+      return originalFetch(input, { ...options, redirect: 'manual' });
+    };
+    const { withDalContext } = req('./lib/dataverse/core/context.js');
+    const { createPromptJobStore } = req('./lib/services/prompt-jobs/store.js');
+    const { db } = req('@vercel/postgres');
+    const store = createPromptJobStore(db);
+    const policy = req('./lib/services/prompt-jobs/recommendations-sandbox-policy.js').readRecommendationsTrialPolicy();
+    if (!policy) throw new Error('Trial policy rejected');
+    await store.verifySandboxRecommendationDatabase();
+    const owner = { environment: policy.environment, principalKey: policy.principalKey, authorizationScope: policy.authorizationScope, requestId: policy.requestId };
+    const actor = { profileId: state.profileId, systemUserId: state.systemUserId, azureId: state.azureId };
+    const { verifyRecommendationsStaffActor } = req('./lib/services/prompt-jobs/staff-recommendations-service.js');
+    if (mode !== 'expire' && !await withDalContext('sandbox-trial-readiness', () => verifyRecommendationsStaffActor(actor, () => true))) throw new Error('Staff authorization failed');
+    return await withDalContext('sandbox-trial-operator', async () => {
+      const trial = req('./lib/services/prompt-jobs/sandbox-recommendations-trial.js');
+      if (mode === 'publish') {
+        const { createRecommendationsProposalSource } = req('./lib/services/prompt-jobs/proposal-source.js');
+        const { SANDBOX_RECOMMENDATIONS_SOURCE_VERSION, sandboxRecommendationSourceProof } = req('./lib/services/prompt-jobs/context.js');
+        const observed = await createRecommendationsProposalSource().observe({ requestId: state.requestId,
+          version: SANDBOX_RECOMMENDATIONS_SOURCE_VERSION, siteId: state.sourceProof.siteId, driveId: state.sourceProof.driveId });
+        if (observed.requestId !== state.requestId || observed.complete !== true || observed.targetHost !== 'orgd9e66399.crm.dynamics.com'
+          || sandboxRecommendationSourceProof(observed.targetHost, ['proposal'], observed.documents).hash !== state.sourceProof.hash) throw new Error('Source changed');
+        const profiles = req('./lib/services/admin/prompt-profiles-service.js');
+        const aiPrompt = req('./lib/dataverse/adapters/ai-prompt.js');
+        const before = await profiles.getPromptProfiles();
+        const found = before.profiles.filter(x => x.profile.key === candidate.profile.key);
+        if (!found.length) {
+          if (state.profileWriteIntent) throw new Error('Profile publication needs reconciliation');
+          await profiles.publishPromptProfile({ profile: candidate.profile, expectedVersion: 0, requestId: state.profilePublicationId });
+        } else if (found.length !== 1 || found[0].sha256 !== candidate.profileHash || found[0].requestId !== state.profilePublicationId
+          || canonical(found[0].profile) !== canonical(candidate.profile)) throw new Error('Profile conflict');
+        const versions = (await aiPrompt.listVersions(task.name)).records || [];
+        if (!versions.length) {
+          if (state.promptWriteIntent) throw new Error('Prompt publication needs reconciliation');
+          await aiPrompt.create({ ...row, wmkf_ai_iscurrent: true, wmkf_ai_promptstatus: 682090001 });
+        } else if (versions.length !== 1 || versions[0].wmkf_ai_promptid !== state.promptId) throw new Error('Prompt conflict');
+        const actual = await aiPrompt.getExecutorPromptById(state.promptId, 'https://orgd9e66399.crm.dynamics.com');
+        if (canonical({ ...actual, wmkf_ai_systemprompt: actual.wmkf_ai_systemprompt ?? '' }) !== canonical(row)
+          || ((await aiPrompt.listVersions(task.name)).records || []).length !== 1) throw new Error('Prompt readback mismatch');
+        return { stage: 'published' };
+      }
+      if (mode === 'preflight') return { stage: 'preflight', budget: await trial.preflightSandboxRecommendationTrial() };
+      if (mode === 'admit') {
+        const result = await trial.admitSandboxRecommendationTrial();
+        if (state.jobId && state.jobId !== result.jobId) throw new Error('Job mismatch');
+        state.jobId = result.jobId; save(); return { stage: 'admitted', replayed: result.replayed };
+      }
+      if (!state.jobId) throw new Error('Missing job receipt');
+      const views = await store.listJobs({ ...owner, limit: 2 });
+      if (views.length !== 1 || views[0].job.id !== state.jobId || views[0].job.idempotency_key !== state.idempotencyKey) throw new Error('Job scope mismatch');
+      if (mode === 'tick' || mode === 'recover') {
+        const audit = async ({ runId, payload, job }) => {
+          const { DynamicsService } = req('./lib/services/dynamics-service.js');
+          const users = await DynamicsService.queryRecords('systemusers', { select: 'systemuserid,applicationid,isdisabled',
+            filter: `applicationid eq ${state.applicationId}`, top: 2 });
+          const appUsers = users.records || [];
+          if (appUsers.length !== 1 || appUsers[0].applicationid !== state.applicationId || appUsers[0].isdisabled !== false) throw new Error('Backend actor unavailable');
+          if (job.id !== state.jobId || !views[0].attempts.some(a => a.audit_run_id === runId)) throw new Error('Audit attempt mismatch');
+          allowedAuditRunId = runId;
+          const auditAdapter = req('./lib/dataverse/adapters/ai-run.js');
+          await auditAdapter.create({ ...payload, wmkf_ai_runid: runId });
+          const check = await auditAdapter.getByIdWithSelect(runId, 'wmkf_ai_runid,_wmkf_ai_prompt_value,_wmkf_ai_request_value,_createdby_value,_createdonbehalfby_value,wmkf_ai_rawoutput,wmkf_ai_promptoverride,wmkf_ai_status,wmkf_ai_runsource,wmkf_ai_model,wmkf_ai_promptversion,wmkf_ai_promptoverridden,wmkf_ai_notes');
+          if (check.wmkf_ai_runid !== runId || check._wmkf_ai_prompt_value !== state.promptId || check._wmkf_ai_request_value !== state.requestId
+            || check._createdby_value !== appUsers[0].systemuserid || check._createdonbehalfby_value != null || check.wmkf_ai_rawoutput != null || check.wmkf_ai_promptoverride != null
+            || ['wmkf_ai_status','wmkf_ai_runsource','wmkf_ai_model','wmkf_ai_promptversion','wmkf_ai_promptoverridden','wmkf_ai_notes'].some(key => check[key] !== payload[key])) throw new Error('Audit readback mismatch');
+        };
+        return await trial.advanceSandboxRecommendationTrial({ recoverResponse: mode === 'recover' }, { audit });
+      }
+      if (mode === 'inspect') {
+        const result = await store.readValidatedSandboxRecommendations({ ...owner, jobId: state.jobId });
+        const file = path.join(directory, 'validated-result.json');
+        if (result?.results?.some(item => item.status === 'available')) {
+          const fd = fs.openSync(file, 'wx', 0o600);
+          try { fs.writeFileSync(fd, JSON.stringify(result)); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+        }
+        return { stage: 'inspected', validation: 'stored-contract', currentFreshness: 'not-checked', httpE2e: false, resultAvailable: Boolean(result?.results?.some(item => item.status === 'available')), providerPosts: state.providerPosts,
+          taskStates: views[0].tasks.map(x => x.state), auditStates: views[0].attempts.map(x => x.audit_state) };
+      }
+      if (mode === 'expire') {
+        const sourceExpiry = new Date(views[0].job.source_expires_at).getTime();
+        if (!Number.isFinite(sourceExpiry) || Date.now() < sourceExpiry) throw new Error('Source not expired');
+        delete process.env.EXPERTISE_RECOMMENDATIONS_TRIAL_ACCESS; delete process.env.EXPERTISE_RECOMMENDATIONS_TRIAL;
+        const expired = await store.expireSandboxRecommendationContent({ ...owner, jobId: state.jobId, databaseIdentity: state.databaseIdentity });
+        return { stage: 'expired', expired };
+      }
+      throw new Error('Unknown stage');
+    });
+  } finally { fs.closeSync(lock); fs.unlinkSync(lockPath); }
+}
+
 async function main() {
   let result;
   if (process.argv.length === 3 && process.argv[2] === 'offline-check') result = checkCandidate();
+  else if (process.argv.length === 3 && process.argv[2] === 'guard-test') result = checkGuards();
   else if (process.argv.length === 4 && process.argv[2] === 'init') result = initialize(process.argv[3]);
   else if (process.argv.length === 4 && process.argv[2] === 'prepare') result = await prepareSource(process.argv[3]);
-  else throw new Error('Only offline-check, private init and read-only prepare are implemented; publication and execution are disabled');
+  else if (process.argv.length === 4 && ['publish','preflight','admit','tick','recover','inspect','expire'].includes(process.argv[2])) result = await liveStage(process.argv[2], process.argv[3]);
+  else throw new Error('Invalid trial stage');
   process.stdout.write(`${JSON.stringify(result)}\n`);
 }
 main().catch(() => { process.stderr.write('STOP: trial stage failed\n'); process.exitCode = 1; });
