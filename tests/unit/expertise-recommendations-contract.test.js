@@ -168,6 +168,34 @@ test('withholds a valid Board identity placed in consultant overlap', () => {
   }, fixture)).toThrow('Recommendations contain an unavailable or ineligible profile identity.');
 });
 
+test.each([
+  ['primary', 2, [1, 3, 4]],
+  ['secondary', 2, [1, 3, 4]],
+  ['staff_consultation', 1, [3, 4]],
+  ['consultant_overlap', 3, [1, 2, 4]],
+  ['board_interest', 4, [1, 2, 3]],
+])('%s accepts its eligible role and rejects other visible roles', (slot, valid, invalid) => {
+  const fixture = buildRecommendationsSnapshot(input());
+  const output = index => ['primary', 'secondary'].includes(slot)
+    ? { staff_assignment: { [slot]: { profile_guid: guid(index) } } }
+    : { staff_assignment: {}, [slot]: [{ profile_guid: guid(index) }] };
+  expect(() => validateRecommendationsOutput(output(valid), fixture)).not.toThrow();
+  for (const index of invalid) {
+    expect(fixture.snapshot.rows.some(row => row.profile_guid === guid(index))).toBe(true);
+    expect(() => validateRecommendationsOutput(output(index), fixture))
+      .toThrow('Recommendations contain an unavailable or ineligible profile identity.');
+  }
+});
+
+test('conflicts can identify any visible category without creating recommendations', () => {
+  const fixture = buildRecommendationsSnapshot(input());
+  const result = validateRecommendationsOutput({
+    staff_assignment: {}, conflicts: [1, 2, 3, 4].map(index => ({ profile_guid: guid(index) })),
+  }, fixture);
+  expect(result.conflicts.map(item => item.profile_guid)).toEqual([1, 2, 3, 4].map(guid));
+  expect(result.consultant_overlap).toEqual([]);
+});
+
 test('requires canonical lowercase model GUIDs', () => {
   const request = input();
   const profileGuid = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
