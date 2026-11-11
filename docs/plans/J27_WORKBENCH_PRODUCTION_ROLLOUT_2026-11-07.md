@@ -57,8 +57,13 @@ these changes:
   phase layout, review summary and presentation assessment need no setting
   there. The rationale, confirmed attendance and Recommendation to Chairs
   are off because their settings are absent. To rehearse them the owner
-  adds the first three settings in the table, scoped to the Preview branch,
-  after a read-only check that the sandbox has the two fields.
+  adds the first three settings in the table, scoped to the Preview branch.
+  The sandbox has both fields: `wmkf_initialassessmentrationale` and
+  `wmkf_confirmedmeetingroster` are present on `akoya_request`, as are
+  `wmkf_staffreviewsummary`, `wmkf_staffvisitassessment`,
+  `wmkf_phaseiistatus` and `wmkf_readyforreview` `[VERIFIED via a read-only
+  metadata GET against the sandbox host orgd9e66399, 2026-11-10; the
+  interlock reported target=sandbox; no records were read]`.
 - **Before promotion: D26 Grant Cycle links (owner-run Production read).**
   Since `91fc83581` the group-review start guard grants the earlier-cycle
   exception only when the request's linked Grant Cycle resolves to a cycle
