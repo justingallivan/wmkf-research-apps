@@ -191,8 +191,11 @@ plan is final, if a deck is still wanted.
 - **Fixed: 10**, the "Panel" part (owner, 2026-11-10). The reviewer roster
   sub-tab under Peer Review is "Reviewers"; "panel" now means only the AI
   Review Panel.
-- **Open: 10**, the rest. The plain-text tab names in Overview next steps
-  are still unlinked.
+- **Closed for now: 10**, the rest (owner, 2026-11-10). The plain-text tab
+  names in Overview next steps stay unlinked. The buttons were removed on
+  purpose on 2026-11-07 ("Simplify J27 Overview and separate awardee
+  work"), which this desk audit did not know. Wording and link polish is
+  deferred until the underlying J27 work is done; revisit it then.
 
 ## 4. Questions only staff can answer
 
