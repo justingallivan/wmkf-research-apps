@@ -135,7 +135,7 @@ describe('line ordering', () => {
 
 describe('work left over from an earlier phase (owner, 2026-11-11)', () => {
   const fullyReviewed = { status: 'present', anySuggestion: true, counts: counts({ candidates: 3, invited: 3, accepted: 3, received: 3, completed: 3 }) };
-  const leftoverNote = { kind: 'earlier', key: 'record-rationale', text: `Still open from Initial Assessment: ${J27_TASK_LABEL['record-rationale']}` };
+  const leftoverNote = { kind: 'earlier', text: '1 earlier step still open' };
 
   test('a Peer Review request leads with its own step; the missing rationale is a note', () => {
     const r = invited({}, { rationale: { status: 'absent' } });
@@ -146,6 +146,16 @@ describe('work left over from an earlier phase (owner, 2026-11-11)', () => {
     expect(rowLine(r)).toMatchObject({ kind: 'next', key: 'identify-reviewers' });
     expect(earlierTaskKeys(r)).toEqual(['record-rationale']);
     expect(rowNotes(r)).toContainEqual(leftoverNote);
+  });
+  test('several earlier steps are one line on the list', () => {
+    // Reviewer suggestions place it in Peer Review before scoring was recorded, as on #1000370.
+    const r = row({ phaseIStatus: null }, {
+      rationale: { status: 'absent' }, integrity: { status: 'present', latest: { flagged: true, reviewed: false } },
+      reviewers: { status: 'present', anySuggestion: true, counts: counts({ candidates: 1 }) },
+    });
+    expect(r.j27.phase).toBe('peer-review');
+    expect(earlierTaskKeys(r)).toEqual(['record-rationale', 'record-scoring', 'review-integrity']);
+    expect(rowNotes(r).filter((note) => note.kind === 'earlier')).toEqual([{ kind: 'earlier', text: '3 earlier steps still open' }]);
   });
   test('a current-phase main task leads over the leftover', () => {
     const r = invited({ requestStatus: 'Phase II Pending' }, {

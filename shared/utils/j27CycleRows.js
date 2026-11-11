@@ -158,9 +158,9 @@ export function rowNotes(row, { suppressDegraded = false } = {}) {
   const notes = [];
   const owed = outstandingReviews(row);
   if (owed) notes.push({ kind: 'outstanding', text: `${owed} review${owed === 1 ? '' : 's'} outstanding` });
-  for (const key of earlierTaskKeys(row)) {
-    notes.push({ kind: 'earlier', key, text: `Still open from ${J27_PHASE_LABEL[TASK_PHASE[key]]}: ${J27_TASK_LABEL[key] || key}` });
-  }
+  // One line however many: the request page's strip names each step (owner, 2026-11-11).
+  const earlier = earlierTaskKeys(row).length;
+  if (earlier) notes.push({ kind: 'earlier', text: `${earlier} earlier step${earlier === 1 ? '' : 's'} still open` });
   if (!suppressDegraded && stage && stage.basis === 'degraded') notes.push({ kind: 'degraded', text: J27_DEGRADED_NOTE });
   return notes;
 }
