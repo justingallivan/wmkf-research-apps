@@ -198,7 +198,27 @@ pending shared source/cache work: Submission-Documents project narrative versus
 AI Materials combined narrative–bibliography. Existing runtime callers and dated
 rehearsals are preserved; this decision does not remove them.
 
-The shared infrastructure owner confirmed clean baseline `0c4b8d39c` and retains
+[VERIFIED via `lib/services/expertise-finder/recommendations-contract.js`]
+The pure domain contract is now source-built: it builds a frozen roster snapshot,
+canonical all-profile manifest/fingerprint and exact candidate-User state set;
+rebuilds the visible roster block and checks its association; and validates closed
+structured recommendations before legacy GUID/category/lead canonicalization.
+The focused suite passed 60/60 and four existing matching/consumer suites passed
+38 tests separately; scoped ESLint passed. Opus focused closure returned READY; named tests and the pure validation extraction are accepted. Only
+the unit suite imports this module; no production caller is wired. This module does not fetch, authorize,
+persist or establish currentness. `complete: true` is a trusted future adapter's
+assertion, not pagination proof. Its 4 MiB cap bounds the roster extension only;
+the shared full sealed-snapshot/prompt budget still requires integration checks.
+No live calls or assignment writes were added. Source choice remains OPEN.
+
+The agreed shared interface checkpoint is `a756735fa`, documented in the shared
+owner's `docs/plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md`; the historical
+runtime baseline remains `0c4b8d39c`. Shared machine audit attribution without an
+invented human and cleanup that still works after principal revocation are explicit
+release gates, alongside typed-result integration, PA admission, source/cache and
+worker operations. The pure contract is not shared integration or PA readiness.
+
+The shared infrastructure owner confirmed clean runtime baseline `0c4b8d39c` and retains
 common source/cache contracts, PA authentication, typed storage/results, worker,
 recovery and operations. The roster stream owns expertise semantics/validation and
 recommendation presentation. Shared interface/typed-result admission, source/cache

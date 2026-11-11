@@ -1,6 +1,6 @@
 # Expertise recommendations through the shared Executor
 
-Status: REVIEWED PLAN; runtime remains PLANNED; recommendations-only direction approved by Justin on November 11,
+Status: REVIEWED PLAN; pure domain contract source-built, shared runtime integration PLANNED; recommendations-only direction approved by Justin on November 11,
 2026. This document does not activate a flow, authorize provider spending, select a
 proposal source, or approve Production cutover. Opus review disposition is recorded
 in the companion review document. Owner: roster stream; shared infrastructure remains owned by
@@ -54,7 +54,32 @@ recommendation presentation. The infrastructure owner confirmed this boundary in
 string extraction and store `saveValidated` as well as profile/DTO changes.
 Any changes to shared modules are a coordinated
 handoff after a stable checkpoint; no concurrent edits, duplicate runner or new
-queue. This turn changes plan/docs only and makes no live writes.
+queue. The initial plan changed docs only; the pure contract checkpoint below adds no live writes.
+
+## Pure contract implementation checkpoint
+
+[Build receipt](PURE_RECOMMENDATIONS_CONTRACT_BUILD_2026-11-11.md) records exports,
+DTO boundaries, test results and remaining shared dependencies.
+
+[VERIFIED via `lib/services/expertise-finder/recommendations-contract.js`]
+The pure domain contract is now source-built: it builds a frozen roster snapshot,
+canonical all-profile manifest/fingerprint and exact candidate-User state set;
+rebuilds the visible roster block and checks its association; and validates closed
+structured recommendations before legacy GUID/category/lead canonicalization.
+The focused suite passed 60/60 and four existing matching/consumer suites passed
+38 tests separately; scoped ESLint passed. Opus focused closure returned READY; named tests and the pure validation extraction are accepted. Only
+the unit suite imports this module; no production caller is wired. This module does not fetch, authorize,
+persist or establish currentness. `complete: true` is a trusted future adapter's
+assertion, not pagination proof. Its 4 MiB cap bounds the roster extension only;
+the shared full sealed-snapshot/prompt budget still requires integration checks.
+No live calls or assignment writes were added. Source choice remains OPEN.
+
+The agreed shared interface checkpoint is `a756735fa`, documented in the shared
+owner's `docs/plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md`; the historical
+runtime baseline remains `0c4b8d39c`. Shared machine audit attribution without an
+invented human and cleanup that still works after principal revocation are explicit
+release gates, alongside typed-result integration, PA admission, source/cache and
+worker operations. The pure contract is not shared integration or PA readiness.
 
 ## Planned caller → result contract
 
@@ -267,8 +292,8 @@ size/privacy bounds and the shared reviewed compiler/checkpoint revision. No cac
 
 | Slice | Owner and work | Exit evidence |
 |---|---|---|
-| 0: shared seam agreement | Both owners pin stable commit/interfaces and typed-output/budget ownership | No overlapping edits; source/cache and PA dependencies explicitly tracked |
-| 1: expertise contract | Roster owner builds pure frozen-roster schema, fingerprint and structured validator tests | No roster expertise text truncated or omitted; changed disabled User affects fingerprint; unknown/oversized outputs reject |
+| 0: shared seam agreement | Agreed interface `a756735fa`; runtime baseline `0c4b8d39c`; shared ownership retained | No overlapping edits; source/cache and PA dependencies explicitly tracked |
+| 1: expertise contract | Pure module source-built; 60 focused tests passed; Opus closure READY | No roster expertise text truncated or omitted; changed disabled User affects fingerprint; unknown/oversized outputs reject |
 | 2: shared capability | Infrastructure owner or explicit handoff adds narrow typed-result/budget support; roster owner adapts versioned prompt | Legacy prose tasks unchanged; both budget guards agree; checkpoint replay validates without model call |
 | 3: Request result access | Coordinated job admission/read policy and staff display; source remains fabricated until decision | Human/machine Request authorization, stale/expired status and no assignment writes verified |
 | 4: integrated automation rehearsal | After source/cache contract and PA admission/worker operation exist | No-model PA auth/duplicate delivery proof, then separately authorized metered recommendation run |
@@ -303,8 +328,8 @@ Persistence is existing job content/receipts, with roster Dataverse reads; new
 business writes are N/A. Consumer fan-out includes Admin, Executor, worker, store,
 status/results DTOs, PA polling and staff display. Shared-helper extraction must
 preserve existing legacy and prose-task behavior. Unknown capability/type/state
-fails closed. This is planning, so implementation tests and deployment checks are
-not claimed. Scoped durable reconciliation follows `/sweep` for owner decisions;
+fails closed. Shared integration remains planned; pure-module tests passed and Opus closure returned READY
+at the implementation checkpoint. No deployment checks are claimed. Scoped durable reconciliation follows `/sweep` for owner decisions;
 old test receipts remain historical. The initial and follow-up Opus 5.5 reviews,
 named-change dispositions and confirmed peer ownership are recorded in
 [the review receipt](POWER_AUTOMATE_RECOMMENDATIONS_OPUS_5_5_REVIEW_2026-11-11.md).
