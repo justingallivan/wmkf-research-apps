@@ -7,7 +7,7 @@
  * One list component renders every request tab, so the chip, the line under
  * it, the filters and the tab counts are all decided here.
  */
-import { J27_TASKS } from '../../lib/services/workbench/j27-read-model';
+import { J27_PHASES, J27_TASKS } from '../../lib/services/workbench/j27-read-model';
 import {
   J27_DEGRADED_NOTE, J27_IDLE_LABEL, J27_OUTCOME_LABEL, J27_PHASE_LABEL, J27_REVIEWER_STAGE_LABEL,
   J27_REVIEW_STANDING_LABEL, J27_STANDING_LABEL, J27_TASK_LABEL, J27_TIMING_LABEL, J27_WAIT_LABEL,
@@ -30,6 +30,26 @@ export const J27_STANDING_KEYS = Object.freeze(Object.keys(J27_STANDING_LABEL));
 
 const OPTIONAL_TASKS = new Set(J27_TASKS.filter((task) => task.secondary).map((task) => task.key));
 const stageOf = (row) => (row && row.j27 && typeof row.j27 === 'object' ? row.j27 : null);
+const TASK_PHASE = Object.fromEntries(J27_TASKS.map((task) => [task.key, task.phase]));
+
+/**
+ * Main tasks the request still owes from a phase before its current one.
+ * Owner decision (2026-11-11): "Next" names the current phase's step; work
+ * left over from an earlier phase is a smaller note, not the next step. A
+ * task of the current or a later phase (a Board draft at the end of
+ * Deliberations) still leads. An unknown phase or task is never "earlier".
+ */
+export function earlierTaskKeys(row) {
+  const stage = stageOf(row);
+  if (!stage || isClosedRow(row) || stage.phase === 'decided') return [];
+  if (stage.phase === 'deliberations' && stage.timing !== 'after') return [];
+  const current = J27_PHASES.indexOf(stage.phase);
+  if (current < 0) return [];
+  const taskKeys = Array.isArray(stage.taskKeys) ? stage.taskKeys : [];
+  return taskKeys.filter((key) => !OPTIONAL_TASKS.has(key)
+    && TASK_PHASE[key] && J27_PHASES.indexOf(TASK_PHASE[key]) >= 0
+    && J27_PHASES.indexOf(TASK_PHASE[key]) < current);
+}
 
 /**
  * A request with no forward work: a terminal outcome, or a Phase I status the
@@ -97,10 +117,10 @@ export function rowLine(row) {
   if (stage.phase === 'deliberations' && stage.timing !== 'after') return { kind: 'none', text: null };
   const taskKeys = Array.isArray(stage.taskKeys) ? stage.taskKeys : [];
   const blockerKeys = Array.isArray(stage.blockerKeys) ? stage.blockerKeys : [];
-  // The model's primary task is already the first main task when one exists.
-  const main = stage.primaryTask && !OPTIONAL_TASKS.has(stage.primaryTask)
-    ? stage.primaryTask
-    : taskKeys.find((key) => !OPTIONAL_TASKS.has(key)) || null;
+  const earlier = new Set(earlierTaskKeys(row));
+  const leads = (key) => key && !OPTIONAL_TASKS.has(key) && !earlier.has(key);
+  // The model's primary task is the first main task when one exists; an earlier phase's is a note instead.
+  const main = leads(stage.primaryTask) ? stage.primaryTask : taskKeys.find(leads) || null;
   if (main) return { kind: 'next', key: main, text: J27_TASK_LABEL[main] || main };
   if (blockerKeys.includes('chairs-outcome-pending')) {
     return { kind: 'wait', key: 'chairs-outcome-pending', text: J27_WAIT_LABEL['chairs-outcome-pending'] };
@@ -111,8 +131,9 @@ export function rowLine(row) {
   if (blockerKeys.includes('phase-two-status-pending')) {
     return { kind: 'wait', key: 'phase-two-status-pending', text: J27_WAIT_LABEL['phase-two-status-pending'] };
   }
-  // "Nothing is waiting" is a claim about every fact; a failed read cannot back it.
-  if (stage.basis === 'degraded') return { kind: 'none', text: null };
+  // "Nothing is waiting" is a claim about every fact; a failed read cannot back
+  // it, and neither can an earlier phase's open task (said in the notes).
+  if (stage.basis === 'degraded' || earlier.size > 0) return { kind: 'none', text: null };
   return { kind: 'idle', text: J27_IDLE_LABEL };
 }
 
@@ -137,6 +158,9 @@ export function rowNotes(row, { suppressDegraded = false } = {}) {
   const notes = [];
   const owed = outstandingReviews(row);
   if (owed) notes.push({ kind: 'outstanding', text: `${owed} review${owed === 1 ? '' : 's'} outstanding` });
+  for (const key of earlierTaskKeys(row)) {
+    notes.push({ kind: 'earlier', key, text: `Still open from ${J27_PHASE_LABEL[TASK_PHASE[key]]}: ${J27_TASK_LABEL[key] || key}` });
+  }
   if (!suppressDegraded && stage && stage.basis === 'degraded') notes.push({ kind: 'degraded', text: J27_DEGRADED_NOTE });
   return notes;
 }

@@ -92,7 +92,7 @@ function RequestRow({ row, showReviewers, suppressDegraded }) {
         {line.kind === 'wait' && <p className="mt-1 text-sm text-gray-600">{line.text}</p>}
         {line.kind === 'idle' && <p className="mt-1 text-sm text-gray-500">{line.text}</p>}
         {notes.map((note) => (
-          <p key={note.kind} className={`mt-0.5 text-xs ${note.kind === 'outstanding' ? 'font-medium text-amber-800' : 'text-gray-500'}`}>{note.text}</p>
+          <p key={note.key ? `${note.kind}-${note.key}` : note.kind} className={`mt-0.5 text-xs ${note.kind === 'outstanding' ? 'font-medium text-amber-800' : 'text-gray-500'}`}>{note.text}</p>
         ))}
       </div>
       {showReviewers && (

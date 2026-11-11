@@ -178,6 +178,21 @@ describe('strip', () => {
     view.rerender(<J27StageStrip stage={{ ...idle, basis: 'full' }} />);
     expect(screen.getByLabelText('Where this request stands')).toHaveTextContent('Nothing is waiting on staff right now.');
   });
+  test('an earlier phase\'s open task is a note, not the next step (owner, 2026-11-11)', () => {
+    // As seen on #1000370: in Peer Review with the staff rationale still unrecorded.
+    render(<J27StageStrip stage={{ phase: 'peer-review', basis: 'full', outcome: 'none', recorded: {}, primaryTask: 'record-rationale', taskKeys: ['record-rationale', 'identify-reviewers'], blockerKeys: [] }} />);
+    const strip = screen.getByLabelText('Where this request stands');
+    expect(strip).toHaveTextContent('Next: Identify reviewers');
+    expect(strip).not.toHaveTextContent(`Next: ${J27_TASK_LABEL['record-rationale']}`);
+    expect(strip).toHaveTextContent(`Still open from an earlier phase: ${J27_TASK_LABEL['record-rationale']}`);
+  });
+  test('with only an earlier phase\'s task open the strip names it and does not call the request idle', () => {
+    render(<J27StageStrip stage={{ phase: 'peer-review', basis: 'full', outcome: 'none', recorded: {}, primaryTask: 'record-rationale', taskKeys: ['record-rationale'], blockerKeys: [] }} />);
+    const strip = screen.getByLabelText('Where this request stands');
+    expect(strip).not.toHaveTextContent('Next:');
+    expect(strip).not.toHaveTextContent('Nothing is waiting');
+    expect(strip).toHaveTextContent(`Still open from an earlier phase: ${J27_TASK_LABEL['record-rationale']}`);
+  });
   test('a decided row shows the phase alone', () => {
     render(<J27StageStrip stage={{ phase: 'decided', basis: 'full', primaryTask: null, taskKeys: [], blockerKeys: [] }} />);
     const strip = screen.getByLabelText('Where this request stands');

@@ -7,7 +7,7 @@ import {
 } from '../../shared/config/j27Labels';
 import {
   isClosedRow, standingKey, rowChip, rowLine, rowNotes, outstandingReviews, matchesPhaseFilters, matchesSearch, matchesShowing, rowsForTab,
-  standingCounts, tabCounts, degradedEverywhere, J27_SHOWING_KEYS, J27_SHOWING_LABEL,
+  standingCounts, tabCounts, degradedEverywhere, earlierTaskKeys, J27_SHOWING_KEYS, J27_SHOWING_LABEL,
 } from '../../shared/utils/j27CycleRows';
 
 const INVITED = 100000003;
@@ -35,7 +35,8 @@ function row(request = {}, over = {}, extra = {}) {
   return {
     requestId: 'r1', requestNumber: '1009001', title: 'Mapping signalling lipids', institution: 'Northfield University',
     projectLeader: 'Alex Sample', programDirector: 'Jordan Example', workRemaining: 'find',
-    j27: j27DashboardDto(deriveJ27Stage(input)), ...extra,
+    // As the dashboard does (deriveJ27Tier1 attaches the input), so the timing and review standing are worked out.
+    j27: j27DashboardDto({ ...deriveJ27Stage(input), input }), ...extra,
   };
 }
 
@@ -129,6 +130,73 @@ describe('line ordering', () => {
     // No known presentation timing: a Deliberations row shows no line, so the optional task cannot lead.
     expect(rowLine(r)).toEqual({ kind: 'none', text: null });
     expect(rowLine(r).text).not.toBe(J27_TASK_LABEL['identify-reviewers']);
+  });
+});
+
+describe('work left over from an earlier phase (owner, 2026-11-11)', () => {
+  const fullyReviewed = { status: 'present', anySuggestion: true, counts: counts({ candidates: 3, invited: 3, accepted: 3, received: 3, completed: 3 }) };
+  const leftoverNote = { kind: 'earlier', key: 'record-rationale', text: `Still open from Initial Assessment: ${J27_TASK_LABEL['record-rationale']}` };
+
+  test('a Peer Review request leads with its own step; the missing rationale is a note', () => {
+    const r = invited({}, { rationale: { status: 'absent' } });
+    expect(r.j27.phase).toBe('peer-review');
+    // The model still lists the earlier task, and would have led with it.
+    expect(r.j27.taskKeys).toContain('record-rationale');
+    expect(r.j27.primaryTask).toBe('record-rationale');
+    expect(rowLine(r)).toMatchObject({ kind: 'next', key: 'identify-reviewers' });
+    expect(earlierTaskKeys(r)).toEqual(['record-rationale']);
+    expect(rowNotes(r)).toContainEqual(leftoverNote);
+  });
+  test('a current-phase main task leads over the leftover', () => {
+    const r = invited({ requestStatus: 'Phase II Pending' }, {
+      rationale: { status: 'absent' },
+      reviewers: { status: 'present', anySuggestion: true, counts: counts({ candidates: 3, invited: 1 }) },
+    });
+    expect(rowLine(r)).toMatchObject({ kind: 'next', key: 'send-invitations' });
+    expect(rowNotes(r)).toContainEqual(leftoverNote);
+  });
+  test('with only a leftover open the row is not called idle', () => {
+    const r = invited({ requestStatus: 'Phase II Pending' }, {
+      rationale: { status: 'absent' }, reviewSummary: { status: 'present' }, reviewers: fullyReviewed,
+    });
+    expect(r.j27.basis).not.toBe('degraded');
+    expect(rowLine(r)).toEqual({ kind: 'none', text: null });
+    expect(rowNotes(r)).toContainEqual(leftoverNote);
+    // A leftover-only row is not counted as having a next step on its tab.
+    expect(tabCounts([r])['peer-review']).toBe(0);
+  });
+  test('an Initial Assessment request still leads with its own rationale task', () => {
+    const r = row({}, { rationale: { status: 'absent' } });
+    expect(r.j27.phase).toBe('initial-assessment');
+    expect(rowLine(r)).toMatchObject({ kind: 'next', key: 'record-rationale' });
+    expect(earlierTaskKeys(r)).toEqual([]);
+  });
+  test('a Deliberations row before its presentation shows neither the line nor the leftover', () => {
+    const r = invited({ requestStatus: 'Phase II Pending' }, {
+      rationale: { status: 'absent' }, reviewSummary: { status: 'present' }, reviewers: fullyReviewed,
+      presentation: { status: 'present', exists: true, id: 'v1', ended: false, legacyException: false },
+    });
+    expect(r.j27.phase).toBe('deliberations');
+    expect(r.j27.taskKeys).toContain('record-rationale');
+    expect(rowLine(r)).toEqual({ kind: 'none', text: null });
+    expect(earlierTaskKeys(r)).toEqual([]);
+  });
+  test('a later phase\'s task still leads: the Board draft at the end of Deliberations', () => {
+    const r = invited({ requestStatus: 'Phase II Pending' }, {
+      rationale: { status: 'absent' }, reviewSummary: { status: 'present' }, reviewers: fullyReviewed,
+      visitAssessment: { status: 'present' },
+      presentation: { status: 'present', exists: true, id: 'v1', ended: true, legacyException: false },
+      roster: { status: 'present', stale: false },
+      boardDraft: { status: 'present', exists: false }, transition: { status: 'present', phase: null },
+    });
+    expect(r.j27.phase).toBe('deliberations');
+    expect(r.j27.timing).toBe('after');
+    expect(rowLine(r)).toMatchObject({ kind: 'next', key: 'write-board-draft' });
+    expect(earlierTaskKeys(r)).toEqual(['record-rationale']);
+  });
+  test('a closed request carries no leftover', () => {
+    const r = row({ statusClass: 'DECLINED' }, { rationale: { status: 'absent' } });
+    expect(earlierTaskKeys(r)).toEqual([]);
   });
 });
 

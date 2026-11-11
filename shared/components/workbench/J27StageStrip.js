@@ -11,7 +11,7 @@
 import { J27_BLOCKERS, J27_OUTCOMES, J27_PHASES, J27_TASKS } from '../../../lib/services/workbench/j27-read-model';
 
 import { J27_BLOCKER_LABEL, J27_DEGRADED_NOTE, J27_OUTCOME_LABEL, J27_PHASE_LABEL, J27_TASK_LABEL } from '../../config/j27Labels';
-import { rowLine } from '../../utils/j27CycleRows';
+import { earlierTaskKeys, rowLine } from '../../utils/j27CycleRows';
 
 // Labels live in shared/config/j27Labels.js; re-exported under their original names.
 export { J27_PHASE_LABEL, J27_TASK_LABEL, J27_BLOCKER_LABEL, J27_OUTCOME_LABEL };
@@ -43,6 +43,8 @@ export default function J27StageStrip({ stage }) {
   // facts, only as tabs load. "Nothing is waiting" is said only once every fact
   // behind it is in; until then the basis note stands alone.
   const line = computed.kind === 'idle' && stage.basis !== 'full' ? { kind: 'none' } : computed;
+  // Owner decision (2026-11-11): an earlier phase's open task is a smaller note, not "Next".
+  const earlier = earlierTaskKeys({ j27: stage });
   return (
     <section aria-label="Where this request stands" className="mb-6 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -57,6 +59,11 @@ export default function J27StageStrip({ stage }) {
         )}
         {note && <span className="text-gray-500">{note}</span>}
       </div>
+      {earlier.length > 0 && (
+        <p className="mt-1 text-xs text-gray-600">
+          Still open from an earlier phase: {earlier.map((key) => J27_TASK_LABEL[key] || key).join(', ')}
+        </p>
+      )}
       {blockers.length > 0 && (
         <ul className="mt-1 list-disc space-y-0.5 pl-5 text-gray-700">
           {blockers.map((key) => <li key={key}>{J27_BLOCKER_LABEL[key] || key}</li>)}
