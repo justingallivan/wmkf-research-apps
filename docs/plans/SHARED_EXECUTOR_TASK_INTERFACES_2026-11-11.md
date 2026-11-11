@@ -176,15 +176,23 @@ current. Changed or incomplete reads cannot substitute another item. Cross-syste
 freshness checks are bounded observations. Freeze adapter version with the task
 and reject unsupported versions during recovery.
 
-**OPEN.** Future proposal and roster document placement can be the project
-narrative in Submission-Documents or the combined narrative–bibliography in AI
-Materials. Selection, document roles, extraction and cache compatibility need an
-owner decision. Use fabricated data for integration until then. No future Phase I
-staff-version document is part of this direction. Existing callers and rehearsal
-evidence remain in place. Reconcile future staff-version assumptions in broader
-planning documents separately. Reuse a cache prefix only after confirming exact
-protected bytes, profile/system and schema compatibility, authorization domain,
-model and measurements under separate trial approval.
+**[OWNER DECIDED 2026-11-11, initial integration]** Use one PDF containing
+the proposal narrative and bibliography in the Request's active AI Materials
+folder. The starting example is `ProposalNarrative_1003384.pdf`, verified in
+the controlled staff trial. The planned adapter reuses the accepted
+Request-number narrative filenames and requires a unique match in that
+folder. Missing or ambiguous files withhold the source. A broader source
+policy and other assemblage formats remain open. Verify the exact file
+identity, extraction and cache compatibility for the new integration
+before live use. The staff trial and other existing callers keep their
+own source policies. This decision authorizes offline work. Live reads,
+writes, provider calls and deployment require separate scope and approval.
+No future Phase I staff-version document is part of this direction.
+[Staff trial source receipt](SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md#verified-owner-uploaded-trial-source).
+
+Reuse a cache prefix only after confirming exact protected bytes,
+profile/system and schema compatibility, authorization domain, model and
+measurements under separate trial approval.
 
 [PLANNED] The roster manifest freezes `contractVersion`, canonical `rosterHash`,
 ordered profiles with GUID, category, active/lead flags, relevant expertise hash,
@@ -229,11 +237,12 @@ boundaries and one unambiguous output contract.
 server-side from verified single-tenant Entra app-only identity and role. Recheck
 current local principal policy and Request/task scope on replay, polling and
 worker dispatch. Expertise needs its own allowlisted authorization scope and
-enablement, with the existing proposal cohort rules preserved. Staff require
-current expertise app access, the existing Request restriction policy and an
-explicit entitlement to the capability's result. The
-server resolves the machine-owned job under the authorized Request and task,
-then calls an owner-scoped ledger read. Keep all existing ledger owner predicates
+enablement, with the existing proposal cohort rules preserved. Staff result
+access requires a current linked staff identity, current expertise app access
+and an explicit server-owned entitlement scoped to the Request, job and
+recommendations task. The generic app guard's cache and trusted DAL context
+do not establish that entitlement. The server resolves the machine-owned job
+under the authorized Request and task, then calls an owner-scoped ledger read. Keep all existing ledger owner predicates
 and submitting-principal audit identity. Do not accept a principal selector from
 either caller or widen user-private expertise history. Reauthorize the read and
 recheck freshness before exposing content. The offline facade exercises these
@@ -258,7 +267,7 @@ alongside PA connector proof, worker scheduling, recovery and roster cutover.
 | Config → Executor → worker → ledger → DTO | Offline fixtures prove cap at configured and resolved gates, exact JSON byte bounds, and current text receipt replay with zero provider calls. Fail the slice if a capability inherits the wrong cap, an unknown JSON key is dropped before validation, an object reaches a text DTO, or a changed validator version can replay a checkpoint. Mismatched or recovered checkpoints make zero provider calls. |
 | Source → validator → read | Test complete and truncated/paged rosters, empty leads, partial/failed User reads, disabled/re-enabled User, changed file/version, unknown GUID/category, hostile input, unsupported claims and encoded bounds. Change source or roster after validation with no worker tick and require a stale result status with no payload. Hidden roster bytes in the prompt, visible/hidden roster mismatch, duplicate leads, a stale result displayed as current, or an assignment writer call blocks integration. Grounding fixtures and human review are quality evidence distinct from deterministic length/schema checks. |
 | Request/actor → receipt → result | Prove foreign tenant/audience, delegated, role-less, revoked and out-of-Request identities fail. Cross-owner reads must preserve ledger scope. Cover lost POST, concurrent replay/conflict, expired result, current result after 24-hour source cleanup, crash and audit recovery, and stale UI response after Request change. PA rehearsal begins with a no-model auth and idempotency proof. |
-| Repository and release | Run the existing real PostgreSQL suites `prompt-jobs.pg.test.js`, `prompt-jobs-executor.pg.test.js` and `prompt-jobs-staff.pg.test.js` against disposable loopback PostgreSQL plus the new typed-path cases. Run route/security, Atlas and migration-manifest gates for new surfaces, DAL/context and injection-tagging gates, status enum parity, focused lint, types and build. Run each changed gate's existing self-test after its gate. Source choice, operations, connector proof and a separately approved live validation run precede release. |
+| Repository and release | Run the existing real PostgreSQL suites `prompt-jobs.pg.test.js`, `prompt-jobs-executor.pg.test.js` and `prompt-jobs-staff.pg.test.js` against disposable loopback PostgreSQL plus the new typed-path cases. Run route/security, Atlas and migration-manifest gates for new surfaces, DAL/context and injection-tagging gates, status enum parity, focused lint, types and build. Run each changed gate's existing self-test after its gate. Verification of the chosen initial source, operations, connector proof and a separately approved live validation run precede release. |
 
 Contract reconciliation covers transition invariants and consumers above. The
 planned ledger change reuses existing tables; verify migration/setup/Atlas parity
