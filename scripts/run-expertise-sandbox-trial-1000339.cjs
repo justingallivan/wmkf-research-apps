@@ -554,6 +554,8 @@ async function liveStage(mode, directory) {
           const beforeRows = await rows();
           if (beforeRows.length !== 1) throw new Error('Publication history mismatch');
           checkRow(beforeRows[0], oldRow, true);
+          const initialEtag = beforeRows[0]._etag;
+          if (typeof initialEtag !== 'string' || !initialEtag || initialEtag === '*' || /[\r\n]/.test(initialEtag)) throw new Error('Old ETag unavailable');
           await aiPrompt.create({ ...row, wmkf_ai_iscurrent: false, wmkf_ai_promptstatus: 682090001 });
           const beforeDemote = checkRows(await rows(), true, false);
           const oldEtag = beforeDemote.old._etag;
