@@ -47,7 +47,11 @@ validates the proof shape. Snapshot persistence checks it against the
 sealed snapshot's ordered document metadata. The private roster is part of the v2 sealed snapshot and
 expires with source content. The v2 response checkpoint remains private.
 The worker atomically attaches the `{contractVersion,result}` envelope
-and the deferred audit through the existing attempt fence.
+and the deferred audit through the existing attempt fence. The offline
+native compiler version 2 adds a canonical provider-schema hash to the
+typed response binding. Compiler version 1 keeps its original binding.
+Both use the same stored result shape, retention and receipts.
+[Native compiler contract](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#native-recommendation-output-compiler).
 
 `readValidatedRecommendations` requires environment, principal, authorization
 scope, Request and job identity. It checks result kind, retained expiry,

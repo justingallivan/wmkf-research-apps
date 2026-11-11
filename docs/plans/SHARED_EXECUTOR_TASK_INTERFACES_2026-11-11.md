@@ -471,8 +471,8 @@ job's metadata with `status: unavailable` and `freshness: unknown`.
 An anonymous GET returned 307 to sign-in. The local server was stopped
 after verification. The trial made no Request-field writes or
 deployment. The ledger retains all three receipts and denies a fourth
-job. The compiler's model-facing wrapper and GUID/category compliance
-remain open follow-up work. A post-trial regression confirms that the
+job. This outcome motivated the offline native compiler below. A
+post-trial regression confirms that the
 validator accepts a valid inner recommendation object and rejects the
 same object under the metadata wrapper. The focused contract suite
 passed 75 tests, and the combined contract, route and source run
@@ -491,6 +491,77 @@ node scripts/run-expertise-sandbox-trial-1000339.cjs expire /private/tmp/wmkf-ex
 
 The deletion checks remain due. The SharePoint PDF and all three
 quota-bearing receipts remain in place.
+
+## Native recommendation output compiler
+
+[BRANCH-BUILT, offline] A task explicitly selecting
+`compilerVersion: 2` uses native JSON Schema output for the model-facing
+recommendation object. This compiler version is independent of profile
+revision and the stored `expertise-recommendations-v1` result contract.
+The code-owned builder revalidates the frozen visible roster and emits
+an explicit subset of the domain shape. It constrains each role's GUIDs
+to that role and lead slots to eligible staff. Conflict GUIDs are drawn
+from the complete visible roster. The model-facing schema puts the
+recommendation fields at its root. The prompt asks for the recommendation
+object directly, without the compiler metadata wrapper observed in the
+third trial.
+
+| Boundary | Design invariant |
+| --- | --- |
+| Empty categories | Omit an array property with no allowed GUIDs and let the existing domain default supply `[]`. Use null-only lead slots when there are no eligible leads. Never emit an empty enum. |
+| Contract and transport | Compose the prompt contract from the same native schema supplied to the provider. `effectiveProviderOutputSchema` serves transport, trial preflight and Executor budget checks. Require model support and enforce local limits of 512 total enum entries and 64 KiB of encoded schema before dispatch. |
+| Checkpoint | Bind the validated selected compiler version and the canonical effective-schema hash in compiler version 2. A builder change that alters the schema blocks replay of an incompatible saved response. Preserve the compiler version 1 payload and checkpoint binding byte for byte. |
+| Parse and storage | Keep the frozen `spec.outputSchema` for parsing and write-result projection. The existing closed domain validator remains authoritative for GUID membership, role, duplicate leads, lengths and stored shape. No response unwrapping, repair, regeneration or validator weakening. |
+| Trial scope | Keep the three published prompt rows, provider attempts, audits and ledger receipts historical. This offline increment adds no prompt publication, provider call, admission extension or fourth trial. |
+
+[VERIFIED via the design review receipt and current domain source]
+The one-turn ordinary OAuth review reported only `claude-opus-5-5`,
+131,932 ms elapsed and a NAMED CHANGES verdict. The 86,145-byte packet
+had SHA-256
+`c2afca4e4e7e75f9d229c58e607db5354054a9f9f8e9a761766b0a029578e7c3`.
+The existing domain schema makes all four category arrays optional
+with `[]` defaults. It accepts null gaps text and an empty summary.
+Keep parser and persistence on the frozen specification while the
+effective schema governs generation, budgeting and the v2 binding.
+The local enum and byte bounds are conservative safeguards. Offline
+checks do not establish provider acceptance, grammar compilation time
+or the provider's injected schema overhead at real roster size.
+The domain helper was imported as `7b140b6ee` from roster commit
+`94b361c04`. Follow-up `3ce88acb6` keeps conflict instructions
+separate from the recommendation shortlist. Shared integration is
+committed as `aa763f044`. The final unit run passed
+225 tests across nine suites. The prompt-injection, DAL, OData and
+context checks and their self-tests passed, as did lint, types and the
+isolated environment-file-free production webpack build.
+
+[VERIFIED via loopback PostgreSQL and mocked provider transport]
+All 90 tests across the three PostgreSQL job suites passed. The
+compiler version 1 fixture matches the pre-change composed bytes,
+wire request and checkpoint binding. Compiler version 2 tests
+capture the exact outbound native schema, match trial preflight and
+Executor budgets, recover with zero provider calls, and reject a
+changed schema on checkpoint recovery. The worker rejects duplicate
+leads, unknown GUIDs, the metadata wrapper and other invalid outputs
+after checkpointing a single response. Unsupported compiler, model
+and schema configurations fail before dispatch. These are offline
+transport and persistence tests.
+
+[VERIFIED via the build review receipt] The 161,004-byte ordinary OAuth
+source packet had SHA-256
+`a46f3753ff827c4b05d9b56f9b03b8b49a416759c528dd0b7a821a9bd0d585b2`.
+The one-turn review reported only `claude-opus-5-5` and 122,764 ms
+elapsed. It passed the domain builder and gave the shared integration
+NAMED CHANGES because the packet lacked results for the new real
+PostgreSQL cases. The final 90-test run supplied the named refusal,
+truncation, wrong-role, duplicate-lead and oversized-rationale
+evidence, plus the later unknown-GUID and wrapper regressions. The
+review required no code changes. The additional evidence was verified
+locally without another review.
+
+Native schema acceptance, grammar overhead and cache behavior remain
+unverified against the provider. Any fourth trial would need a new
+reviewed prompt, policy and admission path, plus separate authorization.
+The current ledger still denies it. [Anthropic structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs).
 
 ## Capability and result path
 

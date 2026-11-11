@@ -641,8 +641,10 @@ and has no destination. It is excluded from Admin authoring and rejected by
 Admin preview and publication. The existing text-task catalog, v1 seal, v1
 checkpoint binding and text result shape continue to apply to text tasks.
 
-The task pins `contractVersion:2`, compiler version 1 and the code-owned
-`expertise-recommendations-v1` result contract. Admission freezes the roster
+The task pins `contractVersion:2`, an explicit compiler version and the
+code-owned `expertise-recommendations-v1` result contract. The original
+fixture and three live trial prompts selected compiler version 1.
+Admission freezes the roster
 fingerprint. The v2 sealed snapshot carries private roster context for
 validation. The composer rebuilds the visible `roster_block` from that
 context and verifies exact equality before rendering it once as wrapped
@@ -650,6 +652,16 @@ data after the document cache marker. The private extension stays out
 of the provider payload. The v2 checkpoint binds the capability, result
 contract, compiler, effective budget, Request, frozen prompt and snapshot
 integrity. Recovery validates the saved response without a provider call.
+
+**[BRANCH-BUILT, offline]** Compiler version 2 builds a code-owned native
+JSON Schema with exact eligible GUID enums, omits empty categories and
+uses null-only slots when there are no leads. It uses the same schema in
+the prompt, provider request and both budgets, and adds a canonical
+provider-schema hash to the existing typed checkpoint binding. A changed
+schema invalidates that checkpoint for recovery. The frozen parser
+specification and closed domain validator still decide acceptance.
+Compiler version 1 keeps its existing payload and binding. No prompt
+publication or additional trial is included. [Native compiler contract](plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#native-recommendation-output-compiler).
 
 The Executor checks the model JSON against the closed roster contract
 before projection and derives canonical recommendation fields from the
