@@ -27,8 +27,27 @@ A second initialization job cannot capture its Request ETag while an earlier ini
 
 Audit exceptions are unknown unless the adapter explicitly proves a definitive rejection. Neither unknown nor failed delivery is automatically resent, and both block publication. A publication waits for all tasks to reach a known terminal generation state and cannot proceed while a contributing audit dispatch is in flight or uncertain. It coalesces eligible validated outputs into one immutable command and records the contributing IDs. Confirmed outcomes update all contributing task receipts together. Draft-only work has no Request writeback. Known pre-dispatch or validation failures release only their eligible slots before a physical publication exists. A field already holding staff content stays protected.
 
+## Synthetic safeguard follow-up (2026-11-11)
+
+[VERIFIED via branch store, Executor, and worker source] The follow-up
+uses existing state values and migration 097. Explicit dispatch
+authorization/freshness denial ends a queued task with
+`failed_pre_dispatch` / `dispatch_denied`. A confirmed provider rejection
+after dispatch intent revokes the attempt as `failed_pre_dispatch` /
+`provider_rejected`. Eligible initialization slots release in the same
+fenced mutation. Ambiguous outcomes still enter `unknown` and preserve
+the reservation. These receipts classify execution certainty. Billing is
+a separate provider fact.
+
+An oversized canonical snapshot records `snapshot_too_large` on queued
+tasks and releases eligible slots. The Executor saves a bounded marker
+with available usage when a response exceeds its canonical checkpoint
+limit. Its parser and checkpoint recovery classify the marker as
+`failed_validation` / `profile_response_too_large`. Both cases are terminal
+for the affected task; the worker never regenerates from that marker.
+
 ## Retention and verification
 
-The synthetic store caps source/response retention at seven days and configuration/result/audit/publication retention at thirty days. It rejects expired content reads, verifies hashes and byte size, and exposes bounded `expireContent` for exact row deletion. No cleanup schedule or receipt purge is wired in this branch increment. Receipt references survive content deletion. Content bytes do not appear in the ledger status read. Temporary text is bounded per row and may need earlier expiry or different storage before real requests are enabled.
+The synthetic store caps source/response retention at seven days and configuration/result/audit/publication retention at thirty days. Shared validators cap raw extracted document text at 256 KiB per document and in aggregate. The store caps canonical snapshots at 4 MiB, response checkpoints at 256 KiB, and validated results at 128 KiB. It rejects expired content reads, verifies hashes and byte size, and exposes bounded `expireContent` for exact row deletion. No cleanup schedule or receipt purge is wired in this branch increment. Receipt references survive content deletion. Content bytes do not appear in the ledger status read. Temporary text is bounded per row and may need earlier expiry or different storage before real requests are enabled.
 
 The PostgreSQL suite applies the exact migration to a randomized loopback schema. It covers racing admission/claims and initialization slots, immutable configuration and snapshot, protected staff content, response recovery, audit and writeback uncertainty, stale completion, original-ETag conflicts, and replay tombstones after content expires. Real provider, audit transport, Dataverse, PA authorization, operational recovery and production worker scheduling are outside this ledger proof.

@@ -24,15 +24,17 @@ field-primer, and review services.
 **Branch-built [VERIFIED via Executor, job worker, and ledger source]:** The
 [internal synthetic job mode](#internal-synthetic-job-mode) uses the same
 Executor transport and parser with frozen inputs, awaited checkpoints, and
-deferred audit. Its scope is local synthetic testing.
+deferred audit. Admin can author immutable profile revisions and synthetic task
+versions and render a fabricated sample in the branch source. These surfaces
+are scoped to the synthetic build.
 
 **Planned (owner decision, 2026-11-10):** Power Automate will submit and poll
 jobs through authenticated endpoints. Staff job routes, Entra authorization,
-profile publication in Admin, and live source and destination adapters are
-planned in the [shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md).
+live source and destination adapters, and real task enablement remain planned.
+See the [shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md).
 
 **Created:** 2026-04-24 (Session 109, reconciliation pass)
-**Last status update:** 2026-11-10 (internal synthetic job mode and planned Power Automate integration)
+**Last status update:** 2026-11-11 (synthetic safeguards and Admin authoring)
 **Owners:** Justin (backend Executor); Connor (Power Automate trigger and follow-up flows)
 **Related docs:** `docs/PROMPT_STORAGE_DESIGN.md`, `docs/BACKEND_AUTOMATION_PLAN.md`, `docs/WORKFLOW_CHAINING_DESIGN.md`, `docs/GRANT_CYCLE_LIFECYCLE.md`
 
@@ -553,12 +555,15 @@ key, revision, and SHA-256. The row has an empty system template and a task
 body. It declares one required `prepared_context` and can declare
 `frozen_record` slots. The profile composer verifies the snapshot's scope
 and integrity, wraps documents and records as untrusted data, and enforces
-bounded sizes and required fields. Record values are authoritative for
+bounded sizes and required fields. Extracted document text is capped at
+256 KiB of UTF-8 per document and in aggregate. The canonical snapshot is
+capped at 4 MiB, including escaping, the protected block, and record content. Record values are authoritative for
 declared fields and missing values stay explicit. The reviewed model must
 be a concrete Anthropic model. The worker supplies the frozen inputs,
-including the model, token budget, and temperature. The Executor reads
-these inputs directly and resolves capabilities from the reviewed local
-registry. Live model-list, prompt, Request, and SharePoint reads are absent
+including the model, token budget, and temperature. The frozen and effective
+output budgets are capped at 1,536 tokens, subject to the reviewed model ceiling.
+The Executor reads these inputs directly and resolves capabilities from the
+reviewed local registry. Live model-list, prompt, Request, and SharePoint reads are absent
 from this path.
 
 | Test task key | Parsed output key | Maximum | Fixture destination |
@@ -590,24 +595,50 @@ worker context. These arguments are internal server data.
    audit data. The store commits the bounded response content and
    `response_saved` state in one PostgreSQL transaction. The retained
    checkpoint may contain model text and stays in bounded internal storage.
-   On recovery, pass
-   the saved `responseCheckpoint`; the Executor checks its binding to the
+   The canonical checkpoint must fit 256 KiB. An oversized response saves
+   a content-free marker and available usage, then fails validation. On
+   recovery, pass the saved `responseCheckpoint`. The Executor checks its binding to the
    frozen prompt, snapshot integrity, Request, and effective token budget and
    resumes validation without another provider call.
 3. The shared parser checks termination and output shape. The synthetic mode
-   also enforces the registered text and length contract. It returns
+   also enforces the registered text and length contract and a 128 KiB
+   canonical result limit. It returns
    `runId:null`, skipped write results, and a content-free `deferredAudit`
    on success. A classified validation failure carries deferred audit
    metadata too. The Executor performs no inline audit or target write.
 4. The worker journals the validated result and deferred audit, and fences
    audit delivery and any conditional fixture publication separately.
-   An ambiguous provider outcome becomes `unknown`; a saved response can
-   be validated after restart, while an unknown attempt cannot be resent
-   automatically. An uncertain audit or destination write also stops automatic
-   replay of that operation.
+   Explicit dispatch authorization or freshness denial records
+   `failed_pre_dispatch` with `dispatch_denied` before a provider attempt.
+   A definitive Anthropic 400, 401, 429, or 529 rejection records
+   `failed_pre_dispatch` with `provider_rejected` after intent. This state
+   transition releases eligible slots and makes no billing assertion.
+   Ambiguous outcomes become `unknown` and hold their fences. A saved response
+   can resume validation. An unknown provider, audit, or destination outcome
+   stops automatic replay of that operation.
 
 See [Service & Utility Catalog](SERVICE_AND_UTILITY_CATALOG.md) for the profile,
 context, task capabilities, worker, and store entries.
+
+### Admin authoring and sample preview
+
+**[BRANCH-BUILT]** Admin → Prompt Templates → Shared document tasks writes
+configuration for the two synthetic tasks. `GET /api/admin/prompt-profiles`
+reads the profile revision catalog. `PUT` appends a revision under
+`executor.profiles.<key>.vNNNNNN` in `wmkf_appsystemsettings`, guarded by
+the expected revision and exact UUID/payload readback. `POST` composes a
+sample with fabricated document and record values. It performs no inference
+or persistence write. Every method uses the superuser guard and trusted DAL
+context.
+
+Task creation and update use the existing versioned prompt publication
+routes. The publisher validates the marked metadata and resolves the
+published profile's exact key, revision, and hash before mutation. It
+requires a UUID, and updates also require the expected prompt version.
+Legacy names cannot switch modes, and the synthetic names require their
+shared-document marker. The editor ties the preview to the draft payload
+and drops it on edit. The worker reads the configuration frozen into its
+job. Later settings revisions do not change that configuration.
 
 ## Test oracle
 
@@ -639,7 +670,7 @@ npx jest tests/unit/prompt-jobs-worker.test.js --runInBand
 - First prompt row: `phase-i.summary` (system/body split, single raw-text output to `wmkf_ai_summary`, `guard: "skip-if-populated"`)
 
 **Still deferred (post-May 1 status — re-verify before consuming):**
-- Authenticated Power Automate submit/status and staff job routes, Admin profile publication, Entra machine authorization, and live source/destination adapters. See the [shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md).
+- Authenticated Power Automate submit/status and staff job routes, Entra machine authorization, and live source/destination adapters. See the [shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md).
 - `prior_output` source kind
 - `overridePromptBody` input
 - Streaming Executor variant

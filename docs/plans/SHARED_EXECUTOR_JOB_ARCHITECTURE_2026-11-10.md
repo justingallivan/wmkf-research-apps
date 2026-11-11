@@ -1,6 +1,6 @@
 # Shared Executor and durable prompt jobs
 
-Status: **DESIGN SETTLED; SYNTHETIC FOUNDATION BUILT — local integration verified; Opus 5.5 required findings addressed and verified; no deployed capability is claimed.**
+Status: **SYNTHETIC FOUNDATION AND ADMIN AUTHORING BUILT ON THE BRANCH.** The initial foundation has local integration evidence. The Admin slice and additional synthetic safeguards are source-verified. Production integration remains planned.
 Owner: Justin. Design branch: `codex/coordinated-start-2026-11-10-b`.
 Evidence baseline: `a20e5f749`; source inspected on 2026-11-10 Pacific.
 
@@ -10,7 +10,7 @@ Keep task instructions in the shared Dataverse prompt library. Add an opt-in exe
 
 Power Automate owns when to request work and what business follow-up to perform. The backend owns authorized document resolution, frozen inputs and configuration, model execution, retained results and conditional writeback. This is a bounded request/task runner, not a general workflow designer or a second PA model implementation.
 
-The owner chose one backend Executor in the [Session 673 handoff](PREFLIGHT_PROMPTS_HANDOFF_2026-11-10.md). Everything below that adds a mechanism, schema or route is [PLANNED], unless marked [VERIFIED]. No deployment, provisioning, paid call, prompt publication or live-data mutation is part of this design work.
+The owner chose one backend Executor in the [Session 673 handoff](PREFLIGHT_PROMPTS_HANDOFF_2026-11-10.md). Sections marked [PLANNED] describe the broader integration. Branch evidence covers internal synthetic execution and Admin authoring. It excludes deployment, live publication, and metered inference.
 
 ## Owner decisions for autonomous work
 
@@ -20,13 +20,13 @@ Authorized work: implement and commit on this branch, local tests and synthetic 
 
 ## Contract surface
 
-| Concern | Proposed boundary |
+| Concern | Source and planned boundary |
 |---|---|
-| Entry points | Existing Admin prompt editor; staff app submit/status/recovery; separate PA submit/status endpoints; cron worker |
-| Persistence | Existing Dataverse prompt/settings/audit entities; new Postgres job, task, attempt and publication ledgers; separate temporary-content store (Postgres driver for the pilot); approved Dataverse or SharePoint destination |
-| Consumers | Admin, staff task-status UI, PA polling, worker recovery, destination-specific readers |
+| Entry points | [BRANCH-BUILT] Admin Shared document tasks and superuser profile/task publication and fabricated preview. [PLANNED] Staff app job submit/status/recovery, separate PA submit/status, and scheduled worker. |
+| Persistence | [BRANCH-BUILT] Dataverse profile revisions and versioned task rows use existing settings/prompt entities and the task publisher’s existing audit table. The synthetic worker uses migration 097 ledgers and bounded PostgreSQL content storage. [PLANNED] Approved live destination and audit adapters. |
+| Consumers | [BRANCH-BUILT] Admin, exact profile/task validation, synthetic worker and fixture writer. [PLANNED] Staff status UI, PA polling, and real destination readers. |
 | Prior findings | Cross-task document caching absent; frozen prompt seam already exists; audit failure can hide a generated result; output destinations and input sets remain undecided |
-| Scope | Architecture plus a branch-built internal synthetic foundation (section 12); no production enablement or changes to other agents' streams |
+| Scope | Branch-built internal synthetic foundation, safeguards, and Admin authoring. Production enablement and live workflow adapters remain planned. |
 
 ```mermaid
 flowchart LR
@@ -69,17 +69,39 @@ Use a versioned extension of the existing variables JSON, rather than adding Dat
 }
 ```
 
-These are proposed identifiers, not existing rows or enums. The new source kind is intentional: existing executors reject unknown source kinds before dispatch (`execute-prompt.js:388`). An older deployment must fail visibly rather than treat task-only text as a complete legacy prompt. New code requires the mode marker and prepared-context declaration together; malformed/unknown versions fail closed. New-mode source kinds are a closed allowlist: `prepared_context` and `frozen_record`; every resolved value comes from the retained snapshot. Reject live `dynamics`, `sharepoint`, and arbitrary caller overrides at publication and runtime, before any read or dispatch. All profiled execution requires server-prepared context, including app callers. There is no fallback to legacy composition for an opted-in row.
+The opt-in contract and synthetic task names are [BRANCH-BUILT]. Existing
+Executors reject an unrecognized source kind before dispatch. The profiled
+path requires the mode marker and exactly one prepared-context declaration.
+The source allowlist is `prepared_context` and `frozen_record`. It resolves
+these values from the retained snapshot. Publication rejects malformed
+metadata, undeclared placeholders, live source kinds, and write targets.
+The profiled Executor requires worker-prepared context and the legacy path
+refuses a marked row.
 
 A task may add reviewed, typed task-specific inputs (e.g. an approved keyword list or PI fields from Dataverse). Record-input declarations bind stable names to allowlisted entity/field resolvers, requiredness and provenance; the server reads and freezes their values/record versions alongside the documents. Callers cannot supply arbitrary entity/field selectors. An assemblage is an input artifact with its own identity and, when available, ordered component-version lineage; missing required lineage blocks a policy that depends on it. The snapshot need not always be one proposal PDF. The profile context is assembled separately; staff do not insert a proposal placeholder into task prose. Missing or misspelled placeholders fail publication and runtime validation. The new mode does not silently auto-declare an arbitrary placeholder as a usable source. Existing legacy rows retain their current behavior.
 
 ### The profile owns shared instructions and composition policy
 
-Store immutable revisions under the existing `wmkf_appsystemsetting` pattern, e.g. `executor.profile.proposal-analysis.v000001`. A profile contains shared analytical instructions, a reference to a reviewed document resolver, required document roles, extraction policy, permitted task-input declarations and limits. A prompt pins a specific profile revision and canonical SHA-256; admission rejects an in-place change to that setting. New-mode publication requires a concrete reviewed model and a new capability-registered prompt name; non-Executor prompt readers must never receive profiled rows. The pilot uses new task names. All tasks in a job must pin the same profile content/revision. Jobs freeze that revision's content and hash as well as its reference.
+[VERIFIED via `lib/services/admin/prompt-profiles-service.js`] The Admin
+publisher appends a revision to existing `wmkf_appsystemsettings` under
+`executor.profiles.<key>.vNNNNNN`. A stored profile has shared instructions,
+document roles, record names, a wrapper version, and bounded input limits.
+The publication envelope records its canonical SHA-256, request UUID, and
+publication timestamp. Authoritative document resolution, extraction policy,
+and Dataverse field mappings belong to approved source adapters [PLANNED].
+They are outside the editable JSON.
 
-Executable resolver/validator/writer implementations, mandatory security preamble, allowed source/target kinds and hard safety bounds stay in code. Profile JSON cannot introduce arbitrary URLs, Dataverse fields, code, queries or credentials. Model/budget choices remain on the prompt; operational worker limits and retention defaults are published Admin settings bounded by code, following the existing mutable-parameter rule. Profiles do not duplicate those tunables.
+Task publication resolves the exact profile key, revision, and hash.
+Publishing a new profile revision leaves prior task pins intact. Moving a
+task to that revision requires a new task version. The synthetic ledger
+validates the hash of the supplied configuration and freezes the actual
+profile body at admission. Worker recovery reads that frozen body. It does
+not query the settings store or resolve a latest revision.
 
-A small advanced Admin profile editor uses immutable publication, required expected revision, payload-bound request id and exact readback. Updating a profile does not move existing task references. Adopting a new revision publishes a new task version; queued jobs keep their snapshots. Unknown revisions or unavailable profile storage block new admission. No silent fallback for missing profile configuration.
+Executable resolvers, validators, writers, the security preamble, allowed
+source and target kinds, and hard safety bounds stay in code. Model and
+output budget stay on the task. Published operational limits and retention
+defaults remain [PLANNED].
 
 ### The destination is a server capability
 
@@ -89,13 +111,44 @@ Profiled job prompts declare outputs with `target.kind: none`; jobs invoke the E
 
 ## 2. Admin editing and publication
 
-For a profiled task, the main editor shows title/purpose, task instructions, readable input names and an output description. Model and output budget remain easy to find. Advanced details show the pinned execution profile and structured output contract. A read-only assembled preview shows shared instructions, protected document position, cache boundary and task suffix; normal preview uses sample placeholders, not unrequested live proposal content, and performs no model call.
+[VERIFIED via branch route, service, and editor source] Admin → Prompt
+Templates → Shared document tasks displays historical profile revisions,
+publishes a new profile revision, and edits the two registered synthetic
+tasks. The superuser-only `/api/admin/prompt-profiles` route runs all methods
+in trusted DAL context. GET lists revisions and synthetic capabilities. PUT
+uses an expected revision and UUID, writes a create-only settings row, and
+requires exact readback. POST renders shared instructions, the protected
+sample document, and the task suffix from fabricated documents and records.
+Preview reads the exact profile pin and calls no provider.
 
-Profiled rows do not use an independently editable `wmkf_ai_systemprompt`; require it to be empty. Shared instructions come from the pinned profile and the code-owned security preamble. Existing legacy rows retain their system/body editor. This prevents a task-specific system instruction from silently splitting the shared document prefix.
+The editor enables task publication after previewing the current draft
+payload. Editing invalidates that preview. The server independently
+validates and composes the submitted contract before mutation. New tasks
+use POST on the existing prompt collection; updates use PUT on the existing
+prompt detail route with the expected prompt version. The prompt body,
+variables (including profile pin), output contract, model, temperature, and
+budget participate in the existing fingerprint and audit protocol.
+Profiled rows require an empty system template, treating Dataverse null
+and empty string alike. Publication rejects execution-mode conversion,
+missing pin, and invalid configuration. Legacy placeholder declaration
+remains available for legacy rows. Each published task uses a reviewed
+concrete Anthropic model and a pass-through output.
 
-Publication includes task text, profile reference, all input/output metadata, concrete model and budget in one immutable version. Require `expectedVersion` for the new mode. Preserve the existing publish audit/recovery flow and full-payload fingerprint; the profile reference is already covered as part of variables JSON. Check profile existence/compatibility before mutation and runtime composition. Profile content has its own immutable revision/hash. A sole-current prompt lookup that returns zero or multiple rows still blocks admission.
+Profile reads scan the fixed `executor.profiles.` prefix across pages,
+reject duplicate storage keys or malformed envelopes, and compare key,
+revision, and hash in code. The checked-in settings schema declares a
+255-character key, a 100,000-character Memo, and the setting-key alternate
+key. The publisher bounds the canonical envelope before write. The alternate
+key arbitrates a competing create for the same revision key. Replay
+compares the existing UUID and exact payload, including after a lost
+response. Live index state and Dataverse behavior have no fresh probe in
+this increment.
 
-On navigation or prompt selection, pending loads cannot replace the next editor's state. Key drafts by prompt id/version; abort or generation-fence preview/save reads on both success and failure. A stale publish keeps the draft and asks the editor to compare with the new version; it never silently reapplies it.
+Generation guards protect profile/model loading, task loading, preview,
+and publication responses across edits and selection changes. A conflict
+keeps the draft and requires loading the new revision. Staff and Power
+Automate execution routes, live file selection, and real Request mappings
+remain [PLANNED].
 
 ## 3. Resolve and freeze the documents once
 
@@ -164,7 +217,7 @@ Staff routes use current `requireAppAccess`, active staff identity and the capab
 
 ## 6. Durable storage and worker
 
-Reuse the repository's Postgres transaction/lease/cron pattern, not its domain-specific meeting or dossier tables. Proposed tables (migration numbers deliberately unassigned while other agents are working):
+[VERIFIED via migration 097 and the synthetic store] The branch has the PostgreSQL ledger below. Scheduled production execution and operator recovery are [PLANNED].
 
 | Table | Durable responsibility and enforcing keys |
 |---|---|
@@ -172,13 +225,14 @@ Reuse the repository's Postgres transaction/lease/cron pattern, not its domain-s
 | `prompt_job_tasks` | Job/task identity, frozen prompt/profile/model/input fingerprints, generation and delivery state, validated result ref, worker lease/token/version. Unique `(job_id, task_key)`. |
 | `prompt_job_attempts` | One row per immutable attempt identity, with fenced dispatch/outcome/checkpoint transitions and usage/validation/audit delivery. Append a new row for each explicit retry; never reset an old attempt. Unique `(task_id, attempt_number)` plus partial unique `(task_id)` for dispatched/unknown attempts blocks a second unresolved call. |
 | `prompt_job_content` | Bounded snapshot/normalized-response/validated-result payloads, hash, byte size and expiration, separate from durable receipts; response save and attempt state transition are atomic. |
-| `prompt_job_publications` | Destination reservation, initialize-once identity, exact expected target version, intended payload hash, applied/blocked/unknown outcome, per-task contributions. Unique initialization slot `(environment, request_id, destination_contract)` independent of prompt/source version or PA event id. |
+| `prompt_job_initializations` | One active reservation per environment, Request, and fixture field. Captures original blankness and content hash. |
+| `prompt_job_publications` | One physical write operation per initialization job with original target ETag, exact payload hash, contributing reservation/task IDs, and recorded outcome. |
 
 Job and child insertion is one transaction. A separate server-owned active-request claim prevents parallel jobs from dispatching or publishing for the same request. Claim under a row/advisory lock, enforce a partial unique active-lease index and recheck siblings after acquiring the parent lock. Never hold a database transaction across network I/O. Every mutation names expected state, attempt identity and live lease token. A stale worker cannot set success, clear uncertainty or publish a new destination command.
 
-A cron tick claims one bounded stage: prepare, invoke one task with inline validation/checkpoint, recover validation from retained response, deliver audit, or publish. Prioritize the next compatible sibling invocation ahead of audit/publication and schedule the future enabled cron every minute. Unknown tasks release the global capacity slot while retaining their own request/destination uncertainty fences, so unrelated requests continue. Select with `FOR UPDATE SKIP LOCKED`; recheck current authorization/admission before side effects. Provider deadline fits inside the lease and platform request duration with explicit checkpoint reserve; renew only while the same lease is live. Do not await a whole workflow in a browser request or rely on detached work after an HTTP response. No new queue product is required for the first version; latency/throughput can be measured before adding one.
+The synthetic worker advances one bounded stage per claimed tick: prepare, invoke one task with inline validation/checkpoint, recover validation from retained response, deliver audit, or publish. Prioritize the next compatible sibling invocation ahead of audit/publication and schedule the future enabled cron every minute. Unknown tasks release the global capacity slot while retaining their own request/destination uncertainty fences, so unrelated requests continue. Select with `FOR UPDATE SKIP LOCKED`; recheck current authorization/admission before side effects. Provider deadline fits inside the lease and platform request duration with explicit checkpoint reserve; renew only while the same lease is live. Do not await a whole workflow in a browser request or rely on detached work after an HTTP response. No new queue product is required for the first version; latency/throughput can be measured before adding one.
 
-State transitions for generation:
+The planned public generation model has preparation and readiness stages. The internal ledger persists the task states listed in the [synthetic job Atlas](../atlas/postgres-prompt-jobs.md).
 
 ```text
 queued -> preparing -> ready -> dispatching -> response_saved -> validated
@@ -187,15 +241,33 @@ queued -> preparing -> ready -> dispatching -> response_saved -> validated
                                                      +-> failed_validation
 ```
 
-`failed_validation` follows a saved response/validation failure, not a pre-dispatch failure. Retryable pre-dispatch failures return to queued with bounded backoff. Storage can retain finer internal phases; the public DTO maps every one explicitly. Independent tasks may complete despite a sibling failure; they do not silently consume failed sibling output. No cross-task dependencies in the pilot.
+`failed_validation` follows a saved response and validation failure. Explicit
+pre-provider authorization or freshness denial records `failed_pre_dispatch`
+with `dispatch_denied` and no provider attempt. A confirmed provider rejection
+can use the same terminal state with the distinct `provider_rejected` code
+after intent. An unknown provider outcome fences subsequent sibling dispatch.
+Other independent tasks may complete after a known sibling failure. Planned
+public DTOs must map every durable state and safe code explicitly.
 
 ### The response checkpoint must precede audit and destination writes
 
-[VERIFIED via `lib/services/execute-prompt.js:269-365`] The Executor currently parses, writes outputs and awaits `wmkf_ai_run` before returning. If the audit fails after generation, the thrown error carries usage but not the result. A wrapper around the return alone cannot guarantee saved-result recovery.
+[VERIFIED via `lib/services/execute-prompt.js`] The legacy Executor parses
+output, writes eligible targets, and attempts `wmkf_ai_run` before returning.
+The branch-built synthetic mode awaits the durable dispatch intent, invokes
+the same transport with one physical request, and awaits a normalized
+response checkpoint before parsing or audit. The store atomically saves
+the checkpoint and `response_saved` state. Recovery validates the exact
+saved response under the frozen configuration. The worker owns deferred
+content-free audit delivery and fixture writeback. Callbacks and response
+snapshots are server-owned.
 
-[PLANNED] Add a server-only awaited checkpoint seam immediately after provider response normalization and before parse/audit. Persist bounded normalized response text, stop reason, model and complete-or-unknown usage under the exact attempt id to the private store, then transactionally attach its reference. No target write occurs on this path. The new-mode Executor exposes dispatch, pure response validation and audit-payload construction as separate stages, with only the job worker delivering audit. Legacy `executePrompt` continues composing the existing stages. Pin content-free audit retention for job calls; no inline catch path may create a competing audit row. Reuse one extracted pure response validator for fresh and recovered responses; it must preserve termination checks, schema behavior and typed errors for legacy callers. Save the validated result separately before delivery. Do not pass callbacks or response snapshots from HTTP input.
-
-Persist dispatch intent and reserve the possible usage before invoking the provider. A definitive pre-dispatch error can clear the reservation. Missing response after dispatch, process death, lost checkpoint or an expired dispatched lease means `unknown`; it does not mean safe to retry. Existing `paidCall` means response knowledge, not proof of a charge. Retain known usage and mark unknown usage explicitly. Existing narrow transport retries for explicit rejection responses must remain bounded by the same deadline; no fallback model or semantic retry is enabled for this pilot.
+The synthetic provider seam recognizes definitive Anthropic HTTP 400, 401,
+429, and 529 rejection responses from the actual transport. The worker
+ends the attempt and releases eligible initialization slots. This
+classification carries no billing assertion. Missing response, ambiguous
+transport errors, and an expired dispatched lease stay unknown. A synthetic
+attempt has no automatic transport, parameter-repair, fallback-model, or
+semantic retry.
 
 A checkpoint/audit failure never automatically re-enters the paid stage. Recovery consumes the exact retained response and frozen validator; audit delivery has its own status. To make audit delivery safely replayable, assign each attempt a stable Dataverse AI-run GUID before dispatch and add an adapter operation that creates/reads that exact id, with identity/payload-hash verification on duplicates. Verify Dataverse create-with-client-id behavior and required privileges before implementing that receipt; if unavailable, audit uncertainty remains operator work. Freeze one audit payload and execution outcome per attempt before delivery. An audit transport error changes audit-delivery status only; it must not run the legacy catch path to create a contradictory Failed row under the same GUID. Delivery retries use that frozen payload. The default existing audit path stays unchanged for legacy calls.
 
@@ -203,7 +275,7 @@ The narrow crash window between provider acceptance and a durable response canno
 
 ## 7. Writeback preserves staff work
 
-Request fields are the intended destination. A synthetic fixture writer will exercise the full conditional Request-field writeback contract before all production mappings are chosen. Unassigned production destinations fail closed; never invent Dataverse logical field names or silently publish to an approximate existing field. First choose one approved destination contract per enabled real task. The short-title, executive summary, lay abstract, rationale, Initial Assessment narrative and governed Initial Assessment document are distinct; this design assigns none of the undecided outputs to an existing field by inference. The request-narratives branch remains owned by its existing stream. Its handoff requires durable initialization identity, exact If-Match and protection of deliberate clearing.
+Request fields are the intended destination. The synthetic fixture writer exercises conditional Request-field writeback using the two fixed fixture fields while production mappings remain open. Unassigned production destinations fail closed; never invent Dataverse logical field names or silently publish to an approximate existing field. First choose one approved destination contract per enabled real task. The short-title, executive summary, lay abstract, rationale, Initial Assessment narrative and governed Initial Assessment document are distinct; this design assigns none of the undecided outputs to an existing field by inference. The request-narratives branch remains owned by its existing stream. Its handoff requires durable initialization identity, exact If-Match and protection of deliberate clearing.
 
 For `initialize`, reserve the destination's initialization slot before generation, independently of the source event/idempotency/prompt hash. When the job acquires its per-request worker claim, capture the destination’s concrete version, content hash and blank flag before generation. Do not retain target text in a content-free receipt. A retry of the same admitted job resumes its own reservation; it does not reserve or initialize again. An initialization reservation/receipt owned by another operation, or protected staff content, blocks a new initialization even when the field is now blank. A different PA event id or changed source/prompt cannot escape that reservation. Known terminal pre-publication failures can release a reservation transactionally only if no physical publication was frozen and no unresolved provider attempt can later publish; revoke the attempt before release. Keep release history. Unknown provider/write outcomes and 412 conflicts never automatically release it. A new initialization after a proven validation failure is allowed; a timed-out PATCH stays fenced. Adoption of existing requests requires an explicit eligibility decision; blankness alone is insufficient.
 
@@ -217,7 +289,18 @@ Expired leases fence our ledger transitions but cannot retract an external reque
 
 ## 8. Limits, retention and operational controls
 
-Publish operational limits in Admin: per-principal admission/rate bounds, active provider concurrency, task count/size limits, retries/backoff, request deadline and retention. Proposed pilot defaults: one active request globally, one model task at a time, at most eight tasks per job, no automatic semantic retry, and five-minute provider caching. These are proposed seeds, not fixed hidden production literals.
+[VERIFIED via profile, capability, context, Executor, and store source] The
+synthetic path caps output at 1,536 tokens, including the effective execution
+budget. It caps raw extracted UTF-8 document text at 256 KiB per document
+and per snapshot and bounds each record by its canonical encoding. The
+complete canonical snapshot must fit 4 MiB. Oversize snapshot preparation
+ends queued tasks with `snapshot_too_large` and releases eligible slots.
+A normalized response checkpoint must fit 256 KiB and a validated result
+128 KiB. Oversize responses are recorded as bounded content-free markers
+with available usage, then fail validation without regeneration.
+
+[PLANNED] Publish operational limits in Admin for principal quotas, active
+provider concurrency, task counts, retries, deadlines, and retention. Proposed pilot defaults: one active request globally, one model task at a time, at most eight tasks per job, no automatic semantic retry, and five-minute provider caching. These are proposed seeds, not fixed hidden production literals.
 
 Proposed temporary-content retention: seven days for source snapshots/raw response checkpoints, thirty days for validated unpublished results. Freeze retention at admission; do not extend it silently on polling. Before source expiry, pending work becomes expired/needs_attention rather than re-extracting a changed source. Published artifacts follow the destination's own policy. The Postgres driver expires exact content rows while retaining references/receipt metadata. A future Blob driver must delete only exact persisted object keys, never broad prefixes.
 
@@ -227,8 +310,8 @@ Record prompt/profile/context hashes; concrete model; provider attempt and audit
 
 ## 9. Delivery sequence and acceptance
 
-1. **Profile foundation:** versioned profile contract, strict Admin publisher/editor/preview, new-mode composer and prepared-context guard. Keep all existing prompt versions on the legacy path until explicitly migrated. Characterize legacy bytes and error behavior.
-2. **Durable foundation:** migrations, bounded content-store references, job/attempt/publication ledgers, checkpoint/validation recovery, dry-run worker and staff status. Use synthetic files and provider doubles. No model is needed to prove crash handling.
+1. **Synthetic profile and authoring foundation [BRANCH-BUILT]:** strict Admin publication and fabricated preview, profile composer and prepared-context guard. Production task authoring requires an approved runtime capability.
+2. **Synthetic durable foundation [BRANCH-BUILT]:** migration 097, content references, job/attempt/publication ledgers, checkpoint recovery, and worker. Staff job status is [PLANNED].
 3. **PA admission:** Entra service policy, submit/status routes and no-model authentication/duplicate-delivery proof with Connor. Prove foreign tenant, wrong audience, role-less/delegated token, revoked local principal and cross-request job access denial.
 4. **Two-task pilot:** Executive Summary and Methodology using one synthetic shared document/Dataverse-field snapshot and compatible model/output configuration for the first trial, then their approved real input policies. Finalize wording/audience/destinations before task publication. Include synthetic initialize-once Request-field writeback in the architecture trial. Enable real destinations individually only after their mapping and writeback tests are approved.
 5. **Controlled rollout:** new admission off by default, synthetic end-to-end app and PA delivery, then explicitly authorized metered cache/quality measurement. Migrate remaining tasks individually. No automatic rerun on file replacement.
@@ -237,7 +320,7 @@ Required tests include identical prefix bytes across two tasks and app/PA caller
 
 Implementation inventory: migrations + manifest + fresh-install path; Atlas pages/index; new route guard/scanner + API security matrix/counts; source/service catalog; Executor contract; privacy/credentials/retention/runbook entries; model telemetry and exhaustive status consumers; scoped boundary/type/gate tests and their sequential self-tests. Re-read other agents' branches before allocating migration numbers or integrating their destinations.
 
-Rollback floor: deploy compatible readers/composer/guards before publishing profile-bound rows. Retain referenced profile/compiler/validator revisions while jobs can resume. An incompatible deployment pauses jobs visibly rather than silently recomposing. Stop new admission first; retain status/recovery and checkpoint data. After migration, reverting an app caller to a legacy implementation requires publishing a compatible legacy prompt version or restoring its previous version, not merely rolling back code. The old-runtime `prepared_context` refusal is a fail-closed brake, not a seamless rollback.
+Rollback floor: deploy compatible readers/composer/guards before publishing profile-bound rows. Retain referenced profile/compiler/validator revisions while jobs can resume. An incompatible deployment pauses jobs visibly rather than silently recomposing. Stop new admission first; retain status/recovery and checkpoint data. Legacy and profiled task names keep their execution modes. A future caller rollback should select the previous compatible legacy name/version. An old runtime rejects `prepared_context` rows before dispatch.
 
 ## 10. Fable review disposition
 
@@ -253,23 +336,23 @@ Author additions: pin profile content hashes (settings are not physically immuta
 |---|---|
 | Legacy Executor is preserved alongside the opt-in path | `lib/services/execute-prompt.js` retains the legacy resolver/audit path; `executeProfiledPrompt` requires frozen worker inputs. Existing payload/audit/multi-output characterization suites pass. |
 | Two tasks share actual transport prefix bytes | `lib/services/prompt-jobs/context.js` and `tests/unit/execute-prompt-profile.test.js`; the provider double captures identical system/document blocks and distinct task suffixes. Real provider cache hits are unmeasured. |
-| Prompt/profile/snapshot hashes and source kinds are checked | `profile.js`, `context.js`, `capabilities.js`, `store.js`; tests reject live source declarations, changed profile content, wrong scope and snapshot tampering. No real profile publisher is implemented. |
+| Prompt/profile/snapshot hashes and source kinds are checked | `profile.js`, `context.js`, `capabilities.js`, `store.js`; tests reject live source declarations, changed profile content, wrong scope and snapshot tampering. The branch-built Admin publisher and preview separately validate the exact Dataverse profile pin. |
 | Response and state commit atomically before parsing | `store.js` `saveResponse`, awaited Executor callback and `worker.js`; the real-PG vertical test interrupts after response save and resumes the parser without another provider call. |
 | Initialization and uncertainty survive replay | Migration 097 constraints and store/worker transitions; real-PG tests cover races, stale leases, original-ETag conflict, audit/write uncertainty and a human-cleared field after confirmed publication. Actual Dataverse transport is not used. |
 | Fresh installation executes the same migration | Disposable database bootstrap ran the manifest and verified all six tables plus migration 097's honest execution receipt. No existing/live database was changed. |
 
 Recommendation evidence: the bounded internal foundation passes 663 tests across 22 suites, including 22 real PostgreSQL tests. These prove mocked provider transport composition, real SQL transactions and injected conditional-destination behavior. They do not prove live caching, real file extraction/version retrieval, Entra tokens or Dataverse ETag/client-ID audit semantics. Disconfirming checks include unequal serialized prefixes, duplicate SQL claims, lost checkpoints, unguarded unknown outcomes, or refilling a human-cleared field; these cases are exercised in the local suites. The canonical application build and 32 selected gates/self-tests pass. The independent Fable build review was attempted but returned an OAuth usage-limit error with no findings or verdict; see the [review-attempt receipt](../audits/SHARED_EXECUTOR_FABLE_BUILD_REVIEW_ATTEMPT_2026-11-10.md). The owner-selected Opus 5.5 review subsequently returned READY WITH NAMED CHANGES on 2026-11-11. Required changes and named rollout limitations are recorded in the [build review and disposition](../audits/SHARED_EXECUTOR_OPUS55_BUILD_REVIEW_2026-11-11.md).
 
-Contract-reconcile audit scope: caller is a server-only synthetic fixture; no client state or HTTP route is added (N/A). The fixture freezes configuration/source, uses the real store/worker/Executor, and receives only stage/status receipts; provider, authorization/freshness observations, audit and conditional destination transports are injected doubles. Partial success is retained per task and coalesced only after the terminal barrier. Async mutations are lease-fenced; provider/audit/write dispatch intents become unknown after interruption. Shared-helper default behavior and legacy response/persistence paths are characterized. Durable migration/manifest/fresh-install/Atlas/CI surfaces are present. New generation, audit and writeback enums are read by the bounded worker and store; unknown state values reject, and uncertain states cannot auto-publish. The active direction docs were reconciled using `/sweep`; the implementation-specific Executor contract and service catalog separately distinguish the new local mode. This is synthetic acceptance evidence, not production acceptance.
+Initial synthetic foundation contract-reconcile scope: the caller was a server-only fixture. Client state and HTTP routing were N/A for that increment. The fixture freezes configuration/source, uses the real store/worker/Executor, and receives only stage/status receipts; provider, authorization/freshness observations, audit and conditional destination transports are injected doubles. Partial success is retained per task and coalesced only after the terminal barrier. Async mutations are lease-fenced; provider/audit/write dispatch intents become unknown after interruption. Shared-helper default behavior and legacy response/persistence paths are characterized. Durable migration/manifest/fresh-install/Atlas/CI surfaces are present. New generation, audit and writeback enums are read by the bounded worker and store; unknown state values reject, and uncertain states cannot auto-publish. The active direction docs were reconciled using `/sweep`; the implementation-specific Executor contract and service catalog separately distinguish the new local mode. This is synthetic acceptance evidence, not production acceptance.
 
-Documentation reconciliation boundary: a bounded `/sweep` reconciled the active Executor, system, storage, backend automation, lifecycle, chaining and related memory documents with the owner's single-backend direction (commit `48f82e542`). Historical dated handoffs remain historical. Those documents distinguish the existing single-prompt Executor from the planned job runtime. This is a direction reconciliation, not a claim that the new runtime is deployed.
+Documentation reconciliation boundary: a bounded `/sweep` reconciled the active Executor, system, storage, backend automation, lifecycle, chaining and related memory documents with the owner's single-backend direction (commit `48f82e542`). Historical dated handoffs remain historical. That pass records the approved direction. The Executor contract, Atlas, route matrix, and service catalog separately document the local synthetic and Admin increments.
 
 Settled for the synthetic pilot: Executive Summary and Methodology, staff summary brief, mixed document/Dataverse inputs and Request-field writeback. Before enabling real tasks: exact task-specific input roles/field mappings, real output field mappings and initialization policy, and retention/capacity defaults. Integration proof needed: Connor's app-only token acquisition and destination service identity. These did not prevent building the synthetic profile/job foundation, but they prevent enabling real tasks.
 
 
 ## 12. Synthetic build invariants
 
-[VERIFIED via the branch modules and local suites] The first build exposes internal server modules and a local two-task test, with no new public route or production admission. Real profile publication, Admin editing, Entra integration and live source/destination adapters remain subsequent integration work. The executable task registry accepts only synthetic task names and test scope until those proofs exist.
+[VERIFIED via the branch modules and local suites] The foundation exposes internal server modules and a local two-task test. The Admin slice adds configuration authoring and sample composition. The executable task registry accepts only the two synthetic task names in test scope. Staff and PA job admission and live adapters remain planned.
 
 | Invariant | Implementation surface | Verification |
 |---|---|---|
@@ -286,9 +369,9 @@ Settled for the synthetic pilot: Executive Summary and Methodology, staff summar
 | New durable shape matches fresh install and preserves tombstones | migration/manifest/setup/Atlas | Disposable PostgreSQL tests, migration/bootstrap gates |
 
 
-The implemented local proof uses `synthetic.executive-summary` and `synthetic.methodology` in `environment:test`, mapping only to `fixture_summary` and `fixture_methodology`. Those labels are not Dataverse schema fields. The test uses the canonical Executor and real PostgreSQL, with synthetic provider, source/auth, audit and conditional writer adapters. No HTTP caller can reach this mode through a new route because no route has been added.
+The implemented local proof uses `synthetic.executive-summary` and `synthetic.methodology` in `environment:test`, mapping only to `fixture_summary` and `fixture_methodology`. Those labels are not Dataverse schema fields. The test uses the canonical Executor and real PostgreSQL, with synthetic provider, source/auth, audit and conditional writer adapters. The Admin preview route composes a sample and exposes no job admission or provider call.
 
-Remaining integration work is explicit: governed profile/task publication and Admin preview/editor; live authoritative source selection/extraction and field mappings; staff/Entra admission and authorized status/result projection; stable-identity audit and conditional Dataverse adapter proofs; published operational limits, global capacity/rate bounds, scheduler and cleanup wiring; operator cancellation/reconciliation/retry; and separately authorized real quality/cache measurement. The synthetic store retains uncertainty receipts and exposes bounded content expiry, but has no automatic receipt purge or operator resolution command. These are rollout requirements, not reasons to add speculative machinery to the local proof.
+Remaining integration work: live authoritative source selection/extraction and field mappings; staff/Entra admission and authorized status/result projection; stable-identity audit and conditional Dataverse adapter proofs; published operational limits, global capacity/rate bounds, scheduler and cleanup wiring; operator cancellation/reconciliation/retry; and separately authorized real quality/cache measurement. The synthetic store retains uncertainty receipts and exposes bounded content expiry, but has no automatic receipt purge or operator resolution command. These are rollout requirements, not reasons to add speculative machinery to the local proof.
 
 
 ## 13. Initial verification and handoff (2026-11-10)
@@ -297,11 +380,40 @@ Remaining integration work is explicit: governed profile/task publication and Ad
 
 Unit command: `npx jest tests/unit/execute-prompt- tests/unit/utils/ai-payload-boundary.test.js tests/unit/prompt-jobs- tests/unit/llm-client.test.js --runInBand --silent` — 14 suites, 181 tests passed. SQL command: both `tests/integration/prompt-jobs.pg.test.js` and `tests/integration/prompt-jobs-executor.pg.test.js` ran with their required scratch-URL variables — 17 tests passed against local PostgreSQL 16. A separate disposable database ran the fresh bootstrap and verified migration 097's execution receipt and all six tables. The tests use provider/audit/destination doubles; no paid inference or live data mutation occurred.
 
-The architecture has a completed Fable plan review. The first build-review attempt using Fable returned an OAuth usage-limit error. On 2026-11-11 the owner explicitly switched reviews to Opus 5.5. That OAuth review returned READY WITH NAMED CHANGES. The required fixes and legacy compatibility fix are implemented and verified in the expanded 663-test suite and application build. Provider rejection/denial recovery and encoded size/budget admission remain required before real trials, as allowed by the review disposition. No paid add-on or provider-key authentication is authorized. All work is on `codex/coordinated-start-2026-11-10-b`; no push, merge or deployment is part of this increment.
+The architecture has a completed Fable plan review. The first build-review attempt using Fable returned an OAuth usage-limit error. On 2026-11-11 the owner explicitly switched reviews to Opus 5.5. That OAuth review returned READY WITH NAMED CHANGES. The required fixes and legacy compatibility fix are implemented and verified in the expanded 663-test suite and application build. At the initial handoff, findings 5 and 7 deferred explicit rejection/denial classification and encoded size/budget safeguards. The branch source for the follow-up is described below. No paid add-on or provider-key authentication is authorized. All work is on `codex/coordinated-start-2026-11-10-b`; no push, merge or deployment is part of this increment.
 
 
 ## 14. Opus 5.5 build-review follow-up (2026-11-11)
 
-The [review receipt](../audits/SHARED_EXECUTOR_OPUS55_BUILD_REVIEW_2026-11-11.md) preserves the findings and model provenance. The build now waits across job ticks before taking a competing Request baseline; gives provider-model mismatch a terminal validation outcome; surfaces other saved-response failures as needs-attention; classifies uncertain audit transport as unknown; blocks both failed and uncertain audits at SQL publication seams; retains frozen configuration through result expiry; and preserves legacy blank/array metadata parsing. The required counterexamples are exercised with real PostgreSQL and the canonical Executor/provider double. No real-provider or real-document trial is approved until the deferred rejection-policy and encoded-size admission gaps are closed.
+The [review receipt](../audits/SHARED_EXECUTOR_OPUS55_BUILD_REVIEW_2026-11-11.md) preserves the findings and model provenance. The build now waits across job ticks before taking a competing Request baseline; gives provider-model mismatch a terminal validation outcome; surfaces other saved-response failures as needs-attention; classifies uncertain audit transport as unknown; blocks both failed and uncertain audits at SQL publication seams; retains frozen configuration through result expiry; and preserves legacy blank/array metadata parsing. The required counterexamples are exercised with real PostgreSQL and the canonical Executor/provider double. This was the initial disposition before the branch-built follow-up on provider rejection and encoded size described below. Real-provider and real-document trials still require their own approval and integration evidence.
 
 The final follow-up verification passed 22 suites / 663 tests, including 22 real PostgreSQL tests, the golden default-preamble fixtures, scoped checks and the application build. Details and remaining limits are in the review receipt. The named fixes close the synthetic acceptance findings; no further full review loop is planned for this bounded increment.
+
+
+## 15. Admin authoring and synthetic safeguard follow-up (2026-11-11)
+
+The owner-authorized OAuth Opus 5.5 plan review returned READY WITH NAMED
+CHANGES. The [verbatim review and dispositions](../audits/SHARED_EXECUTOR_ADMIN_OPUS55_PLAN_REVIEW_2026-11-11.md)
+record the five named changes and the limits of the evidence.
+
+[VERIFIED via branch source] The authoring chain is the Shared document
+tasks editor → superuser profile API and existing prompt publish API →
+strict profile resolver and versioned publisher → existing Dataverse
+settings and prompt rows and the existing Postgres prompt publish audit →
+Admin revision/task readback. The editor fences async completions and
+invalidates its preview when the task draft changes. Publication is one
+profile revision or one task version at a time. Prompt publication retains
+the existing conflict/partial outcome and audit recovery protocol. Profile
+publication confirms only an exact settings revision readback. Preview has
+no durable write.
+
+[VERIFIED via branch source] The synthetic follow-up reuses the existing
+generation state enum and migration 097. The worker consumes the new safe
+denial/rejection/oversize codes at the dispatch, response, and publication
+boundaries. Known terminal outcomes release eligible slots. Unknown
+transport outcomes retain the existing fences. Canonical size checks cover
+escaped document/record content and the exact stored response/result shape.
+The source and result limits are hard bounds across the shared validators
+and storage seam. All user-facing job state projection and real adapters
+remain [PLANNED]. Integrated validation and the final build review are
+tracked separately.
