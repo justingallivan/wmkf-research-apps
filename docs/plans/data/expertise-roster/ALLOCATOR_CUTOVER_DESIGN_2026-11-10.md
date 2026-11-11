@@ -210,8 +210,12 @@ with an explicit statement guard. Retarget feedback FK only after taking its loc
 ## Rollback reconciliation (slice B contract, review before build)
 
 Only paused with no pending intents; preserve all Dataverse rows and bridge records.
-Require exact private baseline and complete current census. Refuse newly observed
-unbound app-key profiles (interrupted writes) but retain baseline quarantined rows.
+Require exact private baseline and complete current census. Refuse every current
+unbound profile absent from the baseline quarantine by exact GUID and creation key,
+regardless of key type. Retain matching baseline quarantined rows outside reconciliation
+while unbound. A baseline canary later bound without an original SQL row becomes an
+insert. See the [reviewed Slice B design](ROLLBACK_RECONCILIATION_DESIGN_2026-11-11.md)
+for the merge and verification contract.
 Direct/older writers must be stopped separately; compare exact complete membership
 and ETags again before committing. This detects drift, not a native CRM write fence.
 
@@ -225,20 +229,27 @@ Unchanged original empty strings and Production Contact links remain verbatim.
 Every current binding without an original source row is a new legacy row even if
 present at prepare (Amy is the existing example). Missing profiles never mean delete.
 
-Reject post-baseline changes to nonlegacy User or lead fields; for new legacy rows
-reject nondefault unsupported values. Validate merged legacy rows against actual
-lengths, role/link rules and active Contact uniqueness before writing. Validate all
+Reject post-baseline changes to User fields. Accept baseline lead true to false
+when the final profile is inactive and refuse other lead changes. For new legacy
+rows reject nondefault unsupported values. Validate merged legacy rows against
+actual lengths, known roles, GUID and linked-email rules and active Contact
+uniqueness. Legacy can preserve a Contact across categories. On a linked-email
+refusal, resume, revert the Dataverse edit, pause and retry. Validate all
 feedback references including excluded identity-only source rows. Preserve created_by,
 updated_by and timestamps for unchanged original rows. Changed original rows retain
-created_by/created_at, set updated_by NULL (no guessed GUID→integer identity), and use
-Dataverse modifiedon for updated_at. New rows use NULL legacy audit actors and target
-createdon/modifiedon; require valid timestamps. Dataverse native actor history remains
+created_by/created_at in place, set updated_by NULL, and use Dataverse modifiedon
+for updated_at. Only final managed values that differ from original SQL count as a
+change. New rows use NULL legacy audit actors and target createdon/modifiedon.
+Bind valid UTC ISO text with explicit conversion into the SQL timestamp columns.
+Preserve historical audit values verbatim, including original precision. Dataverse native actor history remains
 intact and authoritative for the migration-era edits.
 
 Under exclusive SQL locks remove only the owned freeze guard transactionally, apply
 validated deltas/new rows, restore exact verified legacy FK, and transactionally
 RESTART legacy sequence at max(old/counter/identity/row high waters)+1. Verify sequence
-increment1, no cycle, expected integer range/cache semantics; refuse exhaustion.
+increment1, no cycle, expected integer range/cache semantics and interpolate only a
+validated integer literal. Refuse exhaustion. Prove restart rollback with a
+post-restart fault in the PostgreSQL test.
 Rollback failure restores guard/data/FK/state by SQL rollback. No rows are deleted.
 The old-code app/flags must be restored separately; this command proves SQL readiness,
 not deployment completion or model/prompt admission.
