@@ -665,12 +665,14 @@ before rechecking the actor and preserves receipts. See the
 [staff trial plan](plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md) and
 [configuration contract](CREDENTIALS_RUNBOOK.md#optional--shared-executor-staff-draft-trial).
 
-[VERIFIED via owner-authorized read-only inspection] Candidate Request
-1003384 had a linked Project Leader with a populated name and no AI Materials
-folder. The PDFs inspected under Submission Documents did not establish a
-suitable narrative. The source policy is unchanged. Suitable source confirmation,
-activation, live execution and model-cost approval remain pending. The
-inspection made no writes or provider calls.
+[VERIFIED via owner-authorized read-only source preparation] The owner-uploaded
+`ProposalNarrative_1003384.pdf` is the unique accepted alias in Request 1003384's
+active AI Materials folder. Preparation passed the candidate profile's limits
+and the source remained current. The PI name comes from the populated
+Dataverse Project Leader record. Scoped configuration, actor and storage
+preflight and explicit publication and application API-spend approval precede
+activation. The probe made no provider calls or writes. See the
+[staff trial source receipt](plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md#verified-owner-uploaded-trial-source).
 
 ### Admin authoring and sample preview
 
@@ -703,8 +705,9 @@ its job. Later settings revisions do not change that configuration.
 content, persisted raw output, and cache usage. The focused local synthetic
 tests passed with fixture inputs and doubles for the provider and external
 adapters. They exercise actual request composition and Executor/worker
-ordering. Integrated staff-route, database, and build verification is pending
-for the proposal draft slice.
+ordering. Integrated staff-route, database and build verification passed
+locally. The [staff workflow receipt](audits/SHARED_EXECUTOR_STAFF_OPUS55_REVIEW_2026-11-11.md#integrated-verification)
+records the command scope and live-evidence limits.
 
 ```sh
 npx jest tests/unit/execute-prompt-profile.test.js tests/unit/prompt-jobs-profile.test.js tests/unit/prompt-jobs-context.test.js tests/unit/execute-prompt-payload-boundary.test.js tests/unit/execute-prompt-audit-retention.test.js tests/unit/execute-prompt-multi-output.test.js --runInBand --silent

@@ -1,6 +1,6 @@
 # Shared Executor and durable prompt jobs
 
-Status: **SYNTHETIC FOUNDATION, ADMIN AUTHORING, AND DEFAULT-OFF STAFF PROPOSAL DRAFT TRIAL BUILT ON THE BRANCH.** The synthetic and Admin increments have local integration evidence. The staff trial has branch source evidence and awaits integrated verification and activation approval. Production integration remains planned.
+Status: **SYNTHETIC FOUNDATION, ADMIN AUTHORING, AND DEFAULT-OFF STAFF PROPOSAL DRAFT TRIAL BUILT ON THE BRANCH.** The synthetic and Admin increments have local integration evidence. The staff trial passed local integrated verification and read-only source preparation. Activation awaits scoped preflight and approval. Production integration remains planned.
 Owner: Justin. Design branch: `codex/coordinated-start-2026-11-10-b`.
 Evidence baseline: `a20e5f749`; source inspected on 2026-11-10 Pacific.
 
@@ -10,7 +10,7 @@ Keep task instructions in the shared Dataverse prompt library. Add an opt-in exe
 
 Power Automate owns when to request work and what business follow-up to perform. The backend owns authorized document resolution, frozen inputs and configuration, model execution, retained results and conditional writeback. This is a bounded request/task runner, not a general workflow designer or a second PA model implementation.
 
-The owner chose one backend Executor in the [Session 673 handoff](PREFLIGHT_PROMPTS_HANDOFF_2026-11-10.md). Sections marked [PLANNED] describe the broader integration. Branch evidence covers internal synthetic execution, Admin authoring, and the narrowly scoped staff draft implementation. The owner authorized a read-only inspection of candidate Request 1003384. Trial activation, live writes, publication, application inference, and deployment remain outside the verified work.
+The owner chose one backend Executor in the [Session 673 handoff](PREFLIGHT_PROMPTS_HANDOFF_2026-11-10.md). Sections marked [PLANNED] describe the broader integration. Branch evidence covers internal synthetic execution, Admin authoring, and the narrowly scoped staff draft implementation. The owner authorized read-only inspection and preparation of the uploaded narrative for Request 1003384. Trial activation, live writes, publication, application inference, and deployment remain outside the verified work.
 
 ## Owner decisions for autonomous work
 
@@ -26,7 +26,7 @@ Authorized work: implement and commit on this branch, local tests and synthetic 
 | Persistence | [BRANCH-BUILT] Dataverse profile revisions and versioned task rows use existing settings/prompt entities and the task publisher’s existing audit table. The synthetic and staff draft workers use migration 097 ledgers and bounded PostgreSQL content. The staff adapter can deliver content-free audit under the current actor. [PLANNED] Real Request-field writeback and live adapter verification. |
 | Consumers | [BRANCH-BUILT] Admin, exact profile/task validation, synthetic worker and fixture writer, staff Proposal tab, scoped status/results service, and trial worker. [PLANNED] PA polling and real destination readers. |
 | Prior findings | Cross-task document caching absent; frozen prompt seam already exists; audit failure can hide a generated result; output destinations and input sets remain undecided |
-| Scope | The branch includes a synthetic fixture, Admin authoring, and a default-off one-cohort staff draft trial. The inspected Request lacks an eligible source under the current policy. Final source selection and live execution approval, including model cost, remain pending. See the [staff trial plan](SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md). |
+| Scope | The branch includes a synthetic fixture, Admin authoring, and a default-off one-cohort staff draft trial. Read-only preparation verified the owner-uploaded narrative under the current policy. Scoped preflight and explicit approval for live publication and application API spend remain pending. See the [staff trial plan](SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md). |
 
 ```mermaid
 flowchart LR
@@ -164,16 +164,13 @@ before and after a download bounded to 20 MiB. The extracted, bounded
 Freshness is rechecked before provider dispatch. An expired source window
 ends preparation before download.
 
-[VERIFIED via owner-authorized read-only inspection, 2026-11-11] Candidate
-Request 1003384 (`15d8e475-02d3-f111-a05b-70a8a5b11800`) had a linked Project
-Leader with a populated name and an active `Submission-Documents` folder with
-eight files. There was no AI Materials folder. A nine-page narrative-named PDF
-contained a draft test application with placeholders. A larger Research Proposal
-PDF mixed test-application pages with unrelated attachments and research slides.
-The inspected material did not establish a suitable trial narrative. The
-AI Materials policy remains unchanged. Source selection and live execution
-approval, including application model cost, remain pending. No writes or
-provider calls occurred during inspection.
+[VERIFIED via owner-authorized read-only preparation, 2026-11-11] The owner
+uploaded `ProposalNarrative_1003384.pdf` to Request 1003384's active AI
+Materials folder. The default source adapter confirmed the unique accepted
+alias, prepared the bounded snapshot with the directly sourced PI record,
+and rechecked the same version. The initial Submission Documents inventory
+predates the upload. The preparation wrote no records and made no provider
+calls. See the [staff trial source receipt](SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md#verified-owner-uploaded-trial-source).
 
 Admission freezes task/profile/model settings and captures an authorized document manifest. A preparation stage fetches the exact file versions, verifies their identities, extracts text and writes one immutable snapshot before the first model call. If exact version retrieval is unavailable, check file version before and after download and stop if it changed. Extraction is bound to the hash of the downloaded bytes.
 
@@ -363,7 +360,7 @@ Record prompt/profile/context hashes; concrete model; provider attempt and audit
 1. **Synthetic profile and authoring foundation [BRANCH-BUILT]:** strict Admin publication and fabricated preview, profile composer and prepared-context guard. Production task authoring requires an approved runtime capability.
 2. **Synthetic durable foundation [BRANCH-BUILT]:** migration 097, content references, job/attempt/publication ledgers, checkpoint recovery, and worker. The scoped staff draft slice reuses these tables for status/results without enabling a Request-field writer.
 3. **PA admission:** Entra service policy, submit/status routes and no-model authentication/duplicate-delivery proof with Connor. Prove foreign tenant, wrong audience, role-less/delegated token, revoked local principal and cross-request job access denial.
-4. **Two-task pilot:** The synthetic fixture proves shared context and initialize-once fixture writeback. The default-off staff proposal draft implementation uses one candidate proposal PDF plus the direct PI name and has no Request-field destination. Suitable source confirmation, exact prompt/profile publication, and scoped live execution and model-cost approval remain pending. Enable real destinations individually after mapping and writeback approval.
+4. **Two-task pilot:** The synthetic fixture proves shared context and initialize-once fixture writeback. The default-off staff proposal draft implementation uses one candidate proposal PDF plus the direct PI name and has no Request-field destination. The owner-uploaded narrative passed read-only preparation. Scoped configuration, actor and storage preflight, exact prompt/profile publication, and live execution and model-cost approval remain pending. Enable real destinations individually after mapping and writeback approval.
 5. **Controlled rollout:** new admission off by default, synthetic end-to-end app and PA delivery, then explicitly authorized metered cache/quality measurement. Migrate remaining tasks individually. No automatic rerun on file replacement.
 
 Required tests include identical prefix bytes across two tasks and app/PA callers; changed document/profile/native schema/model separation; missing/ambiguous/oversized/untrusted inputs; duplicate admission and simultaneous claim; source/permission change; worker death before dispatch, after dispatch, after response checkpoint and after remote write; audit failure after valid output; expired lease and late response; invalid raw prose/JSON/refusal/truncation; partial tasks; staff edit/clear; initialization under new event/prompt ids; expired retained content with surviving tombstone; polling/navigation races; and unknown enum handling. Real SQL tests must exercise unique constraints/locks, not mock them.
@@ -421,7 +418,7 @@ Settled for the synthetic pilot: Executive Summary and Methodology, staff summar
 
 The implemented local proof uses `synthetic.executive-summary` and `synthetic.methodology` in `environment:test`, mapping only to `fixture_summary` and `fixture_methodology`. Those labels are not Dataverse schema fields. The test uses the canonical Executor and real PostgreSQL, with synthetic provider, source/auth, audit and conditional writer adapters. The Admin preview route composes a sample and exposes no job admission or provider call.
 
-Remaining integration work: confirm an eligible narrative on the selected Request, prove staff operation and stable-identity audit under scoped live execution, finalize broader source and destination mappings, implement Entra/PA admission and polling, and prove the conditional Dataverse writer. Published limits, global capacity/rate bounds, scheduler and cleanup wiring, operator recovery, and separately authorized real quality/cache measurement remain planned. The synthetic store retains uncertainty receipts and exposes bounded content expiry, but has no automatic receipt purge or operator resolution command. These are rollout requirements, not reasons to add speculative machinery to the local proof.
+Remaining integration work: preflight scoped staff configuration, actor and storage, prove staff operation and stable-identity audit under approved live execution, finalize broader source and destination mappings, implement Entra/PA admission and polling, and prove the conditional Dataverse writer. Published limits, global capacity/rate bounds, scheduler and cleanup wiring, operator recovery, and separately authorized real quality/cache measurement remain planned. The synthetic store retains uncertainty receipts and exposes bounded content expiry, but has no automatic receipt purge or operator resolution command. These are rollout requirements, not reasons to add speculative machinery to the local proof.
 
 
 ## 13. Initial verification and handoff (2026-11-10)
@@ -491,8 +488,8 @@ source adapter, two proposal task keys, staff admission/status/results routes
 and a strictly authenticated, unscheduled drain. Each job produces retained
 drafts. It has no Request-field writeback path.
 
-Integrated staff tests, build and operational retention verification are
-pending. The authorized read-only inspection established the candidate
-Request's current source gap. Suitable source confirmation, live execution,
-application model-cost approval, and task/profile publication remain pending. See the
-[staff trial plan](SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md).
+Integrated local staff verification passed. The owner-uploaded narrative
+also passed read-only source preparation. Scoped configuration, actor and
+storage preflight and explicit approval for publication and application API
+spend remain pending. Operational retention and live execution are
+unverified. See the [staff trial plan](SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md).

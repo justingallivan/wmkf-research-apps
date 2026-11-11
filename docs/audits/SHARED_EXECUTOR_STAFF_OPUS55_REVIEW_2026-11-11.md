@@ -22,9 +22,9 @@ The unpublished candidate profile/tasks pass the real Admin preview validator wi
 
 ## Authorized live-read boundary
 
-The owner separately requested inspection of Request 1003384. Read-only Dataverse/Graph checks found a populated Project Leader and eight Submission-Documents files. The nominal narrative is a nine-page placeholder test application; the larger packet mixes that application and assorted attachments. A substantive narrative is still needed for a useful two-draft trial. The candidate AI Materials policy remains unchanged, and no files were copied or moved. Temporary extracted document text and content-bearing probe logs were deleted after recording non-content findings in the staff trial plan.
+The initial owner-authorized inspection of Request 1003384 found a populated Project Leader and eight Submission-Documents files. The nominal narrative was a placeholder test application and the larger packet combined that application with assorted attachments. The owner later uploaded `ProposalNarrative_1003384.pdf` to AI Materials. A second owner-authorized read-only probe used the default adapter to verify the unique accepted alias, stable version and bounded preparation with the directly sourced PI record. The source policy stayed the same. Neither probe made a provider call or wrote data. See the [staff trial source receipt](../plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md#verified-owner-uploaded-trial-source).
 
-Actual model latency/cache use, production audit attribution, and the final replacement narrative remain unverified. Subsequent live execution still needs the concrete source, activation/publication, API-spend and retention arrangement agreed with the owner.
+Actual model latency/cache use and Dataverse audit attribution remain unverified. Live execution requires scoped configuration, actor and storage preflight, including retention handling, followed by explicit approval for trial activation, publication, application API spend, and audit writes.
 
 ## First Opus review — verbatim
 
@@ -181,4 +181,4 @@ Owner: Codex orchestrator. Branch: `codex/coordinated-start-2026-11-10-b`, isola
 
 Status: staff workflow, source adapter, controlled runner, Admin capability extension and scoped SQL reads/quota/expiry are committed and verified locally. Runtime closure is `5652c96dd`; follow-up evidence is this receipt. No push, merge, deployment, live generation, or Request write occurred. Documentation is committed with the receipt; the final worktree check must be clean.
 
-Next owner/action: owner supplies or identifies a substantive narrative for Request 1003384. Codex then verifies the source placement and prepares the exact trial publication/activation, API-cost and audit-write approval. The current AI Materials policy is a candidate, not permission to move documents or silently substitute Submission-Documents. Source/profile revision, actor, cost and retention must be concrete before the live run.
+Next action: complete scoped configuration, actor and storage preflight for Request 1003384, then prepare the exact trial publication, activation, application API-spend and audit-write approval. The uploaded narrative has passed read-only preparation under the current AI Materials policy.

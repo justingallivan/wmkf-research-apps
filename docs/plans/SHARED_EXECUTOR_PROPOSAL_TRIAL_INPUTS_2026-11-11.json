@@ -1,6 +1,6 @@
 {
   "status": "UNPUBLISHED_REVIEW_INPUT",
-  "note": "Candidate configuration only. Verify the profile key/revision is available before publication. No live records have been created. The chosen Request, source policy and application API spend still need approval.",
+  "note": "Candidate configuration only. Read-only preparation of the owner-uploaded Request 1003384 narrative passed with this profile. Verify the profile key/revision, actor and ledger storage before publication. No live records have been created. Trial activation, publication and application API spend await explicit approval.",
   "profile": {
     "key": "proposal-staff-trial",
     "revision": 1,

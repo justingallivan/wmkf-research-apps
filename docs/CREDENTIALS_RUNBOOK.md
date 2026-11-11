@@ -229,9 +229,9 @@ the post-flip Workbench smoke emitted `mode=on` and no denial.
 
 **[VERIFIED via branch source, 2026-11-11]** The staff proposal draft trial
 defaults off. No live configuration, scheduling, or deployment has been
-verified. Read-only inspection of candidate Request 1003384 found no AI Materials
-folder. Suitable source confirmation, live execution and application model-cost
-approval remain pending. See the [staff trial plan](plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md).
+verified. Read-only preparation verified the owner-uploaded narrative for
+Request 1003384. Scoped configuration, actor and storage preflight and explicit
+approval for publication and application API spend remain pending. See the [staff trial plan](plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md).
 
 | Variable | Purpose | Contract |
 |---|---|---|
