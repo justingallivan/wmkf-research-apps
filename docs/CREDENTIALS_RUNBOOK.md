@@ -225,6 +225,29 @@ the post-flip Workbench smoke emitted `mode=on` and no denial.
 
 **B4 deployment contract [VERIFIED via branch source, 2026-09-29]:** The “fails open” descriptions above apply only to the older read-side fences. B4 requires `SYNTHETIC_REVIEWER_ISOLATION=on` before any existing-person reviewer bind or identity edit, including ordinary people. A marked synthetic reviewer also requires `TEST_REQUEST_ISOLATION=on` and an exact server-read Request/person binding. If either switch is off, unset, or invalid, the acceptance drain pauses **all** jobs before Contact, honorarium, or BILL writes; maintenance reports the configuration pause as failed. Keep both switches at literal `on` in every environment receiving B4. For a B4 rollback, redeploy the prior code before disabling either switch; disabling a switch alone interrupts reviewer workflows. Verify the environment's wave29 and wave30 columns before deploying B4.
 
+### Optional — Shared Executor staff draft trial
+
+**[VERIFIED via branch source, 2026-11-11]** The staff proposal draft trial
+defaults off. No live configuration, scheduling, or deployment has been
+verified. The exact Request, source choice, live access and application
+model-cost approval remain pending. See the [staff trial plan](plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md).
+
+| Variable | Purpose | Contract |
+|---|---|---|
+| `PROMPT_JOB_TRIAL_ACCESS` | Bind one proposal trial cohort | Unset or empty disables admission and the worker. The exact JSON keys are `trialId`, `requestId`, `profileId`, `systemUserId`, and `sourcePolicy`. The three IDs are lowercase GUIDs, `profileId` is a positive safe integer, and `sourcePolicy` is `ai-materials-proposal-pi-v1`. The authenticated actor must independently match the configured current Superuser. |
+| `PROMPT_JOB_NONCE_SECRET` | Seal and verify frozen context snapshots | Independent server-only HMAC secret of at least 32 UTF-8 bytes. Keep the value stable for retained jobs and consistent between admission and worker environments. |
+| `CRON_SECRET` | Authenticate the trial drain endpoint | An exact bearer is required even in development. The route is unscheduled. |
+| `DYNAMICS_IMPERSONATION_ENABLED` | Attribute deferred AI-run audit to the configured actor | Requires literal `true` to activate the trial and again for an audit write. Impersonation fallback is disabled. |
+
+Trial scope derives from deployment and the actual `DYNAMICS_URL` target.
+The allowlist is `local-production`, `local-sandbox`, and `preview-sandbox`.
+A sandbox URL override does not establish trial scope. The existing Dataverse
+target/write interlock still governs the actual operation. A valid configured drain deletes only expired
+content in that exact scope, before rechecking the actor. Disabled or malformed
+policy does no database work. Keep the trial policy available through the
+seven-day expiry and authorized cleanup, or arrange explicit scoped cleanup
+before deactivating. No operational cleanup has been run.
+
 ### Optional — Research APIs
 
 | Variable | Purpose | Source | Cost |
@@ -635,6 +658,7 @@ Canonical list lives in `lib/utils/tracked-secrets.js` — both `pages/api/cron/
 | `bill_webhook_secret` | BILL Webhook Secret (HMAC for /api/webhooks/bill) | hmac | Per-subscription `securityKey` from BILL. Rotate via `POST /v3/subscriptions/{id}/security-key` |
 | `vercel_log_drain_secret` | Vercel Log Drain Secret (HMAC for /api/webhooks/vercel-log-drain) | hmac | No expiry. Rotate by editing the drain's Signature Verification Secret in Vercel Team Settings → Drains and updating the env var in the same window |
 | `assemblyai_webhook_secret` | AssemblyAI callback HMAC secret | hmac | No vendor expiry; independently generate and rotate on compromise/offboarding or at least annually. |
+| `prompt_job_nonce_secret` | Shared Executor snapshot HMAC secret | hmac | Server-only; keep stable while retained trial snapshots can be resumed. |
 | `transcription_reference_encryption_key` | Transcription provider-reference encryption key | hmac | No vendor expiry; rotation requires decrypt/re-encrypt of retained provider references before replacing the key. |
 | `claude_api_key` | Anthropic Claude API Key | vendor | No vendor expiry, but rotate on compromise or staff offboarding |
 | `openai_api_key` | OpenAI API Key (Executor provider seam; opt-in) | vendor | No assumed vendor expiry; rotate on compromise or staff offboarding and update every enabled runtime environment |

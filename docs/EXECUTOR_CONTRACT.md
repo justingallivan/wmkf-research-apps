@@ -3,7 +3,7 @@ title: Executor Contract
 domain: prompt-executor
 kind: source-of-truth
 status: canonical
-summary: "Single-prompt execution contract for the shipped Dataverse path and the internal synthetic job mode."
+summary: "Single-prompt execution contract for the shipped Dataverse path and the branch-built profiled job mode."
 canonical: true
 cataloged: 2026-07-02
 last_verified: 2026-09-12
@@ -22,19 +22,20 @@ The legacy single-prompt path serves the Phase I summary route and grantee,
 field-primer, and review services.
 
 **Branch-built [VERIFIED via Executor, job worker, and ledger source]:** The
-[internal synthetic job mode](#internal-synthetic-job-mode) uses the same
+[internal profiled job mode](#internal-profiled-job-mode) uses the same
 Executor transport and parser with frozen inputs, awaited checkpoints, and
-deferred audit. Admin can author immutable profile revisions and synthetic task
-versions and render a fabricated sample in the branch source. These surfaces
-are scoped to the synthetic build.
+deferred audit. The branch includes a synthetic fixture and a default-off
+[staff proposal draft trial](#staff-proposal-draft-trial). Admin can author
+immutable profile revisions and registered task versions and render a fabricated
+sample.
 
 **Planned (owner decision, 2026-11-10):** Power Automate will submit and poll
-jobs through authenticated endpoints. Staff job routes, Entra authorization,
-live source and destination adapters, and real task enablement remain planned.
+jobs through authenticated endpoints. PA routes, Entra authorization,
+real Request-field destinations, and broader task enablement remain planned.
 See the [shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md).
 
 **Created:** 2026-04-24 (Session 109, reconciliation pass)
-**Last status update:** 2026-11-11 (synthetic safeguards and Admin authoring)
+**Last status update:** 2026-11-11 (staff proposal draft branch source)
 **Owners:** Justin (backend Executor); Connor (Power Automate trigger and follow-up flows)
 **Related docs:** `docs/PROMPT_STORAGE_DESIGN.md`, `docs/BACKEND_AUTOMATION_PLAN.md`, `docs/WORKFLOW_CHAINING_DESIGN.md`, `docs/GRANT_CYCLE_LIFECYCLE.md`
 
@@ -45,7 +46,7 @@ See the [shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026
 The Executor invokes one prompt per call. The shipped path resolves a Dataverse
 prompt row or accepts a server-owned snapshot, composes the input, calls the
 provider, validates the response, and attempts an invocation audit. The internal
-synthetic mode accepts a frozen prompt and context and returns audit data to the
+profiled mode accepts a frozen prompt and context and returns audit data to the
 worker. Callers own sequencing and business follow-up.
 
 ## Scope of generality
@@ -70,7 +71,7 @@ The shipped path covers **Pattern A, dual-caller prompts, and Pattern B/C Vercel
 
 ## Signature
 
-This signature describes the shipped legacy invocation. See [internal synthetic job mode](#internal-synthetic-job-mode) for the additional worker-only inputs.
+This signature describes the shipped legacy invocation. See [internal profiled job mode](#internal-profiled-job-mode) for the additional worker-only inputs.
 
 ### Inputs
 
@@ -546,9 +547,11 @@ A prompt row with `guard: "always-overwrite"` on every output ignores `forceOver
 
 ---
 
-## Internal synthetic job mode
+<a id="internal-synthetic-job-mode"></a>
 
-**[BRANCH-BUILT, synthetic only]** `executePrompt()` accepts the
+## Internal profiled job mode
+
+**[BRANCH-BUILT]** `executePrompt()` accepts the
 `shared-document-task` execution mode from an internal worker. The prompt's
 variables JSON carries `contractVersion:1` and a profile reference pinned by
 key, revision, and SHA-256. The row has an empty system template and a task
@@ -566,16 +569,18 @@ The Executor reads these inputs directly and resolves capabilities from the
 reviewed local registry. Live model-list, prompt, Request, and SharePoint reads are absent
 from this path.
 
-| Test task key | Parsed output key | Maximum | Fixture destination |
+| Task key | Parsed output key | Maximum | Job destination |
 |---|---|---|---|
 | `synthetic.executive-summary` | `summary` | 200 words | `fixture_summary` |
 | `synthetic.methodology` | `methodology` | 12,000 characters | `fixture_methodology` |
+| `proposal.executive-summary` | `summary` | 200 words | Retained draft |
+| `proposal.methodology` | `methodology` | 12,000 characters | Retained draft |
 
-The task registry accepts only these keys under `environment:'test'`.
-Each Executor output must declare `target.kind:'none'`. The destination
-keys identify fixture writer slots for initialization. The internal worker
-uses injected adapters for authorization, freshness, target reads, audit,
-and conditional writes.
+The two synthetic keys run only under `environment:'test'`. The two proposal
+keys require the bounded staff trial scope below. Each Executor output declares
+`target.kind:'none'`. The fixture destination keys identify synthetic writer slots
+for initialization. The worker owns authorization, freshness, audit, and any
+separately authorized fixture writer.
 
 ### Worker-only inputs and ordering
 
@@ -600,7 +605,7 @@ worker context. These arguments are internal server data.
    recovery, pass the saved `responseCheckpoint`. The Executor checks its binding to the
    frozen prompt, snapshot integrity, Request, and effective token budget and
    resumes validation without another provider call.
-3. The shared parser checks termination and output shape. The synthetic mode
+3. The shared parser checks termination and output shape. The profiled mode
    also enforces the registered text and length contract and a 128 KiB
    canonical result limit. It returns
    `runId:null`, skipped write results, and a content-free `deferredAudit`
@@ -624,10 +629,49 @@ worker context. These arguments are internal server data.
 See [Service & Utility Catalog](SERVICE_AND_UTILITY_CATALOG.md) for the profile,
 context, task capabilities, worker, and store entries.
 
+### Staff proposal draft trial
+
+**[BRANCH-BUILT, default off]** One configured Request, one current Superuser,
+and one trial UUID bind the proposal capabilities. The Workbench uses the
+authenticated `reviewers` app session and trusted DAL context. POST
+`/api/workbench/prompt-jobs` takes only `requestId` and a UUID
+`Idempotency-Key` header. The service selects both proposal tasks and the
+source policy. A transaction fence permits one job per trial UUID in the
+shared ledger, including across principals/environments. Each task can
+dispatch once, with a 1,536-token cap and no automatic retry or rerun. Exact
+replay returns the existing job after reauthorization. Status excludes
+source and model text. A separate, reauthorized results GET returns only
+available validated draft outputs. Both reads use private, no-store responses.
+
+The service pins the two published task/profile versions and the approved
+manifest shape. The candidate source is one exact accepted Proposal Narrative
+PDF in a unique active Request AI Materials folder plus the directly stored
+Project Leader contact name. The manifest retains identifiers and hashes.
+The worker verifies the complete source and PI identity, downloads at most
+20 MiB, checks both accepted filename aliases and PI again, and freezes
+`proposal` and `pi_name` in one snapshot. It rechecks authorization and
+source freshness before dispatch. The adapter refuses missing, ambiguous,
+changed, or oversized inputs.
+
+The unscheduled `/api/cron/drain-prompt-jobs` endpoint requires the cron bearer
+in every environment and advances one server-selected stage. The worker
+delivers content-free AI-run audit using required current-actor impersonation
+with fallback disabled. There is no Request-field write, fixture slot, or
+publication command for these proposal tasks. Source and response content
+expires after 24 hours. Configuration and validated results expire after
+seven days. The drain deletes expired content in the exact configured scope
+before rechecking the actor and preserves receipts. See the
+[staff trial plan](plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md) and
+[configuration contract](CREDENTIALS_RUNBOOK.md#optional--shared-executor-staff-draft-trial).
+
+No live trial access, activation, publication, provider call, or deployment is
+verified. The exact Request, candidate source, live access, and application
+model-cost approval are pending.
+
 ### Admin authoring and sample preview
 
 **[BRANCH-BUILT]** Admin → Prompt Templates → Shared document tasks writes
-configuration for the two synthetic tasks. `GET /api/admin/prompt-profiles`
+configuration for the two synthetic and two proposal tasks. `GET /api/admin/prompt-profiles`
 reads the profile revision catalog. `PUT` appends a revision under
 `executor.profiles.<key>.vNNNNNN` in `wmkf_appsystemsettings`, guarded by
 the expected revision and exact UUID/payload readback. `POST` composes a
@@ -639,7 +683,7 @@ Task creation and update use the existing versioned prompt publication
 routes. The publisher validates the marked metadata and resolves the
 published profile's exact key, revision, and hash before mutation. It
 requires a UUID, and updates also require the expected prompt version.
-Legacy names cannot switch modes, and the synthetic names require their
+Legacy names cannot switch modes, and registered task names require their
 shared-document marker. The editor ties the preview to the draft payload
 and drops it on edit. A partial task publication, or a failed or conflicting
 publication with a new row ID, blocks further publication while the editor
@@ -655,8 +699,8 @@ its job. Later settings revisions do not change that configuration.
 content, persisted raw output, and cache usage. The focused local synthetic
 tests passed with fixture inputs and doubles for the provider and external
 adapters. They exercise actual request composition and Executor/worker
-ordering. HTTP admission and polling checks belong to the planned caller
-integration.
+ordering. Integrated staff-route, database, and build verification is pending
+for the proposal draft slice.
 
 ```sh
 npx jest tests/unit/execute-prompt-profile.test.js tests/unit/prompt-jobs-profile.test.js tests/unit/prompt-jobs-context.test.js tests/unit/execute-prompt-payload-boundary.test.js tests/unit/execute-prompt-audit-retention.test.js tests/unit/execute-prompt-multi-output.test.js --runInBand --silent
@@ -678,7 +722,7 @@ npx jest tests/unit/prompt-jobs-worker.test.js --runInBand
 - First prompt row: `phase-i.summary` (system/body split, single raw-text output to `wmkf_ai_summary`, `guard: "skip-if-populated"`)
 
 **Still deferred (post-May 1 status — re-verify before consuming):**
-- Authenticated Power Automate submit/status and staff job routes, Entra machine authorization, and live source/destination adapters. See the [shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md).
+- Authenticated Power Automate submit/status, Entra machine authorization, and real Request-field destinations. See the [shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md).
 - `prior_output` source kind
 - `overridePromptBody` input
 - Streaming Executor variant
