@@ -25,7 +25,8 @@
 
 import NextAuth from 'next-auth';
 import AzureADProvider from 'next-auth/providers/azure-ad';
-import { sql } from '@vercel/postgres';
+import { browserSql as sql } from '../../../lib/services/expertise-finder/roster-sql.cjs';
+import rosterTarget from '../../../lib/services/expertise-finder/roster-rehearsal-target.cjs';
 import { DEFAULT_APP_GRANTS } from '../../../shared/config/appRegistry';
 import NotificationService from '../../../lib/services/notification-service';
 import { grantApps } from '../../../lib/services/app-access-service';
@@ -107,6 +108,30 @@ export const authOptions = {
      * otherwise match the disabled row and mint a live session).
      */
     async signIn({ user, account, profile }) {
+      if (rosterTarget.browserRequested()) {
+        try {
+          rosterTarget.assertBrowserTarget();
+          if (account?.provider !== 'azure-ad') return false;
+          const azureId = profile?.oid || user?.id;
+          const email = user?.email?.toLowerCase();
+          if (!azureId || !email) return false;
+          const { rows } = await sql`
+            SELECT id, is_active, needs_linking, azure_email
+            FROM user_profiles WHERE azure_id = ${azureId} LIMIT 2
+          `;
+          if (rows.length !== 1 || rows[0].is_active !== true || rows[0].needs_linking !== false ||
+              rows[0].azure_email?.toLowerCase() !== email) return false;
+          const updated = await sql`
+            UPDATE user_profiles SET last_login_at = CURRENT_TIMESTAMP, last_used_at = CURRENT_TIMESTAMP
+            WHERE id = ${rows[0].id} AND azure_id = ${azureId} AND lower(azure_email) = ${email}
+              AND is_active = true AND needs_linking = false RETURNING id
+          `;
+          return updated.rows.length === 1;
+        } catch {
+          return false;
+        }
+      }
+
       const testDeployment = getMeetingTranscriptionTestDeploymentProfile(process.env);
       if (testDeployment.dedicated) {
         if (!testDeployment.enabled || !testDeployment.identityVerified) return false;

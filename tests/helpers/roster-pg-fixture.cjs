@@ -37,14 +37,22 @@ async function fingerprintPublic(client) {
       [`public.${publicCutoverTable}`],
     );
     hash.update(JSON.stringify([publicCutoverTable, present]));
-    const tables = present ? [...publicRosterTables, publicCutoverTable] : publicRosterTables;
+    const tables = present ? [...publicRosterTables, publicCutoverTable] : [...publicRosterTables];
+    for (const table of ['user_profiles', 'dynamics_user_roles', 'expertise_matches']) {
+      const { rows: [item] } = await client.query('SELECT to_regclass($1) IS NOT NULL AS present', [`public.${table}`]);
+      hash.update(JSON.stringify([table, item.present]));
+      if (item.present) tables.push(table);
+    }
     for (const table of tables) {
       const { rows } = await client.query(
         `SELECT to_jsonb(t)::text AS value FROM public."${table}" AS t ORDER BY value`,
       );
       hash.update(JSON.stringify([table, rows]));
     }
-    for (const sequence of publicSequences) {
+    for (const sequence of [...publicSequences, 'expertise_matches_id_seq']) {
+      const { rows: [item] } = await client.query('SELECT to_regclass($1) IS NOT NULL AS present', [`public.${sequence}`]);
+      hash.update(JSON.stringify([sequence, item.present]));
+      if (!item.present) { assert(!publicSequences.includes(sequence), 'Required public sequence missing'); continue; }
       const { rows } = await client.query(`SELECT last_value, is_called FROM public."${sequence}"`);
       hash.update(JSON.stringify([sequence, rows]));
     }
@@ -82,7 +90,7 @@ async function fingerprintPublic(client) {
          JOIN pg_namespace fn_ns ON fn_ns.oid = fn.pronamespace
         WHERE n.nspname = 'public' AND c.relname = ANY($1::text[])
         ORDER BY c.relname, t.tgname`,
-      [publicRosterTables],
+      [tables],
     );
     hash.update(JSON.stringify(triggers));
     await client.query('COMMIT');

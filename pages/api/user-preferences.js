@@ -9,6 +9,7 @@
  */
 
 import { DatabaseService } from '../../lib/services/database-service';
+import rosterTarget from '../../lib/services/expertise-finder/roster-rehearsal-target.cjs';
 import { requireAuthWithProfile } from '../../lib/utils/auth';
 import { withDalContext } from '../../lib/dataverse/core/context';
 import { PREFERENCE_KEYS } from '../../shared/config/reviewerFinderPreferences';
@@ -103,6 +104,15 @@ async function validateEmailTemplatesPreference(value) {
 }
 
 export default async function handler(req, res) {
+  if (rosterTarget.browserRequested()) {
+    try {
+      rosterTarget.assertBrowserTarget();
+    } catch {
+      return res.status(503).json({ error: 'Roster browser rehearsal is unavailable.' });
+    }
+    if (req.method !== 'GET') return res.status(403).json({ error: 'Preferences are read-only during the roster browser rehearsal.' });
+  }
+
   // Require authentication and extract profile ID from session
   const profileId = await requireAuthWithProfile(req, res);
   if (profileId === null) return;

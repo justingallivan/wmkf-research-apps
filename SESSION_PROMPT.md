@@ -151,10 +151,18 @@ its plan/build reviews using OAuth Opus 5.5. Do not substitute a paid review pro
 is preserved; no milestone log entry is required for this unreleased rehearsal.
 The accepted design and remaining boundaries are in
 `docs/plans/data/expertise-roster/ALLOCATOR_CUTOVER_DESIGN_2026-11-10.md`.
-Next: independent signed-in browser UAT, actual attachment and linked-person
+[VERIFIED via the real November 11 Chrome walkthrough and private cleanup receipt]
+Normal Microsoft SSO, protected roster/filtering, own synthetic history, inactive
+canary edit/reload/restore and signed-in actor attribution passed. The 46-profile
+census preserved every other profile; owned-schema cleanup preserved public SQL.
+Display guards for NaN latency/blank roster footer passed three UI tests, an Opus
+READY review, rebuild and a second real OAuth read-only browser check; its 46-profile
+census and public SQL were unchanged and its fixture was removed. See
+`docs/plans/data/expertise-roster/ENGINEERING_CHECKS_2026-11-10.md`.
+Next: actual attachment and linked-person
 lifecycle checks, full application matching smoke, and deliberate public cutover
-and deployment admission. Bounded SQL rollback is verified; component tests are
-not browser UAT.
+and deployment admission. Bounded SQL rollback is verified; this browser pass is
+limited to the named editor/history surfaces.
 The local import fixture is not a full application schema; do not claim full app UAT.
 Justin approved the minimal matching contract: active explicitly lead-eligible staff
 with enabled User links only for lead; other active staff may be consulted; validated

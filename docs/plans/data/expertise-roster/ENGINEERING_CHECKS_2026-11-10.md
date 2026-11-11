@@ -164,6 +164,47 @@ those fields, Site Visit and feedback picker projections omit them, and matching
 verification.
 No public rollback, live Dataverse rollback or Production readiness is claimed.
 
+## Signed-in browser checkpoint — November 11
+
+[VERIFIED via the coordinating session's real Chrome walkthrough and private
+`browser-walkthrough-20261111/result.json`] A fresh localhost secret redirected
+anonymous protected-roster navigation to sign-in (not a 401). The normal Microsoft
+button completed the existing SSO callback without bypass or injected cookies.
+The session header identified Justin and the protected roster loaded 40 active rows.
+History showed only the operator's synthetic row, excluded the unrelated seed, and
+expanded with the no-lead message and zero tokens/cost; no model ran.
+
+Searching `blank` with inactive profiles included returned one row; Board returned
+zero and Consultant one. The existing inactive canary
+`b34e680b-849c-4207-a2c5-689defd79aa7` was edited through the real form: Title/Role
+changed from blank to `Synthetic browser walkthrough check`, Save Changes succeeded,
+and full reload/refilter confirmed persistence. A second edit restored blank to null.
+The complete after-census verified 46 profiles, all non-canary values/ETags unchanged,
+canary business values restored, intentional canary ETag change and attribution to
+the signed-in operator. Ctrl-C cleanup succeeded, removed the owned schema and
+preserved the public fingerprint. Dated full-import receipts remain historical.
+
+The runner corrections passed ten tests; the initial 105-test/14-suite run plus five additional runner cases covered
+110 tests across 14 suites in aggregate. Relevant security gates/self-tests, types, scoped lint and the
+post-lazy-import build passed. The walkthrough exposed NaN latency and a blank
+roster footer. The three display guards passed three focused UI metadata tests,
+an Opus READY review and rebuild (`outputs/roster-browser-history-build.log`).
+A second real OAuth pass with a fresh fixture displayed only Model, Tokens 0 and
+Cost $0.0000, without NaN, Latency or an empty Roster label. Its private
+`browser-history-recheck-20261111/result.json` confirmed success, 46 unchanged
+profiles including the canary ETag, unchanged public SQL and fixture removal.
+That recheck made no Dataverse writes. See the
+[exact footer review](BROWSER_HISTORY_FOOTER_OPUS_5_5_REVIEW_2026-11-11.md).
+The distinct test runs cover 113 tests across 15 suites in aggregate (105 initial,
+five additional runner cases and three new UI cases); no single 113-test run is claimed.
+The private first-run log showed the expected migration-tracker warning and invalid
+connection-string refusal, no NextAuth error and no preference/Dataverse write error.
+That observation is bounded log evidence, not proof that all global notifications
+are impossible; the source guards and pinned environment remain the isolation basis.
+No model submission, upload, Production write, push or deployment occurred.
+Attachments, linked-person lifecycle, full application matching and deliberate
+public cutover/deployment admission remain separate checks.
+
 ## Historical Fable empty-text source review transcript
 
 **READY FOR BOUNDED SANDBOX CANARY** — no named blockers, with caveats below.

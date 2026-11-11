@@ -162,9 +162,12 @@ function MatchResults({ results, metadata }) {
         <div className="text-xs text-gray-400 flex flex-wrap gap-4">
           <span>Model: {metadata.model}</span>
           <span>Tokens: {metadata.inputTokens?.toLocaleString()} in / {metadata.outputTokens?.toLocaleString()} out</span>
-          <span>Cost: ${(metadata.estimatedCostCents / 100).toFixed(4)}</span>
-          <span>Latency: {(metadata.latencyMs / 1000).toFixed(1)}s</span>
-          <span>Roster: {metadata.rosterSize} members</span>
+          {Number.isFinite(metadata.estimatedCostCents) && metadata.estimatedCostCents >= 0 &&
+            <span>Cost: ${(metadata.estimatedCostCents / 100).toFixed(4)}</span>}
+          {Number.isFinite(metadata.latencyMs) && metadata.latencyMs >= 0 &&
+            <span>Latency: {(metadata.latencyMs / 1000).toFixed(1)}s</span>}
+          {Number.isSafeInteger(metadata.rosterSize) && metadata.rosterSize >= 0 &&
+            <span>Roster: {metadata.rosterSize} members</span>}
         </div>
       )}
     </div>

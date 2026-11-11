@@ -1,0 +1,11 @@
+/** @jest-environment node */
+jest.mock('../../lib/utils/auth',()=>({requireAuthWithProfile:jest.fn(async()=>7)}));
+jest.mock('../../lib/services/database-service',()=>({DatabaseService:{ENCRYPTED_PREFERENCE_KEYS:[],getUserPreferences:jest.fn(),setUserPreference:jest.fn(),setUserPreferences:jest.fn(),deleteUserPreference:jest.fn()}}));
+const handler=require('../../pages/api/user-preferences').default;
+const {DatabaseService}=require('../../lib/services/database-service');
+const original=process.env,url='postgres://roster_rehearsal:synthetic@127.0.0.1:55439/roster_rehearsal';
+function response(){return {statusCode:200,status(n){this.statusCode=n;return this;},json(b){this.body=b;return this;}};}
+beforeEach(()=>{jest.clearAllMocks();process.env={...original,EXPERTISE_ROSTER_REHEARSAL:'on',EXPERTISE_ROSTER_BROWSER_REHEARSAL:'on',EXPERTISE_ROSTER_BROWSER_SCHEMA:'roster_rehearsal_'+'a'.repeat(32),DYNAMICS_URL:'https://orgd9e66399.crm.dynamics.com',DYNAMICS_SANDBOX_URL:'https://orgd9e66399.crm.dynamics.com',DATAVERSE_TARGET_INTERLOCK:'on',DATAVERSE_DAL_ENFORCEMENT:'on',POSTGRES_URL:url,DATABASE_URL:url,POSTGRES_URL_NON_POOLING:url,POSTGRES_PRISMA_URL:url,AUTH_REQUIRED:'true',NODE_ENV:'production',NEXTAUTH_URL:'http://localhost:3000',NEXTAUTH_SECRET:'synthetic-secret-with-sufficient-length',AZURE_AD_CLIENT_ID:'synthetic',AZURE_AD_CLIENT_SECRET:'synthetic',AZURE_AD_TENANT_ID:'synthetic'};delete process.env.VERCEL;delete process.env.VERCEL_ENV;});
+afterAll(()=>{process.env=original;});
+test.each(['POST','DELETE','PUT','PATCH'])('%s cannot write preferences in browser mode',async method=>{const res=response();await handler({method,query:{},body:{key:'synthetic',value:'x'}},res);expect(res.statusCode).toBe(403);expect(DatabaseService.setUserPreference).not.toHaveBeenCalled();expect(DatabaseService.setUserPreferences).not.toHaveBeenCalled();expect(DatabaseService.deleteUserPreference).not.toHaveBeenCalled();});
+test('GET still reads preferences',async()=>{DatabaseService.getUserPreferences.mockResolvedValue({});const res=response();await handler({method:'GET',query:{},body:{}},res);expect(res.statusCode).toBe(200);expect(DatabaseService.getUserPreferences).toHaveBeenCalledTimes(1);});
