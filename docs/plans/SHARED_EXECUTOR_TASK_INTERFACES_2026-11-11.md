@@ -1,6 +1,6 @@
 # Shared Executor task interfaces
 
-**Status [BRANCH-BUILT, offline fixture] and [PLANNED, caller integration].**
+**Status [BRANCH-BUILT, offline fixture and read facade] and [PLANNED, live caller integration].**
 This checkpoint coordinates the proposal-draft and expertise recommendation
 streams. The shared infrastructure owner controls the capability
 registry, Admin compiler, authorization, Executor, worker and ledger. The roster
@@ -56,6 +56,45 @@ of the fixture. The remaining sections describe the planned caller
 and domain integration. [Executor contract](../EXECUTOR_CONTRACT.md#typed-recommendations-fixture),
 [ledger](../atlas/postgres-prompt-jobs.md#typed-recommendations-fixture).
 
+## Offline recommendations read facade
+
+[VERIFIED via branch source and loopback PostgreSQL] The server-only
+`createRecommendationsReader` accepts normalized Request and job GUID
+selectors. It checks a trusted injected staff authorizer, then resolves
+an independent `app:`-namespaced job owner in the test fixture scope.
+The scope GUID identifies the cohort independently of the Request ID.
+The store requires all five owner predicates, a sole recommendations
+task, draft operation and no destination or writeback. An invalid,
+unauthorized, missing or foreign selector yields no job envelope.
+
+`readStatus` returns only `jobId`, `requestId`, `taskKey`,
+`contractVersion`, `expiresAt` and task `state`. It reads ledger metadata
+without loading proof or result payloads, invoking source or roster
+observers, or mutating the ledger. `readResult` can load a hash-checked
+proof from retained configuration for a validated result. Admission
+validates the optional `fixture-documents-v1` proof and snapshot save
+checks it against document identities in profile role order. The proof
+contains a hash and version. The full v2 seal separately covers source
+text. A replay keeps the original frozen proof. A proofless legacy fixture
+can return status and cannot establish a current result.
+
+The result method compares fabricated source and complete roster
+observations against frozen fingerprints. An unverifiable observation
+takes precedence over a known change. It rereads receipt identity,
+version, hashes and expiries after observations, then uses the scoped
+typed reader only when both observations are current. It checks owner
+binding again after the payload read and reauthorizes the original
+staff subject as its final asynchronous step. A database-clock sample
+plus conservative monotonic elapsed time fences job, configuration and
+content expiry. Only `available` and `current` include the unwrapped
+canonical result. A validated result can survive a separate audit
+failure and source cleanup while its own proof and payload remain
+retained. Source and roster freshness are bounded observations.
+
+This fixture does not select a real source placement or install HTTP,
+DAL, real authorization or source/roster adapters, PA, scheduling or
+deployment. [Ledger](../atlas/postgres-prompt-jobs.md#typed-recommendations-fixture).
+
 ## Capability and result path
 
 [PLANNED] The published task pins its capability and result contract version
@@ -103,13 +142,14 @@ have no consumer DTO. Validation or audit recovery cannot dispatch a second
 model call for a checkpointed attempt. Ambiguous dispatch remains an operator
 case. A failed audit does not erase already validated data.
 
-The staff recommendation envelope is `{jobId, requestId, taskKey, contractVersion,
+The offline result facade implements the planned staff recommendation envelope `{jobId, requestId, taskKey, contractVersion,
 status, freshness, expiresAt, result?}`. The domain `status` values are `available`,
 `not-ready`, `unavailable` and `expired`. `freshness` is `current`, `stale` or
 `unknown`. Use `unknown` if no freshness check can apply. Emit `result` only for
 an authorized, validated, unexpired result with current inputs. Stale/unverifiable
 results stay private and require an explicit new authorized job. This read-time
-freshness check is new. The existing staff text projector has no such check. Use
+freshness check is verified with fabricated observations. The existing staff
+text projector has no such check. Use
 safe codes for unavailable details. The aggregate job status vocabulary remains the shared
 one. The recommendations operation has no business writer for assignment, invitation,
 notification, Contact/User, Request fields or history. The result field
@@ -196,8 +236,9 @@ server resolves the machine-owned job under the authorized Request and task,
 then calls an owner-scoped ledger read. Keep all existing ledger owner predicates
 and submitting-principal audit identity. Do not accept a principal selector from
 either caller or widen user-private expertise history. Reauthorize the read and
-recheck freshness before exposing content. Foreign jobs return non-enumerating
-responses. PA polls content-free state and a result reference for the staff viewer.
+recheck freshness before exposing content. The offline facade exercises these
+checks with injected authority. Foreign jobs return non-enumerating responses.
+PA polling with a result reference for the staff viewer remains planned.
 Polls perform no proposal or roster freshness reads.
 
 Use the existing trial retention defaults as proposed initial values, 24 hours
@@ -272,3 +313,34 @@ temporary current-source copy without environment files or application
 credentials, with a loopback-only Node socket guard. It retained four
 existing DOCX tracing warnings and the `_app` static-optimization warning.
 This is local build evidence.
+
+
+## Offline facade verification
+
+Runtime commit `c9777bc87` imports the pure roster comparator and its tests
+from `b0b69b90a` and adds the offline facade. The ordinary Opus 5.5 OAuth plan review returned READY WITH
+NAMED CHANGES. The implementation applies its eight findings to proof
+admission and save, immutable replay, receipt/version checks, DB-clock
+expiry, profile-ordered source metadata, non-enumerating failures,
+machine-owner scope and the returned envelope. The build review and the
+focused final review both returned READY. All three receipts name only
+`claude-opus-5-5`.
+
+The follow-up adds a status owner-rebinding regression and an explicit
+configuration expiry check. The store can record a task as `expired`
+before a result exists. The result facade reports that case as
+`unavailable` while the job remains within its retention window.
+Content cleanup deletes only expired bytes and keeps the validated
+receipt. An expired or deleted result then returns `expired` without
+a payload. An audit outcome does not itself invalidate a retained result.
+
+
+[VERIFIED via local commands] Final verification passed 409 tests across
+26 suites, including all three job suites against disposable loopback
+PostgreSQL. Tests cover metadata-only SQL, no reads for denied selectors,
+owner and actor changes across awaits, proof replay, malformed and changed
+observations, deleted or corrupt results, and expiry during final
+authorization. The application build exited zero in an environment-file-free
+source copy with the non-loopback Node TCP guard. Four existing DOCX
+tracing warnings remain. Scoped lint, types and repository gates passed.
+All staff, source and roster observations were fabricated.

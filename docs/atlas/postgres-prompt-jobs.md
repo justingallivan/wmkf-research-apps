@@ -42,7 +42,9 @@ Audit exceptions are unknown unless the adapter explicitly proves a definitive r
 tables or persisted states. A `test` job under `expertise-fixture:<lowercase GUID>`
 admits exactly one `expertise.recommendations` draft task and has no
 destination or publication reservation. Configuration freezes the roster
-fingerprint. The private roster is part of the v2 sealed snapshot and
+fingerprint and may pin a versioned source identity proof. Admission
+validates the proof shape. Snapshot persistence checks it against the
+sealed snapshot's ordered document metadata. The private roster is part of the v2 sealed snapshot and
 expires with source content. The v2 response checkpoint remains private.
 The worker atomically attaches the `{contractVersion,result}` envelope
 and the deferred audit through the existing attempt fence.
@@ -52,9 +54,16 @@ scope, Request and job identity. It checks result kind, retained expiry,
 hash, byte size and envelope. The Executor already ran domain validation
 against the frozen roster before persistence. The internal reader can
 return an unexpired validated result after source cleanup. It does not
-assert current source or roster freshness. The text reader and fixture
-publication consume text only. Public and staff recommendations read
-surfaces remain planned. [Shared task interfaces](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md).
+assert current source or roster freshness. The offline facade uses
+`readRecommendationState` under the same owner predicates plus the fixture
+app owner, sole task, draft operation and no-writeback guards. Status reads
+only receipt and TTL metadata. For a retained result, the facade can read
+the hash-checked proof from configuration after source cleanup. It compares
+current fabricated observations before reading and projecting the result.
+A database clock sample plus monotonic elapsed time fences expiry across
+the final authorization check. The text reader and fixture publication
+consume text only. Production staff delivery and live adapters remain
+planned. [Shared task interfaces](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md).
 
 ## Synthetic safeguard follow-up (2026-11-11)
 

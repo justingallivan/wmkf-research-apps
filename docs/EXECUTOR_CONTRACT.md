@@ -657,9 +657,14 @@ frozen roster. The worker retains a result envelope with the contract
 version and validated object. The store verifies scope, expiry, kind,
 hash, encoded byte length and envelope when it reads the retained object.
 `readValidatedRecommendations` is an internal fixture reader. Existing
-staff result endpoints continue to return text only. A real source adapter,
-staff result facade with read-time freshness, and PA admission remain
-planned. [Shared task interfaces](plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md).
+staff result endpoints continue to return text only. The offline
+`createRecommendationsReader` facade adds injected staff authorization,
+owner binding and source/roster freshness checks. It returns a validated
+object only when both observations are current and the authorization,
+ledger and expiry fences still hold. Its status method reads ledger
+metadata without proof/result payloads or freshness observations. A real
+source adapter, production staff and machine authorization, HTTP delivery,
+and PA admission remain planned. [Shared task interfaces](plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md).
 
 ### Staff proposal draft trial
 
