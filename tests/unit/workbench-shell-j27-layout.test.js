@@ -196,8 +196,11 @@ test('Deliberations and Final Assessment open on their request list; today’s p
   // No fixture row is in Final Assessment: the list says so instead of showing the review panel.
   expect(await screen.findByText(/No requests are in Final Assessment yet/)).toBeInTheDocument();
   expect(screen.queryByTestId('final-writeups')).not.toBeInTheDocument();
+  // The request list is filtered by program, so the panel's hint does not belong here.
+  expect(screen.queryByText('Not filtered by program')).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Writeup review' }));
   expect(await screen.findByTestId('final-writeups')).toBeInTheDocument();
+  expect(screen.getByText('Not filtered by program')).toBeInTheDocument();
 });
 
 test('someone who leads no requests opens on All in program; an explicit Assigned to me is kept in the address', async () => {

@@ -149,3 +149,36 @@ test('a later unknown freshness result replaces an earlier known one on the same
   await act(async () => { overviewFacts({ summaryStale: null }); });
   expect(screen.getByLabelText('Where this request stands')).not.toHaveTextContent('Reviewer reports changed');
 });
+
+// The page stamps each report with the order it landed in, and the newer report of the
+// presentation wins (Codex build review 3). Both orders, so the test fails if the stamp
+// is ignored and either reporter is applied last regardless.
+test.each([
+  ['Final Writeup then a newer Overview', ['finalWriteup', 'overview'], true],
+  ['Overview then a newer Final Writeup', ['overview', 'finalWriteup'], false],
+])('%s: the newer presentation report decides the strip', async (_label, order, offersStart) => {
+  const present = { status: 'present' };
+  const server = {
+    ...invitedInput,
+    reviewSummary: present, visitAssessment: present,
+    reviewers: { status: 'present', anySuggestion: true, counts: { status: 'present', candidates: 3, invited: 3, accepted: 3, received: 3, completed: 3 } },
+    presentation: { status: 'present', exists: true, id: 'v1', ended: true, legacyException: false },
+    roster: { status: 'present', stale: false },
+    boardDraft: { status: 'present', exists: true },
+    transition: { status: 'present', phase: null },
+  };
+  render(<WorkbenchRequest />);
+  await act(async () => { pending.get('/api/workbench/resolve-request?requestId=request-a')(resolved('request-a', true, server)); });
+  await screen.findByLabelText('Where this request stands');
+  const notEnded = { status: 'present', exists: true, id: 'v1', ended: false, legacyException: false };
+  const ended = { ...notEnded, ended: true };
+  const reports = {
+    finalWriteup: { finalWriteup: { available: true, phase: 'ready', sourceArtifactId: 'a', stageFacts: {
+      presentation: notEnded, boardDraft: { status: 'present', exists: true }, transition: { status: 'present', phase: null } } } },
+    overview: { overview: { meeting: { presentation: true, stageFacts: { presentation: ended, roster: { status: 'present', stale: false } } } } },
+  };
+  for (const name of order) await act(async () => { overviewFacts(reports[name]); });
+  const strip = screen.getByLabelText('Where this request stands');
+  if (offersStart) expect(strip).toHaveTextContent('Next: Start group review');
+  else expect(strip).not.toHaveTextContent('Start group review');
+});

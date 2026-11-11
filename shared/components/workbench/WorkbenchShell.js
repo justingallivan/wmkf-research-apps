@@ -237,7 +237,8 @@ export function WorkbenchShell({ previewReadOnly = false, j27IntegrityEnabled = 
   });
   const counts = stageLayout && rowsState.hasSnapshot ? tabCounts(rowsState.rows) : {};
 
-  const programHint = view === 'final-writeups' || (stageLayout && view === 'final-assessment')
+  // The Final writeups panel ignores the program; the Final Assessment request list does not.
+  const programHint = view === 'final-writeups' || (stageLayout && view === 'final-assessment' && section === 'writeup-review')
     ? 'Not filtered by program'
     : view === 'awardees'
       ? 'Research programs only'

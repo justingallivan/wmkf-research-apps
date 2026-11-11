@@ -61,9 +61,19 @@ these changes:
   The sandbox has both fields: `wmkf_initialassessmentrationale` and
   `wmkf_confirmedmeetingroster` are present on `akoya_request`, as are
   `wmkf_staffreviewsummary`, `wmkf_staffvisitassessment`,
-  `wmkf_phaseiistatus` and `wmkf_readyforreview` `[VERIFIED via a read-only
-  metadata GET against the sandbox host orgd9e66399, 2026-11-10; the
-  interlock reported target=sandbox; no records were read]`.
+  `wmkf_phaseiistatus`, `wmkf_readyforreview` and the two document pointers
+  `wmkf_currentpresitevisit` and `wmkf_currentfinalwriteup`, which the list
+  feed now selects `[VERIFIED via scripts/probe-sandbox-j27-fields.cjs, a
+  read-only metadata GET against the sandbox host orgd9e66399, 2026-11-11;
+  the interlock reported target=sandbox; no records were read]`.
+- **Transition request read and the Grant Cycle expand.** Since `91fc83581`
+  the Final Writeup transition's request read expands the linked Grant
+  Cycle. Every caller runs inside a trusted Dataverse context: the Final
+  Writeup, leadership-review and pre-site-visit routes, the pre-site
+  artifact service they and the preparation cron call (the cron wraps it in
+  `withDalContext`), and the test-request rehearsal's pre-site dependencies
+  `[VERIFIED via git grep of every import of the transition modules,
+  2026-11-11]`. Not exercised live.
 - **Before promotion: D26 Grant Cycle links (owner-run Production read).**
   Since `91fc83581` the group-review start guard grants the earlier-cycle
   exception only when the request's linked Grant Cycle resolves to a cycle
