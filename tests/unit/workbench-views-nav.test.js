@@ -44,6 +44,14 @@ describe('WorkbenchViewsNav shell links', () => {
 });
 
 describe('WorkbenchViewsNav scope preservation', () => {
+  test('in the phase layout every request-list tab keeps "All in program", Final Assessment included', () => {
+    render(<WorkbenchViewsNav activeKey="requests" cycleCode="J27" programId="p1" scope="all" scopeSet layout="j27" />);
+    // Dropping the scope on Final Assessment reloaded the shared rows and changed every tab's count (Codex build review 2).
+    for (const name of [/Initial Assessment/, /Peer Review/, /Deliberations/, /Final Assessment/]) {
+      expect(screen.getByRole('link', { name }).getAttribute('href')).toContain('scope=all');
+    }
+  });
+
   test('carries scope for the four scope consumers, but not for Final writeups or Initial assessments', () => {
     render(<WorkbenchViewsNav activeKey="requests" cycleCode="J27" programId="p1" scope="all" />);
     expect(screen.getByRole('link', { name: 'Request list' })).toHaveAttribute('href', '/workbench?programId=p1&cycleCode=J27&scope=all');

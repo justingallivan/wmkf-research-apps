@@ -37,6 +37,20 @@ jest.mock('../../lib/services/workbench/j27-integrity-jobs', () => ({
   readLatestIntegrityStates: (...a) => readLatestIntegrityStates(...a),
 }));
 
+// The later-phase facts are mocked as one call (three batched Dataverse reads inside it:
+// draft documents, Final documents, presentations; covered in j27-later-facts.test.js).
+const loadJ27LaterFacts = jest.fn();
+jest.mock('../../lib/services/workbench/j27-later-facts', () => ({
+  ...jest.requireActual('../../lib/services/workbench/j27-later-facts'),
+  loadJ27LaterFacts: (...a) => loadJ27LaterFacts(...a),
+}));
+const NO_PRESENTATION_FACTS = {
+  presentation: { status: 'present', exists: false, id: null, ended: null, legacyException: false },
+  roster: { status: 'absent' },
+  boardDraft: { status: 'present', exists: false },
+  transition: { status: 'present', phase: null },
+};
+
 import { resolveWorkbenchRequest } from '../../lib/services/workbench/resolve-request-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 import { STATUS_CLASS } from '../../lib/services/dataverse-export/constants';
@@ -65,6 +79,7 @@ beforeEach(() => {
   getCycleDatesById.mockResolvedValue({ wmkf_grantcycleid: CYCLE_ID, wmkf_cyclecode: 'J26', wmkf_meetingdate: '2026-06-04' });
   existsAnySuggestionForRequests.mockResolvedValue(new Set());
   readLatestIntegrityStates.mockResolvedValue(new Map());
+  loadJ27LaterFacts.mockImplementation(async (rows) => new Map(rows.map(r => [String(r.akoya_requestid).toLowerCase(), NO_PRESENTATION_FACTS])));
   // The link helpers check the wmkf_grantcycle restriction (covered in grant-cycle-link.test.js).
   jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {});
 });
@@ -208,8 +223,9 @@ describe('J27 read model (plan C7)', () => {
     expect(body).not.toHaveProperty('j27');
     expect(existsAnySuggestionForRequests).not.toHaveBeenCalled();
     expect(readLatestIntegrityStates).not.toHaveBeenCalled();
+    expect(loadJ27LaterFacts).not.toHaveBeenCalled();
   });
-  test('a J27 row adds one suggestion read and one integrity read and carries the stage with its tier 1 input', async () => {
+  test('a J27 row adds one suggestion read, one integrity read and one later-facts load, and carries the stage with its tier 1 input', async () => {
     getById.mockResolvedValue(j27Row({ wmkf_phaseistatus: 707510005 }));
     getCycleDatesById.mockResolvedValue({ wmkf_grantcycleid: CYCLE_ID, wmkf_cyclecode: 'J27', wmkf_meetingdate: '2027-06-10', wmkf_researchofframpmeetingdate: '2027-03-15', wmkf_researchreviewsduedate: '2027-03-01' });
     existsAnySuggestionForRequests.mockResolvedValue(new Set([REQ]));
@@ -218,7 +234,10 @@ describe('J27 read model (plan C7)', () => {
     expect(existsAnySuggestionForRequests).toHaveBeenCalledTimes(1);
     expect(existsAnySuggestionForRequests).toHaveBeenCalledWith([REQ]);
     expect(readLatestIntegrityStates).toHaveBeenCalledTimes(1);
-    // Budget (plan C7 as built): two Dataverse reads (suggestions, program catalog) and one Postgres read.
+    expect(loadJ27LaterFacts).toHaveBeenCalledTimes(1);
+    // Budget: Dataverse reads = suggestions (1) + program catalog (1) + later facts (one load, 3 batched
+    // reads inside: drafts, Finals, presentations) = 5, plus one Postgres read (integrity).
+    // No presentation exists in this setup, so its end is unverified and the stage says so (j27-read-model.js:246).
     expect(require('../../lib/services/workbench/program-scope-service').resolveDiscoveryScope).toHaveBeenCalledTimes(1);
     expect(getById).toHaveBeenCalledTimes(1);
     expect(body.meetingDate).toBe('2027-06-10');
@@ -226,12 +245,29 @@ describe('J27 read model (plan C7)', () => {
     expect(body.j27).toMatchObject({
       phase: 'peer-review', basis: 'partial', outcome: 'none',
       recorded: { chairsRecommendation: 'yes', chairsOutcome: 'pending' },
-      blockerKeys: ['chairs-outcome-pending', 'integrity-unreviewed'],
+      blockerKeys: ['chairs-outcome-pending', 'integrity-unreviewed', 'presentation-end-unverified'],
     });
     expect(body.j27.taskKeys).toEqual(['review-integrity', 'record-offramp']);
     expect(body.j27.tasks[1].detail).toEqual({ received: null, pastOfframpDate: true });
     expect(body.j27.input.reviewers).toEqual({ status: 'present', anySuggestion: true, counts: { status: 'not-loaded' } });
     expect(body.j27.input.calendar).toEqual({ status: 'present', offrampMeetingDate: '2027-03-15', reviewsDueDate: '2027-03-01', today: '2027-03-16' });
+  });
+  test('the later facts come from the server by one load and the phase follows them', async () => {
+    const facts = {
+      presentation: { status: 'present', exists: true, id: '77777777-7777-4777-8777-777777777777', ended: false, legacyException: false },
+      roster: { status: 'absent' },
+      boardDraft: { status: 'present', exists: false },
+      transition: { status: 'present', phase: null },
+    };
+    loadJ27LaterFacts.mockResolvedValue(new Map([[REQ, facts]]));
+    getById.mockResolvedValue(j27Row({ wmkf_phaseistatus: 707510005 }));
+    getCycleDatesById.mockResolvedValue({ wmkf_grantcycleid: CYCLE_ID, wmkf_cyclecode: 'J27', wmkf_meetingdate: '2027-06-10' });
+    const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '', today: new Date('2027-03-16T12:00:00Z') });
+    expect(loadJ27LaterFacts).toHaveBeenCalledTimes(1);
+    expect(loadJ27LaterFacts.mock.calls[0][0]).toEqual([expect.objectContaining({ akoya_requestid: REQ })]);
+    const { presentation, roster, boardDraft, transition } = body.j27.input;
+    expect({ presentation, roster, boardDraft, transition }).toEqual(facts);
+    expect(body.j27.phase).toBe('deliberations');
   });
   test('failed new reads degrade the stage instead of failing resolution', async () => {
     getById.mockResolvedValue(j27Row());

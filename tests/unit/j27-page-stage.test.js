@@ -2,7 +2,8 @@
 import { render, screen } from '@testing-library/react';
 import { composeJ27PageInput, deriveJ27PageStage, j27CountsInput, j27OverviewInputs, j27FinalWriteupInputs } from '../../shared/utils/j27PageStage';
 import J27StageStrip, { J27_PHASE_LABEL, J27_TASK_LABEL, J27_BLOCKER_LABEL, J27_OUTCOME_LABEL, visibleBlockerKeys } from '../../shared/components/workbench/J27StageStrip';
-import { J27_PHASES, J27_TASK_KEYS, J27_BLOCKER_KEYS, J27_OUTCOMES, PHASE_I_CHAIRS } from '../../lib/services/workbench/j27-read-model';
+import { composeJ27Tier1 } from '../../lib/services/workbench/j27-read-model-inputs';
+import { J27_PHASES, deriveJ27Stage, J27_TASK_KEYS, J27_BLOCKER_KEYS, J27_OUTCOMES, PHASE_I_CHAIRS } from '../../lib/services/workbench/j27-read-model';
 import { CHAIRS_RECOMMENDATION_STATUS } from '../../shared/config/j27Scoring';
 
 const RESEARCH = '94cab30b-958f-ee11-8179-000d3a341e8f';
@@ -180,5 +181,93 @@ describe('strip', () => {
     const strip = screen.getByLabelText('Where this request stands');
     expect(strip).toHaveTextContent('Decided');
     expect(strip).not.toHaveTextContent('Nothing is waiting');
+  });
+});
+
+describe('server-supplied later-phase facts (stageFacts)', () => {
+  const PRES_ENDED = { status: 'present', exists: true, id: 'v', ended: true, legacyException: false };
+  const PRES_UPCOMING = { ...PRES_ENDED, ended: false };
+  const FINAL_STATUS = { available: true, phase: 'ready', sourceArtifactId: 'a', presentationSchedule: 'not_checked' };
+
+  test('j27FinalWriteupInputs with stageFacts returns exactly those three keys and ignores presentationSchedule', () => {
+    const stageFacts = {
+      presentation: PRES_UPCOMING, boardDraft: { status: 'present', exists: true }, transition: { status: 'present', phase: 'group-review' },
+    };
+    // The schedule says 'ended' and the status says no draft; the whole keys must win over both.
+    const out = j27FinalWriteupInputs({ ...FINAL_STATUS, presentationSchedule: 'ended', sourceArtifactId: null, phase: 'ready', stageFacts }, PRES_ENDED);
+    expect(out).toEqual(stageFacts);
+    expect(Object.keys(out).sort()).toEqual(['boardDraft', 'presentation', 'transition']);
+  });
+
+  test('serverLoaded with no stageFacts never changes the server presentation; the legacy path still changes it', () => {
+    const base = { ...serverInput({ requestStatus: 'Phase II Pending', phaseIStatus: PHASE_I_CHAIRS.invited, phaseIIStatus: 100000002 }) };
+    const serverPresentation = { status: 'present', exists: true, id: 'v', ended: true, legacyException: false };
+    const finalWriteup = { ...FINAL_STATUS, phase: 'group-review' };
+    const loaded = composeJ27PageInput({ ...base, presentation: serverPresentation, boardDraft: { status: 'present', exists: true }, transition: { status: 'present', phase: null } }, { finalWriteup });
+    expect(loaded.presentation).toEqual(serverPresentation);
+    expect(loaded.presentation.ended).toBe(true);
+    // The status still speaks for the keys it owns.
+    expect(loaded.transition).toEqual({ status: 'present', phase: 'group-review' });
+    // Legacy: the server keys are 'not-loaded' (boardDraft too), so the schedule check overwrites the presentation with ended null.
+    const legacy = composeJ27PageInput({ ...base, presentation: serverPresentation, boardDraft: NL, transition: NL }, { finalWriteup });
+    expect(legacy.presentation.ended).toBeNull();
+  });
+
+  test('serverLoaded with a failed status report leaves the server boardDraft and transition alone', () => {
+    const server = { ...serverInput(), presentation: PRES_ENDED, boardDraft: { status: 'present', exists: true }, transition: { status: 'present', phase: 'group-review' } };
+    const out = composeJ27PageInput(server, { finalWriteup: { error: true, code: 'whatever' } });
+    expect(out.boardDraft).toEqual(server.boardDraft);
+    expect(out.transition).toEqual(server.transition);
+    expect(out.presentation).toEqual(PRES_ENDED);
+    // Control: without server keys, the same failed report does make them unavailable.
+    expect(composeJ27PageInput(serverInput(), { finalWriteup: { error: true, code: 'whatever' } }).boardDraft).toEqual({ status: 'unavailable' });
+  });
+
+  test('j27OverviewInputs: meeting.stageFacts replaces presentation and roster; without it the legacy mapping applies', () => {
+    const stageFacts = { presentation: PRES_ENDED, roster: { status: 'present', stale: false } };
+    // The legacy fields disagree on purpose (no presentation, no roster): the whole keys must win.
+    expect(j27OverviewInputs({ meeting: { presentation: false, roster: false, stageFacts } })).toEqual(stageFacts);
+    expect(j27OverviewInputs({ meeting: { presentation: false, roster: false } })).toEqual({
+      presentation: { status: 'present', exists: false, id: null, ended: null, legacyException: false }, roster: ABSENT,
+    });
+  });
+
+  // List and page must agree on phase, tasks, primary task and blockers. Review-summary freshness
+  // (`summaryStale`) is deliberately not in the page facts: the owner accepted that one difference.
+  describe('parity: list stage from the server input equals page stage from page facts', () => {
+    const calendar = { status: 'present', offrampMeetingDate: '2027-03-15', reviewsDueDate: '2027-03-01', today: '2027-03-20' };
+    const counts = { candidates: 3, invited: 3, accepted: 3, received: 3, completed: 3 };
+    const row = {
+      akoya_requestid: '11111111-1111-4111-8111-111111111111', akoya_requeststatus: 'Phase II Pending',
+      wmkf_phaseistatus: PHASE_I_CHAIRS.invited, wmkf_phaseiistatus: 100000002, wmkf_readyforreview: true,
+      _wmkf_grantprogram_value: RESEARCH, wmkf_GrantCycle: { wmkf_cyclecode: 'J27' },
+    };
+    const facts = { anySuggestion: new Set([row.akoya_requestid]), integrity: new Map() };
+    const none = { status: 'present', exists: false };
+    const cases = [
+      ['presentation scheduled but not ended',
+        { presentation: PRES_UPCOMING, roster: ABSENT, boardDraft: none, transition: { status: 'present', phase: null } }],
+      ['presentation ended with no roster',
+        { presentation: PRES_ENDED, roster: ABSENT, boardDraft: none, transition: { status: 'present', phase: null } }],
+      ['Board draft shared with an ended presentation',
+        { presentation: PRES_ENDED, roster: { status: 'present', stale: false }, boardDraft: { status: 'present', exists: true }, transition: { status: 'present', phase: 'group-review' } }],
+    ];
+    test.each(cases)('%s', (_name, later) => {
+      const base = composeJ27Tier1(row, facts, { calendar, counts, later, availability: { rationale: false, reviewSummary: false, visitAssessment: false, rosterMemo: false } });
+      const server = { ...base, rationale: PRESENT, reviewSummary: PRESENT, visitAssessment: PRESENT };
+      const list = deriveJ27Stage(server);
+      const pageFacts = {
+        progress: { status: 'ready', data: { counts } },
+        overview: { meeting: { presentation: later.presentation.exists, presentationId: 'v', stageFacts: { presentation: later.presentation, roster: later.roster } } },
+        finalWriteup: { ...FINAL_STATUS, phase: later.transition.phase || 'ready', stageFacts: { presentation: later.presentation, boardDraft: later.boardDraft, transition: later.transition } },
+      };
+      const pick = (stage) => ({ phase: stage.phase, taskKeys: stage.taskKeys, primaryTask: stage.primaryTask, blockerKeys: stage.blockerKeys });
+      // The page's own server input has none of the later keys, so the page facts alone must supply them.
+      const noLater = { ...server, presentation: NL, roster: NL, boardDraft: NL, transition: NL, reviewers: { ...server.reviewers, counts: NL } };
+      expect(pick(deriveJ27PageStage(noLater, pageFacts))).toEqual(pick(list));
+      // And with the server keys supplied (the real page), the same facts leave the stage unchanged.
+      expect(pick(deriveJ27PageStage(server, pageFacts))).toEqual(pick(list));
+      expect(list.phase).not.toBe('initial-assessment');
+    });
   });
 });

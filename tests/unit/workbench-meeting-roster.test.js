@@ -162,3 +162,29 @@ test.each([['D27', 200], ['D26', 404]])('cycle %s reads with status %s', async (
   const [status] = await call('GET');
   expect(status).toBe(expected);
 });
+
+describe('stageFacts for the request page stage', () => {
+  test('no accepted presentation: presentation is null and the keys say absent', async () => {
+    // Setup has no records at all, so no presentation exists under either rule.
+    findSummariesByRequests.mockResolvedValue({ records: [] });
+    const [status, body] = await call('GET');
+    expect(status).toBe(200);
+    expect(body.presentation).toBeNull();
+    expect(body.stageFacts.presentation.exists).toBe(false);
+    expect(body.stageFacts.roster).toEqual({ status: 'absent' });
+  });
+
+  test('a saved matching roster is present and fresh, and stale once the presentation is rescheduled', async () => {
+    const body = await saveBody();
+    await call('POST', body);
+    const [, patch] = updateById.mock.calls[0];
+    getById.mockResolvedValue({ akoya_requestid: requestId, cycleCode: 'J27', _etag: visit._etag, ...patch });
+    const [, fresh] = await call('GET');
+    expect(fresh.stageFacts.roster).toEqual({ status: 'present', stale: false });
+    expect(fresh.stageFacts.presentation).toMatchObject({ status: 'present', exists: true, id: visitId });
+    // Different scheduledend than the saved binding.
+    findSummariesByRequests.mockResolvedValue({ records: [{ ...visit, scheduledend: '2027-03-01T19:30:00Z' }] });
+    const [, moved] = await call('GET');
+    expect(moved.stageFacts.roster).toEqual({ status: 'present', stale: true });
+  });
+});

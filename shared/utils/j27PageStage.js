@@ -25,6 +25,10 @@ export function j27CountsInput(progress) {
   return { status: 'present', candidates: n(c.candidates), invited: n(c.invited), accepted: n(c.accepted), received: n(c.received), completed: n(c.completed) };
 }
 
+const KEY_STATUSES = new Set(['present', 'absent', 'unavailable', 'stale', 'not-provisioned']);
+/** A stage-model key as the server reports it: an object with a known status. */
+const isWholeKey = (key) => Boolean(key) && typeof key === 'object' && KEY_STATUSES.has(key.status);
+
 const memo = (value) => (value === undefined ? null : value === null ? { status: 'unavailable' } : { status: value ? 'present' : 'absent' });
 
 /** Memo presence and the meeting record from the Overview's handoff reads. */
@@ -35,6 +39,13 @@ export function j27OverviewInputs(loaded) {
   const review = memo(loaded.review); if (review) out.reviewSummary = review;
   const visit = memo(loaded.visit); if (visit) out.visitAssessment = visit;
   const meeting = loaded.meeting;
+  // The attendance read reports whole keys by the shared server rule
+  // (j27-later-facts.js); they replace the keys outright.
+  if (isWholeKey(meeting?.stageFacts?.presentation) && isWholeKey(meeting.stageFacts.roster)) {
+    out.presentation = meeting.stageFacts.presentation;
+    out.roster = meeting.stageFacts.roster;
+    return out;
+  }
   if (meeting === null) { out.presentation = { status: 'unavailable' }; out.roster = { status: 'unavailable' }; }
   else if (meeting && meeting.presentation === false) {
     out.presentation = { status: 'present', exists: false, id: null, ended: null, legacyException: false };
@@ -46,9 +57,20 @@ export function j27OverviewInputs(loaded) {
   return out;
 }
 
-/** Board draft, transition, and the presentation's end from the Final Writeup state. */
-export function j27FinalWriteupInputs(status, presentation) {
+/**
+ * Board draft, transition, and the presentation's end from the Final Writeup state.
+ * `serverLoaded` says the server already supplied these keys for this request
+ * (resolve-request); a status read that carries no whole keys then never
+ * replaces a known presentation with an unknown one.
+ */
+export function j27FinalWriteupInputs(status, presentation, serverLoaded = false) {
   if (!status) return {};
+  const whole = status.stageFacts;
+  if (isWholeKey(whole?.boardDraft) && isWholeKey(whole.transition) && isWholeKey(whole.presentation)) {
+    return { boardDraft: whole.boardDraft, transition: whole.transition, presentation: whole.presentation };
+  }
+  // A failed status read says nothing new about facts the server already supplied.
+  if (serverLoaded && (status.error || status.available !== true)) return {};
   // "No Board draft yet" is a known state, not a failure: the tab offers the draft editor there.
   if (status.error && status.code === 'final_writeup_source_missing') {
     return { boardDraft: { status: 'present', exists: false }, transition: { status: 'present', phase: null } };
@@ -60,6 +82,7 @@ export function j27FinalWriteupInputs(status, presentation) {
     boardDraft: { status: 'present', exists: Boolean(status.sourceArtifactId) },
     transition: { status: 'present', phase: TRANSITION_PHASES.has(status.phase) ? status.phase : null },
   };
+  if (serverLoaded) return out;
   const schedule = status.presentationSchedule;
   const legacyException = LEGACY_REASONS.has(status.startCompatibilityReason);
   // Without an Overview meeting read, the schedule check still says something about
@@ -84,7 +107,8 @@ export function composeJ27PageInput(serverInput, facts = {}) {
     merged.reviewSummary = { ...merged.reviewSummary, stale: facts.summaryStale };
   }
   const presentation = merged.presentation?.status === 'not-loaded' ? null : merged.presentation;
-  return { ...merged, ...j27FinalWriteupInputs(facts.finalWriteup, presentation) };
+  const serverLoaded = Boolean(serverInput.boardDraft && serverInput.boardDraft.status !== 'not-loaded');
+  return { ...merged, ...j27FinalWriteupInputs(facts.finalWriteup, presentation, serverLoaded) };
 }
 
 export function deriveJ27PageStage(serverInput, facts) {

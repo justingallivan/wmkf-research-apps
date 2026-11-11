@@ -79,7 +79,9 @@ const J27_VIEW_LIST = Object.entries(J27_VIEWS).map(([key, meta]) => ({ key, ...
 
 // The four views that share the `scope` (my/all) URL key. Every other
 // per-view key resets on a switch; scope is carried only among these.
-const SCOPE_VIEWS = new Set(['requests', 'reviewer-follow-up', 'staff-deliberations', 'awardees', 'initial-assessment', 'peer-review', 'deliberations']);
+// Final Assessment joined them when it became a request list over the shared rows:
+// dropping the scope there reloaded the feed and changed every tab's count.
+const SCOPE_VIEWS = new Set(['requests', 'reviewer-follow-up', 'staff-deliberations', 'awardees', 'initial-assessment', 'peer-review', 'deliberations', 'final-assessment']);
 
 // Every view lives inside the shell page: links carry the shell's program and
 // cycle and switch the view shallowly (per-view filters reset on a switch,

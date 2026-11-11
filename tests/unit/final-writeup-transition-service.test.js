@@ -483,6 +483,11 @@ test.each([true, false])('status projects the exact pending Final from populated
         failedAt: '2026-08-30T19:07:00Z',
       },
     },
+    stageFacts: {
+      presentation: { status: 'present', exists: true, id: null, ended: true, legacyException: false },
+      boardDraft: { status: 'present', exists: true },
+      transition: { status: 'present', phase: null },
+    },
   });
   expectFinalStatusReadPure(harness.dependencies, purityNames);
 });
@@ -537,6 +542,11 @@ test('status ignores pending rows after a valid committed Final pointer and rema
       lastError: null,
     },
     pendingArtifact: null,
+    stageFacts: {
+      presentation: { status: 'present', exists: true, id: null, ended: true, legacyException: false },
+      boardDraft: { status: 'present', exists: true },
+      transition: { status: 'present', phase: 'group-review' },
+    },
   });
   expectFinalStatusReadPure(harness.dependencies, forbidden);
 });
@@ -1024,5 +1034,51 @@ test('every default transition request read selects Phase II status and expands 
   expect(grantRequestAdapter.getById).toHaveBeenCalledWith(REQUEST_ID, {
     select: expect.stringContaining('wmkf_phaseiistatus'),
     expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  });
+});
+
+describe('status stageFacts (request page stage model, every viewer)', () => {
+  const ENDED_PRESENTATION = { status: 'present', exists: true, id: null, ended: true, legacyException: false };
+
+  test('stage facts do not depend on who may start: a non-starting viewer sees the same ended presentation', async () => {
+    const h = createHarness();
+    const other = await getFinalWriteupStatus({ requestId: REQUEST_ID, isSuperuser: false, actingUserSystemId: OTHER_USER_ID }, h.dependencies);
+    const lead = await getFinalWriteupStatus({ requestId: REQUEST_ID, isSuperuser: false, actingUserSystemId: LEAD_PD_ID }, h.dependencies);
+    // Setup has an ended presentation, so the non-starting viewer is the case the schedule check skips.
+    expect(other).toMatchObject({ canStart: false, presentationSchedule: 'not_checked' });
+    expect(other.stageFacts.presentation.ended).toBe(true);
+    expect(lead).toMatchObject({ canStart: true, presentationSchedule: 'ended' });
+    expect(lead.stageFacts).toEqual(other.stageFacts);
+    expect(other.stageFacts.presentation).toEqual(ENDED_PRESENTATION);
+  });
+
+  test('a rejected presentation read gives an unavailable presentation for a non-starting viewer and the status still resolves', async () => {
+    const h = createHarness();
+    h.dependencies.findSiteVisits.mockRejectedValue(new Error('dataverse 503'));
+    const status = await getFinalWriteupStatus({ requestId: REQUEST_ID, isSuperuser: false, actingUserSystemId: OTHER_USER_ID }, h.dependencies);
+    expect(status.available).toBe(true);
+    expect(status).toMatchObject({ canStart: false, presentationSchedule: 'not_checked' });
+    expect(h.dependencies.findSiteVisits).toHaveBeenCalled();
+    expect(status.stageFacts.presentation).toEqual({ status: 'unavailable' });
+    expect(status.stageFacts.boardDraft).toEqual({ status: 'present', exists: true });
+  });
+
+  test('in group review the status carries the group-review transition and an existing Board draft', async () => {
+    const h = createHarness();
+    h.rows.push(finalStatusRow({
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+      wmkf_claimtoken: null,
+      wmkf_sourceversionid: '2.0',
+      wmkf_sourcecontenthash: 'gdc1:final-source-hash',
+      wmkf_groupreviewstartedat: '2026-08-30T19:05:00Z',
+      _wmkf_groupreviewstartedby_value: LEAD_PD_ID,
+    }));
+    h.request._wmkf_currentfinalwriteup_value = FINAL_ID;
+    h.source.wmkf_lifecyclestate = REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL;
+    const status = await getFinalWriteupStatus({ requestId: REQUEST_ID, isSuperuser: false, actingUserSystemId: LEAD_PD_ID }, h.dependencies);
+    expect(status.phase).toBe('group-review');
+    expect(status.stageFacts.transition.phase).toBe('group-review');
+    expect(status.stageFacts.boardDraft).toEqual({ status: 'present', exists: true });
   });
 });

@@ -88,9 +88,9 @@ export default function J27Overview({ context, requestId, reviewerProgress,
       read('staff-review-summary', r => memoPresent(r, 'summary')),
       read('staff-visit-assessment', r => memoPresent(r, 'assessment')),
       meetingRosterEnabled ? read('meeting-roster', r => (
-        r.presentation === null ? { presentation: false, roster: false }
+        r.presentation === null ? { presentation: false, roster: false, stageFacts: r.stageFacts }
           : r.presentation?.id && typeof r.stale === 'boolean'
-            ? { presentation: true, roster: Boolean(r.roster) && !r.stale, presentationId: r.presentation.id, rosterPresent: Boolean(r.roster), rosterStale: r.stale }
+            ? { presentation: true, roster: Boolean(r.roster) && !r.stale, presentationId: r.presentation.id, rosterPresent: Boolean(r.roster), rosterStale: r.stale, stageFacts: r.stageFacts }
             : null
       )) : undefined,
     ];
@@ -101,7 +101,7 @@ export default function J27Overview({ context, requestId, reviewerProgress,
         presentation: meeting?.presentation ?? meeting, roster: meeting?.roster ?? meeting });
       // Step E: the page recomputes the J27 stage from the same reads (plan C7).
       onJ27Facts?.(requestId, { overview: { rationale, review, visit,
-        meeting: meeting ? { presentation: meeting.presentation, presentationId: meeting.presentationId || null, roster: meeting.rosterPresent === true, rosterStale: meeting.rosterStale === true } : meeting } });
+        meeting: meeting ? { presentation: meeting.presentation, presentationId: meeting.presentationId || null, roster: meeting.rosterPresent === true, rosterStale: meeting.rosterStale === true, stageFacts: meeting.stageFacts } : meeting } });
     });
     return () => controller.abort();
   }, [requestId, initialRationaleEnabled, meetingRosterEnabled]);
