@@ -315,6 +315,12 @@ before slice 1 starts.
 
 ## 3a. Separate plan: Deliberations and Final Assessment lists
 
+**Status, 2026-11-11:** the separate plan is
+`docs/plans/J27_LATER_PHASE_LISTS_PLAN_2026-11-10.md`. It was reviewed by
+Codex three times, approved by the owner and built on `claude/j27-cycle-page`
+(its section 6); not promoted. The text below is this plan's original
+requirement list, kept as written.
+
 Not part of this build. Its own plan is written, given a whole-flow review
 and sent to Codex before anything is built. Starting requirements:
 
@@ -353,6 +359,9 @@ part (its section 5).
   explicit design, measured at 300 requests.
 
 ## 4. What is not built
+
+*(As planned on 2026-11-09. The Deliberations and Final Assessment lists
+named below were later built under their own plan; see section 3a.)*
 
 No new route, table, permission, status or Dataverse field. No writes from
 any list. The request list feed gains three response fields (the title,

@@ -85,7 +85,8 @@ carry `[VERIFIED via …]` or `[ASSUMED]`.
    that as hard coded." The owner expects the JXX / DXX cadence to continue
    and no wholesale change to the flow for D27, so each test becomes "2027
    or later". Each of the twelve is checked first, in case one is
-   deliberately J27-only. The same change renames the seven settings that
+   deliberately J27-only. **Built 2026-11-10** (`31ee18bb6`, alignment log
+   D64); none of the twelve was deliberately J27-only. The same change renames the seven settings that
    carry the cycle in their name (`J27_CHAIRS_RECOMMENDATION_ENABLED`,
    `J27_INITIAL_RATIONALE_SCHEMA_READY`, `J27_MEETING_ROSTER_SCHEMA_READY`,
    `J27_AUTOMATIC_INTEGRITY` and the three rehearsal and simulation ones)
@@ -319,9 +320,10 @@ support stays later.
 - Codex's second and fourth points are confirmed only in part: the Final
   writeup's readiness check and the claim that batched reads fail as a
   whole were not traced.
-- `docs/CLAUDE_REMEDIATION_PLAN.md` and the request-document Atlas page were
-  not re-read for this draft; CLAUDE.md requires both before data-layer
-  planning is final.
+- **Closed 2026-11-11:** `docs/CLAUDE_REMEDIATION_PLAN.md` was read; its
+  one applicable rule (commit probe scripts) is met by
+  `scripts/probe-sandbox-j27-fields.cjs` on the J27 line. The request-document,
+  site-visit and request Atlas pages gained reader entries for the new facts.
 - The chips in step 2 are the design brief's (its standing-chip table and
   tab descriptions). The brief's interim row, "Until the later phases are
   derived … Some details could not be read", ends when this plan is built.
@@ -354,4 +356,5 @@ fixtures when the Preview is moved, and with December's requests.
 
 **Before promotion**, in addition to the rollout plan: the Preview needs
 `STAFF_DELIBERATIONS_SITE_VISIT_STATE_STATUS_PAIRS` for group review to be
-rehearsable there, and the D26 Grant Cycle link check (rollout plan).
+rehearsable there, and `FINAL_WRITEUP_SCHEMA_READY` (set for Production and
+another rehearsal branch only, 2026-11-11) for the review stages to show, and the D26 Grant Cycle link check (rollout plan).
