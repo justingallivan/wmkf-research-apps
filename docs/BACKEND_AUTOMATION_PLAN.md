@@ -3,7 +3,7 @@ title: Long-Term Plan: Event-Driven Backend Automation via PowerAutomate
 domain: general
 kind: plan
 status: active
-summary: "Executor foundations are built; Power Automate automation remains planned. Grant Reporting integration destination is undecided."
+summary: "The single-prompt Executor is live. Power Automate submit/status integration is planned. Grant Reporting integration destination is undecided."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -16,13 +16,13 @@ related:
 
 # Long-Term Plan: Event-Driven Backend Automation via PowerAutomate
 
-**Status:** Active roadmap. The Vercel-side prompt-storage and Executor foundation shipped;
-the remaining work is Connor-owned PowerAutomate composition/operation plus the extensions
-needed for backend-first automation. This plan retains the earlier architecture discussion as
-historical context.
+**Status:** Active roadmap. The shared prompt store and single-prompt
+Executor are shipped. [PLANNED, owner decision 2026-11-10] Power Automate
+will trigger work in one shared backend through authenticated submit and
+status endpoints. See the [shared Executor job
+design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md).
 **Created:** Session 90, 2026-03-28
 **Last implementation probe:** 2026-07-27 production Power Automate metadata probe
-**Documentation boundary added:** 2026-10-31 (later Grant Reporting owner direction)
 **Stakeholders:** Justin (prompt development, Vercel app), Connor (PowerAutomate flows, Dynamics admin)
 
 ## Context
@@ -33,69 +33,46 @@ See `docs/GRANT_CYCLE_LIFECYCLE.md` for the full proposal lifecycle with stage-b
 
 ---
 
-> **Update — Session 100, 2026-04-15:** Two design decisions taken since this plan was originally written change how Phase 1+ should be approached:
->
-> 1. **Prompts move out of `.js` into a Dataverse `wmkf_ai_prompt` table** so PA can read them natively. (Shipped — Connor built the table as `wmkf_ai_prompt`, not the originally-proposed `wmkf_prompt_template`; the Executor service at `lib/services/execute-prompt.js` reads from it via the `wmkf_ai_prompts` entity set.) See `docs/PROMPT_STORAGE_DESIGN.md`. Affects Phase 1 (prompts under development now should be designed with the storage schema in mind) and Phase 4 (PA flow construction reads from this table, not from hard-coded text).
-> 2. **Workflow chaining via structured outputs** — the first call in a backend lifecycle (e.g., Phase I writeup) produces structured fields that downstream calls (compliance, PD assignment, etc.) consume from Dynamics, rather than re-reading the proposal. See `docs/WORKFLOW_CHAINING_DESIGN.md`. Materially changes what the "Summary + keyword extraction" prompt should produce, and what intermediate Dynamics fields need to exist on `akoya_request` before downstream PA flows can chain.
->
-> The "Hybrid vs. full PA composition" question was resolved in Session 102 (2026-04-16): **full PA composition**. PA owns the entire flow including direct Anthropic API calls. The architecture diagram below accurately reflects the chosen path.
+## Current foundation and target architecture
 
-> **Update — Session 110, 2026-04-25:** Phase 0 of the prompt-storage + Executor architecture is **shipped on the Vercel side**. Concrete state:
->
-> 1. **`wmkf_ai_prompt` table is live** in Dynamics with a real seed row (`phase-i.summary`, GUID `d4201d8e-3840-f111-88b5-000d3a3065b8`). Seed script at `scripts/seed-phase-i-summary-prompt.js` is idempotent and round-trips cleanly. Field names finalized: `wmkf_ai_systemprompt`, `wmkf_ai_promptbody`, `wmkf_ai_promptvariables`, `wmkf_ai_promptoutputschema`, plus the new `wmkf_ai_Prompt` Lookup on `wmkf_ai_run` for provenance.
-> 2. **`executePrompt()` Executor service** lives at
-> `lib/services/execute-prompt.js` and implements the 10-step contract in
-> `docs/EXECUTOR_CONTRACT.md`, including output guards
-> (`skip-if-populated` / `always-overwrite` + `forceOverwrite`). It attempts an
-> audit row for blocked, completed/needs-review, and thrown-failure outcomes,
-> but audit persistence is fallible and a failure path can carry
-> `runId = null`. Structured target writes also report per-output results and
-> can return `allOk = false`; callers must not equate model completion with
-> durable write success. Phase 0 source kinds were `dynamics`, `sharepoint`,
-> and `override`; target kinds were `akoya_request` (with optional `$.foo`
-> jsonPath) and `none`; parse modes were `raw` and `json`.
-> 3. **Reference call site refactored** — `pages/api/phase-i-dynamics/summarize-v2.js` shrank from 292 → 145 lines and now does only Vercel-specific concerns (auth, rate limit, file load from `fileRef`, 409 shaping, per-user usage logging). UI compatibility preserved.
-> 4. **Strategic shift on user-facing intake apps** — see `memory/project_phase_i_summary_app_winddown.md`. Phase I summary as a user-facing task is winding down post-May-2026 cycle; future intake prompts (compliance, fit-assessment, keywords) should be designed **backend-first** (PA-triggered) rather than as new Vercel routes. At the time, user-driven apps including reviewer finder, Phase II tools, Expertise Finder, Grant Reporting, and Review Manager were described as staying in active development.
+[VERIFIED via `lib/services/execute-prompt.js` and
+`pages/api/phase-i-dynamics/summarize-v2.js`] The Vercel Executor reads
+versioned Dataverse prompts, resolves declared sources, validates model
+results, coalesces eligible Request field writes, and attempts to write an
+invocation audit to `wmkf_ai_run`. Audit persistence and Request writeback
+can fail independently. The first reference prompt, `phase-i.summary`,
+shipped in April 2026. See [Executor Contract](EXECUTOR_CONTRACT.md).
+
+### Automated AI tasks [PLANNED]
+
+1. Power Automate detects a configured lifecycle event and submits the
+   approved Request and task keys to the backend.
+2. The backend prepares authorized source material and executes the tasks
+   through the shared Executor. It owns validation, the invocation audit,
+   and conditional writeback to approved destinations.
+3. Power Automate polls job status and handles business branching,
+   notifications, and follow-up.
+
+The owner selected Executive Summary and Methodology as the first pilot.
+Planned inputs include a mix of applicant-submitted and assembled documents
+and PI fields sourced directly from Dataverse. The destination is eventually
+approved Request fields. A synthetic trial comes first so the flow and job
+contract can be exercised while the real field mappings are finalized.
+The profiles, job service, and Power Automate endpoint integration are
+planned work.
+
+### Historical decisions and production probe
+
+Session 102 (2026-04-16) chose full Power Automate composition to make the
+flow easier for Connor to debug in one place and remove a Vercel runtime
+dependency. Session 109 proposed a matching `ExecutePrompt` child flow.
+A read-only production probe on 2026-07-27 scanned 114 cloud-flow definitions
+visible to the Dataverse application user. None referenced `wmkf_ai_*`
+fields or tables, Executor routes, Claude/Anthropic, or the WMKF Vercel app.
+This was a dated probe of visible definitions. The owner superseded the
+Power Automate-native design on 2026-11-10.
 
 > **Later Grant Reporting direction (owner, 2026-10-21):** the standalone Grant Reporting app is out of date; the owner intends to integrate useful features elsewhere, but destination, scope, and timing remain undecided and no implementation has been requested. The active app still exists, but this older roadmap's Grant Reporting placement and any assumed PA/UI writeback destination are not current direction. See `.claude-memory/project-grant-reporting-rework.md`. Interim-report evaluation also remains undecided pending that product-direction review; see `.claude-memory/project-interim-report-automation.md`.
->
-> **Phase 1 implications for Connor:** the `ExecutePrompt` PA child flow builds against `docs/EXECUTOR_CONTRACT.md` — same 10 steps, same prompt-row schema, same `wmkf_ai_run` write contract. The Vercel implementation is the test oracle (echo-prompt parity). PA-side `forceOverwrite` defaults to caller's choice — see contract § "Notes for caller authors" for explicit guidance per parent flow type. The `phase-i.compliance` prompt row was deferred from Phase 0; when authored, it's a backend-first prompt.
->
-> **Executor extensions still pending** before backend automation can do compliance/fit/keywords: native PDF input (`preprocess: pdf_native`), multi-output PATCH coalescing (current Executor's same-row second-PATCH would 412), Picklist-target output type. None blocking May 1; needed before backend intake automation.
-
-> **Update — Session 103, 2026-04-17:** Three empirical findings affect PA flow design:
->
-> 1. **`{{var}}` interpolation syntax verified on the Next.js side** (still needs a PA-side confirmation). Dataverse Memo fields holding `{{proposal_text}}`-style placeholders round-trip cleanly through OData — `{{` is not interpreted as an expression. See `docs/archive/CONNOR_QUESTIONS_2026-04-15.md` Q3.
-> 2. **Historical Sonnet 4.6 observation (Session 103):** the April test measured an
-> ~2,048-token effective floor. That is not current guidance: Anthropic now documents a
-> 1,024-token minimum for Sonnet 4.6. PA flows must check the concrete model's current floor
-> in [Anthropic's prompt-caching documentation](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)
-> before deciding whether a marker is useful.
-> 3. **Image handling creates a path asymmetry.** PA backend strips images in a pre-filter (lean, text-only); user-side Vercel paths likely keep PDFs with images intact. The cached content profiles differ significantly — a user-side PDF with figures may be 12–20K tokens vs. 5–7K text-only. Caching ROI is correspondingly higher on the user-side path.
->
-> Related: Session 103 shipped a working prototype of the Dynamics-stored-prompt pattern against the Phase I test endpoint — see the "Session 103 prototype findings" section of `PROMPT_STORAGE_DESIGN.md`. **Update:** the Executor (`lib/services/execute-prompt.js`) is now the live prompt-execution path — it reads current prompt rows from Dataverse entity set `wmkf_ai_prompts` and writes audit rows to `wmkf_ai_runs`. The earlier `PromptResolver` service is a Session 103 holdover that reads a scratch row on `wmkf_ai_runs`; it is still in tree but is used only by scripts, not by live API routes.
->
-> Also in Session 103: a **proposal context extraction plan** (`docs/PROPOSAL_CONTEXT_EXTRACTION_PLAN.md`) that extends the workflow-chaining idea for the upcoming single-phase cycle. Proposes ~15 structured fields the initial pass should extract so deep-dive calls (reviewer matching, panel review, compliance) read ~1.5K tokens of curated context instead of the full ~7K-token proposal. Compounds with expensive models and multi-LLM panel work. Not blocking v1; factored in when planning single-phase cycle Dynamics fields.
-
-## Target architecture (Power Automate prompt pipeline not deployed)
-
-### Automated AI Tasks (PowerAutomate → Claude API → Dynamics)
-
-The intended Power Automate flows handle automated backend processing:
-1. Detect status change or document arrival in Dynamics
-2. Fetch proposal PDFs from SharePoint
-3. Call Claude API directly (HTTP connector with API key)
-4. Write results back to Dynamics fields
-
-Under the chosen target architecture, the Vercel app is **not in the loop** for
-those automated tasks. A read-only production probe on 2026-07-27 scanned all
-114 cloud-flow definitions visible to the Dataverse application user. None
-referenced any `wmkf_ai_*` field/table, the Executor routes, Claude/Anthropic,
-or the WMKF Vercel app. The corresponding PA prompt flows,
-triggers, retries, and prompt-parity behavior are therefore **not deployed in
-the visible production flow metadata**; Phase 4 below remains planned work.
-
-> **Decision (2026-04-16, Session 102):** Full PA composition confirmed. PA owns the entire Claude call lifecycle for automated backend jobs — no Vercel dependency at runtime. This matches the original architecture above. Rationale: easier to debug PA-native flows, and backend automation is mission-critical. PA handles PDF extraction natively (confirmed 2026-04-15). Retry, `cache_control`, and JSON validation will be implemented in PA flows. See `PROMPT_STORAGE_DESIGN.md` for full decision record.
 
 ### Human-Initiated Tasks (Vercel App → Dynamics)
 
@@ -113,20 +90,20 @@ Where their implementation contracts call for it, reviewer-finding and review-ma
 New AI capabilities (compliance screening, PD assignment, staff matching) are developed by:
 1. Building and testing prompts against historical proposals via batch evaluation tools in the Vercel app
 2. Iterating with staff feedback until accuracy is acceptable
-3. Handing proven prompts to Connor for deployment in PowerAutomate flows
+3. Publishing approved shared prompts and coordinating with Connor on the task keys used by the flows
 
 ---
 
 ## Phase 1: Prompt Development & Batch Evaluation
 
-**Goal:** Build tools to develop, test, and validate prompts against historical proposals. Proven prompts are then deployed by Connor in PowerAutomate flows.
+**Goal:** Build tools to develop, test, and validate prompts against historical proposals. Approved shared prompts are published in Dataverse and invoked by the backend.
 
 **AI tasks to develop prompts for (ordered by lifecycle priority):**
 1. **Compliance checking** — does the application meet Foundation requirements? (lifecycle step 4)
 2. **Summary + keyword extraction** — generate summary and keywords for Dynamics fields (lifecycle step 4)
 3. **PD assignment by specialty area** — route proposals to the right program director (lifecycle step 6, rules to be built from scratch)
 4. **Phase II compliance** — similar to Phase I but requirements may differ (lifecycle step 14)
-5. **Staff-proposal matching** — route to staff lead, flag for consultant, identify relevant board members. **Now powered by the Expertise Finder app** (`pages/expertise-finder.js`) with the roster managed in Vercel Postgres (`expertise_roster` table). Prompt text and model live in the `expertise-finder.match` Dataverse prompt row, editable in Admin → Prompt Templates (row definition: `shared/config/prompts/expertise-finder-dynamics.js`). When validated, hand prompt to Connor for automated PowerAutomate flow.
+5. **Staff-proposal matching** — route to staff lead, flag for consultant, identify relevant board members. **Now powered by the Expertise Finder app** (`pages/expertise-finder.js`) with the roster managed in Vercel Postgres (`expertise_roster` table). Prompt text and model live in the `expertise-finder.match` Dataverse prompt row, editable in Admin → Prompt Templates (row definition: `shared/config/prompts/expertise-finder-dynamics.js`). Any future automation would need an approved backend task contract and an appropriate trigger.
 
 ### What to build
 
@@ -169,7 +146,7 @@ A Vercel app page + API endpoint that:
 2. Run batch evaluation against historical proposals
 3. Review CSV results with staff — annotate where AI was right/wrong
 4. Refine prompt, re-run, compare improvement
-5. When accuracy is acceptable, hand prompt to Connor for PowerAutomate deployment
+5. When accuracy is acceptable, publish the shared prompt and give Connor the approved backend task key for the flow.
 
 #### Vercel timeout management
 - Large batches exceed the 300s function timeout
@@ -282,9 +259,12 @@ For the remaining Postgres-only tables (integrity, panel, expertise), the same p
 
 ## Phase 4: PowerAutomate Flow Configuration
 
-**Goal:** Configure the automated AI processing flows in PowerAutomate. This is primarily Connor's work in the Power Platform.
+**Goal:** Configure the Power Automate lifecycle triggers and follow-up flows. The backend owns shared execution and publication.
 
-### Flows to build
+### Broader lifecycle flow candidates
+
+The following candidates preserve the earlier lifecycle roadmap. The first
+shared backend pilot covers Executive Summary and Methodology.
 
 | Flow | Trigger | AI Task | Status |
 |------|---------|---------|--------|
@@ -296,26 +276,23 @@ For the remaining Postgres-only tables (integrity, panel, expertise), the same p
 | Phase II AI check-in | File organization complete | Claude: compliance (+ TBD) | Planned |
 | Phase II staff version | AI check passes compliance | — (PDF formatting) | Planned |
 
-### Flow architecture (each AI flow)
+### Planned flow architecture
+
 ```
-Dataverse trigger (status change on akoya_request)
-  → SharePoint: get files from request folder
-  → For each PDF:
-    → SharePoint: get file content
-    → HTTP: call Claude API directly (with proven prompt from Phase 1)
-    → Parse response
-    → Dataverse: update akoya_request with AI results
-  → On failure: email Connor + Justin
+Dataverse lifecycle trigger
+  → Authenticated backend submit for approved task keys
+  → Poll authenticated status using the returned job ID
+  → Branch on the job outcome and notify the appropriate staff
 ```
 
-### Trigger conditions
-To be determined during flow construction — the proposal process is actively evolving, so exact status values and conditions will be customized as flows are built.
+Trigger conditions and approved tasks are configured with Connor. Justin
+owns the shared job service and approved prompt/task configuration. Connor
+owns Power Platform triggers, authentication setup, and business follow-up.
 
-### Who does what
-- **Justin:** develops and validates prompts (Phase 1), provides proven prompts for flows
-- **Connor:** builds flows in Power Platform, configures triggers and Dataverse connectors, handles error notification routing
-
-**Dependencies:** Phase 1 (proven prompts ready for deployment).
+**Dependencies:** the approved backend job contract, connection setup, and
+published task configuration. The synthetic trial can run before the real
+Request-field mappings are complete. Production writeback requires the
+reviewed mappings and the destination-specific conditional write contract.
 
 ---
 
@@ -340,11 +317,12 @@ Can start now:
 
 Connor (parallel):
   Create custom fields on akoya_request for AI outputs
-  Draft PowerAutomate flows (trigger logic, SharePoint file retrieval)
+  Draft Power Automate trigger and follow-up logic
   Grant write permissions on app registration
 
-After Phase 1 prompts are validated:
-  Phase 4: PowerAutomate Flow Configuration (deploy prompts in flows)
+After the shared job and endpoint contract is implemented:
+  Phase 4: Connect Power Automate triggers and test submit/status with synthetic inputs
+  Enable real tasks after prompt validation and destination mapping
 
 ~~When Connor grants write permissions~~ — granted (S77 era):
   Phase 2: Dynamics Write-Back (human-initiated tools) — SHIPPED
@@ -365,7 +343,7 @@ All within Connor's access — no external IT or vendor dependencies.
 1. **Custom fields on `akoya_request`** for AI outputs — fields spec'd in `docs/GRANT_CYCLE_LIFECYCLE.md`
 2. **Write permissions** for app registration — custom security role with `prvUpdate` on `akoya_request`. App ID: `d2e73696-537a-483b-bb63-4a4de6aa5d45`
 3. **Dynamics entities** for data migration — schema for reviewer data, screenings, panel reviews, etc.
-4. **PowerAutomate flows** — build flows per Phase 4 specs using prompts developed in Phase 1
+4. **Power Automate flows** — configure triggers and status handling for approved backend task keys
 5. **Premium connectors** — available, no licensing blocker
 6. **Pending from previous sessions:** None as of 2026-05-08 — all original asks resolved (Email Sender role granted; `Sites.Selected` read + write granted; Contact AppendTo granted; Mail.Send retired). See `docs/archive/PENDING_ADMIN_REQUESTS.md` for history.
 
@@ -376,7 +354,7 @@ All within Connor's access — no external IT or vendor dependencies.
 - **Phase 1:** Batch evaluation produces CSV with AI assessments alongside actual outcomes; staff confirm accuracy is acceptable
 - **Phase 2:** Save reviewer candidate in UI → verify data appears in Dynamics
 - **Phase 3:** Migrate test data → verify Vercel app reads from Dynamics correctly
-- **Phase 4:** Upload test proposal to Dynamics → verify AI results appear automatically via PowerAutomate flow
+- **Phase 4:** Use a synthetic event to verify authenticated submit, repeat delivery, status polling, and terminal outcome handling. Verify real Request writeback after field mappings and write policies are approved.
 - **Phase 5:** Deliberately fail a processing job → verify alert fires
 
 ---

@@ -3,7 +3,7 @@ title: "Workflow Chaining & Token Efficiency (Design Principle)"
 domain: prompt-executor
 kind: spec
 status: active
-summary: "Chaining fields and Vercel Executor persistence are live; the end-to-end Power Automate DAG remains unbuilt target architecture."
+summary: "Chaining fields and Executor writeback are live. Power Automate-triggered jobs and the lifecycle DAG are planned."
 canonical: true
 cataloged: 2026-07-02
 owner: product-engineering
@@ -28,14 +28,17 @@ tracked/deployed schema; prompt rows can declare
 `wmkf_ai_promptoutputschema`; and the Executor can parse structured output and
 coalesce declared targets onto the request write.
 
-The end-to-end lifecycle DAG below remains **TARGET ARCHITECTURE**. A read-only
-production probe on 2026-07-27 scanned all 114 cloud-flow definitions visible
-to the Dataverse application user; none referenced any `wmkf_ai_*` field/table,
-the Executor routes, Claude/Anthropic, or the WMKF Vercel app. The current
-production PA ingest/chaining DAG is therefore **NOT DEPLOYED in the visible
-flow metadata**. No current PA producer populates all six fields as this design
-describes, and the proposed downstream compliance, reviewer-matching,
-portfolio, and PD-assignment consumers remain unbuilt.
+The end-to-end lifecycle DAG below remains **TARGET ARCHITECTURE**. The
+owner decided on 2026-11-10 that Power Automate will call one shared backend
+through authenticated submit and status endpoints. The [shared Executor job
+design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md) specifies the
+planned execution profiles and durable job service.
+
+A read-only production probe on 2026-07-27 scanned all 114 cloud-flow
+definitions visible to the Dataverse application user. It found no reference
+to `wmkf_ai_*` fields or tables, the Executor routes, Claude/Anthropic, or the
+WMKF Vercel app. The proposed downstream compliance, reviewer-matching,
+portfolio, and PD-assignment consumers below are part of the target design.
 
 > Companion to `PROMPT_STORAGE_DESIGN.md`. Storage is about *where prompts live*. This doc is about *how workflows use them* — specifically, how to pass data between steps without re-uploading the source document to Claude on every call.
 
@@ -43,9 +46,14 @@ portfolio, and PD-assignment consumers remain unbuilt.
 
 ## Principle
 
-**A proposal should be read by Claude as few times as possible.** The first call that receives the full proposal text should extract everything downstream steps will need. Subsequent calls consume structured fields from Dynamics, not the original document.
+**Reduce repeated reads of the full proposal.** An upstream task can extract and persist context for downstream tasks that can use structured fields.
 
-This is a token-efficiency principle but also a design principle — it forces explicit thinking about what data a workflow produces and consumes, which makes PA flows easier to reason about.
+This principle makes each workflow's data dependencies explicit. Where two
+independent tasks both need the original proposal, the planned execution profile
+can prepare one authorized snapshot and share a cache-compatible prefix. The
+Executive Summary and Methodology pilot will exercise that path. The lifecycle
+DAG below illustrates the separate case where downstream tasks can use
+structured outputs from an upstream task.
 
 ## Three techniques that serve it
 
@@ -71,20 +79,20 @@ Instead of splitting extraction into multiple Claude calls — Call 1 = summary,
 - Pro: one call vs. several — saves re-uploads of the input
 - Pro: forces an explicit extraction schema, which is good discipline
 - Con: complex prompts can degrade the model's attention on individual fields. Not every task is a fit.
-- Con: JSON reliability — Claude's JSON output is good but not perfect. Schema validation + malformed-JSON retry is necessary. PA's native JSON handling is brittle; this becomes an argument for hybrid composition.
+- Con: structured output requires schema validation and an explicit failure policy. The backend handles validation for shared jobs.
 
 ### 2. Prompt caching (Anthropic `cache_control`)
 
-Mark the stable prefix of a prompt with `cache_control`; Anthropic caches it and subsequent calls to the same prefix within TTL cost ~10% of the cached portion.
-
-**Caveats for backend workflows:**
-- Ephemeral cache TTL is ~5 minutes
-- PA workflows frequently span more than 5 minutes between steps (human approval gates, scheduled runs, batch processing)
-- Net: caching helps Vercel apps where calls cluster in a single user session. For PA flows, either design spatially-tight clusters or accept no cache benefit.
+The current Executor marks the completed system block. Document text in the
+user message comes after that marker. The proposed execution profile would
+place the shared protected document prefix before the marker and run compatible
+tasks close together in the backend. A workflow that pauses for approvals or a
+schedule may exceed the cache lifetime. Verify hits from provider usage.
 
 ### 3. Intermediate data capture
 
-**The structural fix, and the one we should design the backend around.** First expensive call persists structured outputs to Dynamics fields. Every downstream step reads those fields, not the proposal text.
+An upstream task can persist structured outputs to Dynamics fields. Downstream
+tasks can reuse those fields when they provide enough context for the task.
 
 ## Target worked example: Phase I proposal lifecycle
 
@@ -115,7 +123,9 @@ One call reads the proposal. Four or five downstream steps read structured field
 
 ### Prompts declare their outputs
 
-Today's Vercel prompts return unstructured markdown. Target-state Pattern A prompts should declare their structured outputs explicitly, so downstream callers and the dashboard know what fields they produce:
+The shipped Executor already supports declared structured outputs. The
+examples in this section are conceptual sketches. Use the actual schema in
+[Executor Contract](EXECUTOR_CONTRACT.md) for implementation.
 
 ```json
 // wmkf_ai_prompt.wmkf_ai_promptoutputschema for phase-i-writeup
@@ -172,13 +182,10 @@ The original blockers classify as follows:
    A generalized automatic `{source:"..."}` input resolver is not established
    by this document and should not be assumed.
 
-3. **PA flow complexity — PLANNED/UNBUILT.** The 2026-07-27 production probe
-   found no prompt-Executor flow. Any future PA ingest flow still needs
-   equivalent parse, validation, coalesced write, and retry behavior.
-
-4. **Validation parity — VERCEL SHIPPED / PA UNBUILT.** Vercel Executor
-   structured parsing/output checks are live. There is no deployed PA side
-   against which to claim validation/retry parity.
+3. **Power Automate integration — PLANNED.** The July 2026 probe found no
+   prompt-Executor flow in the visible production metadata. The planned flows
+   submit and poll jobs through authenticated backend endpoints. The shared
+   backend owns model calls, parsing, validation, and governed writeback.
 
 ## Honest caveats
 

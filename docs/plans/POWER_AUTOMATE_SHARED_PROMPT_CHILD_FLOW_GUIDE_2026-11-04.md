@@ -2,21 +2,28 @@
 title: Shared-prompt Power Automate child flow guide
 domain: prompt-executor
 kind: plan
-status: draft
-summary: Saved instructions proposed for Connor's reusable child flow; a bounded initial subset of the Executor contract, not an implemented Power Automate executor.
+status: superseded
+summary: Superseded 2026-11-10. Historical proposal for a Power Automate-native child flow.
 canonical: false
 owner: product-engineering
 related:
   - docs/EXECUTOR_CONTRACT.md
+  - docs/plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md
   - docs/plans/SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md
 ---
 
-# Instructions for Connor: reusable shared-prompt child flow
+# Superseded Power Automate child-flow proposal
 
-Saved from the 2026-11-04 discussion at session close. [PLANNED] No child flow
-was built or deployed in this session. The authoritative full contract is
-`docs/EXECUTOR_CONTRACT.md`; this guide proposes a deliberately small first
-implementation and must not be represented as full Executor parity.
+**Superseded by the owner on 2026-11-10.** Power Automate will use the
+authenticated submit and status endpoints of the planned [shared Executor
+backend](SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md).
+
+## Historical design record (2026-11-04)
+
+The recipe below records the unimplemented proposal from that discussion.
+Its scope, build sequence, and acceptance examples apply to the superseded
+design. See [Executor Contract](../EXECUTOR_CONTRACT.md) for the shipped
+single-prompt service.
 
 ## Responsibility split
 

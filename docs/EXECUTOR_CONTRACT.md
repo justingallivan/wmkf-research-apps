@@ -17,30 +17,29 @@ related:
 
 # Executor Contract
 
-**Status:** SHIPPED on the Vercel side — this doc describes the contract that
-`lib/services/execute-prompt.js` implements in production today (used by the Phase I summary route
-and multiple live grantee, field-primer, and review services). A Power Automate implementation is a deferred target, not a
-second current implementation. The original "May 1 2026 cycle target" framing is historical.
+**Status:** [VERIFIED via `lib/services/execute-prompt.js` and its callers] This
+contract describes the shipped single-prompt Executor. Its callers include the
+Phase I summary route and grantee, field-primer, and review services.
+**Power Automate direction (owner, 2026-11-10):** [PLANNED] Power Automate will
+submit work to the same backend through authenticated job submit and status
+endpoints. The [shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md)
+specifies the proposed profiles and job service. This decision supersedes the
+earlier Power Automate child-flow implementation proposal.
 **Created:** 2026-04-24 (Session 109, reconciliation pass)
-**Last status update:** 2026-09-12 (opt-in OpenAI provider seam for governed prompt snapshots)
-**Owners:** Justin (Vercel implementation — shipped); Connor would own any future Power Automate implementation
+**Last status update:** 2026-11-10 (planned Power Automate integration)
+**Owners:** Justin (backend Executor); Connor (Power Automate trigger and follow-up flows)
 **Related docs:** `docs/PROMPT_STORAGE_DESIGN.md`, `docs/BACKEND_AUTOMATION_PLAN.md`, `docs/WORKFLOW_CHAINING_DESIGN.md`, `docs/GRANT_CYCLE_LIFECYCLE.md`
 
 ---
 
 ## Purpose
 
-The Executor is the contract implemented by the Vercel `executePrompt()` service function and
-reserved for a future Power Automate `ExecutePrompt` child flow. Today, only the Vercel
-implementation exists. A future PA implementation must perform the same ten steps with the same
-inputs and outputs so that:
-
-- A prompt row authored once in `wmkf_ai_prompt` can serve both caller types without duplication.
-- Cache prefixes can be made byte-identical if/when a second runtime exists.
-- `wmkf_ai_run` rows from either runtime will remain structurally coherent.
-- Adding a shared prompt does not require maintaining divergent prompt bodies in two runtimes.
-
-The Executor is the **function invoker**. The prompt row is the **function definition**. Chains and triggers are the **Flow's** job, not the Executor's.
+The Executor invokes one published prompt per call. It resolves the Dataverse
+prompt row or accepts a server-owned prompt snapshot, composes the input, calls
+the provider, validates the response, and attempts an invocation audit.
+Callers define sequencing and business follow-up. The planned job service will
+coordinate task admission and durable execution for application and Power
+Automate callers using that same invocation boundary.
 
 ## Scope of generality
 
@@ -48,10 +47,10 @@ The contract covers **Pattern A + dual-caller prompts and Pattern B/C Vercel-onl
 
 **In scope:**
 - Single-shot Anthropic prompts and explicitly allowed OpenAI prompt snapshots (system + user, no multi-turn)
-- Backend-triggered (PA, on Dynamics status change) and user-triggered (Vercel button) callers
+- Server-side callers, including user-triggered Vercel routes. Power Automate status triggers are planned through the job service.
 - Summarization, classification, multi-output extraction
 - Prompts that mix Dynamics-sourced inputs, SharePoint file inputs, and caller-supplied overrides
-- Sequential chains (output → input via shared Dynamics fields) and parallel-consumer chains (shared context block)
+- Individual invocations within caller-orchestrated sequences. Callers can use persisted Dynamics outputs or pass approved shared inputs to multiple calls.
 
 **Out of scope (separate code paths):**
 - Tool-use / agent loops (Dynamics Explorer)
@@ -255,18 +254,18 @@ complete when Dataverse logging is unavailable.
 
 ## The 10 steps
 
-| # | Step | Future PA action (target contract) | Current Vercel implementation |
-|---|---|---|---|
-| 1 | Resolve prompt | HTTP GET `wmkf_ai_prompts?$filter=wmkf_ai_promptname eq '<name>' and wmkf_ai_iscurrent eq true&$top=1` | `execute-prompt.js` queries `wmkf_ai_prompts` directly via Dataverse (NOT via `PromptResolver` — that's the legacy `wmkf_ai_runs` scratch-row path, used now only by audit scripts) |
-| 2 | Parse variable declarations | Parse JSON on `wmkf_ai_promptvariables` | `JSON.parse(row.wmkf_ai_promptvariables)` |
-| 3 | Resolve variable values | Apply-to-each + Switch on `source.kind` | Loop + switch; source kinds handled by dedicated resolvers |
-| 4 | **Preflight output guards** | For each output with `guard != "always-overwrite"`, GET target field. If populated AND `forceOverwrite = false` → write `wmkf_ai_run` with status `Needs Review`, return `{ blocked: true, conflicts, runId }`. Capture `@odata.etag` per target for step 8's `If-Match`. | Same. Skip steps 5–8 on block. |
-| 5 | Compose provider payload | Compose action: system + user blocks; `cache_control: {type:"ephemeral"}` at the Anthropic prefix boundary | Compose one system block plus one user message after applying A7 boundaries. |
-| 6 | Call provider | HTTP action → explicitly allowed provider API | `callProvider()` dispatches by the reviewed capability row: Anthropic → `LLMClient.complete()`; OpenAI → `OpenAIClient.complete()`. Both use `safeFetch`, abortable timeouts, retry, and key redaction. Anthropic retains its cache marker and native structured-output behavior. OpenAI uses the reviewed instruction role and Phase A keeps provider-native structured output disabled. No `appName` is passed, so the Executor does not write `api_usage_log`. |
-| 7 | Validate termination + parse output | Require a clean terminal response, then parse the complete joined text using `wmkf_ai_promptoutputschema.jsonSchema` (or treat as raw text when `parseMode = "raw"`) | Requires `stopReason="end_turn"` before parsing/persistence. Joins every text content block. Applies required-key checks and then the optional local `validationSchema`. |
-| 8 | Persist outputs | Coalesce all `akoya_request` outputs into **one** PATCH with `If-Match: <etag>` from step 4. Direct field writes (no `jsonPath`) merge into the payload as `{ field: value }`. `jsonPath` outputs grouped by field: GET the current memo, apply each `$.path` write in declaration order (later writes win on key collisions), serialize back, add the merged JSON to the same payload. Two direct outputs writing the same field (no `jsonPath`) throws at preflight as a schema error. Success or failure is uniform across all contributors: a 412 marks every eligible output as `concurrent_edit`. Persistence errors become structured `writeResults`, not necessarily thrown errors. | Same coalesced PATCH and structured result |
-| 9 | Log Execution | Attempt to create `wmkf_ai_run`: Lookup to prompt row, `wmkf_ai_promptversion`, `wmkf_ai_runsource`, `wmkf_ai_status`, `wmkf_ai_model`, `wmkf_ai_rawoutput` according to `rawOutputRetention`, token/cache counts in `wmkf_ai_notes`, `wmkf_ai_request` Lookup | Same; logging failure is fail-visible and can leave `runId=null` on a thrown path |
-| 10 | Return | Return parsed output, audit id, cache/guard state, structured write results, usage, and metadata | `return { parsed, runId, cacheHit, blocked, conflicts, writeResults, usage, usageComplete, meta }` |
+| # | Step | Current implementation |
+|---|---|---|
+| 1 | Resolve prompt | Use the sole current Dataverse prompt row by name, or validate a server-owned prompt snapshot. |
+| 2 | Parse declarations | Parse the row's variable declarations and output schema. |
+| 3 | Resolve variable values | Resolve each declared source kind and apply any declared A7 payload boundaries. |
+| 4 | **Preflight output guards** | Inspect populated targets and capture the Request ETag for step 8. If a guarded target is populated and `forceOverwrite` is false, attempt a `Needs Review` audit row and return `{ blocked: true, conflicts, runId }` without steps 5–8. |
+| 5 | Compose provider payload | Compose one system block and one user message from the prompt templates and resolved variables. |
+| 6 | Call provider | `callProvider()` dispatches by the reviewed capability row: Anthropic → `LLMClient.complete()`; OpenAI → `OpenAIClient.complete()`. Both use `safeFetch`, abortable timeouts, retry, and key redaction. Anthropic retains its cache marker and native structured-output behavior. OpenAI uses the reviewed instruction role and Phase A keeps provider-native structured output disabled. No `appName` is passed, so the Executor does not write `api_usage_log`. |
+| 7 | Validate termination + parse output | Require `stopReason="end_turn"` before parsing/persistence. Join every text content block. For JSON, apply required-key checks and then the optional local `validationSchema`. |
+| 8 | Persist outputs | Coalesce all eligible `akoya_request` outputs into one PATCH using the ETag from step 4 when present. Direct field writes merge into the payload. For JSON paths, read the current memo and merge paths in declaration order. Two direct outputs for one field cause a schema error before writeback. A 412 marks all eligible outputs as `concurrent_edit`; persistence failures are reported through `writeResults`. |
+| 9 | Log execution | Attempt to create a `wmkf_ai_run` row. See the logging contract for fields and failure handling. |
+| 10 | Return | `{ parsed, runId, cacheHit, blocked, conflicts, writeResults, usage, usageComplete, meta }` on success. See the return contract for blocked calls. |
 
 ---
 
@@ -310,24 +309,24 @@ complete when Dataverse logging is unavailable.
 | `sharepoint` | Fetch file by pattern from the SharePoint buckets for this request | Graph API GET + preprocess |
 | `override` | Value from `overrideVariables` input; fall back to `default` | Read from input |
 
-**Source kinds (Phase 1+):**
+**Source kinds considered in the earlier design (unimplemented):**
 
 | Kind | Meaning | Phase |
 |---|---|---|
 | `prior_output` | Value from a field a prior Execution wrote (implicit chaining via Dynamics) | Phase 1 |
 | `context_block` | Recursively assemble another prompt row tagged as `Context` | Phase 2 |
 
-**Preprocess hints (Phase 0):** `pdf_to_text` only — the live `execute-prompt.js` throws on any other hint. `docx_to_text`, `truncate_tokens:N`, `strip_images` are deferred until needed. If a PA implementation is added, every supported hint must be implemented and tested in both runtimes.
+**Preprocess hints (Phase 0):** `pdf_to_text` only — the live `execute-prompt.js` throws on any other hint. `docx_to_text`, `truncate_tokens:N`, `strip_images` are deferred until needed.
 
-**Placement attribute (Phase 0 — present but single-valued):** v0 only supports `placement: "user"`. Phase 2 adds `placement: "system"` for context-block variables that need to be part of the cacheable system-array prefix.
+**Placement attribute (Phase 0 — present but single-valued):** v0 only supports `placement: "user"`. Earlier designs considered `placement: "system"` for context blocks. The proposed execution profile defines composition for the new shared-prefix mode.
 
 **`cacheable` flag:** Phase 0 stores this declaration but does not use it to place variables
 relative to the cache boundary. `composeMessages()` interpolates variables wherever their
 placeholders occur in the stored system/body templates, and the Anthropic transport marks the completed
 system block. An identical rerun can be cache-eligible when its composed prefix is unchanged
 (including stable nonces for opted-in untrusted variables), but a cache hit must be verified
-from response usage rather than assumed. Cross-prompt alignment still requires Phase-2 context
-blocks.
+from response usage. Cross-prompt document-prefix reuse is proposed in the
+[shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md).
 
 **Data classification + payload boundary (added 2026-05-04):** A variable can declare two additional optional fields to opt into the shared AI payload-boundary helper:
 
@@ -340,7 +339,7 @@ blocks.
 
 - The bounded value is what reaches the prompt body / system block.
 - Source string is `executor.<promptName>.<variableName>` (e.g. `executor.phase-i.summary.proposal_text`), so audit logs and tests can distinguish Executor-driven boundaries from route-driven ones.
-- Boundary metadata (`source`, `dataClass`, `maxChars`, `originalChars`, `transmittedChars`, `truncated`, `truncationMarker`) is returned on `result.meta.aiPayloadBoundaries` (array, one entry per bounded variable). The `wmkf_ai_run` notes string also captures a compact form of the metadata (no content) so unattended PA-triggered runs keep an audit trail.
+- Boundary metadata (`source`, `dataClass`, `maxChars`, `originalChars`, `transmittedChars`, `truncated`, `truncationMarker`) is returned on `result.meta.aiPayloadBoundaries` (array, one entry per bounded variable). The `wmkf_ai_run` notes string also captures a compact form of the metadata (no content).
 - Existing variables without these fields pass through ungated; adoption is opt-in per variable. Existing `kind: 'sharepoint'` variables that already use `source.maxChars` continue with the legacy silent substring unless they're upgraded by also declaring top-level `dataClass`.
 
 Example:
@@ -444,10 +443,6 @@ Each output may declare a `guard` policy that the Executor applies in step 4 (pr
 
 ## Caching contract
 
-**Byte-identical prefixes are the target contract for any future second runtime.** Today there is no
-PA prefix to compare. If PA is implemented and it produces different bytes before the first
-`cache_control` marker, the two callers will land in different cache buckets.
-
 The current Phase-0 Executor:
 
 1. Sends `system` and `user` as separate blocks (requires the `wmkf_ai_systemprompt` + `wmkf_ai_promptbody` split — added by Connor in Phase 0, confirmed live 2026-04-24).
@@ -462,9 +457,10 @@ the active model's requirements; response usage is the proof of a realized hit.
 the same PDF content may be cache-eligible when its composed prefix is unchanged; confirm a
 realized hit through `usage.cache_read_input_tokens`.
 
-**Cross-prompt caching (Phase 2 target, not built):** the planned shape has `phase-i.summary` and
-`phase-i.compliance` reference a shared `context_block` placed in `system`, allowing a back-to-back
-invocation to reuse the document prefix. `context_block` remains deferred.
+**Cross-prompt caching [PLANNED]:** an opt-in execution profile would compose
+a common protected document prefix for compatible tasks in the shared backend.
+See the [shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md)
+for proposed cache grouping and verification.
 
 ---
 
@@ -492,7 +488,7 @@ that no execution occurred.
 
 ---
 
-## Notes for caller authors (Vercel route + PA parent flow)
+## Notes for server-side caller authors
 
 The Executor is intentionally minimal. Two decisions belong to the caller, not the prompt row:
 
@@ -503,13 +499,11 @@ Each caller decides whether the user invoking it can clobber populated target fi
 | Caller | `forceOverwrite` default | Rationale |
 |---|---|---|
 | Interactive Vercel route (button click in UI) | `false` | User is in front of the screen — surface the conflict, let them confirm. Vercel route turns `blocked: true` into HTTP 409, UI shows existing content + "Overwrite?" button, user re-submits with `forceOverwrite: true`. |
-| PowerAutomate auto-trigger (status-change-driven) | depends on the trigger | If the trigger fires only on the *first* transition into the target stage, `forceOverwrite: false` is the safer default — it prevents re-runs on backsliding statuses from clobbering curated content. If the parent flow is explicitly a *re-summarize all rows* batch (e.g., model bump, prompt-template change), set `forceOverwrite: true`. |
 | Vercel test harness | `true` | Test runs use clean fixtures or controlled overwrites. |
-| PowerAutomate manual-button flow ("Re-run summary on this row") | `true` | The user clicked a button literally meaning "redo this." |
 
-**For any future PA flows (Phase 1):** every parent flow that calls `ExecutePrompt` must explicitly
-pass `forceOverwrite`. Do not default it at the child-flow level: a bulk re-summarization flow and a
-first-pass intake flow have opposite correct defaults.
+The proposed Power Automate job API uses server-owned operation and writeback
+policies. Its contract is separate from the in-process `forceOverwrite` input.
+See the [shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md).
 
 ### 2. Output `guard` — set once on the prompt row
 
@@ -524,15 +518,14 @@ A prompt row with `guard: "always-overwrite"` on every output ignores `forceOver
 
 ## Non-goals (what the Executor does NOT do)
 
-- **Does not orchestrate chains.** The caller (parent PA flow or Vercel API route) decides which prompts run in what order. Executor runs exactly one prompt per invocation.
+- **Does not orchestrate chains.** The calling workflow decides which prompts run in what order. Executor runs exactly one prompt per invocation.
 - **Does not branch on output.** Business-logic conditions ("if compliance failed, notify staff") live in the caller's Flow.
 - **Does not semantically retry.** Caller decides retry policy. Executor returns a
   typed failure; the review-synthesis service is the current example that
   re-invokes once only for `claude_output_truncated`. Transport-level 429/529
   retries remain inside `LLMClient` and are not semantic prompt attempts.
 - **Does not handle arbitrary code.** Preprocessing, source kinds, and target kinds are closed enums.
-  A new case requires a new enum value in the live Executor and, if PA is later implemented, its
-  conformance implementation — not an "exec arbitrary script" escape hatch.
+  A new case requires a reviewed enum value and implementation in the shared Executor.
 - **Does not write to SharePoint.** Phase 0 is Dynamics-only for persistence.
 - **Does not manage prompt lifecycle.** Draft/publish/retire is a separate dashboard concern.
 - **Does not stream.** Streaming Executor variant (`executePromptStream`) deferred; today's streaming routes stay outside the contract.
@@ -541,19 +534,12 @@ A prompt row with `guard: "always-overwrite"` on every output ignores `forceOver
 
 ## Test oracle
 
-A small test prompt `test.echo`:
-- Declares two variables — one `dynamics`, one `override`
-- Output schema: `{ echo: string }` with target `kind: none`
-- System prompt: `"Echo the inputs verbatim as JSON."`
-
-The Vercel implementation uses this as a characterization fixture. If a PA implementation is added,
-evaluate both runtimes for:
-1. Identical composed request bytes and structurally equivalent `wmkf_ai_run` output for identical
-   `requestId` and `overrideVariables`.
-2. Cache eligibility and actual `cacheHit` behavior under the active model, using response usage
-   rather than treating a second invocation as proof.
-
-If either assertion fails, the two implementations have drifted and must be reconciled before building more prompts on top.
+`scripts/test-echo-parity.js` is a Vercel smoke script for the
+`executor.echo-parity` prompt. It invokes the provider twice and checks echoed
+content, persisted raw output, and cache usage. The proposed job API uses
+synthetic inputs and a provider double to verify both caller paths, including
+admission, repeat delivery, and polling. Provider usage measures realized cache
+hits in a separate authorized test.
 
 ---
 
@@ -570,8 +556,7 @@ If either assertion fails, the two implementations have drifted and must be reco
 - First prompt row: `phase-i.summary` (system/body split, single raw-text output to `wmkf_ai_summary`, `guard: "skip-if-populated"`)
 
 **Still deferred (post-May 1 status — re-verify before consuming):**
-- PowerAutomate `ExecutePrompt` child flow — Connor-owned, pacing tracked outside this doc
-- Context blocks + `context_block` source kind + `placement: system`
+- Authenticated Power Automate submit/status endpoints and the execution profile/job layer. See the [shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md).
 - `prior_output` source kind
 - `overridePromptBody` input
 - Streaming Executor variant
@@ -580,4 +565,4 @@ If either assertion fails, the two implementations have drifted and must be reco
   capability, and max-token validation before mutation; it does not run the
   model as part of publication.
 
-**Caching note:** within-prompt cache hits only. Running summary then compliance on the same request does NOT share cache on the document block — both calls pay full price. Worth revisiting when proposal-context-extraction (`docs/PROPOSAL_CONTEXT_EXTRACTION_PLAN.md`) ships.
+**Caching note:** the current Executor marks the composed system block. Proposal text in the user message follows that marker, so the current Phase I summary path cannot reuse it as a cached document prefix across tasks.

@@ -3,7 +3,7 @@ title: "Prompt Storage — Current Boundary and Historical Design"
 domain: prompt-executor
 kind: plan
 status: active
-summary: "Current prompt-storage boundary: live current rows, Vercel Executor fetch, admin publication, and audit; broader authoring and PA execution remain unbuilt."
+summary: "Dataverse prompt rows, Executor resolution, Admin publication, and audit are live. Power Automate is planned as a client of the shared backend."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -16,7 +16,7 @@ related:
 
 # Prompt Storage — Current Boundary and Historical Design
 
-## Current implementation boundary (reconciled 2026-10-12)
+## Current implementation and caller direction
 
 **Shipped in source:**
 
@@ -64,37 +64,37 @@ the generic phrase “Phase I.” The production run ledger had 353 rows; its 30
 PowerAutomate-labeled historical rows had no current-prompt lookup and ended on
 2026-05-06, while Vercel-labeled Executor runs continued through 2026-07-26.
 
-Therefore the Power Automate Executor, its trigger/retry behavior, and the
-automated chaining DAG are **not deployed in the visible production flow
-metadata**. They remain unfinished target architecture, not unknown current
-behavior. Connection health and run history for a future PA implementation
-will require a new probe after a flow is actually deployed.
-`docs/EXECUTOR_CONTRACT.md` is the current Vercel execution contract; the body
-below is retained as historical rationale and unfinished target architecture.
+The earlier Power Automate Executor and chaining DAG were absent in the
+visible metadata on that date. That probe does not establish the current
+contents or connection health of external flows.
 
-**Status:** Design conversation started 2026-04-14 (Session 99), extended in Sessions 100–103. Session 103 (2026-04-17) shipped a **working prototype** via the Phase I Dynamics test endpoint — see "Session 103 prototype findings" below. Session 109 (2026-04-24) reconciled this design with Connor's built-out schema and produced a phased delivery plan.
+**Caller direction (owner, 2026-11-10) [PLANNED]:** Power Automate will submit
+and poll jobs through authenticated endpoints on the shared backend.
+Dataverse remains the shared prompt library. The backend resolves prompts and
+approved inputs, composes and validates model calls, and owns approved
+writeback and invocation audit. See the [shared Executor job
+design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md) for the proposed
+profiles and durable job service, and [Executor Contract](EXECUTOR_CONTRACT.md)
+for the shipped single-prompt interface.
+
 **Owner:** Justin Gallivan
-**Related docs:** `docs/EXECUTOR_CONTRACT.md` (authoritative for the shared PA/Vercel spec), `docs/BACKEND_AUTOMATION_PLAN.md`, `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md`, `docs/WORKFLOW_CHAINING_DESIGN.md`, `docs/PROMPT_CACHING_PLAN.md`, `docs/PROPOSAL_CONTEXT_EXTRACTION_PLAN.md`
 
-> **Reconciliation history:**
->
-> - **Session 109 (2026-04-24):** Connor's live schema reconciled with this doc — table renamed from the design-time `wmkf_prompt_template` to **`wmkf_ai_prompt`**, field names renamed to match (`wmkf_ai_promptbody`, `wmkf_ai_promptvariables`, `wmkf_ai_promptoutputschema`, `wmkf_ai_promptname`, `wmkf_promptversion`, `wmkf_ai_promptstatus`, `wmkf_ai_iscurrent`). Connor added `wmkf_ai_systemprompt` Memo (system/user split for caching) and Lookup `wmkf_ai_prompt` on `wmkf_ai_run` (fixes provenance gap) — both confirmed live 2026-04-24. Already-present fields include `wmkf_ai_rollbackfrom`, `wmkf_ai_preflightpasseddatetime`, `wmkf_ai_lasttestdatetime`. Note the field name is `wmkf_ai_systemprompt` (no underscore between "system" and "prompt").
-> - **Session 110 (2026-04-25):** body of this doc rewritten in place to use the live field names. References below now match `wmkf_ai_*` directly; no mental mapping needed.
->
-> **For implementation, read `docs/EXECUTOR_CONTRACT.md` first** — that is the shared spec both PowerAutomate and Vercel executors build against. This design doc remains the conceptual backdrop; the Executor contract is the operational spec.
->
-> **Phased delivery (set Session 109, Phase 0 shipped Vercel-side Session 110):** Phase 0 = shared Dynamics core + Vercel Executor by 2026-05-01 ✅ (shipped on Vercel; PA-side Phase 1 still pending). Phase 1 = PowerAutomate executor post-cycle. Phase 2 = context blocks + cross-prompt cache alignment.
+## Historical design record
 
-> The sections below preserve the original working design. Statements about
-> drafts, editor safety tiers, universal visibility/overrides, rollback, and PA
-> composition are target-state unless the current boundary above says they
-> shipped.
+The remaining sections preserve the Sessions 99–110 design and prototype. The
+Power Automate-native execution proposals are superseded by the 2026-11-10
+owner decision. Draft workflows, universal visibility/overrides, editor safety
+tiers, and rollback sketches document earlier targets. Use the implementation
+boundary above and the Executor contract for current behavior.
 
----
+Connor's live schema was reconciled with the design in Sessions 109–110
+(2026-04-24–25). The system/user split uses `wmkf_ai_systemprompt` and
+`wmkf_ai_promptbody`. The prompt lookup on `wmkf_ai_run` links the run to the
+exact prompt row, because the version number alone is ambiguous.
 
 ## Historical design principles
 
-Extracted from the Session 99–100 design conversations. These are the load-bearing ideas — if a feature or implementation choice conflicts with one of these, that's a signal to stop and reconsider.
+These principles reflect the Session 99–100 design conversations.
 
 1. **Dynamics is source of truth for PA-readable prompts.** `.js` stays canonical for Next.js-only prompts (Pattern B, Pattern C) until there's a concrete reason to move. Don't migrate for the sake of migrating.
 2. **Transparency by default.** Every Vercel app that calls Claude shows the user the prompt it's about to use, collapsed by default. Users can always see what the model is doing.
@@ -106,7 +106,7 @@ Extracted from the Session 99–100 design conversations. These are the load-bea
 8. **Compose infrastructure, not features.** A prompt resolver, an execute-with-body endpoint, and `wmkf_ai_run` logging form one infrastructure layer that serves: PA workflows, user overrides, superuser test runs, "promote override to draft," and the editor dashboard. Build once.
 9. **Defer polish.** Justin-only editor for v1. No two-person review. No A/B testing or canary rollout. Three prompts, informed human in the loop, explicit publish gate. Add sophistication when scale or staffing demands it.
 
-## Motivation
+## Original motivation
 
 Today, Claude prompts live in `shared/config/prompts/*.js` as hard-coded JS templates. This works while all AI calls originate from Next.js apps running on Vercel. It breaks as soon as **PowerAutomate-triggered backend jobs** start composing their own Claude calls on status-change events in Dynamics — PA can't import JS modules from a Vercel deployment.
 
@@ -119,7 +119,7 @@ We need prompts to live somewhere that:
 
 ## Historical decisions and targets
 
-These came out of the design conversation in Session 99. Listed here so a fresh agent session doesn't re-litigate them:
+These decisions came out of the design conversation in Session 99:
 
 1. **Storage location: Microsoft Dynamics / Dataverse.** A new table, `wmkf_ai_prompt`, is the single source of truth for both PA and Next.js.
 2. **PowerAutomate composes Claude calls itself** (not dumb-trigger Next.js). This is the reason Dynamics storage wins over Postgres — PA reads Dataverse natively.
@@ -253,7 +253,7 @@ The run log already exists (Connor's side). Three additions for override and pro
 
 The design assigned the following responsibilities to Power Automate under
 full composition. The 2026-07-27 production probe found no prompt-Executor flow
-implementing them, so each remains unbuilt target behavior.
+implementing them. The owner superseded this design on 2026-11-10.
 
 - **PDF/DOCX text extraction** — `lib/utils/file-loader.js` on the Vercel side. PA has its own PDF preprocessing capability, so both callers can handle extraction independently — no cross-boundary helper needed.
 - **Anthropic retry / backoff on 529s and rate limits.** PA has built-in retry but it's coarse; needs per-flow configuration.
@@ -261,7 +261,7 @@ implementing them, so each remains unbuilt target behavior.
 - **Token counting + cost estimation.**
 - **Logging to `wmkf_ai_run`.** PA can do this natively (it's the same Dataverse table it already writes to), so this one is easy.
 
-With PDF extraction solved natively in PA, the remaining items (retry, caching, token counting) will need to be implemented in PA flows. **Full composition was chosen** (2026-04-16, Session 102) — PA owns the entire Claude call lifecycle with no Vercel dependency for automated backend jobs. Rationale: easier for Connor to debug PA-native flows, and backend automation is mission-critical so removing the Vercel dependency is worth the PA-side complexity.
+Session 102 chose this design on 2026-04-16. The rationale was to let Connor debug a self-contained Power Automate flow and remove a Vercel dependency for mission-critical automation. That approach would have duplicated provider retry, caching, and validation in the flow.
 
 ## Historical unbuilt target: user-facing prompt features
 
@@ -382,7 +382,7 @@ The "first non-Justin editor" question (Q3 below) crystallizes into a specific b
 
 Probably 2–3 days of build for a competent React engineer. Materially more than "plain textarea + publish button," materially less than a polished Prompt Studio.
 
-## Workflow chaining and structured outputs
+## Historical workflow chaining sketch
 
 The token-efficiency principle (#7 above) has its own design doc — see
 `WORKFLOW_CHAINING_DESIGN.md`. Current Vercel Executor support includes
@@ -399,7 +399,7 @@ The companion doc covers worked examples, prerequisite Dynamics fields on `akoya
 
 ## Historical questions and current disposition
 
-### 1. Template variable format — RESOLVED on Vercel; PA implementation unbuilt
+### 1. Template variable format
 
 Prompts are templates with runtime slots (proposal text, grant context, file contents, etc.). What substitution syntax do we use?
 
@@ -407,20 +407,18 @@ Prompts are templates with runtime slots (proposal text, grant context, file con
 
 **Empirical verification (Session 103, 2026-04-17):** The Phase I prototype (`lib/services/prompt-resolver.js`) stored `{{proposal_text}}`, `{{summary_length}}`, `{{summary_length_suffix}}`, and `{{audience_description}}` in a Dataverse Memo field (`wmkf_ai_rawoutput` on a scratch `wmkf_ai_run` row), read them via OData, and successfully interpolated at runtime. **Dataverse does not interpret `{{` in Memo field values** — content is returned as literal strings. The Next.js-side `{{var}}` syntax works.
 
-The PA-side substitution path is not merely untested: the 2026-07-27
-production metadata probe found no deployed prompt-Executor flow. A future
-implementation must still verify that reading a Memo and applying PA
-`replace()` preserves literal `{{name}}` delimiters before parity can be
-claimed.
+The 2026-07-27 production metadata probe found no deployed prompt-Executor
+flow to test the proposed Power Automate substitution. The 2026-11-10 direction
+puts interpolation in the shared backend.
 
-### 2. v1 scope — RESOLVED
+### 2. Original v1 scope
 
-**v1 is three prompt rows:** `phase-i-writeup`, `phase-ii-writeup`, `compliance-field-set-c`.
+**The proposal named three prompt rows:** `phase-i-writeup`, `phase-ii-writeup`, `compliance-field-set-c`.
 
 Historical rationale: these were the three prompts selected for the proposed PA
 driver. No production PA prompt driver was present in the 2026-07-27 probe.
-Phase I/II writeup rows and Compliance Field Set C therefore remain target
-dual-caller/backend cases rather than current PA consumers. Batch Phase I/II
+Phase I/II writeups and Compliance Field Set C were proposed
+dual-caller/backend cases. Batch Phase I/II
 Summaries were intended to share the corresponding per-proposal prompt, so the
 target inventory did not add separate prompt rows for them.
 
@@ -437,18 +435,21 @@ The remaining question is whether v1 ships with the full editor, or with a strip
 
 Decision depends on whether anyone other than Justin needs to edit a prompt in the v1 timeframe. If yes, ship the editor with v1 — the safety tiers aren't optional for non-developer editors. If no, defer the editor.
 
-### 4. Hybrid vs. full PA composition
+### 4. Superseded alternatives for Power Automate composition
 
 - **Full composition:** PA fetches prompt → renders → POSTs to Anthropic directly → writes result to `akoya_request` + logs to `wmkf_ai_run`. Pure — no Next.js dependency at runtime.
 - **Hybrid:** PA fetches prompt → renders → POSTs rendered prompt to Next.js `/api/execute-prompt` → Next.js handles Claude call, caching, retry, token counting, SharePoint file fetch, PDF extraction → returns result → PA writes to Dynamics.
 
-Full composition is philosophically cleaner and removes Vercel as a runtime dependency for backend jobs. Hybrid is pragmatic — reuses everything we've already built.
+The original discussion weighed removing the Vercel dependency against reusing the provider transport and validation already in Next.js.
 
 Tentatively chose full composition in Session 99. Session 100 additions noted hybrid advantages (JSON schema validation, retry, single codepath). Session 101 noted PA's native PDF preprocessing removes the extraction dependency on Next.js.
 
-> **Decision (2026-04-16, Session 102):** **Full composition confirmed.** Connor chose full PA composition. Rationale: (1) easier to debug when the entire flow is PA-native, and (2) backend automation is mission-critical, so removing the Vercel runtime dependency is worth the added PA-side complexity (retry logic, `cache_control` assembly, JSON validation). PA will own: trigger detection → prompt fetch → file extraction → Claude API call → retry/backoff → result write → `wmkf_ai_run` logging. Next.js is not in the loop for automated backend jobs.
->
-> **Implications for Next.js:** The `/api/execute-prompt` endpoint is still needed for user-initiated features (prompt test runs, user overrides) but is **not** called by PA flows. The two codepaths (PA and Next.js) will share the same prompt templates from `wmkf_ai_prompt` but compose Claude calls independently.
+Connor selected full Power Automate composition on 2026-04-16 (Session 102).
+The proposal put the full provider lifecycle in Power Automate and reserved
+a separate Next.js execution endpoint for UI prompt tests and overrides.
+The 2026-11-10 owner decision superseded this split. The planned job API
+takes approved work requests and owns prompt resolution and governed writes
+in the shared backend.
 
 ---
 
@@ -507,7 +508,7 @@ stateDiagram-v2
 - The publish transition is atomic: new row becomes `published` + `is_current = true`; prior `is_current` row becomes `retired` + `is_current = false`.
 - `retired` is terminal. Rows stay queryable for historical `wmkf_ai_run.wmkf_ai_promptversion` references, but are never mutated or revived.
 
-### 2. Full-composition vs. hybrid sequence
+### 2. Superseded full-composition and hybrid sequences
 
 Same trigger in both: a Dynamics status change fires a PowerAutomate flow that needs to run a prompt for a specific `akoya_request`.
 
@@ -564,7 +565,7 @@ sequenceDiagram
     PA->>Dyn: PATCH akoya_request.wmkf_ai_summary
 ```
 
-**What the diagrams make visible**
+**Original trade-offs recorded by the diagrams**
 
 - Full composition is now fully self-contained — PA handles PDF/DOCX extraction natively (confirmed 2026-04-15), removing the last Next.js dependency. PA still has to implement `cache_control` JSON assembly, retry/backoff, and cost calculation, but the "no Vercel runtime dependency" argument is now genuine.
 - Hybrid keeps every mechanic that already works in one tested codepath (`file-loader.js`, `claude-reviewer-service.js` retry, prompt caching) and adds exactly one cross-boundary POST. PA still fetches the prompt row itself, so `wmkf_ai_promptversion` provenance stays visible in PA's audit trail — that's the thing hybrid is careful not to give up.

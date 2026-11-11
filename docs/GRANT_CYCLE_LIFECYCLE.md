@@ -10,7 +10,7 @@ owner: product-engineering
 related:
   - docs/atlas/dataverse-akoya-request.md
   - lib/services/execute-prompt.js
-  - scripts/test-echo-parity.js
+  - docs/plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md
   - docs/POSTGRES_TO_DATAVERSE_MIGRATION.md
 ---
 
@@ -28,7 +28,6 @@ related:
 - **`wmkf_ai_run`** audit table is live; Vercel writes via `dynamics-service.logAiRun` and `lib/services/execute-prompt.js`.
 - **`/phase-i-dynamics/summarize-v2`** writes summaries via the Executor contract — single-request prompt-tuning surface (not in nav, direct URL).
 - **Reviewer-finding + Review-management + Integrity screening** all run from the Vercel app.
-- **PA-side `ExecutePrompt` flow** is the parity oracle (Connor builds; Vercel side is ready, see `scripts/test-echo-parity.js`).
 - **Connor's `akoya_request` create/update PA flows** (file-org, AI check-in, staff version) are still pending.
 
 ---
@@ -38,7 +37,10 @@ related:
 This document maps the full lifecycle of a grant application from submission through funding decision. Each stage identifies the Dynamics status value, what triggers it, who acts, and whether AI automation is involved.
 
 **Architecture:**
-- Automated AI tasks run in PowerAutomate, calling the Claude API directly and writing results to Dynamics
+- [PLANNED, owner decision 2026-11-10] Power Automate triggers approved AI jobs through
+  authenticated submit and status endpoints. The shared backend resolves inputs, executes the
+  prompt, and owns approved writeback. See the [shared Executor job
+  design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md).
 - Human-initiated tasks (reviewer finding, review management, integrity screening) run in the Vercel app
 - Dynamics is the source of truth for all operational data
 
@@ -51,9 +53,9 @@ This document maps the full lifecycle of a grant application from submission thr
 | 1 | Application submitted | `Phase I Status = Pending Committee Review` | Applicant submits in GOapply | Applicant | — | New request created in Dynamics |
 | 2 | Documents stored | — | Request creation | GOapply/Dynamics | — | Application docs placed in akoyaGO SharePoint request folder |
 | 3 | File organization | — | Step 2 complete | PA flow | — | Docs moved into Phase I subfolder |
-| 4 | AI compliance check | — | Step 3 complete | PA flow → Claude API | **Compliance verification, keyword extraction, summary generation** | Results written to Dynamics fields on `akoya_request` |
+| 4 | AI compliance check | — | Step 3 complete | PA flow → shared backend (planned) | **Compliance verification, keyword extraction, summary generation** | Results written to Dynamics fields on `akoya_request` |
 | 5 | Staff version created | — | Step 4 passes compliance | PA flow | — | Formatted cover page + consolidated PDF saved to WMKF Research SharePoint |
-| 6 | PD assignment | — | After application deadline | PA flow → Claude API | **PD assignment by specialty area** | PD assigned on `akoya_request` |
+| 6 | PD assignment | — | After application deadline | PA flow → shared backend (planned) | **PD assignment by specialty area** | PD assigned on `akoya_request` |
 | 7 | PD review & scoring | `Not Scored` or `Scored` | PDs review applications | PDs (human) | — | Applications scored or eliminated |
 | 8 | Staff recommendation | `Recommended Invite` or `Recommended Not Invite` | PD discussion complete | Staff (human) | — | Recommendations for program chairs |
 | 9 | Integrity screening | — | Recommendations finalized | Staff via Vercel app (manual) | **Integrity screening** | Screen all `Recommended Invite` applicants |
@@ -68,7 +70,7 @@ This document maps the full lifecycle of a grant application from submission thr
 | 11 | Phase II proposal submitted | `Phase II Status = Phase II Pending Committee Review` | Invited applicant submits in GOapply | Applicant | — | Request updated in Dynamics |
 | 12 | Documents stored | — | Proposal submission | GOapply/Dynamics | — | Proposal docs placed in akoyaGO SharePoint request folder |
 | 13 | File organization | — | Step 12 complete | PA flow | — | Docs moved into Phase II subfolder |
-| 14 | AI compliance check | — | Step 13 complete | PA flow → Claude API | **Compliance verification (+ additional tasks TBD)** | Results written to Dynamics fields |
+| 14 | AI compliance check | — | Step 13 complete | PA flow → shared backend (planned) | **Compliance verification (+ additional tasks TBD)** | Results written to Dynamics fields |
 | 15 | Staff version created | — | Step 14 passes compliance | PA flow | — | Formatted cover page + consolidated PDF saved to WMKF Research SharePoint |
 | 16 | PD review & recommendation | `Recommended` or `Not Recommended` | PDs review proposals | PDs (human) | — | Staff funding recommendations |
 | 17 | Board decision | `Approved` or `Phase II Declined` | Board meets | Board (human) | — | Final funding decisions |
@@ -77,13 +79,13 @@ This document maps the full lifecycle of a grant application from submission thr
 
 ## AI Task Summary
 
-### Automated (PowerAutomate → Claude API)
+### Planned automation (Power Automate → shared backend)
 
 | Task | Lifecycle Step | Input | Output | Prompt Status |
 |------|---------------|-------|--------|---------------|
 | Compliance check | 4, 14 | Application/proposal PDF text | Pass/fail + reasons | To be developed |
 | Summary + keywords | 4 | Application PDF text | Summary text, keywords → Dynamics fields | To be developed |
-| PD assignment | 6 | Application text + staff roster + specialty rules | Recommended PD | **Expertise Finder app built** — prompt + roster in Vercel; hand to Connor for PA flow when validated |
+| PD assignment | 6 | Application text + staff roster + specialty rules | Recommended PD | **Expertise Finder app built.** Any later automated assignment needs an approved backend task and trigger. |
 
 ### Human-Initiated (Vercel App)
 
@@ -122,25 +124,26 @@ PD assignment writes to existing `wmkf_programdirector` lookup (Field Set D — 
 | Flow | Trigger | Steps | Status |
 |------|---------|-------|--------|
 | Phase I file organization | Request created with `Phase I Status = Pending Committee Review` | Move docs to Phase I subfolder | Planned |
-| Phase I AI check-in | File organization complete | Call Claude API for compliance + summary + keywords → write to Dynamics | Planned |
+| Phase I AI check-in | File organization complete | Submit approved compliance, summary, and keyword tasks → poll backend status | Planned |
 | Phase I staff version | AI check passes compliance | Generate cover page + consolidate PDF → save to WMKF Research SharePoint | Planned |
-| PD assignment | After application deadline (batch) | Call Claude API with all pending apps → assign PDs in Dynamics | Planned |
+| PD assignment | After application deadline (batch) | Submit approved PD assignment tasks for eligible Requests → poll backend status | Planned |
 | Phase II file organization | `Phase II Status = Phase II Pending Committee Review` | Move docs to Phase II subfolder | Planned |
-| Phase II AI check-in | File organization complete | Call Claude API for compliance (+ TBD tasks) → write to Dynamics | Planned |
+| Phase II AI check-in | File organization complete | Submit approved compliance tasks → poll backend status | Planned |
 | Phase II staff version | AI check passes compliance | Generate cover page + consolidate PDF → save to WMKF Research SharePoint | Planned |
 
 ---
 
-## Prompt Development Priority
+## Broader lifecycle prompt candidates
 
-Ordered by lifecycle position (earliest AI task first):
+This list records the older lifecycle order. The first shared Executor pilot
+covers Executive Summary and Methodology.
 
 1. **Compliance check** (step 4) — first AI task in the lifecycle, gates everything downstream
 2. **Summary + keyword extraction** (step 4) — runs alongside compliance check
 3. **PD assignment** (step 6) — rules need to be built from scratch
 4. **Phase II compliance** (step 14) — similar to Phase I but requirements may differ
 
-Development approach: batch evaluation against historical proposals in Dynamics, iterate on prompts, hand proven prompts to Connor for PA flows.
+Development approach includes evaluation against historical proposals in Dynamics, prompt iteration, and publishing approved shared prompts for backend task keys.
 
 ---
 
