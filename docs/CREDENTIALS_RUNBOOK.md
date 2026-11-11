@@ -300,7 +300,11 @@ match `applicationId`. The hash pins are lowercase SHA-256 values.
 `sourceHash` binds the canonical target-bound PDF proof, and
 `databaseIdentity` binds the PostgreSQL cluster identifier and database
 name. The trial verifies the configured ledger before preflight,
-admission and worker advancement.
+admission and worker advancement. The operator runner also pins the
+endpoint hostname. The application database is shared by Production and
+Preview. The Sandbox Dataverse trial's ledger writes target that
+database. The owner approved one scoped trial on the shared ledger.
+[Source review receipt](audits/EXPERTISE_SANDBOX_ADMISSION_OPUS55_2026-11-11.md#live-boundary).
 
 The trial uses 24-hour source/response expiry and seven-day
 configuration/result/audit expiry. Physical deletion requires a separate

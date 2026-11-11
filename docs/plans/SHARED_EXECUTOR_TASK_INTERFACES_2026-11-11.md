@@ -175,10 +175,14 @@ Scoped lint, types, DAL/context, Atlas, enum, migration, model and prompt
 tagging gates passed. The read-only application ledger probe found no
 fixture-only schema constraint or existing expertise job. The reviewed
 plan and implementation summary returned READY WITH NAMED CHANGES
-from Opus 5.5. The operator runner
-and source-level review are pending. No Sandbox trial prompt publication,
-job admission, provider call, audit delivery or signed GET has been
-verified.
+from Opus 5.5. The subsequent exact-packet source review also returned
+READY WITH NAMED CHANGES. The runner checks the exact database endpoint
+as well as the database identity. The configured application PostgreSQL
+database is shared by Production and Preview, even with Sandbox Dataverse.
+The owner explicitly approved one scoped trial on the shared ledger.
+No Sandbox trial prompt publication, job admission, provider call, audit
+delivery or signed GET has been verified.
+[Opus source review and dispositions](../audits/EXPERTISE_SANDBOX_ADMISSION_OPUS55_2026-11-11.md).
 
 ## Capability and result path
 
