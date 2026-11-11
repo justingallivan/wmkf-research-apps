@@ -169,13 +169,35 @@ test('old links land on the matching tab; Peer Review holds the Reviewer follow-
 
   const second = open(`/workbench?view=staff-deliberations&programId=${RESEARCH}&cycleCode=J27`);
   expect(await screen.findByTestId('staff-deliberations')).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Deliberations' })).toHaveAttribute('aria-current', 'page');
+  expect(screen.getByRole('link', { name: /Deliberations/ })).toHaveAttribute('aria-current', 'page');
+  expect(screen.getByRole('button', { name: 'Drafts' })).toHaveAttribute('aria-pressed', 'true');
   second.unmount();
 
   open(`/workbench?view=final-writeups&programId=${RESEARCH}&cycleCode=J27`);
   expect(await screen.findByTestId('final-writeups')).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Final Assessment' })).toHaveAttribute('aria-current', 'page');
+  expect(screen.getByRole('link', { name: /Final Assessment/ })).toHaveAttribute('aria-current', 'page');
+  expect(screen.getByRole('button', { name: 'Writeup review' })).toHaveAttribute('aria-pressed', 'true');
   expect(screen.getByText('Not filtered by program')).toBeInTheDocument();
+});
+
+test('Deliberations and Final Assessment open on their request list; today’s panels are the second section', async () => {
+  const first = open(`/workbench?view=deliberations&programId=${RESEARCH}&cycleCode=J27`);
+  // The Deliberations row from the feed is listed; the Staff deliberations panel is not mounted.
+  expect(await screen.findByText('Presented already')).toBeInTheDocument();
+  expect(screen.queryByTestId('staff-deliberations')).not.toBeInTheDocument();
+  expect(screen.queryByText('Deep-ocean carbon cycling')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Requests' })).toHaveAttribute('aria-pressed', 'true');
+  fireEvent.click(screen.getByRole('button', { name: 'Drafts' }));
+  expect(await screen.findByTestId('staff-deliberations')).toBeInTheDocument();
+  expect(screen.queryByText('Presented already')).not.toBeInTheDocument();
+  first.unmount();
+
+  open(`/workbench?view=final-assessment&programId=${RESEARCH}&cycleCode=J27`);
+  // No fixture row is in Final Assessment: the list says so instead of showing the review panel.
+  expect(await screen.findByText(/No requests are in Final Assessment yet/)).toBeInTheDocument();
+  expect(screen.queryByTestId('final-writeups')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Writeup review' }));
+  expect(await screen.findByTestId('final-writeups')).toBeInTheDocument();
 });
 
 test('someone who leads no requests opens on All in program; an explicit Assigned to me is kept in the address', async () => {

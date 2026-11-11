@@ -20,7 +20,8 @@
  * `isStageLayout`) adds the phase views initial-assessment | peer-review |
  * deliberations | final-assessment and these keys:
  *   scope     my                           — written only when chosen, so "no choice" can default by assignment
- *   section   reviewers                    — Peer Review: the Reviewers section
+ *   section   reviewers | drafts | writeup-review — a phase tab's second section
+ *             (Peer Review: Reviewers; Deliberations: Drafts; Final Assessment: Writeup review)
  *   showing   everything | <ending>        — All requests menu (default: open requests)
  *   standing  not-yet-scored | scored | recommended — Initial Assessment filter
  *   closed    1                            — phase tabs list closed requests too
@@ -55,10 +56,20 @@ export const J27_STANDING_VALUES = ['not-yet-scored', 'scored', 'recommended'];
 const TO_STAGE_VIEW = {
   requests: { view: 'requests' },
   'reviewer-follow-up': { view: 'peer-review', section: 'reviewers' },
-  'staff-deliberations': { view: 'deliberations' },
+  'staff-deliberations': { view: 'deliberations', section: 'drafts' },
   'initial-assessments': { view: 'initial-assessment' },
-  'final-writeups': { view: 'final-assessment' },
+  'final-writeups': { view: 'final-assessment', section: 'writeup-review' },
 };
+/**
+ * The second section each phase tab can show beside its request list: today's
+ * panel for that phase. An old link to one of those panels lands on it.
+ */
+export const STAGE_SECTION = Object.freeze({
+  'peer-review': 'reviewers',
+  deliberations: 'drafts',
+  'final-assessment': 'writeup-review',
+});
+const SECTION_VALUES = Object.values(STAGE_SECTION);
 /** New tab key → the nearest of today's views, for an earlier cycle or another program. */
 const FROM_STAGE_VIEW = {
   'initial-assessment': 'requests',
@@ -90,7 +101,7 @@ export function resolveWorkbenchView(location = {}, stageLayout = false) {
   if (stageLayout) {
     const mapped = TO_STAGE_VIEW[view];
     if (mapped) return { view: mapped.view, section: mapped.section || '' };
-    return { view, section: view === 'peer-review' && location.section === 'reviewers' ? 'reviewers' : '' };
+    return { view, section: STAGE_SECTION[view] && location.section === STAGE_SECTION[view] ? STAGE_SECTION[view] : '' };
   }
   if (view === 'peer-review' && location.section === 'reviewers') return { view: 'reviewer-follow-up', section: '' };
   return { view: FROM_STAGE_VIEW[view] || view, section: '' };
@@ -143,7 +154,7 @@ export function readWorkbenchQuery(query = {}) {
     // stored value always equals what rows are compared against.
     pd: GUID_RE.test(pd) ? pd : '',
     uncycled: cleanString(get('uncycled')) === '1',
-    section: cleanString(get('section')) === 'reviewers' ? 'reviewers' : '',
+    section: SECTION_VALUES.includes(cleanString(get('section'))) ? cleanString(get('section')) : '',
     showing: J27_SHOWING_VALUES.includes(showing) ? showing : 'open',
     standing: J27_STANDING_VALUES.includes(standing) ? standing : '',
     showClosed: cleanString(get('closed')) === '1',
@@ -164,7 +175,7 @@ export function buildWorkbenchHref(state = {}) {
   if (state.writeupsView && state.writeupsView !== 'needs-review') params.set('writeups', state.writeupsView);
   if (state.pd) params.set('pd', state.pd);
   if (state.uncycled) params.set('uncycled', '1');
-  if (state.section === 'reviewers') params.set('section', 'reviewers');
+  if (SECTION_VALUES.includes(state.section)) params.set('section', state.section);
   if (state.showing && state.showing !== 'open') params.set('showing', state.showing);
   if (state.standing) params.set('standing', state.standing);
   if (state.showClosed) params.set('closed', '1');

@@ -3,6 +3,7 @@ import { j27DashboardDto } from '../../lib/services/workbench/j27-read-model-inp
 import { SCORING_STATUS, CHAIRS_RECOMMENDATION_STATUS } from '../../shared/config/j27Scoring';
 import {
   J27_REVIEWER_STAGE_LABEL, J27_STANDING_LABEL, J27_WAIT_LABEL, J27_IDLE_LABEL, J27_DEGRADED_NOTE,
+  J27_TIMING_LABEL, J27_REVIEW_STANDING_LABEL, J27_TASK_LABEL,
 } from '../../shared/config/j27Labels';
 import {
   isClosedRow, standingKey, rowChip, rowLine, rowNotes, outstandingReviews, matchesPhaseFilters, matchesSearch, matchesShowing, rowsForTab,
@@ -125,7 +126,9 @@ describe('line ordering', () => {
     });
     expect(r.j27.phase).toBe('deliberations');
     expect(rowChip(r)).toEqual({ kind: 'phase', key: 'deliberations', label: 'Deliberations' });
-    expect(rowLine(r).kind).toBe('idle');
+    // No known presentation timing: a Deliberations row shows no line, so the optional task cannot lead.
+    expect(rowLine(r)).toEqual({ kind: 'none', text: null });
+    expect(rowLine(r).text).not.toBe(J27_TASK_LABEL['identify-reviewers']);
   });
 });
 
@@ -229,6 +232,50 @@ describe('notes, search, tabs and counts', () => {
   });
   test('a tab count is the number of rows of that phase with a Next line', () => {
     const rows = [notScored(), scored(), recommended(), invited(), row({ phaseIStatus: SCORING_STATUS.no })];
-    expect(tabCounts(rows)).toEqual({ 'initial-assessment': 2, 'peer-review': 1 });
+    expect(tabCounts(rows)).toEqual({
+      'initial-assessment': 2, 'peer-review': 1, deliberations: 0, 'final-assessment': 0,
+    });
+  });
+});
+
+/** A row whose stage is overridden: the feed's j27 with the given fields. */
+const withJ27 = (r, patch) => ({ ...r, j27: { ...r.j27, ...patch } });
+const deliberations = (patch) => withJ27(row(), { phase: 'deliberations', basis: 'complete', ...patch });
+const finalAssessment = (patch) => withJ27(row(), { phase: 'final-assessment', basis: 'complete', ...patch });
+
+describe('later-phase lists', () => {
+  test.each(['not-scheduled', 'before', 'unconfirmed'])('a Deliberations row with timing %s: timing chip, no line, even with a read-reports task', (timing) => {
+    const r = deliberations({ timing, primaryTask: 'read-reports', taskKeys: ['read-reports'] });
+    expect(r.j27.primaryTask).toBe('read-reports');
+    expect(rowChip(r)).toEqual({ kind: 'timing', key: timing, label: J27_TIMING_LABEL[timing] });
+    expect(rowLine(r)).toEqual({ kind: 'none', text: null });
+  });
+  test('a Deliberations row after its presentation shows its Next task', () => {
+    const r = deliberations({ timing: 'after', primaryTask: 'confirm-roster', taskKeys: ['confirm-roster'] });
+    expect(rowChip(r)).toEqual({ kind: 'timing', key: 'after', label: J27_TIMING_LABEL.after });
+    const line = rowLine(r);
+    expect(line.kind).toBe('next');
+    expect(line.text).toBe(J27_TASK_LABEL['confirm-roster']);
+  });
+  test.each(['board-draft', 'group-review', 'leadership-review'])('a Final Assessment row at %s: review chip', (review) => {
+    expect(rowChip(finalAssessment({ review }))).toEqual({ kind: 'review', key: review, label: J27_REVIEW_STANDING_LABEL[review] });
+  });
+  test('a Final Assessment row with no known review falls back to the phase chip', () => {
+    const r = finalAssessment({ review: null });
+    expect(r.j27.review).toBeNull();
+    expect(rowChip(r)).toEqual({ kind: 'phase', key: 'final-assessment', label: 'Final Assessment' });
+  });
+  test('rowsForTab filters Deliberations and Final Assessment by phase', () => {
+    const d = deliberations({ timing: 'before' });
+    const f = finalAssessment({ review: 'board-draft' });
+    const rows = [notScored(), d, f, invited()];
+    expect(rowsForTab(rows, 'deliberations')).toEqual([d]);
+    expect(rowsForTab(rows, 'final-assessment')).toEqual([f]);
+  });
+  test('tabCounts counts a Deliberations row after its presentation, not one before it that also has a task', () => {
+    const after = deliberations({ timing: 'after', primaryTask: 'confirm-roster', taskKeys: ['confirm-roster'] });
+    const before = deliberations({ timing: 'before', primaryTask: 'read-reports', taskKeys: ['read-reports'] });
+    expect(rowLine(before).kind).toBe('none');
+    expect(tabCounts([after, before]).deliberations).toBe(1);
   });
 });

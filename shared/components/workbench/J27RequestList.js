@@ -127,11 +127,13 @@ function PlaceholderRows() {
 const EMPTY_PHASE = {
   'initial-assessment': 'No requests are in Initial Assessment. A request arrives here when it is marked ready for review.',
   'peer-review': 'No requests are in Peer Review yet. A request arrives here once the Chairs’ outcome is recorded as Invited.',
+  deliberations: 'No requests are in Deliberations yet. A request arrives here once its research presentation is on the calendar.',
+  'final-assessment': 'No requests are in Final Assessment yet. A request arrives here once its Draft Writeup is shared for review.',
 };
 
 /**
  * @param {object} props
- * @param {'requests'|'initial-assessment'|'peer-review'} props.tab
+ * @param {'requests'|'initial-assessment'|'peer-review'|'deliberations'|'final-assessment'} props.tab
  * @param {{rows: Array, hasSnapshot: boolean, loading: boolean, error: string|null, reload: Function}} props.rowsState
  * @param {boolean} props.loadingCycles   the shell is still resolving the cycle
  * @param {'my'|'all'} props.scope        the scope in effect

@@ -23,12 +23,15 @@
  * Data: /api/workbench/dashboard (no cycleCode = cycle list for a program).
  */
 
-// Peer Review: the request list, or the existing Reviewer follow-up panel.
-function SectionSwitch({ section, onChange }) {
-  const options = [['', 'Requests'], ['reviewers', 'Reviewers']];
+// A phase tab shows its request list, or today's panel for that phase:
+// Reviewer follow-up, Staff deliberations (temporary, until the J27
+// pre-presentation step is decided) or Final writeups.
+const SECTION_LABEL = { reviewers: 'Reviewers', drafts: 'Drafts', 'writeup-review': 'Writeup review' };
+function SectionSwitch({ section, second, onChange }) {
+  const options = [['', 'Requests'], [second, SECTION_LABEL[second]]];
   return (
-    <div role="group" aria-labelledby="peer-review-section-label" className="flex flex-col gap-1.5">
-      <span id="peer-review-section-label" className="text-sm font-medium text-gray-700">Show</span>
+    <div role="group" aria-labelledby="phase-section-label" className="flex flex-col gap-1.5">
+      <span id="phase-section-label" className="text-sm font-medium text-gray-700">Show</span>
       <div className={`inline-flex ${TOOLBAR_CONTROL_HEIGHT_CLASS} overflow-hidden rounded-xl border border-gray-300 bg-white`}>
         {options.map(([key, label], index) => (
           <button
@@ -62,7 +65,7 @@ import InitialAssessmentsPanel from './InitialAssessmentsPanel';
 import StaffDeliberationsPanel from './StaffDeliberationsPanel';
 import { cycleCodeToLabel } from '../../../lib/utils/cycle-code.js';
 import {
-  WORKBENCH_LOCATION_KEYS, buildWorkbenchHref, readWorkbenchQuery, isStageLayout, isStageLayoutCycle, resolveWorkbenchView,
+  STAGE_SECTION, WORKBENCH_LOCATION_KEYS, buildWorkbenchHref, readWorkbenchQuery, isStageLayout, isStageLayoutCycle, resolveWorkbenchView,
 } from './workbench-location';
 import J27RequestList from './J27RequestList';
 import { useJ27CycleRows } from './useJ27CycleRows';
@@ -255,7 +258,9 @@ export function WorkbenchShell({ previewReadOnly = false, j27IntegrityEnabled = 
     standing: location.standing,
     onStandingChange: (standing) => navigate({ standing }),
   };
-  const sectionSwitch = <SectionSwitch section={section} onChange={(next) => navigate({ view: 'peer-review', section: next, search: '' })} />;
+  const sectionSwitch = stageLayout && STAGE_SECTION[view]
+    ? <SectionSwitch section={section} second={STAGE_SECTION[view]} onChange={(next) => navigate({ view, section: next, search: '' })} />
+    : null;
 
   return (
     <Layout title="Workbench">
@@ -409,7 +414,11 @@ export function WorkbenchShell({ previewReadOnly = false, j27IntegrityEnabled = 
           onReviewersViewChange={(reviewersView) => navigate({ reviewersView })}
           onSearchChange={(search) => navigate({ search })}
         />
+      ) : stageLayout && (view === 'deliberations' || view === 'final-assessment') && !section ? (
+        <J27RequestList key={`${programId}:${view}`} tab={view} {...listProps} leading={sectionSwitch} />
       ) : view === 'final-writeups' || view === 'final-assessment' ? (
+        <>
+        {sectionSwitch && <div className="mb-4">{sectionSwitch}</div>}
         <FinalWriteupsPanel
           cycleCode={cycleCode}
           loadingCycles={!cyclesReady && !cyclesError}
@@ -423,7 +432,10 @@ export function WorkbenchShell({ previewReadOnly = false, j27IntegrityEnabled = 
           onUncycledChange={(uncycled) => navigate({ uncycled }, { push: true })}
           onCycleChange={(code) => navigate({ cycleCode: code, uncycled: false }, { push: true })}
         />
+        </>
       ) : view === 'staff-deliberations' || view === 'deliberations' ? (
+        <>
+        {sectionSwitch && <div className="mb-4">{sectionSwitch}</div>}
         <StaffDeliberationsPanel
           programId={programId}
           cycleCode={cycleCode}
@@ -431,6 +443,7 @@ export function WorkbenchShell({ previewReadOnly = false, j27IntegrityEnabled = 
           scope={stageLayout ? stageScope : location.scope}
           onScopeChange={stageLayout ? chooseScope : (scope) => navigate({ scope })}
         />
+        </>
       ) : view === 'awardees' ? (
         <AwardeesPanel
           cycleCode={cycleCode}

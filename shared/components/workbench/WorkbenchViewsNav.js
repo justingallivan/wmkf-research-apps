@@ -65,11 +65,11 @@ export const J27_VIEWS = {
   },
   deliberations: {
     label: J27_PHASE_LABEL.deliberations,
-    description: VIEWS['staff-deliberations'].description,
+    description: 'Requests with a research presentation: schedule, attendance and the staff assessment.',
   },
   'final-assessment': {
     label: J27_PHASE_LABEL['final-assessment'],
-    description: VIEWS['final-writeups'].description,
+    description: 'Requests with a Draft Writeup, or in group or leadership review.',
   },
   awardees: VIEWS.awardees,
 };

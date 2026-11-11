@@ -24,6 +24,18 @@ const readLatestIntegrityStates = jest.fn(async () => new Map());
 jest.mock('../../lib/services/workbench/j27-integrity-jobs', () => ({
   readLatestIntegrityStates: (...a) => readLatestIntegrityStates(...a),
 }));
+const loadJ27LaterFacts = jest.fn();
+jest.mock('../../lib/services/workbench/j27-later-facts', () => ({
+  ...jest.requireActual('../../lib/services/workbench/j27-later-facts'),
+  loadJ27LaterFacts: (...a) => loadJ27LaterFacts(...a),
+}));
+/** Neutral later-phase facts: no presentation, no roster, no Board draft, no review stage. */
+const neutralLater = () => ({
+  presentation: { status: 'present', exists: false, id: null, ended: null, legacyException: false },
+  roster: { status: 'absent' },
+  boardDraft: { status: 'present', exists: false },
+  transition: { status: 'present', phase: null },
+});
 const getLandingCycle = jest.fn(async () => ({ code: null, reason: null }));
 jest.mock('../../lib/services/landing-cycle-service.js', () => ({ getLandingCycle: (...a) => getLandingCycle(...a) }));
 jest.mock('../../lib/services/workbench/program-scope-service.js', () => ({
@@ -87,6 +99,7 @@ beforeEach(() => {
   getCycleDatesById.mockResolvedValue({ wmkf_grantcycleid: 'cycle-j27', wmkf_cyclecode: 'J27', wmkf_researchofframpmeetingdate: '2027-03-15', wmkf_researchreviewsduedate: '2027-03-01' });
   existsAnySuggestionForRequests.mockResolvedValue(new Set());
   readLatestIntegrityStates.mockResolvedValue(new Map());
+  loadJ27LaterFacts.mockImplementation(async (rows) => new Map(rows.map((r) => [String(r.akoya_requestid).toLowerCase(), neutralLater()])));
   queryAllRequests.mockResolvedValue({ records: [], capped: false });
   listBoardDates.mockResolvedValue(BOARD_DATES);
   fetchReviewerRollup.mockResolvedValue({});
@@ -493,19 +506,49 @@ describe('J27 read model on the proposal list (plan C7)', () => {
     expect(getCycleDatesById).toHaveBeenCalledWith('cycle-j27');
     const byNumber = Object.fromEntries(body.proposals.map((p) => [p.requestNumber, p]));
     expect(byNumber['1002836']).not.toHaveProperty('j27');
-    // Memo waves are off in this env: their keys are not-provisioned and do not degrade; tier 2 is not loaded, so partial (plan C1, C3).
+    // Memo waves are off in this env: their keys are not-provisioned and do not degrade; the later-phase facts are mocked neutral, so the basis is full.
     expect(byNumber['1000380'].j27).toEqual({
-      phase: 'initial-assessment', basis: 'partial', primaryTask: 'record-scoring',
-      taskKeys: ['record-scoring', 'identify-reviewers'], blockerKeys: [],
+      phase: 'initial-assessment', basis: 'full', primaryTask: 'record-scoring',
+      taskKeys: ['record-scoring', 'identify-reviewers'], blockerKeys: ['presentation-end-unverified'],
       recorded: { scoring: 'unset', chairsRecommendation: 'unset', chairsOutcome: 'pending', label: null, unmapped: false }, outcome: 'none',
+      timing: 'not-scheduled', review: null,
     });
     expect(byNumber['1000385'].j27).toMatchObject({
       phase: 'peer-review', primaryTask: 'review-integrity',
       taskKeys: ['review-integrity', 'identify-reviewers', 'record-offramp'],
-      blockerKeys: ['chairs-outcome-pending', 'integrity-unreviewed'],
+      blockerKeys: ['chairs-outcome-pending', 'integrity-unreviewed', 'presentation-end-unverified'],
     });
     expect(byNumber['1000385'].j27).not.toHaveProperty('input');
     expect(byNumber['1000385'].reviewers.candidates).toBe(1);
+  });
+  test('later-phase facts load once per list, for 2027-or-later Research rows only', async () => {
+    const d26 = { akoya_requestid: 'r-d26', akoya_requestnum: '1002836', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, akoya_requeststatus: 'Phase II Pending', wmkf_triagestatus: 100000000, _wmkf_grantprogram_value: '94cab30b-958f-ee11-8179-000d3a341e8f', _wmkf_programdirector_value: 'pd-1' };
+    const socal = j27(82, { akoya_requeststatus: 'Phase II Pending', _wmkf_grantprogram_value: '8dcab30b-958f-ee11-8179-000d3a341e8f' });
+    queryAllRequests.mockResolvedValue({ capped: false, records: [j27(80), d26, socal, j27(81)] });
+    const body = await loadDashboard(args({ cycleCode: 'J27', scope: 'all' }));
+    expect(body.proposals.map((p) => p.requestNumber)).toEqual(expect.arrayContaining(['1002836', '1000382']));
+    expect(loadJ27LaterFacts).toHaveBeenCalledTimes(1);
+    expect(loadJ27LaterFacts.mock.calls[0][0].map((r) => r.akoya_requestid)).toEqual(['r-80', 'r-81']);
+  });
+  test('the later-phase facts are not loaded when no row qualifies', async () => {
+    queryAllRequests.mockResolvedValue({ capped: false, records: [
+      { akoya_requestid: 'r-d26', akoya_requestnum: '1002836', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, akoya_requeststatus: 'Phase II Pending', wmkf_triagestatus: 100000000, _wmkf_grantprogram_value: '94cab30b-958f-ee11-8179-000d3a341e8f', _wmkf_programdirector_value: 'pd-1' },
+      j27(82, { akoya_requeststatus: 'Phase II Pending', _wmkf_grantprogram_value: '8dcab30b-958f-ee11-8179-000d3a341e8f' }),
+    ] });
+    const body = await loadDashboard(args({ cycleCode: 'J27', scope: 'all' }));
+    expect(body.proposals.map((p) => p.requestNumber)).toEqual(expect.arrayContaining(['1002836', '1000382']));
+    expect(loadJ27LaterFacts).not.toHaveBeenCalled();
+  });
+  test('the later-phase facts place a row: an ended presentation is Deliberations, a Board draft is Final Assessment', async () => {
+    queryAllRequests.mockResolvedValue({ capped: false, records: [j27(80), j27(81)] });
+    loadJ27LaterFacts.mockResolvedValue(new Map([
+      ['r-80', { ...neutralLater(), presentation: { status: 'present', exists: true, id: 'p1', ended: true, legacyException: false } }],
+      ['r-81', { ...neutralLater(), boardDraft: { status: 'present', exists: true } }],
+    ]));
+    const body = await loadDashboard(args({ cycleCode: 'J27', scope: 'all' }));
+    const byNumber = Object.fromEntries(body.proposals.map((p) => [p.requestNumber, p]));
+    expect(byNumber['1000380'].j27).toMatchObject({ phase: 'deliberations', timing: 'after' });
+    expect(byNumber['1000381'].j27).toMatchObject({ phase: 'final-assessment', review: 'board-draft' });
   });
   test('a page with no in-scope rows makes none of the new reads', async () => {
     queryAllRequests.mockResolvedValue({ capped: false, records: [

@@ -54,6 +54,8 @@ const SELECT = [
   'wmkf_phaseiistatus',
   'wmkf_readyforreview',
   'wmkf_triagestatus',
+  '_wmkf_currentpresitevisit_value',
+  '_wmkf_currentfinalwriteup_value',
 ].join(',');
 
 function mockRes() {

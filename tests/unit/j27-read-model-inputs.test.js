@@ -29,7 +29,7 @@ jest.mock('../../lib/utils/j27-integrity-readiness', () => ({
 
 import {
   withJ27ReadModelSelect, j27MemoAvailability, j27MemoInputs, j27RequestInput, loadJ27Facts,
-  j27CalendarInput, composeJ27Tier1, deriveJ27ForRow, j27DashboardDto, isoDate, J27_MEMO_COLUMNS,
+  j27CalendarInput, composeJ27Tier1, deriveJ27ForRow, j27DashboardDto, j27ListStanding, isoDate, J27_MEMO_COLUMNS,
 } from '../../lib/services/workbench/j27-read-model-inputs';
 
 const REQ = '11111111-1111-4111-8111-111111111111';
@@ -50,6 +50,7 @@ describe('projection', () => {
   test('adds the request fields and only the provisioned memo columns', () => {
     expect(withJ27ReadModelSelect('akoya_requestid').split(',')).toEqual([
       'akoya_requestid', 'akoya_requeststatus', 'wmkf_phaseistatus', 'wmkf_phaseiistatus', 'wmkf_readyforreview', 'wmkf_triagestatus', '_wmkf_grantprogram_value',
+      '_wmkf_currentpresitevisit_value', '_wmkf_currentfinalwriteup_value',
     ]);
     process.env.TEST_RATIONALE_WAVE = 'on';
     process.env.TEST_SUMMARY_WAVE = 'on';
@@ -162,7 +163,60 @@ describe('composition', () => {
     expect(stage.input.request.cycleCode).toBe('J27');
     expect(j27DashboardDto(stage)).toEqual({
       phase: 'initial-assessment', basis: 'partial', primaryTask: 'record-scoring', taskKeys: ['record-scoring'],
-      blockerKeys: [], recorded: stage.recorded, outcome: 'none',
+      blockerKeys: [], recorded: stage.recorded, outcome: 'none', timing: null, review: null,
     });
+  });
+});
+
+describe('j27ListStanding', () => {
+  const pres = (over) => ({ presentation: { status: 'present', exists: true, id: 'p1', ended: true, legacyException: false, ...over } });
+  test('presentation not loaded or unavailable: timing null', () => {
+    expect(j27ListStanding({ presentation: { status: 'not-loaded' } }).timing).toBeNull();
+    expect(j27ListStanding({ presentation: { status: 'unavailable' } }).timing).toBeNull();
+    expect(j27ListStanding({}).timing).toBeNull();
+  });
+  test('no presentation row: not-scheduled', () => {
+    expect(j27ListStanding(pres({ exists: false, id: null, ended: null })).timing).toBe('not-scheduled');
+  });
+  test('an existing presentation: after, before or unconfirmed by its ended flag', () => {
+    expect(j27ListStanding(pres({ ended: true })).timing).toBe('after');
+    expect(j27ListStanding(pres({ ended: false })).timing).toBe('before');
+    expect(j27ListStanding(pres({ ended: null })).timing).toBe('unconfirmed');
+  });
+  test('a transition phase wins over an existing Board draft', () => {
+    const input = { boardDraft: { status: 'present', exists: true }, transition: { status: 'present', phase: 'group-review' } };
+    expect(input.boardDraft.exists).toBe(true);
+    expect(j27ListStanding(input).review).toBe('group-review');
+  });
+  test('a Board draft with no transition phase: board-draft', () => {
+    expect(j27ListStanding({ boardDraft: { status: 'present', exists: true }, transition: { status: 'present', phase: null } }).review).toBe('board-draft');
+  });
+  test('Board draft unavailable: review null', () => {
+    expect(j27ListStanding({ boardDraft: { status: 'unavailable' }, transition: { status: 'present', phase: null } }).review).toBeNull();
+    expect(j27ListStanding({ boardDraft: { status: 'unavailable' }, transition: { status: 'unavailable' } }).review).toBeNull();
+  });
+});
+
+describe('deriveJ27ForRow with later-phase facts', () => {
+  const scope = { readinessOnlyProgramIds: ['c247b11a-a7cb-ee11-9078-000d3a341e8f'] };
+  const neutral = {
+    presentation: { status: 'present', exists: false, id: null, ended: null, legacyException: false },
+    roster: { status: 'absent' },
+    boardDraft: { status: 'present', exists: false },
+    transition: { status: 'present', phase: null },
+  };
+  test('a Map keyed by the lower-cased request id places Deliberations and Final Assessment rows', () => {
+    const key = REQ.toLowerCase();
+    const withPresentation = { ...neutral, presentation: { ...neutral.presentation, exists: true, id: 'p1', ended: true } };
+    const d = deriveJ27ForRow(row(), facts(), { calendar, scope, later: new Map([[key, withPresentation]]) });
+    expect(d.phase).toBe('deliberations');
+    const f = deriveJ27ForRow(row(), facts(), { calendar, scope, later: new Map([[key, { ...neutral, boardDraft: { status: 'present', exists: true } }]]) });
+    expect(f.phase).toBe('final-assessment');
+  });
+  test('a row whose id is not in the Map keeps all four keys not-loaded', () => {
+    const later = new Map([['22222222-2222-4222-8222-222222222222', neutral]]);
+    const stage = deriveJ27ForRow(row(), facts(), { calendar, scope, later });
+    for (const k of ['presentation', 'roster', 'boardDraft', 'transition']) expect(stage.input[k]).toEqual({ status: 'not-loaded' });
+    expect(stage.basis).toBe('partial');
   });
 });

@@ -112,6 +112,20 @@ describe('documentFacts', () => {
     expect(documentFacts(req, rows, ready)).toEqual({ boardDraft: { status: 'unavailable' }, transition: { status: 'unavailable' } });
   });
 
+  test('two Final rows being generated for the draft need reconciliation: not "ready to start"', () => {
+    const pending = (id) => final({ wmkf_requestdocumentid: id, wmkf_operationstatus: OP.GENERATING });
+    const rows = [source(), pending(F), pending('77777777-7777-4777-8777-777777777777')];
+    const facts = documentFacts(request(), rows, ready);
+    expect(facts).toEqual({ boardDraft: { status: 'unavailable' }, transition: { status: 'unavailable' } });
+    const stage = deriveJ27Stage({
+      request: { status: 'present', cycleCode: 'J27', phaseIStatus: 100000003, requestStatus: 'Phase II Pending' },
+      presentation: { status: 'present', exists: true, id: V, ended: true, legacyException: false }, ...facts,
+    });
+    expect(stage.taskKeys).not.toContain('start-group-review');
+    // One Final row being generated is an ordinary state.
+    expect(documentFacts(request(), [source(), pending(F)], ready).boardDraft).toEqual({ status: 'present', exists: true });
+  });
+
   test('another request\'s rows are ignored', () => {
     const facts = documentFacts(request(), [source({ _wmkf_request_value: OTHER })], ready);
     expect(facts.boardDraft).toEqual({ status: 'unavailable' });
@@ -217,6 +231,30 @@ describe('rosterFact', () => {
     const two = presentationFact(R, [visit(), visit({ activityid: '66666666-6666-4666-8666-666666666666' })], options);
     expect(rosterFact(request(), two, on)).toEqual({ status: 'unavailable' });
     expect(rosterFact(request({ wmkf_confirmedmeetingroster: '{' }), seen, on)).toEqual({ status: 'absent', stale: true });
+  });
+
+  test('a stored entry whose names do not validate is not a confirmed roster, even with a matching binding', () => {
+    const value = JSON.stringify({ [V]: { binding: presentationBinding(seen.visit), wmkf: 'Alice', consultants: [] } });
+    const fact = rosterFact(request({ wmkf_confirmedmeetingroster: value }), seen, on);
+    expect(fact).toEqual({ status: 'absent', stale: true });
+    const stage = deriveJ27Stage({
+      request: { status: 'present', cycleCode: 'J27', phaseIStatus: 100000003, requestStatus: 'Phase II Pending' },
+      presentation: seen.presentation, roster: fact,
+    });
+    expect(stage.taskKeys).toContain('confirm-roster');
+  });
+
+  test('a presentation only the configured schedule pairs recognise cannot be confirmed, so it is not asked for', () => {
+    const pairs = [{ stateCode: 0, statusCode: 3, eligible: true }];
+    const odd = presentationFact(R, [visit({ statecode: 0, statuscode: 3 })], { pairs, nowMs: NOW });
+    expect(odd.presentation).toMatchObject({ exists: true, ended: true });
+    const fact = rosterFact(request(), odd, on);
+    expect(fact).toEqual({ status: 'unavailable' });
+    const stage = deriveJ27Stage({
+      request: { status: 'present', cycleCode: 'J27', phaseIStatus: 100000003, requestStatus: 'Phase II Pending' },
+      presentation: odd.presentation, roster: fact,
+    });
+    expect(stage.taskKeys).not.toContain('confirm-roster');
   });
 
   test('schema off reads not-provisioned even when a roster is stored', () => {

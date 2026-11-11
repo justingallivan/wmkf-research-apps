@@ -77,6 +77,21 @@ export const J27_WAIT_LABEL = {
   'phase-two-status-pending': 'Reviewer invitations are not open yet',
 };
 
+/** Presentation timing on a Deliberations row; keys are the feed's `j27.timing`. */
+export const J27_TIMING_LABEL = {
+  'not-scheduled': 'Not scheduled',
+  before: 'Before presentation',
+  after: 'After presentation',
+  unconfirmed: 'Presentation time not confirmed',
+};
+
+/** Where a Final Assessment row stands; keys are the feed's `j27.review`. */
+export const J27_REVIEW_STANDING_LABEL = {
+  'board-draft': 'Draft Writeup',
+  'group-review': 'Group review',
+  'leadership-review': 'Leadership review',
+};
+
 export const J27_IDLE_LABEL = 'Nothing is waiting on staff right now.';
 export const J27_DEGRADED_NOTE = 'Some details could not be read.';
 /** Shown once above the list when every request is affected, in place of the note on each row. */

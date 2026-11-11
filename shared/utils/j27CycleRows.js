@@ -10,11 +10,11 @@
 import { J27_TASKS } from '../../lib/services/workbench/j27-read-model';
 import {
   J27_DEGRADED_NOTE, J27_IDLE_LABEL, J27_OUTCOME_LABEL, J27_PHASE_LABEL, J27_REVIEWER_STAGE_LABEL,
-  J27_STANDING_LABEL, J27_TASK_LABEL, J27_WAIT_LABEL,
+  J27_REVIEW_STANDING_LABEL, J27_STANDING_LABEL, J27_TASK_LABEL, J27_TIMING_LABEL, J27_WAIT_LABEL,
 } from '../config/j27Labels';
 
 /** Tabs whose list is a phase filter over the shared rows. */
-export const J27_PHASE_TABS = Object.freeze(['initial-assessment', 'peer-review']);
+export const J27_PHASE_TABS = Object.freeze(['initial-assessment', 'peer-review', 'deliberations', 'final-assessment']);
 
 /** "Showing" menu on All requests: open (default), everything, then each ending. */
 export const J27_SHOWING_KEYS = Object.freeze([
@@ -71,6 +71,13 @@ export function rowChip(row) {
   if (stage.phase === 'peer-review' && J27_REVIEWER_STAGE_LABEL[row.workRemaining]) {
     return { kind: 'reviewer-stage', key: row.workRemaining, label: J27_REVIEWER_STAGE_LABEL[row.workRemaining] };
   }
+  // The later phases show what the feed knows; an unknown fact falls through to the phase name.
+  if (stage.phase === 'deliberations' && J27_TIMING_LABEL[stage.timing]) {
+    return { kind: 'timing', key: stage.timing, label: J27_TIMING_LABEL[stage.timing] };
+  }
+  if (stage.phase === 'final-assessment' && J27_REVIEW_STANDING_LABEL[stage.review]) {
+    return { kind: 'review', key: stage.review, label: J27_REVIEW_STANDING_LABEL[stage.review] };
+  }
   return { kind: 'phase', key: stage.phase, label: J27_PHASE_LABEL[stage.phase] || stage.phase };
 }
 
@@ -84,6 +91,10 @@ export function rowChip(row) {
 export function rowLine(row) {
   const stage = stageOf(row);
   if (!stage || isClosedRow(row)) return { kind: 'none', text: null };
+  // Owner decision (build plan 3; later-phase lists plan 2): until its
+  // presentation has ended a Deliberations row shows the timing chip and no
+  // line at all, including work left over from Peer Review.
+  if (stage.phase === 'deliberations' && stage.timing !== 'after') return { kind: 'none', text: null };
   const taskKeys = Array.isArray(stage.taskKeys) ? stage.taskKeys : [];
   const blockerKeys = Array.isArray(stage.blockerKeys) ? stage.blockerKeys : [];
   // The model's primary task is already the first main task when one exists.

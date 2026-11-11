@@ -77,9 +77,16 @@ describe('J27 Research layout keys', () => {
     const to = (view, extra = {}) => resolveWorkbenchView({ view, ...extra }, true);
     expect(to('requests')).toEqual({ view: 'requests', section: '' });
     expect(to('reviewer-follow-up')).toEqual({ view: 'peer-review', section: 'reviewers' });
-    expect(to('staff-deliberations')).toEqual({ view: 'deliberations', section: '' });
+    // An old link to a panel lands on that panel, now the tab's second section.
+    expect(to('staff-deliberations')).toEqual({ view: 'deliberations', section: 'drafts' });
     expect(to('initial-assessments')).toEqual({ view: 'initial-assessment', section: '' });
-    expect(to('final-writeups')).toEqual({ view: 'final-assessment', section: '' });
+    expect(to('final-writeups')).toEqual({ view: 'final-assessment', section: 'writeup-review' });
+    // A new link opens the tab's request list; a section that belongs to another tab is dropped.
+    expect(to('deliberations')).toEqual({ view: 'deliberations', section: '' });
+    expect(to('deliberations', { section: 'drafts' })).toEqual({ view: 'deliberations', section: 'drafts' });
+    expect(to('deliberations', { section: 'reviewers' })).toEqual({ view: 'deliberations', section: '' });
+    expect(to('final-assessment', { section: 'writeup-review' })).toEqual({ view: 'final-assessment', section: 'writeup-review' });
+    expect(to('final-assessment', { section: 'drafts' })).toEqual({ view: 'final-assessment', section: '' });
     expect(to('awardees')).toEqual({ view: 'awardees', section: '' });
     expect(to('peer-review', { section: 'reviewers' })).toEqual({ view: 'peer-review', section: 'reviewers' });
     expect(to('initial-assessment', { section: 'reviewers' })).toEqual({ view: 'initial-assessment', section: '' });
