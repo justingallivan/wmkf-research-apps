@@ -71,7 +71,7 @@ const LEGACY_TAB_ALIASES = {
 
 export function WorkbenchRequest({ previewReadOnly = false }) {
   const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const { isSuperuser, hasAccess } = useAppAccess();
   const { preferences } = useProfile();
   const { requestId } = router.query;
@@ -269,7 +269,9 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
               }}
             />
           )}
-          <ProposalTab key={routeRequestId || ''} context={visibleContext} requestId={routeRequestId || ''} />
+          <ProposalTab key={routeRequestId || ''} context={visibleContext} requestId={routeRequestId || ''}
+            actorProfileId={sessionStatus === 'authenticated' ? session?.user?.profileId : null}
+            previewReadOnly={previewReadOnly} />
         </>
       ) : activeTab === 'integrity' ? (
         <IntegrityTab key={routeRequestId || ''} requestId={routeRequestId || ''} />

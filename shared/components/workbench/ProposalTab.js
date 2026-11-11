@@ -15,6 +15,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { requestEnvelope } from '../../utils/api-request';
 import { Card } from '../Layout';
+import ProposalDrafts from './ProposalDrafts';
 import { parseFieldPrimerEnvelope } from '../../utils/field-primer-envelope';
 import { expertProfileLinks, expertMetrics } from '../../utils/field-primer-display';
 
@@ -500,7 +501,7 @@ function DocumentsSection({ requestId, docs, error }) {
   );
 }
 
-export default function ProposalTab({ context, requestId: requestIdProp }) {
+export default function ProposalTab({ context, requestId: requestIdProp, actorProfileId = null, previewReadOnly = false }) {
   const requestId = requestIdProp || context?.requestId || null;
   const [docs, setDocs] = useState(null);
   const [docsError, setDocsError] = useState(null);
@@ -554,6 +555,8 @@ export default function ProposalTab({ context, requestId: requestIdProp }) {
       <Section title="Documents">
         <DocumentsSection requestId={requestId} docs={docs} error={docsError} />
       </Section>
+
+      {context && <ProposalDrafts requestId={requestId} profileId={actorProfileId} previewReadOnly={previewReadOnly} />}
 
       {/* Bottom — AI content */}
       {context && <Section title="AI Content">
