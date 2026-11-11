@@ -17,7 +17,8 @@ function fixture({operation='initialize', two=false}={}) {
     saveResponse:jest.fn(async({taskId,attemptId:aid,response})=>{state.events.push('checkpoint');const a=state.attempts.find(x=>x.id===aid);a.state='response_saved';a.response_content_id=`response-${taskId}`;contents[a.response_content_id]=response;tasks.find(x=>x.id===taskId).state='response_saved';return a;}),
     markAttemptFailed:jest.fn(async({taskId,attemptId:aid,outcome,deferredAudit})=>{const t=tasks.find(x=>x.id===taskId),a=state.attempts.find(x=>x.id===aid);if(a && a.state!=='dispatching' && outcome==='unknown')return null;t.state=outcome;if(a){a.state=outcome;if(deferredAudit){a.audit_state='pending';a.audit_content_id=`audit-${taskId}`;contents[a.audit_content_id]=deferredAudit;}}return t;}),
     saveValidated:jest.fn(async({taskId,attemptId:aid,result,deferredAudit})=>{state.events.push('validated');const t=tasks.find(x=>x.id===taskId),a=state.attempts.find(x=>x.id===aid);t.state='validated';t.result=result;a.state='validated';a.audit_state='pending';a.audit_content_id=`audit-${taskId}`;contents[a.audit_content_id]=deferredAudit;return t;}),
-    markAudit:jest.fn(async({attemptId:aid,outcome})=>{state.attempts.find(x=>x.id===aid).audit_state=outcome;return true;}),
+    markAuditDispatching:jest.fn(async({attemptId:aid})=>{const a=state.attempts.find(x=>x.id===aid);if(a.audit_state!=='pending')return null;a.audit_state='dispatching';return true;}),
+    markAudit:jest.fn(async({attemptId:aid,outcome})=>{const a=state.attempts.find(x=>x.id===aid);if(a.audit_state!=='dispatching')return null;a.audit_state=outcome;return true;}),
     freezePublication:jest.fn(async()=>{const fields={};for(const t of tasks.filter(x=>x.state==='validated')) fields[t.destination_field]=t.result;contents.patch=fields;state.publication={id:'pub',state:'ready',expected_etag:job.target_etag,payload_content_id:'patch'};return state.publication;}),
     markPublicationDispatched:jest.fn(async()=>{state.publication.state='dispatching';return true;}),finishPublication:jest.fn(async({outcome})=>{state.publication.state=outcome;return true;}),
   };
@@ -34,10 +35,10 @@ test('intent precedes provider and response checkpoint precedes validation and a
   expect(f.args.writer.mock.calls[0][0]).toMatchObject({expectedEtag:'etag-original',fields:{field1:'validated result',field2:'validated result'}});
   expect(await f.tick()).toEqual({stage:'complete'});expect(f.args.writer).toHaveBeenCalledTimes(1);
 });
-test('post-dispatch ambiguity is never retried and blocks publication while a sibling can finish', async()=>{
+test('post-dispatch ambiguity blocks queued siblings and publication', async()=>{
   const f=fixture({two:true});f.executePrompt.mockImplementationOnce(async o=>{await o.onDispatch();throw new Error('timeout');});
-  expect(await f.tick()).toEqual({stage:'unknown'});expect(await f.tick()).toEqual({stage:'validated'});expect(await f.tick()).toEqual({stage:'audit_delivered'});expect(await f.tick()).toEqual({stage:'waiting'});
-  expect(f.executePrompt).toHaveBeenCalledTimes(2);expect(f.args.writer).not.toHaveBeenCalled();
+  expect(await f.tick()).toEqual({stage:'unknown'});expect(await f.tick()).toEqual({stage:'needs_attention'});
+  expect(f.executePrompt).toHaveBeenCalledTimes(1);expect(f.args.writer).not.toHaveBeenCalled();
 });
 test('checkpoint is reused without provider call after validation stage crash', async()=>{
   const f=fixture();f.executePrompt.mockImplementationOnce(async o=>{await o.onDispatch();await o.onResponse({version:1,binding:'hash',response:{text:'saved'}});throw new Error('crashed after checkpoint');});
@@ -88,4 +89,21 @@ test('scope, wildcard target and exhausted lease reject before dispatch', async(
   const f=fixture();f.state.job.authorization_scope='foreign';await expect(f.tick()).rejects.toThrow();expect(f.executePrompt).not.toHaveBeenCalled();
   const g=fixture();g.state.job.target_etag='*';await expect(g.tick()).rejects.toThrow();expect(g.executePrompt).not.toHaveBeenCalled();
   const h=fixture();h.state.job.lease_expires_at=new Date(Date.now()+1000).toISOString();await expect(h.tick()).rejects.toThrow();expect(h.executePrompt).not.toHaveBeenCalled();
+});
+
+test('audit dispatch is fenced and lost sink acknowledgement is never resent', async()=>{
+  const f=fixture();await f.tick();f.store.markAuditDispatching.mockResolvedValueOnce(null);await expect(f.tick()).rejects.toThrow('audit dispatch fenced');expect(f.args.audit).not.toHaveBeenCalled();
+  f.store.markAudit.mockRejectedValueOnce(new Error('lost receipt'));await expect(f.tick()).rejects.toThrow('lost receipt');expect(f.args.audit).toHaveBeenCalledTimes(1);expect(f.state.attempts[0].audit_state).toBe('dispatching');
+  // Claim recovery converts a previously dispatched audit into an uncertain outcome.
+  f.state.attempts[0].audit_state='unknown';expect(await f.tick()).toEqual({stage:'needs_attention'});expect(f.args.audit).toHaveBeenCalledTimes(1);expect(f.args.writer).not.toHaveBeenCalled();
+});
+test('audit authorization denial prevents a dispatch intent and sink call', async()=>{
+  const f=fixture();await f.tick();f.args.authorize.mockImplementation(async ({stage})=>stage!=='audit');await expect(f.tick()).rejects.toThrow('authorization or freshness denied');expect(f.store.markAuditDispatching).not.toHaveBeenCalled();expect(f.args.audit).not.toHaveBeenCalled();
+});
+
+test('saved response recovery still proceeds when another task is unknown', async()=>{
+  const f=fixture({two:true});f.state.tasks[0].state='unknown';f.state.tasks[1].state='response_saved';
+  f.state.attempts.push({id:attemptId,task_id:'t2',state:'response_saved',response_content_id:'saved',audit_run_id:runId,audit_state:'none'});f.state.contents.saved={version:1,response:{text:'saved'}};
+  f.executePrompt.mockImplementationOnce(async o=>({parsed:{methodology:o.responseCheckpoint.response.text},deferredAudit:auditPayload()}));
+  expect(await f.tick()).toEqual({stage:'validated'});expect(f.store.markDispatching).not.toHaveBeenCalled();
 });
