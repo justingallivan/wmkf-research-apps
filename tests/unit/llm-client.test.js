@@ -923,3 +923,29 @@ describe('reviewer-finder Opus 4.8 pinning', () => {
     expect(modelSupportsTemperature(getModelForApp('reviewer-finder'))).toBe(false);
   });
 });
+
+test.each(['529', 'timeout', 'dropped unary body'])('durable Sonnet call posts once on %s', async failure => {
+  const timeoutMs = failure === 'timeout' ? 10 : 1000;
+  const client = new LLMClient({
+    apiKey: 'fabricated-unused-key', model: 'claude-sonnet-4-6',
+    fallbackModel: null, maxRetries: 0, allowParameterRepair: false, timeoutMs,
+  });
+  if (failure === '529') {
+    safeFetch.mockResolvedValueOnce(jsonResponse({ error: { message: 'overloaded' } }, { status: 529 }));
+  } else if (failure === 'timeout') {
+    safeFetch.mockImplementationOnce((_url, { signal }) => new Promise((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(new Error('simulated timeout')), { once: true });
+    }));
+  } else {
+    safeFetch.mockResolvedValueOnce({ ...jsonResponse({}), json: async () => { throw new Error('simulated dropped body'); } });
+  }
+  await expect(client.complete({ messages: [{ role: 'user', content: 'fabricated' }], maxTokens: 4096, temperature: 0 })).rejects.toThrow();
+  expect(safeFetch).toHaveBeenCalledTimes(1);
+  const [, request] = safeFetch.mock.calls[0];
+  expect(request.method).toBe('POST');
+  expect(request.headers).not.toHaveProperty('anthropic-beta');
+  const body = JSON.parse(request.body);
+  expect(body).toMatchObject({ model: 'claude-sonnet-4-6', max_tokens: 4096 });
+  expect(body).not.toHaveProperty('thinking');
+  expect(body).not.toHaveProperty('tools');
+});

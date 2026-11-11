@@ -7,7 +7,7 @@ import { readStaffRecommendation } from '../../lib/services/prompt-jobs/staff-re
 import { createRecommendationsProposalSource } from '../../lib/services/prompt-jobs/proposal-source.js';
 import { SANDBOX_RECOMMENDATIONS_SOURCE_VERSION } from '../../lib/services/prompt-jobs/context.js';
 import { EXPERTISE_TASK_KEY, isTaskEnabled } from '../../lib/services/prompt-jobs/capabilities.js';
-import { readRecommendationsAccessPolicy, RECOMMENDATIONS_SANDBOX_HOST, RECOMMENDATIONS_SANDBOX_ORIGIN } from '../../lib/services/prompt-jobs/recommendations-sandbox-policy.js';
+import { readRecommendationsAccessPolicy, readRecommendationsTrialPolicy, recommendationsTrialBudget, RECOMMENDATIONS_SANDBOX_HOST, RECOMMENDATIONS_SANDBOX_ORIGIN } from '../../lib/services/prompt-jobs/recommendations-sandbox-policy.js';
 
 const requestId = randomUUID();
 const filename = 'ProposalNarrative_12345.pdf';
@@ -133,4 +133,42 @@ test('default staff User read reaches strict transport and strict adapters rejec
       strictRead: true, expectedOrigin: RECOMMENDATIONS_SANDBOX_ORIGIN });
     expect(hasGrant).not.toHaveBeenCalled();
   } finally { transport.mockRestore(); }
+});
+
+test('trial extraction and proof use the same approved bytes and reject another drive before downloading', async () => {
+  const { source, deps, metadata } = fixture();
+  const input = { ...args, siteId: metadata.siteId, driveId: metadata.driveId };
+  const buffer = Buffer.from('%PDF-same-buffer');
+  deps.downloadFile.mockResolvedValue({ filename, buffer });
+  deps.extractText.mockResolvedValue('Extracted fabricated text.');
+  const observation = await source.observe(input);
+  const prepared = await source.prepare(input);
+  expect(prepared).toEqual({ observation, document: { ...observation.documents[0], text: 'Extracted fabricated text.' } });
+  expect(deps.extractText.mock.calls[0][0]).toBe(buffer);
+  expect(deps.extractText).toHaveBeenCalledWith(buffer, filename, 'application/pdf');
+  deps.downloadFile.mockClear();
+  await expect(source.prepare({ ...input, driveId: 'another-drive' })).rejects.toMatchObject({ code: 'proposal_source_changed' });
+  expect(deps.downloadFile).not.toHaveBeenCalled();
+});
+
+test('operator trial requires a separate exact local grant and uses conservative input headroom', () => {
+  const grant = {
+    requestId, profileId: 7, systemUserId: randomUUID(), azureId: randomUUID(), applicationId: randomUUID(),
+    scopeId: randomUUID(), idempotencyKey: randomUUID(), promptId: randomUUID(), promptHash: 'a'.repeat(64),
+    profileHash: 'b'.repeat(64), sourceHash: 'c'.repeat(64), databaseIdentity: 'd'.repeat(64),
+    sourceSiteId: 'appriver3651007194.sharepoint.com,site,web', sourceDriveId: 'b!drive',
+  };
+  const env = { DYNAMICS_URL: RECOMMENDATIONS_SANDBOX_ORIGIN, DYNAMICS_CLIENT_ID: grant.applicationId,
+    DATAVERSE_TARGET_INTERLOCK: 'on', DATAVERSE_DAL_ENFORCEMENT: 'on',
+    EXPERTISE_RECOMMENDATIONS_TRIAL: 'on', EXPERTISE_RECOMMENDATIONS_TRIAL_ACCESS: JSON.stringify(grant) };
+  expect(readRecommendationsTrialPolicy(env)).toMatchObject({ ...grant, ...target });
+  for (const patch of [
+    { EXPERTISE_RECOMMENDATIONS_TRIAL: 'true' }, { VERCEL: '1' }, { VERCEL_ENV: 'development' },
+    { NODE_ENV: 'production' }, { DYNAMICS_CLIENT_ID: randomUUID() },
+    { DYNAMICS_URL: `${RECOMMENDATIONS_SANDBOX_ORIGIN}/` }, { DATAVERSE_DAL_ENFORCEMENT: 'warn' },
+    { DATAVERSE_TARGET_INTERLOCK: undefined }, { EXPERTISE_RECOMMENDATIONS_TRIAL_ACCESS: JSON.stringify({ ...grant, databaseIdentity: 'not-a-hash' }) },
+  ]) expect(readRecommendationsTrialPolicy({ ...env, ...patch })).toBeNull();
+  expect(recommendationsTrialBudget(195_000, 4096)).toEqual({ inputUpperBound: 195_000, maxTokens: 4096, costCeilingMicros: 1_665_101 });
+  expect(() => recommendationsTrialBudget(195_001, 4096)).toThrow('exceeds budget');
+  expect(() => recommendationsTrialBudget(195_000, 4097)).toThrow('exceeds budget');
 });

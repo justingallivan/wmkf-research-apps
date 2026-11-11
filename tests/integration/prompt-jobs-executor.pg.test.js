@@ -20,7 +20,8 @@ import { canonical, hashProfile, sha256 } from '../../lib/services/prompt-jobs/p
 import { composeProfileTask, prepareContextSnapshot, recommendationSourceProof, sandboxRecommendationSourceProof } from '../../lib/services/prompt-jobs/context.js';
 import { createRecommendationsReader } from '../../lib/services/prompt-jobs/recommendations-reader.js';
 import { readStaffRecommendation } from '../../lib/services/prompt-jobs/staff-recommendations-service.js';
-import { readRecommendationsAccessPolicy, RECOMMENDATIONS_SANDBOX_ORIGIN } from '../../lib/services/prompt-jobs/recommendations-sandbox-policy.js';
+import { readRecommendationsAccessPolicy, readRecommendationsTrialPolicy, RECOMMENDATIONS_SANDBOX_ORIGIN } from '../../lib/services/prompt-jobs/recommendations-sandbox-policy.js';
+import { admitSandboxRecommendationTrial, advanceSandboxRecommendationTrial, preflightSandboxRecommendationTrial } from '../../lib/services/prompt-jobs/sandbox-recommendations-trial.js';
 import { EXPERTISE_RESULT_CONTRACT, EXPERTISE_TASK_KEY } from '../../lib/services/prompt-jobs/capabilities.js';
 import { buildRecommendationsSnapshot, validateRecommendationsOutput } from '../../lib/services/expertise-finder/recommendations-contract.js';
 import roster from '../../lib/services/expertise-finder/roster-contract.cjs';
@@ -689,8 +690,8 @@ suite('shared prompt job synthetic vertical trial',()=>{
     expect((await mismatch.read()).tasks[0].error_code).toBe('invalid_prompt_job_snapshot');
   });
 
-  // Future read-compatible receipt only in the disposable SQL schema. The
-  // actual admission/Executor paths continue to reject Sandbox expertise tasks.
+  // Read-compatible fixture receipt in the disposable SQL schema. The generic
+  // admission path still rejects Sandbox recommendations.
   async function sandboxReceipt() {
     const f = expertiseFixture();
     const jobId = randomUUID(), requestId = f.owner.requestId, azureId = randomUUID();
@@ -834,4 +835,209 @@ suite('shared prompt job synthetic vertical trial',()=>{
     expect(await store.readSandboxRecommendationState({ ...t.policy, requestId: fixture.owner.requestId, jobId: fixture.jobId })).toBeNull();
   });
 
+});
+
+suite('local Sandbox recommendation admission and controlled stages', () => {
+  let admin, pool, store, schema, previousEnv, databaseIdentity;
+  beforeAll(async () => {
+    schema = `prompt_jobs_admission_${randomUUID().replaceAll('-', '')}`;
+    admin = new Pool({ connectionString: databaseUrl, max: 2 });
+    await admin.query(`CREATE SCHEMA "${schema}"`);
+    pool = new Pool({ connectionString: databaseUrl, max: 5, options: `-c search_path=${schema},public` });
+    await pool.query(fs.readFileSync(path.join(process.cwd(), 'lib/db/migrations/097_shared_prompt_jobs.sql'), 'utf8'));
+    store = createPromptJobStore(pool);
+    const { rows: [database] } = await pool.query('SELECT current_database() AS name, system_identifier::text FROM pg_catalog.pg_control_system()');
+    databaseIdentity = sha256(canonical([database.system_identifier, database.name]));
+  });
+  beforeEach(async () => {
+    previousEnv = process.env;
+    process.env = { ...previousEnv, CLAUDE_API_KEY: 'fabricated-unused-key' };
+    delete process.env.VERCEL;
+    delete process.env.VERCEL_ENV;
+    delete process.env.DYNAMICS_SANDBOX_URL;
+    delete process.env.SHAREPOINT_SITE_URL;
+    await pool.query('TRUNCATE prompt_jobs CASCADE');
+    mockComplete.mockReset();
+  });
+  afterEach(() => { process.env = previousEnv; });
+  afterAll(async () => {
+    await pool?.end();
+    if (admin) { await admin.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`); await admin.end(); }
+  });
+
+  function trial(grantOverride = {}) {
+    const f = expertiseFixture();
+    const { profile: definition } = f.input.tasks[0].configuration;
+    const targetHost = new URL(RECOMMENDATIONS_SANDBOX_ORIGIN).hostname;
+    const proof = sandboxRecommendationSourceProof(targetHost, definition.documentRoles, f.sourceObservation.documents);
+    const observation = { ...f.sourceObservation, version: proof.version, targetHost };
+    const grant = {
+      requestId: f.owner.requestId, profileId: 7, azureId: randomUUID(), systemUserId: randomUUID(), applicationId: randomUUID(),
+      scopeId: randomUUID(), idempotencyKey: randomUUID(), promptId: f.promptRow.wmkf_ai_promptid,
+      promptHash: sha256(canonical(f.promptRow)), profileHash: hashProfile(definition), sourceHash: proof.hash,
+      sourceSiteId: 'appriver3651007194.sharepoint.com,site,web', sourceDriveId: 'b!test-drive', databaseIdentity, ...grantOverride,
+    };
+    Object.assign(process.env, {
+      DYNAMICS_URL: RECOMMENDATIONS_SANDBOX_ORIGIN, DYNAMICS_CLIENT_ID: grant.applicationId,
+      DATAVERSE_DAL_ENFORCEMENT: 'on', DATAVERSE_TARGET_INTERLOCK: 'on',
+      EXPERTISE_RECOMMENDATIONS_TRIAL: 'on', EXPERTISE_RECOMMENDATIONS_TRIAL_ACCESS: JSON.stringify(grant),
+    });
+    const policy = readRecommendationsTrialPolicy();
+    const deps = {
+      store, nonceSecret: () => nonceSecret, authorize: jest.fn(async () => true), prompt: jest.fn(async () => f.promptRow),
+      profiles: async () => ({ profiles: [{ profile: definition, sha256: grant.profileHash }] }),
+      source: { prepare: jest.fn(async () => ({ observation, document: f.snapshotArgs.documents[0] })), observe: jest.fn(async () => observation) },
+      roster: jest.fn(async () => ({ targetHost, projection: f.rosterProjection })),
+    };
+    mockComplete.mockResolvedValue(providerResponse(JSON.stringify(f.output)));
+    return { ...f, proof, grant, policy, deps, admit: () => admitSandboxRecommendationTrial(deps),
+      tick: args => advanceSandboxRecommendationTrial(args, deps) };
+  }
+
+  async function admitted(t) {
+    const { jobId } = await t.admit();
+    expect(await t.tick()).toEqual({ stage: 'snapshot_saved' });
+    return jobId;
+  }
+
+  test('bounded admission is idempotent before mutable inputs, then produces one typed draft and a separate audit intent', async () => {
+    const fixture = await store.admit(expertiseFixture().input);
+    expect(fixture.job.environment).toBe('test');
+    const t = trial();
+    expect(await preflightSandboxRecommendationTrial(t.deps)).toEqual({
+      inputUpperBound: expect.any(Number), maxTokens: 4096, costCeilingMicros: expect.any(Number),
+    });
+    expect((await pool.query("SELECT 1 FROM prompt_jobs WHERE environment='local-sandbox'")).rowCount).toBe(0);
+    expect(mockComplete).not.toHaveBeenCalled();
+    const receipts = await Promise.all([t.admit(), t.admit()]);
+    expect(receipts.map(r => r.replayed).sort()).toEqual([false, true]);
+    const [{ jobId }] = receipts;
+    expect(receipts.every(r => r.jobId === jobId)).toBe(true);
+    t.deps.prompt.mockRejectedValue(new Error('must reuse frozen prompt'));
+    t.deps.source.prepare.mockClear();
+    await expect(t.admit()).resolves.toEqual({ jobId, replayed: true });
+    expect(t.deps.source.prepare).not.toHaveBeenCalled();
+    expect(await t.tick()).toEqual({ stage: 'snapshot_saved' });
+    expect(await t.tick({ recoverResponse: true })).toEqual({ stage: 'unavailable' });
+    expect(mockComplete).not.toHaveBeenCalled();
+    mockComplete.mockImplementationOnce(async () => {
+      const { rows } = await pool.query('SELECT state FROM prompt_job_attempts');
+      expect(rows).toEqual([{ state: 'dispatching' }]);
+      return providerResponse(JSON.stringify(t.output));
+    });
+    expect(await t.tick()).toEqual({ stage: 'validated' });
+    expect(await t.tick()).toEqual({ stage: 'audit_pending' });
+    const read = await store.readValidatedSandboxRecommendations({ ...t.policy, jobId });
+    expect(read.results).toEqual([expect.objectContaining({
+      status: 'available', contractVersion: EXPERTISE_RESULT_CONTRACT,
+      result: validateRecommendationsOutput(t.output, t.built),
+    })]);
+    const view = await store.readJob({ ...t.policy, jobId });
+    expect(view.attempts).toEqual([expect.objectContaining({ state: 'validated', audit_state: 'pending' })]);
+    expect(view.tasks[0]).toMatchObject({ destination_field: null, writeback_state: 'not_requested' });
+    expect(view.publication).toBeNull();
+    expect(mockComplete).toHaveBeenCalledTimes(1);
+    await pool.query("UPDATE prompt_job_content SET expires_at=clock_timestamp()-interval '1 second' WHERE job_id=$1 AND kind='result'", [jobId]);
+    const expired = await store.readValidatedSandboxRecommendations({ ...t.policy, jobId });
+    expect(expired.results).toEqual([expect.objectContaining({ status: 'expired' })]);
+    expect(expired.results[0]).not.toHaveProperty('result');
+    expect((await pool.query("SELECT 1 FROM prompt_job_content WHERE job_id=$1 AND kind='result'", [jobId])).rowCount).toBe(1);
+  });
+
+  test('same-target changes require a new approval but the Sandbox singleton forbids a second job across owner, scope and Request', async () => {
+    const t = trial();
+    const { jobId } = await t.admit();
+    await pool.query("UPDATE prompt_jobs SET environment = 'preview-sandbox'");
+    await pool.query("UPDATE prompt_job_tasks SET state = 'expired'");
+    await pool.query("UPDATE prompt_job_content SET expires_at = clock_timestamp() - interval '1 second'");
+    expect(await store.expireSandboxRecommendationContent({ ...t.policy, environment: 'preview-sandbox', jobId })).toBe(1);
+    const other = trial();
+    await expect(other.admit()).rejects.toMatchObject({ code: 'prompt_job_trial_limit' });
+    expect((await pool.query('SELECT 1 FROM prompt_jobs')).rowCount).toBe(1);
+    expect(mockComplete).not.toHaveBeenCalled();
+  });
+
+  test('rejects a mismatched database and same idempotency key with different binding', async () => {
+    const wrong = trial({ databaseIdentity: '0'.repeat(64) });
+    await expect(wrong.admit()).rejects.toMatchObject({ code: 'recommendations_trial_database_mismatch' });
+    expect(wrong.deps.authorize).not.toHaveBeenCalled();
+    expect(wrong.deps.source.prepare).not.toHaveBeenCalled();
+    const original = trial();
+    const { jobId } = await original.admit();
+    const conflict = trial({ applicationId: original.grant.applicationId, idempotencyKey: original.grant.idempotencyKey });
+    await expect(conflict.admit()).rejects.toMatchObject({ code: 'prompt_job_idempotency_key_reused' });
+    const { rows } = await pool.query('SELECT id FROM prompt_jobs');
+    expect(rows).toEqual([{ id: jobId }]);
+    expect(mockComplete).not.toHaveBeenCalled();
+  });
+
+  test('known source mismatch and insufficient authorization consume no singleton or call', async () => {
+    const t = trial();
+    t.deps.authorize.mockResolvedValueOnce(false);
+    await expect(t.admit()).rejects.toMatchObject({ code: 'recommendations_trial_access_denied' });
+    const prepared = await t.deps.source.prepare();
+    t.deps.source.prepare.mockResolvedValueOnce({ ...prepared, observation: { ...prepared.observation,
+      documents: [{ ...prepared.document, text: undefined, sha256: 'b'.repeat(64) }].map(({ text, ...d }) => d),
+    } });
+    await expect(t.admit()).rejects.toMatchObject({ code: 'trial_inputs_changed' });
+    expect((await pool.query('SELECT 1 FROM prompt_jobs')).rowCount).toBe(0);
+    expect(mockComplete).not.toHaveBeenCalled();
+    await expect(t.admit()).resolves.toMatchObject({ replayed: false });
+  });
+
+  test('post-response unknown holds the durable checkpoint until explicitly recovered, with no second provider call', async () => {
+    const t = trial();
+    const jobId = await admitted(t);
+    mockComplete.mockImplementationOnce(async () => {
+      // The dispatch freshness check has already completed at this point.
+      t.deps.source.observe.mockRejectedValueOnce(new Error('source unavailable after generation'));
+      return providerResponse(JSON.stringify(t.output));
+    });
+    expect(await t.tick()).toEqual({ stage: 'needs_attention' });
+    const held = await store.readJob({ ...t.policy, jobId });
+    expect(held.attempts).toEqual([expect.objectContaining({ state: 'response_saved', response_hash: expect.any(String) })]);
+    expect(await t.tick()).toEqual({ stage: 'needs_attention' });
+    expect(await t.tick({ recoverResponse: true })).toEqual({ stage: 'validated' });
+    expect(mockComplete).toHaveBeenCalledTimes(1);
+  });
+
+  test('confirmed post-response source change beats unknown roster, preserving a failed audit receipt', async () => {
+    const t = trial();
+    const jobId = await admitted(t);
+    mockComplete.mockImplementationOnce(async () => {
+      t.deps.source.observe.mockRejectedValueOnce(Object.assign(new Error('source changed'), { code: 'proposal_source_changed' }));
+      t.deps.roster.mockRejectedValueOnce(new Error('roster unavailable'));
+      return providerResponse(JSON.stringify(t.output));
+    });
+    expect(await t.tick()).toEqual({ stage: 'failed_validation' });
+    const view = await store.readJob({ ...t.policy, jobId });
+    expect(view.attempts).toEqual([expect.objectContaining({
+      state: 'failed_validation', audit_state: 'pending', error_code: 'profile_inputs_changed_after_dispatch',
+    })]);
+    expect(await t.tick({ recoverResponse: true })).toEqual({ stage: 'unavailable' });
+    expect(mockComplete).toHaveBeenCalledTimes(1);
+  });
+
+  test('exact-job cleanup removes expired bytes after revocation and preserves same-scope sibling bytes and tombstone', async () => {
+    const t = trial();
+    const jobId = await admitted(t);
+    t.deps.authorize.mockResolvedValue(false);
+    delete process.env.EXPERTISE_RECOMMENDATIONS_TRIAL;
+    const sibling = randomUUID();
+    await pool.query(`INSERT INTO prompt_jobs (id,environment,principal_key,authorization_scope,request_id,idempotency_key,
+      payload_hash,operation,source_expires_at,result_expires_at)
+      SELECT $2,environment,principal_key,authorization_scope,request_id,$3,payload_hash,operation,source_expires_at,result_expires_at
+      FROM prompt_jobs WHERE id=$1`, [jobId, sibling, randomUUID()]);
+    await pool.query(`INSERT INTO prompt_job_content(job_id,kind,payload,sha256,size_bytes,expires_at)
+      SELECT $2,kind,payload,sha256,size_bytes,expires_at FROM prompt_job_content WHERE job_id=$1`, [jobId, sibling]);
+    await pool.query("UPDATE prompt_job_content SET expires_at=clock_timestamp()-interval '1 second'");
+    await expect(store.expireSandboxRecommendationContent(t.policy)).rejects.toMatchObject({ code: 'invalid_prompt_job_id' });
+    await expect(store.expireSandboxRecommendationContent({ ...t.policy, jobId, databaseIdentity: '0'.repeat(64) }))
+      .rejects.toMatchObject({ code: 'recommendations_trial_database_mismatch' });
+    expect(await store.expireSandboxRecommendationContent({ ...t.policy, jobId, principalKey: `app:${randomUUID()}` })).toBe(0);
+    expect(await store.expireSandboxRecommendationContent({ ...t.policy, jobId })).toBe(2);
+    expect((await pool.query('SELECT DISTINCT job_id FROM prompt_job_content')).rows).toEqual([{ job_id: sibling }]);
+    expect((await pool.query('SELECT 1 FROM prompt_job_tasks WHERE job_id=$1', [jobId])).rowCount).toBe(1);
+    expect((await pool.query('SELECT 1 FROM prompt_jobs WHERE id=$1', [jobId])).rowCount).toBe(1);
+  });
 });
