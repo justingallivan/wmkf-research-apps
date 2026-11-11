@@ -186,9 +186,25 @@ Sonnet 5.5 submission, 40 active profiles and actor-owned exact persistence/Hist
 Exact Blob cleanup, unchanged all 46 profiles/public SQL, fixture removal and server stop
 passed with the prior reviewed build; no Graph/attachment writes or runtime changes.
 See `docs/plans/data/expertise-roster/SINGLE_MATCH_RERUN_2026-11-11.md`.
-Remaining boundaries: batch picker proof and deliberate public cutover/deployment
-admission; bounded single/batch/attachment proof does not establish full-app or
-Production readiness.
+The bounded single/batch/attachment rehearsals do not establish full-app or
+Production readiness. Legacy batch-picker proof remains separate from the new
+automation direction.
+
+[PLANNED; owner decisions, November 11] The next expertise direction is
+recommendations-only through the shared Executor/Power Automate backend, not staff
+assignment. Future assignment requires a separate contract with Connor. No future
+Phase I staff-version document is assumed. The authoritative source remains OPEN
+pending shared source/cache work: Submission-Documents project narrative versus
+AI Materials combined narrative–bibliography. Existing runtime callers and dated
+rehearsals are preserved; this decision does not remove them.
+
+The shared infrastructure owner confirmed clean baseline `0c4b8d39c` and retains
+common source/cache contracts, PA authentication, typed storage/results, worker,
+recovery and operations. The roster stream owns expertise semantics/validation and
+recommendation presentation. Shared interface/typed-result admission, source/cache
+selection, PA authorization/operations and deliberate roster cutover remain
+integration dependencies, not built capability. See
+`docs/plans/data/expertise-roster/POWER_AUTOMATE_RECOMMENDATIONS_PLAN_2026-11-11.md`.
 The local import fixture is not a full application schema; do not claim full app UAT.
 Justin approved the minimal matching contract: active explicitly lead-eligible staff
 with enabled User links only for lead; other active staff may be consulted; validated

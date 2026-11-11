@@ -12,6 +12,24 @@ A separately authorized additional normal-UI single run subsequently passed with
 actor-owned persistence, History and cleanup; see [rerun evidence](SINGLE_MATCH_RERUN_2026-11-11.md).
 Batch picker, full-application and Production readiness are not claimed.
 
+## Next planning direction
+
+[PLANNED; owner decisions, November 11] The next expertise direction is
+recommendations-only through the shared Executor/Power Automate backend, not staff
+assignment. Future assignment requires a separate contract with Connor. No future
+Phase I staff-version document is assumed. The authoritative source remains OPEN
+pending shared source/cache work: Submission-Documents project narrative versus
+AI Materials combined narrative–bibliography. Existing runtime callers and dated
+rehearsals are preserved; this decision does not remove them.
+
+The shared infrastructure owner confirmed clean baseline `0c4b8d39c` and retains
+common source/cache contracts, PA authentication, typed storage/results, worker,
+recovery and operations. The roster stream owns expertise semantics/validation and
+recommendation presentation. Shared interface/typed-result admission, source/cache
+selection, PA authorization/operations and deliberate roster cutover remain
+integration dependencies, not built capability. See
+[the new recommendations plan](POWER_AUTOMATE_RECOMMENDATIONS_PLAN_2026-11-11.md).
+
 ## Executed venue contract
 
 The source-built minimal transport, staging, runner, model guard and logger passed
@@ -244,9 +262,11 @@ The implemented usage logger contains synchronous initial and synchronous/asynch
 fallback SQL failures, with tests, so logging cannot turn a saved result into false
 failure. A missing usage row must still be recorded honestly.
 
-The second approved PDF copy must sit directly in the synthetic Request folder with
-the Phase I staff-version filename pattern, because batch listing is non-recursive.
-Upload with conflict behavior `fail` and clean up by exact item ID and ETag. The
+For the historical executed batch rehearsal, the second approved PDF copy used
+the Phase I staff-version filename pattern directly in the synthetic Request
+folder because the existing batch listing is non-recursive. It was uploaded with
+conflict behavior `fail` and removed by exact item ID and ETag. This fixture does
+not select the future automation source. The
 batch picker covers 2020 through next year and excludes this D99 fixture: label any
 same-origin batch POST as route/service proof, not picker proof. Private/public Blob
 use is limited to the approved synthetic scope. Each model submission can make up

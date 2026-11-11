@@ -107,3 +107,21 @@ and public SQL unchanged; see `docs/plans/data/expertise-roster/SINGLE_MATCH_RER
 Superseded registry audit retained, owned SQL schema removed and all 46 roster
 values/ETags plus public SQL unchanged. No Production promotion occurred. See
 `docs/plans/data/expertise-roster/LIVE_ATTACHMENT_MATCHING_RESULTS_2026-11-11.md`.
+
+## Planned shared-backend recommendations
+
+[PLANNED; owner decisions, November 11] The next expertise direction is
+recommendations-only through the shared Executor/Power Automate backend, not staff
+assignment. Future assignment requires a separate contract with Connor. No future
+Phase I staff-version document is assumed. The authoritative source remains OPEN
+pending shared source/cache work: Submission-Documents project narrative versus
+AI Materials combined narrative–bibliography. Existing runtime callers and dated
+rehearsals are preserved; this decision does not remove them.
+
+The shared infrastructure owner confirmed clean baseline `0c4b8d39c` and retains
+common source/cache contracts, PA authentication, typed storage/results, worker,
+recovery and operations. The roster stream owns expertise semantics/validation and
+recommendation presentation. Shared interface/typed-result admission, source/cache
+selection, PA authorization/operations and deliberate roster cutover remain
+integration dependencies, not built capability. See
+`docs/plans/data/expertise-roster/POWER_AUTOMATE_RECOMMENDATIONS_PLAN_2026-11-11.md`.
