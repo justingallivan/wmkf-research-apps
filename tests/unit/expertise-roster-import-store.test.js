@@ -55,3 +55,43 @@ test('inactive key blocks preflight before profile writes',async()=>{
  const client={raw:jest.fn().mockResolvedValueOnce({ok:true,body:{EntitySetName:'wmkf_expertiseprofiles',IsAuditEnabled:{Value:true},IsOptimisticConcurrencyEnabled:true}}).mockResolvedValueOnce({ok:true,body:{value:[{KeyAttributes:['wmkf_creationkey'],EntityKeyIndexStatus:'Pending'}]}})};
  const s=createStore({env:env(),client,pg:pgMock()});await expect(s.preflight({rows:[]})).rejects.toThrow(/not Active/);expect(client.raw.mock.calls.every(c=>c[0]==='GET')).toBe(true);
 });
+test('forward binding conflict refuses remapping and rolls back',async()=>{
+ const pg=pgMock(),base=pg.query.getMockImplementation();
+ pg.query.mockImplementation((sql,args)=>{
+  if(sql.startsWith('SELECT roster_id'))return Promise.resolve({rows:[]});
+  if(sql.startsWith('SELECT dataverse_profile_guid'))return Promise.resolve({rows:[{guid:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'}]});
+  return base(sql,args);
+ });
+ const s=createStore({env:env(),pg,client:{}});
+ await expect(s.bridgeTransaction(90,b=>b.bind(1,HOST,GUID))).rejects.toMatchObject({message:'Numeric identity already bound to another profile',bridgeCommitted:false,transactionPhase:'rows'});
+ expect(pg.query.mock.calls.some(([q])=>q.startsWith('INSERT INTO expertise_roster_binding'))).toBe(false);
+ expect(pg.query).toHaveBeenLastCalledWith('ROLLBACK');
+});
+test('identity is verified before lock and lock timeout is set before locking',async()=>{
+ const pg=pgMock(),s=createStore({env:env(),pg,client:{}});await s.bridgeTransaction(90,async()=>{});
+ const calls=pg.query.mock.calls.map(c=>c[0]),identity=calls.findIndex(q=>q.includes('current_database')),lock=calls.findIndex(q=>q.startsWith('LOCK TABLE'));
+ expect(identity).toBeGreaterThan(-1);expect(lock).toBeGreaterThan(identity);
+ expect(calls.indexOf("SET LOCAL lock_timeout = '5s'")).toBeGreaterThan(identity);
+ expect(calls.indexOf("SET LOCAL lock_timeout = '5s'")).toBeLessThan(lock);
+ expect(calls[lock]).toBe('LOCK TABLE expertise_roster, expertise_roster_identity, expertise_roster_binding IN ACCESS EXCLUSIVE MODE');
+});
+test('wrong connected database refuses before taking a table lock',async()=>{
+ const pg=pgMock(),base=pg.query.getMockImplementation();pg.query.mockImplementation(sql=>sql.includes('current_database')?Promise.resolve({rows:[{database:'wrong',username:'roster_rehearsal'}]}):base(sql));
+ const work=jest.fn(),s=createStore({env:env(),pg,client:{}});
+ await expect(s.bridgeTransaction(90,work)).rejects.toMatchObject({message:'Connected database identity mismatch',transactionPhase:'identity',bridgeCommitted:false});
+ expect(work).not.toHaveBeenCalled();expect(pg.query.mock.calls.some(([q])=>q.startsWith('LOCK'))).toBe(false);
+});
+test.each([['SELECT setval','sequence',false],['COMMIT','commit',null]])('%s failure reports its phase and commit certainty',async(prefix,phase,committed)=>{
+ const pg=pgMock(),base=pg.query.getMockImplementation(),original=new Error('original failure');
+ pg.query.mockImplementation(sql=>sql.startsWith(prefix)?Promise.reject(original):base(sql));
+ const s=createStore({env:env(),pg,client:{}});
+ await expect(s.bridgeTransaction(90,async()=>{})).rejects.toMatchObject({message:'original failure',transactionPhase:phase,bridgeCommitted:committed,rollbackSucceeded:true});
+ expect(pg.query).toHaveBeenLastCalledWith('ROLLBACK');
+});
+test('rollback failure is secondary and cannot erase original failure or unknown commit',async()=>{
+ const pg=pgMock(),base=pg.query.getMockImplementation(),original=new Error('COMMIT response lost');
+ pg.query.mockImplementation(sql=>sql==='COMMIT'?Promise.reject(original):sql==='ROLLBACK'?Promise.reject(new Error('rollback unavailable')):base(sql));
+ const s=createStore({env:env(),pg,client:{}});
+ await expect(s.bridgeTransaction(90,async()=>{})).rejects.toBe(original);
+ expect(original).toMatchObject({transactionPhase:'commit',bridgeCommitted:null,rollbackSucceeded:false,rollbackError:'rollback unavailable'});
+});

@@ -27,15 +27,16 @@ function memoryStore(){
   create:jest.fn(async values=>{if(profiles.has(values.wmkf_creationkey))throw Error('duplicate key');profiles.set(values.wmkf_creationkey,{profileGuid:`aaaaaaaa-aaaa-4aaa-8aaa-${String(++serial).padStart(12,'0')}`,values:structuredClone(values)});}),
   bridgeTransaction:jest.fn(async(floor,work)=>{
    const ids=new Set(identities),bs=new Map(bindings);let n=Math.max(floor,...ids);
-   await work({ensureIdentity:async id=>ids.add(id),lookup:async(id,host)=>bs.get(`${host}:${id}`)||null,
+   try { await work({ensureIdentity:async id=>ids.add(id),lookup:async(id,host)=>bs.get(`${host}:${id}`)||null,
     bind:async(id,host,guid)=>{
      if(store.failBinding)throw Error('bridge unavailable');
      const inverse=[...bs].find(([key,value])=>key.startsWith(host+':')&&value===guid);
      if(inverse){const existing=Number(inverse[0].split(':')[1]);if(id!==null&&id!==existing)throw Error('inverse conflict');return existing;}
      if(id===null){id=++n;ids.add(id);}const key=`${host}:${id}`;
      if(bs.has(key)&&bs.get(key)!==guid)throw Error('binding conflict');bs.set(key,guid);return id;
-    }});
+    }}); } catch(error) { error.bridgeCommitted=false; error.rollbackSucceeded=true; throw error; }
    identities.clear();for(const id of ids)identities.add(id);bindings.clear();for(const [k,v]of bs)bindings.set(k,v);
+   if(store.loseCommitResponse)throw Object.assign(new Error('COMMIT response lost'),{transactionPhase:'commit',bridgeCommitted:null,rollbackSucceeded:true});
   })};return store;
 }
 test('category override, exclusion tombstone and new-person allocation preserve source and replay identity',async()=>{
@@ -62,7 +63,7 @@ test('SQL failure retains created profiles but reports no committed bridge; repl
 test('later failure rolls back ALL bridge rows and does not report earlier rows saved',async()=>{
  const f=fixture(),s=memoryStore(),create=s.create.getMockImplementation();
  s.create.mockImplementation(async v=>{if(v.wmkf_creationkey.startsWith('app_'))throw Error('create unavailable');return create(v);});
- const r=await executeImport(f,s);expect(r.success).toBe(false);expect(r.rows.map(x=>x.status)).toEqual(['profile-retained-bridge-unconfirmed','identity-unconfirmed']);
+ const r=await executeImport(f,s);expect(r.success).toBe(false);expect(r.rows.map(x=>x.status)).toEqual(['profile-retained-bridge-unconfirmed','identity-unconfirmed','failed']);
  expect(r.rows.every(x=>x.rosterId===null)).toBe(true);expect(s.bindings.size).toBe(0);expect(s.identities.size).toBe(0);
 });
 test('changed source, mapping, target or absent high-water rejects before writes',async()=>{
@@ -109,4 +110,55 @@ test('caller mutation during an awaited census cannot change the captured import
 test('new target duplicate-name warning requires renewed review',async()=>{
  const f=fixture(),s=memoryStore();s.profiles.set('direct_other',{profileGuid:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',values:{wmkf_creationkey:'direct_other',wmkf_name:f.source.rows[0].name,wmkf_contactguid:null,wmkf_staffuser:null}});
  await expect(executeImport(f,s)).rejects.toThrow(/warnings changed/);expect(s.create).not.toHaveBeenCalled();
+});
+test('changed sequence high-water alone fails the input-hash guard',async()=>{
+ const f=fixture(),s=memoryStore();f.source.sequenceHighWater++;
+ await expect(executeImport(f,s)).rejects.toThrow('Reviewed inputs changed');
+ expect(s.readTarget).not.toHaveBeenCalled();expect(s.create).not.toHaveBeenCalled();
+});
+test('competing create with different values is recorded and never bound or overwritten',async()=>{
+ const f=fixture(),s=memoryStore(),create=s.create.getMockImplementation();
+ s.create.mockImplementation(async values=>{await create({...values,wmkf_name:'Competing profile values'});throw Error('duplicate key');});
+ const r=await executeImport(f,s);
+ expect(r).toMatchObject({success:false,bridgeCommitted:false,rollbackSucceeded:true,failure:{phase:'rows',creationKey:f.reviewedPlan.rows[0].creationKey,message:expect.stringContaining('differs at wmkf_name')}});
+ expect(r.rows).toHaveLength(1);expect(r.rows[0]).toMatchObject({status:'failed',createAttempted:true,profileOutcome:'observed',profileGuid:expect.any(String),rosterId:null});
+ expect(s.bindings.size).toBe(0);expect(s.create).toHaveBeenCalledTimes(1);
+ expect([...s.profiles.values()][0].values.wmkf_name).toBe('Competing profile values');
+ await expect(executeImport(f,s)).rejects.toThrow(/conflicts/);
+});
+test('a failed create with unavailable readback has unknown profile outcome',async()=>{
+ const f=fixture(),s=memoryStore();s.create.mockRejectedValue(new Error('create timed out'));
+ s.findByKey.mockResolvedValueOnce(null).mockRejectedValueOnce(new Error('readback timed out'));
+ const r=await executeImport(f,s);
+ expect(r.rows[0]).toMatchObject({status:'failed',createAttempted:true,profileOutcome:'unknown',rosterId:null});
+ expect(r.failure.creationKey).toBe(f.reviewedPlan.rows[0].creationKey);
+});
+test('failure before create is distinguishable from uncertain create',async()=>{
+ const f=fixture(),s=memoryStore();s.findByKey.mockRejectedValue(new Error('initial read failed'));
+ const r=await executeImport(f,s);
+ expect(r.rows[0]).toMatchObject({status:'failed',createAttempted:false,profileOutcome:'not-checked'});
+ expect(s.create).not.toHaveBeenCalled();
+});
+test('lost COMMIT response is transaction-level unknown, even when data committed; replay resolves it',async()=>{
+ const f=fixture(),s=memoryStore();s.loseCommitResponse=true;
+ const r=await executeImport(f,s);
+ expect(r).toMatchObject({version:2,success:false,bridgeCommitted:null,rollbackSucceeded:true,failure:{phase:'commit',creationKey:null}});
+ expect(r.rows.every(row=>row.rosterId===null)).toBe(true);expect(s.bindings.size).toBe(2);
+ s.loseCommitResponse=false;const replay=await executeImport(f,s);
+ expect(replay).toMatchObject({success:true,bridgeCommitted:true});expect(replay.rows.map(row=>row.rosterId)).toEqual([1,35,91]);
+ expect(s.create).toHaveBeenCalledTimes(2);
+});
+test('sequence advancement failure is transaction-level, not attributed to last row',async()=>{
+ const f=fixture(),s=memoryStore(),tx=s.bridgeTransaction.getMockImplementation();
+ s.bridgeTransaction.mockImplementation((floor,work)=>tx(floor,async b=>{await work(b);throw Object.assign(new Error('setval failed'),{transactionPhase:'sequence'});}));
+ const r=await executeImport(f,s);
+ expect(r).toMatchObject({bridgeCommitted:false,failure:{phase:'sequence',creationKey:null,message:'setval failed'}});
+ expect(s.bindings.size).toBe(0);expect(r.rows).toHaveLength(3);
+});
+test('identity reservation failure names the unattempted row',async()=>{
+ const f=fixture(),s=memoryStore();
+ s.bridgeTransaction.mockImplementation(async(_floor,work)=>{try{await work({ensureIdentity:async()=>{throw Error('reserve failed');}});}catch(e){e.bridgeCommitted=false;throw e;}});
+ const r=await executeImport(f,s);
+ expect(r.failure).toMatchObject({phase:'reserve-identities',creationKey:f.reviewedPlan.rows[0].creationKey});
+ expect(r.rows[0]).toMatchObject({status:'failed',createAttempted:false,profileOutcome:'not-checked'});
 });

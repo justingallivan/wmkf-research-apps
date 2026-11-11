@@ -27,24 +27,37 @@ async function executeImport(input, store) {
   const warnings = rows => rows.map(r => ({key:r.creationKey, warnings:r.warnings}));
   check(fingerprint(warnings(plan.rows)) === fingerprint(warnings(reviewedPlan.rows)), 'Target warnings changed; review a fresh plan');
   await store.preflight(plan);
-  const result = {version:1, targetHost:store.targetHost, datasetId:source.datasetId,
+  const result = {version:2, targetHost:store.targetHost, datasetId:source.datasetId,
     sourceHash:plan.sourceHash, mappingHash:plan.mappingHash, success:false, bridgeCommitted:false, rows:[]};
-  let currentKey = null;
+  let currentKey = null, currentRow = null, executionPhase = 'reserve-identities';
   try {
     await store.bridgeTransaction(floor, async bridge => {
       // Reserve ALL legacy identities before allocating numbers for new people.
-      for (const row of plan.rows) if (row.legacyId !== null) await bridge.ensureIdentity(row.legacyId);
+      for (const row of plan.rows) if (row.legacyId !== null) {
+        currentKey = row.creationKey;
+        await bridge.ensureIdentity(row.legacyId);
+      }
+      currentKey = null;
+      executionPhase = 'rows';
       for (const row of plan.rows) {
         currentKey = row.creationKey;
+        currentRow = {creationKey:row.creationKey, legacyId:row.legacyId, rosterId:null,
+          status:'pending', createAttempted:false, profileOutcome:'not-checked'};
+        result.rows.push(currentRow);
         const bound = row.legacyId === null ? null : await bridge.lookup(row.legacyId, store.targetHost);
         if (row.action === 'exclude') {
+          currentRow.profileOutcome = 'not-applicable';
           check(!bound, 'Excluded identity already has a binding; reconcile without deletion');
-          result.rows.push({creationKey:row.creationKey, legacyId:row.legacyId, rosterId:row.legacyId, status:'identity-only'});
+          currentRow.rosterId = row.legacyId; currentRow.status = 'identity-only';
           continue;
         }
         let profile = await store.findByKey(row.creationKey);
+        currentRow.profileOutcome = profile ? 'observed' : 'absent';
+        if (profile) currentRow.profileGuid = profile.profileGuid;
         check(!bound || profile?.profileGuid === bound, 'Existing numeric identity has a conflicting target binding');
         if (!profile) {
+          currentRow.createAttempted = true;
+          currentRow.profileOutcome = 'unknown';
           try { await store.create(row.values); }
           catch (error) {
             // A lost response or competing create may have committed. Never PATCH.
@@ -53,18 +66,34 @@ async function executeImport(input, store) {
           }
           profile = profile || await store.findByKey(row.creationKey);
         }
+        if (profile) { currentRow.profileOutcome = 'observed'; currentRow.profileGuid = profile.profileGuid; }
         sameProfile(profile, row);
-        const rosterId = await bridge.bind(row.legacyId, store.targetHost, profile.profileGuid);
-        result.rows.push({creationKey:row.creationKey, legacyId:row.legacyId, rosterId,
-          profileGuid:profile.profileGuid, status:'bound'});
+        currentRow.rosterId = await bridge.bind(row.legacyId, store.targetHost, profile.profileGuid);
+        currentRow.status = 'bound';
       }
+      // Sequence advancement and COMMIT belong to the transaction, not its last row.
+      currentKey = null; currentRow = null; executionPhase = 'transaction';
     });
     result.success = true; result.bridgeCommitted = true;
   } catch (error) {
-    // The SQL transaction rolls back as a unit; Dataverse creates are retained.
-    // Retrying the unchanged manifest recovers them by creation key.
-    for (const row of result.rows) { row.status = row.profileGuid ? 'profile-retained-bridge-unconfirmed' : 'identity-unconfirmed'; row.rosterId = null; }
-    result.failure = {creationKey:currentKey, message:error.message, retry:'Replay unchanged inputs; keyed-value or binding conflicts require reconciliation.'};
+    result.bridgeCommitted = error.bridgeCommitted === false ? false : null;
+    result.rollbackSucceeded = error.rollbackSucceeded ?? null;
+    if (currentKey && !currentRow) {
+      const planned = plan.rows.find(row => row.creationKey === currentKey);
+      currentRow = {creationKey:currentKey, legacyId:planned.legacyId, rosterId:null,
+        status:'pending', createAttempted:false, profileOutcome:'not-checked'};
+      result.rows.push(currentRow);
+    }
+    for (const row of result.rows) {
+      row.status = row === currentRow ? 'failed' : row.profileGuid ? 'profile-retained-bridge-unconfirmed' : 'identity-unconfirmed';
+      row.rosterId = null;
+    }
+    result.failure = {
+      phase: error.transactionPhase && error.transactionPhase !== 'rows' ? error.transactionPhase : executionPhase,
+      creationKey:currentKey, message:error.message,
+      ...(error.rollbackError ? {rollbackError:error.rollbackError} : {}),
+      retry:'Replay unchanged inputs only for recoverable transport/transaction failures; keyed-value or binding conflicts require separately authorized reconciliation outside this tool.',
+    };
   }
   return result;
 }

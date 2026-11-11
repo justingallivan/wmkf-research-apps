@@ -10,7 +10,8 @@ are recorded in `SANDBOX_REHEARSAL_2026-11-09.md`; no Production migration occur
 - `lib/dataverse/schema/wave-expertise-roster/wmkf_expertiseprofile.json`:
   proposed entity, preserved optional fields, category choices, default-false lead
   eligibility, optional User lookup and Contact GUID text, three alternate keys.
-  Choice values are provisional until metadata preflight. Audit configuration,
+  Choice labels/values still require operator metadata verification; the importer
+  does not compare option labels. Audit configuration,
   actor attribution, permissions, concurrency and key activation are separate
   release gates. This specification is now provisioned in sandbox only.
 - `identity-bridge.sql`: inert DDL draft, deliberately outside auto-discovered
@@ -112,7 +113,9 @@ review every warning. The executor compares source/mapping hashes and the stable
 row payload, and rejects newly changed warnings. It never trusts a plan's old
 `create`/`unchanged` disposition without reading the current target.
 
-The private environment file must set `EXPERTISE_ROSTER_REHEARSAL=on`, the registered
+The CLI combines the private environment file with the process environment (file
+values take precedence); it does not load `.env.local`. The validated combination
+must set `EXPERTISE_ROSTER_REHEARSAL=on`, the registered
 sandbox URL, both enforcement flags, and all four Postgres aliases to exactly the
 same loopback `127.0.0.1:55439/roster_rehearsal` connection with user
 `roster_rehearsal`. Production/Preview execution is refused. Credentials are for the
@@ -135,14 +138,43 @@ sequence gaps. These are temporary transaction locks, **not** the durable deploy
 admission/freeze required for Production. No numbered migration or runtime allocator
 is installed by this command.
 
-If any row fails, the SQL transaction rolls back as a unit; already-created Dataverse
-profiles remain. The receipt names the failing creation key and marks prior bridge
-results unconfirmed, never saved. A lost COMMIT response likewise remains unconfirmed.
-Replay unchanged inputs to recover by key and target binding. Do not mint new mutation
-or dataset UUIDs to bypass an error. Dataverse requests have 30-second timeouts so
-transport failure can release the database locks. The exclusive mode-0600 receipt
-contains identities/status, not expertise text; retain it privately with the inputs.
-A killed process may leave a started-only receipt: replay is the recovery path.
+A row failure causes a rollback attempt; already-created Dataverse profiles remain.
+Receipt version 2 reports `bridgeCommitted: true` only after an acknowledged COMMIT,
+`false` when the transaction failed before attempting COMMIT, and `null` when a COMMIT
+response is lost or the transaction outcome is otherwise unknown. `rollbackSucceeded`
+is separate: even a successful ROLLBACK after a lost COMMIT response cannot establish
+whether that earlier COMMIT succeeded. A rollback error is secondary and does not
+replace the original failure.
+
+`failure.phase` distinguishes identity checks, locks, preparation, identity reservation,
+row processing, sequence advancement and COMMIT. Transaction-level failures have a
+null `failure.creationKey`, rather than naming the last row. Failed rows remain in the
+receipt with `createAttempted` and `profileOutcome` (`not-checked`, `not-applicable`,
+`absent`, `unknown`, or `observed`). An uncertain create has `createAttempted: true`
+and `profileOutcome: unknown` until a keyed read observes a row. A failed-run row's
+`rosterId` is null; an observed `profileGuid` is evidence of the Dataverse row, not a
+claim that its bridge binding committed.
+
+Replay unchanged inputs only for recoverable transport or transaction failures when
+the keyed profile still exactly matches the reviewed values. A keyed-value mismatch,
+including server normalization of empty strings/state, or a binding conflict **cannot
+be fixed by unchanged replay**. Stop for separately authorized manual reconciliation
+outside this create-only tool; it never patches/deletes the retained row. Do not alter
+the immutable source, mint new mutation/dataset UUIDs, or change the reviewed payload
+merely to bypass the conflict. A killed process may leave a started-only receipt;
+inspect current keyed state and apply the same recovery/reconciliation distinction.
+
+Before a full import, separately authorize a one-row synthetic canary through this
+same executor: use a distinct synthetic lineage, an inactive staged new profile, and
+an empty-string text field. Verify exact read-back and retain the receipt. Count empty
+strings in the approved private source offline before deciding whether normalization
+needs a separately reviewed mapping policy. Neither this canary nor the private-source
+count has been performed here; the private source evidence is unavailable.
+
+Dataverse requests have 30-second timeouts so transport failure can release database
+locks. This is a per-request bound, not a bound on total transaction duration. The
+exclusive mode-0600 receipt contains identities/status, not expertise text; retain it
+privately with the inputs.
 
 No real import or local SQL execution was performed during this implementation.
 Synthetic tests use in-memory durable stores for failure recovery and mocked concrete
@@ -183,7 +215,13 @@ sandbox CLI, and guarded transport/bridge store are implemented on
 `codex/expertise-roster-import-2026-11-10`. Tests cover approved-input/payload tampering,
 lost create responses, later-row failure, bridge rollback/replay, exclusions, new-person
 allocation, conflicting mappings, target isolation, high-water preservation, HTTP
-timeouts, pagination refusal and CLI argument refusal. No live import was executed.
+timeout option propagation and rollback, pagination refusal and CLI argument refusal.
+These are synthetic or mocked boundary checks, not live timeout/SQL/platform evidence.
+The Fable follow-up repairs add COMMIT-unknown and transaction-phase receipts,
+post-create mismatch and forward-binding tests, complete-input CLI refusal, and
+database identity-before-lock ordering. The input-hash, post-create comparison,
+forward-binding and CLI execute-mode guards were each temporarily removed and their
+targeted tests failed; the source was restored after each check. No live import was executed.
 Independent source/test review found three issues (reviewed payload binding, bridge
 high-water on replay, unbounded HTTP waits); all were repaired and re-reviewed.
 

@@ -74,17 +74,22 @@ function createStore({env, client, pg}) {
     },
     async create(values) { checked(await post(ENTITY, payload(values))); },
     async bridgeTransaction(floor, work) {
-      await pg.query('BEGIN');
+      let phase = 'begin', began = false;
       try {
-        await pg.query("SET LOCAL lock_timeout = '5s'");
-        await pg.query('LOCK TABLE expertise_roster, expertise_roster_identity, expertise_roster_binding IN ACCESS EXCLUSIVE MODE');
+        await pg.query('BEGIN'); began = true;
+        phase = 'identity';
         const identity = (await pg.query('SELECT current_database() AS database, current_user AS username')).rows[0];
         check(identity.database === 'roster_rehearsal' && identity.username === 'roster_rehearsal', 'Connected database identity mismatch');
+        phase = 'lock';
+        await pg.query("SET LOCAL lock_timeout = '5s'");
+        await pg.query('LOCK TABLE expertise_roster, expertise_roster_identity, expertise_roster_binding IN ACCESS EXCLUSIVE MODE');
+        phase = 'prepare';
         const seq = (await pg.query("SELECT pg_get_serial_sequence('expertise_roster','id') AS name")).rows[0].name;
         check(seq === 'public.expertise_roster_id_seq', 'Unexpected legacy sequence');
         const oldHigh = Number((await pg.query('SELECT last_value FROM expertise_roster_id_seq')).rows[0].last_value);
         let high = Math.max(floor, oldHigh, Number((await pg.query('SELECT COALESCE(MAX(id),0) AS n FROM expertise_roster')).rows[0].n), Number((await pg.query('SELECT COALESCE(MAX(id),0) AS n FROM expertise_roster_identity')).rows[0].n));
         const lookup = async (id, host) => (await pg.query('SELECT dataverse_profile_guid AS guid FROM expertise_roster_binding WHERE roster_id=$1 AND target_host=$2',[id,host])).rows[0]?.guid || null;
+        phase = 'rows';
         await work({
           async ensureIdentity(id) { await pg.query('INSERT INTO expertise_roster_identity(id) VALUES($1) ON CONFLICT DO NOTHING',[id]); high = Math.max(high,id); },
           lookup,
@@ -105,9 +110,22 @@ function createStore({env, client, pg}) {
         });
         // Local fixture only: preserve a high-water above new IDs if old fixture
         // writers resume after our lock ends. Sequence gaps on rollback are safe.
+        phase = 'sequence';
         await pg.query("SELECT setval('expertise_roster_id_seq', $1, true)",[Math.max(1,high)]);
+        phase = 'commit';
         await pg.query('COMMIT');
-      } catch (error) { await pg.query('ROLLBACK'); throw error; }
+      } catch (error) {
+        error.transactionPhase = phase;
+        // A successful ROLLBACK after a lost COMMIT response cannot tell us
+        // whether the preceding transaction committed. Preserve that uncertainty.
+        error.bridgeCommitted = phase === 'commit' ? null : false;
+        error.rollbackSucceeded = null;
+        if (began) {
+          try { await pg.query('ROLLBACK'); error.rollbackSucceeded = true; }
+          catch (rollbackError) { error.rollbackSucceeded = false; error.rollbackError = rollbackError.message; }
+        }
+        throw error;
+      }
     },
   };
 }
