@@ -27,6 +27,9 @@ watch_paths:
   - pages/workbench/[requestId].js
   - lib/services/pre-site-visit/preparation-config.js
   - pages/api/cron/staff-deliberations-preparation.js
+  - shared/components/workbench/workbench-location.js
+  - shared/components/workbench/J27RequestList.js
+  - shared/utils/j27CycleRows.js
 update_triggers:
   - "Workbench shell navigation or view ordering changes"
   - "Staff Deliberations preparation, handoff, or cycle behavior changes"
@@ -83,14 +86,17 @@ under Operating Notes below.
   component, `J27RequestList.js`, over rows from `useJ27CycleRows.js`. Every
   chip, next-step line, filter and tab count is decided in
   `shared/utils/j27CycleRows.js`; every label comes from
-  `shared/config/j27Labels.js`. The request page's stage strip uses the same
-  next-step rule, so the strip and a list row agree.
+  `shared/config/j27Labels.js`. The request page's stage strip
+  (`J27StageStrip.js`) calls the same `rowLine`, but over facts the page
+  loads tab by tab, so the two agree only on the facts both have.
 - **Not yet lists.** Deliberations and Final Assessment mount the existing
   Staff deliberations and Final writeups panels and carry no tab count. Their
   lists need their own plan (the J27 cycle page build plan of 2026-11-09,
   section 3a; that document is on `main` and joins this line at the merge).
-- **Hazards.** A failed read is reported once above the list, and "Nothing is
-  waiting on staff right now." is shown on a row only when no read failed. A
+- **Hazards.** When every open row has a failed read (`degradedEverywhere`),
+  the list says so once above the rows instead of on each one. "Nothing is
+  waiting on staff right now." is not shown on a row whose basis is degraded
+  (`rowLine`). A
   request with a final decision is listed on All requests only. Tests:
   `tests/unit/j27-cycle-rows.test.js`, `tests/unit/workbench-shell-j27-layout.test.js`.
 - **Decision record.** Alignment log D62 (`docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`).

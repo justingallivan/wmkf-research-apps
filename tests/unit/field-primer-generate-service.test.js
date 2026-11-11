@@ -153,7 +153,7 @@ describe('generateForRequest (Mode A)', () => {
     await expect(generateForRequest({ requestId: GUID })).rejects.toMatchObject({
       httpStatus: 400,
       message:
-        'No readable AI proposal narrative was found. Exactly one of these must be present: AI Materials/ProposalNarrative_1002900.pdf, AI Materials/Project-Narrative_1002900.pdf or Submission-Documents/Project-Narrative_1002900.pdf.',
+        'No readable AI proposal narrative was found. It is read from exactly one of these, and the file must contain readable text: AI Materials/ProposalNarrative_1002900.pdf, AI Materials/Project-Narrative_1002900.pdf or Submission-Documents/Project-Narrative_1002900.pdf.',
     });
     expect(getAiProposalNarrativeText).toHaveBeenCalledWith(GUID, '1002900');
     expect(generateFieldPrimer).not.toHaveBeenCalled();
