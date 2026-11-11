@@ -129,6 +129,110 @@ describePg('durable shared Executor ledger on PostgreSQL', () => {
     expect(await store.markAudit({ ...attempt, outcome: 'delivered' })).toMatchObject({ audit_state: 'delivered' });
   }
 
+  it('lists only jobs in the full Request scope, with a bounded stable newest-first order', async () => {
+    const command = input({ operation: 'generate-draft' }, [SUMMARY]);
+    const readScope = { ...scope(command), principalKey: command.principalKey };
+    const admissions = [];
+    for (let index = 0; index < 6; index += 1) {
+      admissions.push(await store.admit({ ...command, idempotencyKey: randomUUID() }));
+    }
+    const ids = admissions.map(({job}) => job.id);
+    const newest = ids.pop();
+    await pool.query("UPDATE prompt_jobs SET created_at = '2026-01-01T00:00:00Z' WHERE id = ANY($1::uuid[])", [ids]);
+    await pool.query("UPDATE prompt_jobs SET created_at = '2026-01-02T00:00:00Z' WHERE id = $1", [newest]);
+
+    for (const overrides of [{ principalKey: 'human:other' }, { requestId: randomUUID() }, { authorizationScope: 'proposal:other' }]) {
+      await store.admit(input({ ...readScope, ...overrides, operation: 'generate-draft' }, [SUMMARY]));
+    }
+    const foreign = await store.admit({ ...command, idempotencyKey: randomUUID() });
+    // Admission stays synthetic-only. Seed a distinct environment for the read isolation proof.
+    await pool.query("UPDATE prompt_jobs SET environment = 'preview' WHERE id = $1", [foreign.job.id]);
+
+    const expected = [newest, ...ids.sort().reverse()];
+    expect((await store.listJobs(readScope)).map(({job}) => job.id)).toEqual(expected.slice(0, 5));
+    expect((await store.listJobs({ ...readScope, limit: 10 })).map(({job}) => job.id)).toEqual(expected);
+    expect((await store.listJobs({ ...readScope, environment: 'preview' })).map(({job}) => job.id)).toEqual([foreign.job.id]);
+    await expect(store.listJobs({ ...readScope, limit: 11 })).rejects.toMatchObject({ code: 'invalid_prompt_job_list_limit' });
+    await expect(store.listJobs({ ...readScope, authorizationScope: undefined })).rejects.toMatchObject({ code: 'invalid_prompt_job_read_scope' });
+    await expect(store.listJobs({ ...readScope, requestId: undefined })).rejects.toMatchObject({ code: 'invalid_prompt_job_id' });
+  });
+
+  it('returns only validated results for the exact Request and actor scope, even beside a raw checkpoint', async () => {
+    const command = input({ operation: 'generate-draft' });
+    const { job, tasks, fence } = await open(command);
+    const readScope = { ...scope(command), principalKey: command.principalKey, jobId: job.id };
+    await validate(fence, tasks[0].id, 'Approved staff draft.');
+    const responseAttempt = await checkpoint(fence, tasks[1].id);
+    const expected = [{ taskId: tasks[0].id, taskKey: SUMMARY, status: 'available', text: 'Approved staff draft.' }];
+    const read = await store.readValidatedResults(readScope);
+    expect(read).toEqual({ jobId: job.id, version: expect.any(Number), expiresAt: job.result_expires_at, results: expected });
+    expect(JSON.stringify(read)).not.toMatch(/Temporary fixture|Analyze the synthetic proposal|configuration_content_id/);
+
+    for (const overrides of [
+      { principalKey: 'human:other' }, { requestId: randomUUID() }, { authorizationScope: 'proposal:other' },
+      { environment: 'preview' }, { jobId: randomUUID() },
+    ]) {
+      expect(await store.readValidatedResults({ ...readScope, ...overrides })).toBeNull();
+    }
+    await expect(store.readValidatedResults({ ...readScope, environment: undefined })).rejects.toMatchObject({ code: 'invalid_prompt_job_read_scope' });
+    await store.markAttemptFailed({
+      ...fence, taskId: tasks[1].id, attemptId: responseAttempt.id,
+      outcome: 'failed_validation', errorCode: 'invalid_fixture', deferredAudit: { status: 'failed' },
+    });
+    expect((await store.readValidatedResults(readScope)).results).toEqual(expected);
+  });
+
+  it('refuses a validated result pointing at a different content kind even with a matching hash', async () => {
+    const command = input({ operation: 'generate-draft' });
+    const { job, tasks, fence } = await open(command);
+    await validate(fence, tasks[0].id);
+    const attempt = await checkpoint(fence, tasks[1].id);
+    const payload = JSON.stringify('Raw checkpoint text must never surface.');
+    const hash = sha256(payload);
+    await pool.query('UPDATE prompt_job_content SET payload = $2, sha256 = $3, size_bytes = octet_length($2) WHERE id = $1', [attempt.response_content_id, payload, hash]);
+    await pool.query('UPDATE prompt_job_tasks SET result_content_id = $2, result_hash = $3 WHERE id = $1', [tasks[0].id, attempt.response_content_id, hash]);
+    await expect(store.readValidatedResults({ ...scope(command), principalKey: command.principalKey, jobId: job.id }))
+      .rejects.toMatchObject({ code: 'prompt_job_content_integrity' });
+  });
+
+  it('reports expired results and checks both the stored bytes and the pinned job deadline', async () => {
+    const command = input({ operation: 'generate-draft' }, [SUMMARY]);
+    const { job, tasks, fence } = await open(command);
+    const readScope = { ...scope(command), principalKey: command.principalKey, jobId: job.id };
+    const original = 'Approved staff draft.';
+    await validate(fence, tasks[0].id, original);
+    const [{ result_content_id: id }] = (await pool.query('SELECT result_content_id FROM prompt_job_tasks WHERE id = $1', [tasks[0].id])).rows;
+    await pool.query('UPDATE prompt_job_content SET payload = $2, size_bytes = octet_length($2) WHERE id = $1', [id, JSON.stringify('Tampered draft.')]);
+    await expect(store.readValidatedResults(readScope)).rejects.toMatchObject({ code: 'prompt_job_content_integrity' });
+    await pool.query(`UPDATE prompt_job_content SET payload = $2, size_bytes = octet_length($2),
+      expires_at = clock_timestamp() - interval '1 second' WHERE id = $1`, [id, JSON.stringify(original)]);
+    const expired = [{ taskId: tasks[0].id, taskKey: SUMMARY, status: 'expired' }];
+    expect((await store.readValidatedResults(readScope)).results).toEqual(expired);
+    await pool.query("UPDATE prompt_job_content SET expires_at = clock_timestamp() + interval '1 day' WHERE id = $1", [id]);
+    await pool.query(`UPDATE prompt_jobs SET source_expires_at = clock_timestamp() - interval '2 seconds',
+      result_expires_at = clock_timestamp() - interval '1 second' WHERE id = $1`, [job.id]);
+    expect((await store.readValidatedResults(readScope)).results).toEqual(expired);
+    await pool.query('DELETE FROM prompt_job_content WHERE id = $1', [id]);
+    expect((await store.readValidatedResults(readScope)).results).toEqual(expired);
+  });
+
+  it('staff reads leave a worker lease and interrupted attempt untouched', async () => {
+    const command = input({ operation: 'generate-draft' });
+    const { job, tasks, fence } = await open(command);
+    await validate(fence, tasks[0].id);
+    const interrupted = await store.markDispatching({ ...fence, taskId: tasks[1].id });
+    await expireLease(job.id);
+    const readScope = { ...scope(command), principalKey: command.principalKey };
+    const readLease = async () => (await pool.query('SELECT version, lease_token, lease_expires_at FROM prompt_jobs WHERE id = $1', [job.id])).rows[0];
+    const before = await readLease();
+    const [listed] = await store.listJobs(readScope);
+    expect(listed.job).not.toHaveProperty('lease_token');
+    expect(listed.attempts.find(attempt => attempt.id === interrupted.id).state).toBe('dispatching');
+    expect(await store.readValidatedResults({ ...readScope, jobId: job.id })).toMatchObject({ version: before.version });
+    expect(await readLease()).toEqual(before);
+    expect((await pool.query('SELECT state FROM prompt_job_attempts WHERE id = $1', [interrupted.id])).rows[0].state).toBe('dispatching');
+  });
+
   it('atomically admits one job under concurrency, scopes replay, and preserves the original frozen configuration', async () => {
     const command = input();
     const [a, b] = await Promise.all([store.admit(command), store.admit(command)]);
