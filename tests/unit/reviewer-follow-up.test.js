@@ -409,7 +409,9 @@ describe('reviewer follow-up refetch resilience', () => {
     });
 
     render(<ReviewerFollowUpDashboard />);
-    expect(screen.getByRole('status')).toHaveTextContent('Loading reviewer activity…');
+    // Until the cycles arrive the shell cannot tell which layout this program uses,
+    // so it announces its own loading state before any panel mounts (J27 cycle page, slice 1).
+    expect(screen.getByRole('status')).toHaveTextContent('Loading…');
 
     resolveCycles({ ok: false, status: 503, json: async () => ({ error: 'cycles down' }) });
     expect(await screen.findByRole('alert')).toHaveTextContent('cycles down');
