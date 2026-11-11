@@ -92,6 +92,7 @@ suite('shared prompt job synthetic vertical trial',()=>{
     expect(calls[0].system).toEqual(calls[1].system);expect(calls[0].messages[0].content[0]).toEqual(calls[1].messages[0].content[0]);
     expect(t.fields.fixture_summary).toContain('RESULT_CANARY');expect(t.fields.fixture_methodology).toContain('RESULT_CANARY');
     expect(JSON.stringify([...t.auditRows.values()])).not.toContain('CANARY');
+    expect(JSON.stringify(await t.read())).not.toContain('CANARY');
     expect((await store.admit(t.input)).replayed).toBe(true);
     t.fields.fixture_summary='';expect((await t.tick()).stage).toBe('complete');expect(t.fields.fixture_summary).toBe('');
     await expect(store.admit({...t.input,idempotencyKey:randomUUID(),sourceEventId:'new-event'})).rejects.toThrow();

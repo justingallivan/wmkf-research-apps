@@ -1,12 +1,12 @@
 # Shared Executor and durable prompt jobs
 
-Status: **DESIGN SETTLED FOR SYNTHETIC BUILD — owner-authorized branch work; Fable review changes incorporated; no deployed capability is claimed.**
+Status: **DESIGN SETTLED; SYNTHETIC FOUNDATION BUILT — local integration verified; Fable build review pending usage availability; no deployed capability is claimed.**
 Owner: Justin. Design branch: `codex/coordinated-start-2026-11-10-b`.
 Evidence baseline: `a20e5f749`; source inspected on 2026-11-10 Pacific.
 
 ## Purpose and recommendation
 
-Keep task instructions in the shared Dataverse prompt library. Add an opt-in execution profile that prepares a proposal once and composes the same protected document prefix for compatible tasks. Put a durable job service around the existing single-prompt Executor. Both the application and Power Automate submit work to that service; the Executor remains responsible for one model invocation, validation and invocation audit.
+Keep task instructions in the shared Dataverse prompt library. Add an opt-in execution profile that prepares a proposal once and composes the same protected document prefix for compatible tasks. Put a durable job service around the existing single-prompt Executor. Both the application and Power Automate submit work to that service; the Executor remains responsible for one model invocation, validation and audit-payload construction; the durable worker owns audit delivery for job-mode calls.
 
 Power Automate owns when to request work and what business follow-up to perform. The backend owns authorized document resolution, frozen inputs and configuration, model execution, retained results and conditional writeback. This is a bounded request/task runner, not a general workflow designer or a second PA model implementation.
 
@@ -26,7 +26,7 @@ Authorized work: implement and commit on this branch, local tests and synthetic 
 | Persistence | Existing Dataverse prompt/settings/audit entities; new Postgres job, task, attempt and publication ledgers; separate temporary-content store (Postgres driver for the pilot); approved Dataverse or SharePoint destination |
 | Consumers | Admin, staff task-status UI, PA polling, worker recovery, destination-specific readers |
 | Prior findings | Cross-task document caching absent; frozen prompt seam already exists; audit failure can hide a generated result; output destinations and input sets remain undecided |
-| Scope | Architecture and acceptance criteria; no implementation or changes to other agents' streams |
+| Scope | Architecture plus a branch-built internal synthetic foundation (section 12); no production enablement or changes to other agents' streams |
 
 ```mermaid
 flowchart LR
@@ -247,29 +247,29 @@ Author additions: pin profile content hashes (settings are not physically immuta
 
 ## 11. Evidence, audit and remaining decisions
 
-[VERIFIED via source inspection on this branch]
+[VERIFIED via branch source and local tests, 2026-11-10]
 
 | Claim | Evidence and limitation |
 |---|---|
-| Frozen prompt support exists | `lib/services/execute-prompt.js:167`, `:1358`; `lib/services/prompt-store.js:49`. Does not by itself freeze document bytes or worker authority. |
-| Current document marker is before the user body | `lib/services/execute-prompt.js:554`, `:674`, `:1255`. Current nonce includes task name; cross-task proposal prefix is a proposed change. |
-| Full variables JSON participates in publish fingerprint | `lib/services/admin/prompts-publish-service.js:638-722`. New-mode strict validation and mandatory expected version still need implementation. |
-| A fenced queue pattern exists | `lib/services/meeting-coordination/preparation-store.js:36-159`; worker `preparation-worker.js:63-96`; route `pages/api/meeting-tracker/visits/[requestId]/preparation.js`. Domain-specific authority/recovery must not be copied as a generic exemption. |
-| Current writeback uses a coalesced conditional PATCH | `lib/services/execute-prompt.js:986-1086`. Existing behavior does not supply the proposed initialize-once receipt or durable result recovery. |
-| Audit can fail after paid response | `lib/services/execute-prompt.js:269-365`, `:1090`. A new internal checkpoint and separately replayable audit adapter are required. |
+| Legacy Executor is preserved alongside the opt-in path | `lib/services/execute-prompt.js` retains the legacy resolver/audit path; `executeProfiledPrompt` requires frozen worker inputs. Existing payload/audit/multi-output characterization suites pass. |
+| Two tasks share actual transport prefix bytes | `lib/services/prompt-jobs/context.js` and `tests/unit/execute-prompt-profile.test.js`; the provider double captures identical system/document blocks and distinct task suffixes. Real provider cache hits are unmeasured. |
+| Prompt/profile/snapshot hashes and source kinds are checked | `profile.js`, `context.js`, `capabilities.js`, `store.js`; tests reject live source declarations, changed profile content, wrong scope and snapshot tampering. No real profile publisher is implemented. |
+| Response and state commit atomically before parsing | `store.js` `saveResponse`, awaited Executor callback and `worker.js`; the real-PG vertical test interrupts after response save and resumes the parser without another provider call. |
+| Initialization and uncertainty survive replay | Migration 097 constraints and store/worker transitions; real-PG tests cover races, stale leases, original-ETag conflict, audit/write uncertainty and a human-cleared field after confirmed publication. Actual Dataverse transport is not used. |
+| Fresh installation executes the same migration | Disposable database bootstrap ran the manifest and verified all six tables plus migration 097's honest execution receipt. No existing/live database was changed. |
 
-Recommendation evidence: provider cache behavior is documentation-supported, not measured here; Entra app-only transport is a proposed integration requiring a no-model tenant proof; new queue/schema/profile/checkpoint mechanisms are unimplemented and require the acceptance tests above. Disconfirming checks are explicit: unequal serialized prefix, token rejected by the intended guard, duplicate SQL claim, lost checkpoint, or a human-cleared field refilled by replay each blocks its corresponding claim.
+Recommendation evidence: the bounded internal foundation passes 181 unit tests and 17 PostgreSQL tests. These prove mocked provider transport composition, real SQL transactions and injected conditional-destination behavior. They do not prove live caching, real file extraction/version retrieval, Entra tokens or Dataverse ETag/client-ID audit semantics. Disconfirming checks include unequal serialized prefixes, duplicate SQL claims, lost checkpoints, unguarded unknown outcomes, or refilling a human-cleared field; these cases are exercised in the local suites. The canonical application build and 32 selected gates/self-tests pass. The independent Fable build review was attempted but returned an OAuth usage-limit error with no findings or verdict; see the [review-attempt receipt](../audits/SHARED_EXECUTOR_FABLE_BUILD_REVIEW_ATTEMPT_2026-11-10.md). It remains required before independent build acceptance.
 
-Contract-reconcile audits: whole flow is specified from editor/caller through persisted job to task/status/destination consumer; partial success is per task and publication; stale async protection covers leases, attempts and editor/status generations; helper extraction preserves existing Executor validation/error behavior; durable surfaces and gates are enumerated; all new statuses require exhaustive readers. A fresh read-only agent reviewed the source prerequisites and this draft; its publication-barrier finding and reservation/audit-replay clarifications are incorporated. No remaining blocker was identified to presenting a proposed design; this is not implementation acceptance. No runtime symbol changed in this design-only increment. Existing characterization verification: `npx jest tests/unit/execute-prompt-payload-boundary.test.js tests/unit/execute-prompt-audit-retention.test.js tests/unit/execute-prompt-multi-output.test.js --runInBand --silent` passed 54 tests across three suites. These mocked tests exercise the existing Executor, not the proposed architecture. No live configuration/schema/source read or paid test is claimed.
+Contract-reconcile audit scope: caller is a server-only synthetic fixture; no client state or HTTP route is added (N/A). The fixture freezes configuration/source, uses the real store/worker/Executor, and receives only stage/status receipts; provider, authorization/freshness observations, audit and conditional destination transports are injected doubles. Partial success is retained per task and coalesced only after the terminal barrier. Async mutations are lease-fenced; provider/audit/write dispatch intents become unknown after interruption. Shared-helper default behavior and legacy response/persistence paths are characterized. Durable migration/manifest/fresh-install/Atlas/CI surfaces are present. New generation, audit and writeback enums are read by the bounded worker and store; unknown state values reject, and uncertain states cannot auto-publish. The active direction docs were reconciled using `/sweep`; the implementation-specific Executor contract and service catalog separately distinguish the new local mode. This is synthetic acceptance evidence, not production acceptance.
 
 Documentation reconciliation boundary: a bounded `/sweep` reconciled the active Executor, system, storage, backend automation, lifecycle, chaining and related memory documents with the owner's single-backend direction (commit `48f82e542`). Historical dated handoffs remain historical. Those documents distinguish the existing single-prompt Executor from the planned job runtime. This is a direction reconciliation, not a claim that the new runtime is deployed.
 
-Settled for the synthetic pilot: Executive Summary and Methodology, staff summary brief, mixed document/Dataverse inputs and Request-field writeback. Before enabling real tasks: exact task-specific input roles/field mappings, real output field mappings and initialization policy, and retention/capacity defaults. Integration proof needed: Connor's app-only token acquisition and destination service identity. These do not prevent implementing a synthetic profile/job foundation after architecture approval, but they prevent enabling real tasks.
+Settled for the synthetic pilot: Executive Summary and Methodology, staff summary brief, mixed document/Dataverse inputs and Request-field writeback. Before enabling real tasks: exact task-specific input roles/field mappings, real output field mappings and initialization policy, and retention/capacity defaults. Integration proof needed: Connor's app-only token acquisition and destination service identity. These did not prevent building the synthetic profile/job foundation, but they prevent enabling real tasks.
 
 
 ## 12. Synthetic build invariants
 
-The first build exposes internal server modules and a local two-task test, with no new public route or production admission. Real profile publication, Admin editing, Entra integration and live source/destination adapters remain subsequent integration work. The executable task registry accepts only synthetic task names and test scope until those proofs exist.
+[VERIFIED via the branch modules and local suites] The first build exposes internal server modules and a local two-task test, with no new public route or production admission. Real profile publication, Admin editing, Entra integration and live source/destination adapters remain subsequent integration work. The executable task registry accepts only synthetic task names and test scope until those proofs exist.
 
 | Invariant | Implementation surface | Verification |
 |---|---|---|
@@ -284,3 +284,17 @@ The first build exposes internal server modules and a local two-task test, with 
 | Status/audit contain no proposal or model text | worker status projection/deferred audit | Secret canary assertions with actual content present |
 | Real writes are disabled for this trial | synthetic registry and injected fixture adapter | Unknown/real task or non-test environment rejects before dispatch |
 | New durable shape matches fresh install and preserves tombstones | migration/manifest/setup/Atlas | Disposable PostgreSQL tests, migration/bootstrap gates |
+
+
+The implemented local proof uses `synthetic.executive-summary` and `synthetic.methodology` in `environment:test`, mapping only to `fixture_summary` and `fixture_methodology`. Those labels are not Dataverse schema fields. The test uses the canonical Executor and real PostgreSQL, with synthetic provider, source/auth, audit and conditional writer adapters. No HTTP caller can reach this mode through a new route because no route has been added.
+
+Remaining integration work is explicit: governed profile/task publication and Admin preview/editor; live authoritative source selection/extraction and field mappings; staff/Entra admission and authorized status/result projection; stable-identity audit and conditional Dataverse adapter proofs; published operational limits, global capacity/rate bounds, scheduler and cleanup wiring; operator cancellation/reconciliation/retry; and separately authorized real quality/cache measurement. The synthetic store retains uncertainty receipts and exposes bounded content expiry, but has no automatic receipt purge or operator resolution command. These are rollout requirements, not reasons to add speculative machinery to the local proof.
+
+
+## 13. Verification and handoff
+
+[VERIFIED via local commands] `npm run build` passed using an isolated dependency copy after Turbopack rejected the worktree's external `node_modules` symlink. Existing warnings concern broad template-file trace patterns in unchanged DOCX renderers and `_app` static optimization. The touched JavaScript files pass scoped ESLint. Thirty-two selected gates/self-tests passed, with every gate preceding its own self-test; this includes types, migration manifest, Atlas, prompt boundary, model registry/warming, DAL/context, status/GUID, fact/doc currency, catalog and agent invariants.
+
+Unit command: `npx jest tests/unit/execute-prompt- tests/unit/utils/ai-payload-boundary.test.js tests/unit/prompt-jobs- tests/unit/llm-client.test.js --runInBand --silent` — 14 suites, 181 tests passed. SQL command: both `tests/integration/prompt-jobs.pg.test.js` and `tests/integration/prompt-jobs-executor.pg.test.js` ran with their required scratch-URL variables — 17 tests passed against local PostgreSQL 16. A separate disposable database ran the fresh bootstrap and verified migration 097's execution receipt and all six tables. The tests use provider/audit/destination doubles; no paid inference or live data mutation occurred.
+
+The architecture has a completed Fable plan review. The build has local verification but no completed Fable build review: the authorized OAuth session ran out of usage credits. No model/product substitution was made. Resume with that exact review requirement, then address any material findings. All work is on `codex/coordinated-start-2026-11-10-b`; no push, merge or deployment is part of this increment.
