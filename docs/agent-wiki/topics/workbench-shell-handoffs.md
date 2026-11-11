@@ -60,6 +60,41 @@ extraction_segments:
 > extract remains dated context. See the [current work queue](../../CURRENT_WORK_QUEUE.md)
 > and [terminology audit](../../audits/terminology-completion-audit-2026-11-01.md).
 
+## J27 cycle page layout (branch-built 2026-11-09 to 2026-11-10; not promoted)
+
+`[VERIFIED via source on claude/j27-cycle-page, 2026-11-10]` This describes the
+J27 line only. `main` and Production still run the six-panel shell described
+under Operating Notes below.
+
+- **Which layout.** `isStageLayout` in
+  `shared/components/workbench/workbench-location.js` chooses the phase layout
+  when the cycle is J27 or later and the program is one of the feed's
+  `stageProgramIds` (`lib/services/workbench/dashboard-service.js`). No cycle
+  literal: a later cycle qualifies without a code change. Earlier cycles and
+  other programs keep the older tabs.
+- **Pending state.** Until the cycle list arrives the shell cannot tell which
+  layout applies, so `layoutPending` in `WorkbenchShell.js` renders a plain
+  "Loading…" status and mounts no panel. An old link is not mapped to a phase
+  tab before the page knows whether the program qualifies.
+- **Tabs.** `J27_VIEWS` in `WorkbenchViewsNav.js`: All requests, Initial
+  Assessment, Peer Review, Deliberations, Final Assessment, Awardees.
+  `resolveWorkbenchView` maps every older view key to a tab the layout has.
+- **Lists.** All requests, Initial Assessment and Peer Review are one
+  component, `J27RequestList.js`, over rows from `useJ27CycleRows.js`. Every
+  chip, next-step line, filter and tab count is decided in
+  `shared/utils/j27CycleRows.js`; every label comes from
+  `shared/config/j27Labels.js`. The request page's stage strip uses the same
+  next-step rule, so the strip and a list row agree.
+- **Not yet lists.** Deliberations and Final Assessment mount the existing
+  Staff deliberations and Final writeups panels and carry no tab count. Their
+  lists need their own plan (the J27 cycle page build plan of 2026-11-09,
+  section 3a; that document is on `main` and joins this line at the merge).
+- **Hazards.** A failed read is reported once above the list, and "Nothing is
+  waiting on staff right now." is shown on a row only when no read failed. A
+  request with a final decision is listed on All requests only. Tests:
+  `tests/unit/j27-cycle-rows.test.js`, `tests/unit/workbench-shell-j27-layout.test.js`.
+- **Decision record.** Alignment log D62 (`docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`).
+
 <!-- source-lines: 2013-2098 -->
 ## Final Writeup lifecycle (Slices 1–4)
 
