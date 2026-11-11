@@ -52,6 +52,15 @@ these changes:
 | `AUTOMATIC_INTEGRITY_SCREENING` (`on`, `off`, `simulate`) | Integrity screening after a recommendation | Delete once screening is always on |
 | `CHAIRS_RECOMMENDATION_REHEARSAL_REQUEST_ID`, `INTEGRITY_SIMULATION_REQUEST_IDS`, `INTEGRITY_SIMULATION_DB_URL` | Preview rehearsal only | Delete |
 
+- **Preview moved, 2026-11-11.** `claude/j27-read-model` fast-forwarded to
+  `01a798524` and deployed as `dpl_EQFqtn7LtKy9G3XyNuspzzquvo6z`; the stable
+  alias points at it (previous target `dpl_2GaUBQnXmXsYd2WdYEnxAKfppSxV`).
+  Branch-scoped Preview Config settings added the same day and read back:
+  `INITIAL_RATIONALE_SCHEMA_READY`, `MEETING_ROSTER_SCHEMA_READY`,
+  `CHAIRS_RECOMMENDATION_ENABLED`, `FINAL_WRITEUP_SCHEMA_READY` (all `on`)
+  and `STAFF_DELIBERATIONS_SITE_VISIT_STATE_STATUS_PAIRS` (Production's
+  value). The bullets below describe the state before this move. Not yet
+  walked through in a browser.
 - **Preview state, 2026-11-10.** The branch-scoped Preview has three
   settings of its own (`DYNAMICS_URL`, `POSTGRES_URL`, `DATABASE_URL`). The
   phase layout, review summary and presentation assessment need no setting
