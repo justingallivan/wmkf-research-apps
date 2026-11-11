@@ -112,7 +112,11 @@ export default async function handler(req, res) {
       return res.status(req.method === 'POST' ? 201 : 200).json(await saveRoster(body, actorRefFromSession(access.session), { create:req.method === 'POST' }));
     });
   } catch (error) {
-    return res.status(error.status === 412 ? 409 : error.status || 503).json({ error:error.status === 412 ? 'Profile changed; reload before saving.' : error.message });
+    const validErrorStatus = Number.isInteger(error.status) && error.status >= 400 && error.status <= 599;
+    const status = error.status === 412 ? 409 : validErrorStatus ? error.status : 503;
+    const message = error.status === 412 ? 'Profile changed; reload before saving.'
+      : validErrorStatus ? error.message : 'Roster operation outcome unavailable. Reload or retry with the same creation identity.';
+    return res.status(status).json({ error: message });
   }
 
   switch (req.method) {

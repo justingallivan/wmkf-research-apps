@@ -396,3 +396,19 @@ describe('executeChangeset — input validation', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 });
+
+test('noFallback refuses impersonated outer 403 without a second batch request', ctx(async () => {
+ fetch.mockResolvedValueOnce({ok:true,json:async()=>({access_token:'test-token',expires_in:3600})})
+  .mockResolvedValueOnce({ok:false,status:403,headers:{get:()=> 'application/json'},text:async()=>JSON.stringify({error:{message:'Denied'}})});
+ await expect(DynamicsService.executeChangeset([{method:'POST',url:'wmkf_expertiseprofiles',body:{wmkf_name:'Synthetic'}}],{actingUserSystemId:ACTING_GUID,noFallback:true})).rejects.toMatchObject({status:403});
+ expect(fetch.mock.calls.filter(([url])=>String(url).endsWith('/$batch'))).toHaveLength(1);
+}));
+
+test('existing callers retain the default outer-403 service-principal retry', ctx(async () => {
+ mockToken();
+ fetch.mockResolvedValueOnce({ok:false,status:403,headers:{get:()=> 'application/json'},text:async()=>JSON.stringify({error:{message:'Denied'}})})
+  .mockResolvedValueOnce(multipartResponse([{contentId:1,status:204}]));
+ await DynamicsService.executeChangeset([{method:'POST',url:'wmkf_expertiseprofiles',body:{wmkf_name:'Synthetic'}}],{actingUserSystemId:ACTING_GUID});
+ const calls=fetch.mock.calls.filter(([url])=>String(url).endsWith('/$batch'));
+ expect(calls).toHaveLength(2);expect(calls[0][1].headers.MSCRMCallerID).toBe(ACTING_GUID);expect(calls[1][1].headers.MSCRMCallerID).toBeUndefined();
+}));

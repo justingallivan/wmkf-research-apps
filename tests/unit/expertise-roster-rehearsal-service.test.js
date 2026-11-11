@@ -52,3 +52,14 @@ test('unlinked actor and disabled impersonation cannot write', async () => {
  await expect(saveRoster({id:ID},ACTOR)).rejects.toMatchObject({status:503});
  expect(profiles.get).not.toHaveBeenCalled(); expect(profiles.update).not.toHaveBeenCalled();
 });
+
+test('inactive creation recovers an uncertain commit by exact creation key and values',async()=>{
+ const input={name:'Synthetic inactive',role_type:'Consultant',is_active:false,mutation_id:ID};
+ const stored={...contract.encode(contract.normalize({name:input.name,role_type:input.role_type,is_active:false})),wmkf_expertiseprofileid:ID,_etag:'W/"9"'};
+ profiles.byCreationKey.mockResolvedValueOnce(null).mockResolvedValueOnce(stored);
+ profiles.create.mockRejectedValue(Object.assign(Error('Unconfirmed batch'),{status:200}));
+ const result=await saveRoster(input,ACTOR,{create:true});
+ expect(result.member).toMatchObject({id:ID,is_active:false});
+ expect(profiles.byCreationKey).toHaveBeenNthCalledWith(2,'app_'+ID);
+ expect(profiles.create).toHaveBeenCalledTimes(1);
+});

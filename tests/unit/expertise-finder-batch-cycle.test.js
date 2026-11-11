@@ -205,9 +205,10 @@ test('T2: RosterTab fetchRoster — network rejection surfaces the native messag
 });
 
 test('T2: RosterTab handleSaveEdit — PATCH posts exact body/headers and updates the member on success', async () => {
+  let saved=false;
   global.fetch = routeFetch([
-    { test: (u, m) => m === 'GET' && u.includes('/api/expertise-finder/roster'), respond: () => ok({ members: [MEMBER] }) },
-    { test: (u, m) => m === 'PATCH' && u.includes('/api/expertise-finder/roster'), respond: () => ok({ member: { ...MEMBER, role: 'Emeritus Professor' } }) },
+    { test: (u, m) => m === 'GET' && u.includes('/api/expertise-finder/roster'), respond: () => ok({ members: [{...MEMBER,role:saved?'Emeritus Professor':MEMBER.role}] }) },
+    { test: (u, m) => m === 'PATCH' && u.includes('/api/expertise-finder/roster'), respond: () => { saved=true; return ok({ member: { ...MEMBER, role: 'Emeritus Professor' } }); } },
   ]);
   render(<ExpertiseFinderPage />);
   fireEvent.click(screen.getByText('Roster'));
@@ -248,29 +249,30 @@ test('T2: RosterTab handleSaveEdit — non-2xx with an unparseable body (502) su
   expect(await screen.findByText('Request failed (502)')).toBeInTheDocument();
 });
 
-test('T2: RosterTab handleDelete — DELETE posts exact body and removes the member on success', async () => {
+test('T2: RosterTab handleStatus — PATCH posts exact body and removes the member on success', async () => {
+  let inactive=false;
   window.confirm = jest.fn(() => true);
   global.fetch = routeFetch([
-    { test: (u, m) => m === 'GET' && u.includes('/api/expertise-finder/roster'), respond: () => ok({ members: [MEMBER] }) },
-    { test: (u, m) => m === 'DELETE' && u.includes('/api/expertise-finder/roster'), respond: () => ok({ success: true }) },
+    { test: (u, m) => m === 'GET' && u.includes('/api/expertise-finder/roster'), respond: () => ok({ members: inactive?[]:[MEMBER] }) },
+    { test: (u, m) => m === 'PATCH' && u.includes('/api/expertise-finder/roster'), respond: () => { inactive=true; return ok({ success: true }); } },
   ]);
   render(<ExpertiseFinderPage />);
   fireEvent.click(screen.getByText('Roster'));
   fireEvent.click(await screen.findByText('Ada Lovelace'));
   fireEvent.click(screen.getByText('Deactivate'));
 
-  await waitFor(() => expect(global.fetch.mock.calls.some(([, o = {}]) => o.method === 'DELETE')).toBe(true));
-  const [, options] = global.fetch.mock.calls.find(([, o = {}]) => o.method === 'DELETE');
+  await waitFor(() => expect(global.fetch.mock.calls.some(([, o = {}]) => o.method === 'PATCH')).toBe(true));
+  const [, options] = global.fetch.mock.calls.find(([, o = {}]) => o.method === 'PATCH');
   expect(options.headers).toEqual({ 'Content-Type': 'application/json' });
-  expect(JSON.parse(options.body)).toEqual({ id: 'm1' });
+  expect(JSON.parse(options.body)).toEqual({ id: 'm1', is_active: false });
   await waitFor(() => expect(screen.queryByText('Ada Lovelace')).not.toBeInTheDocument());
 });
 
-test('T2: RosterTab handleDelete — non-2xx surfaces data.error verbatim', async () => {
+test('T2: RosterTab handleStatus — non-2xx surfaces data.error verbatim', async () => {
   window.confirm = jest.fn(() => true);
   global.fetch = routeFetch([
     { test: (u, m) => m === 'GET' && u.includes('/api/expertise-finder/roster'), respond: () => ok({ members: [MEMBER] }) },
-    { test: (u, m) => m === 'DELETE' && u.includes('/api/expertise-finder/roster'), respond: () => fail({ error: 'Cannot deactivate.' }, 409) },
+    { test: (u, m) => m === 'PATCH' && u.includes('/api/expertise-finder/roster'), respond: () => fail({ error: 'Cannot deactivate.' }, 409) },
   ]);
   render(<ExpertiseFinderPage />);
   fireEvent.click(screen.getByText('Roster'));
@@ -279,11 +281,11 @@ test('T2: RosterTab handleDelete — non-2xx surfaces data.error verbatim', asyn
   expect(await screen.findByText('Cannot deactivate.')).toBeInTheDocument();
 });
 
-test('T2: RosterTab handleDelete — non-2xx with an unparseable body (502) surfaces "Request failed (502)"', async () => {
+test('T2: RosterTab handleStatus — non-2xx with an unparseable body (502) surfaces "Request failed (502)"', async () => {
   window.confirm = jest.fn(() => true);
   global.fetch = routeFetch([
     { test: (u, m) => m === 'GET' && u.includes('/api/expertise-finder/roster'), respond: () => ok({ members: [MEMBER] }) },
-    { test: (u, m) => m === 'DELETE' && u.includes('/api/expertise-finder/roster'), respond: () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError('Unexpected token <'); } }) },
+    { test: (u, m) => m === 'PATCH' && u.includes('/api/expertise-finder/roster'), respond: () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError('Unexpected token <'); } }) },
   ]);
   render(<ExpertiseFinderPage />);
   fireEvent.click(screen.getByText('Roster'));
@@ -293,9 +295,10 @@ test('T2: RosterTab handleDelete — non-2xx with an unparseable body (502) surf
 });
 
 test('T2: RosterTab handleAdd — POST posts exact headers and adds the member on success', async () => {
+  let added=false;
   global.fetch = routeFetch([
-    { test: (u, m) => m === 'GET' && u.includes('/api/expertise-finder/roster'), respond: () => ok({ members: [] }) },
-    { test: (u, m) => m === 'POST' && u.includes('/api/expertise-finder/roster'), respond: () => ok({ member: { ...MEMBER, id: 'm2', name: 'Grace Hopper' } }) },
+    { test: (u, m) => m === 'GET' && u.includes('/api/expertise-finder/roster'), respond: () => ok({ members: added?[{...MEMBER,id:'m2',name:'Grace Hopper'}]:[] }) },
+    { test: (u, m) => m === 'POST' && u.includes('/api/expertise-finder/roster'), respond: () => { added=true; return ok({ member: { ...MEMBER, id: 'm2', name: 'Grace Hopper' } }); } },
   ]);
   render(<ExpertiseFinderPage />);
   fireEvent.click(screen.getByText('Roster'));
@@ -437,4 +440,22 @@ test('T2: HistoryTab fetchHistory — network rejection is swallowed (console.er
   fireEvent.click(screen.getByText('History'));
   await waitFor(() => expect(console.error).toHaveBeenCalled());
   console.error.mockRestore();
+});
+
+test('v2 matching renders no-lead, exclusions and non-lead staff consultation', async () => {
+  global.fetch = routeFetch([
+    { test: (u, m) => m === 'POST' && u.includes('/api/expertise-finder/match'), respond: () => ok({ results: {
+      staff_assignment: { primary: null, secondary: null },
+      no_lead_recommendation: true,
+      roster_warnings: ['An invalid profile was excluded.'],
+      staff_consultation: [{ profile_guid: '11111111-1111-4111-8111-111111111111', name: 'Synthetic consultant staff', rationale: 'Consult on methods.' }],
+    } }) },
+  ]);
+  render(<ExpertiseFinderPage />);
+  fireEvent.click(screen.getByText('mock-upload'));
+  fireEvent.click(screen.getByText('Find Matches'));
+  expect(await screen.findByText('No eligible lead recommendation is available for this proposal.')).toBeInTheDocument();
+  expect(screen.getByText('An invalid profile was excluded.')).toBeInTheDocument();
+  expect(screen.getByText('Staff consultation')).toBeInTheDocument();
+  expect(screen.getByText('Synthetic consultant staff')).toBeInTheDocument();
 });
