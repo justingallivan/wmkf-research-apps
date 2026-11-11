@@ -9,12 +9,18 @@ const { createRequire, registerHooks } = require('node:module');
 const root = path.resolve(__dirname, '..');
 const candidateDigest = '5060ea160f58ec90ab54736e40180cbddb61d8073089faa930e1cb8eb3d44679';
 const successorDigest = '8022bb7771a842efe533a5983c7059c3bff264b77cf54e2173dd0eac62f26795';
+const thirdDigest = '0c5ae42ab2b1023b2c2e04200b2a4f71ac48f01b4892f15d23500904e99d9889';
 const predecessorStatePath = '/private/tmp/wmkf-expertise-sandbox-trial-20261111/state.json';
+const secondStatePath = '/private/tmp/wmkf-expertise-sandbox-trial-1000339-v2-20261111/state.json';
+const thirdDirectory = '/private/tmp/wmkf-expertise-sandbox-trial-1000339-v3-20261111';
+const secondJobId = 'ba425a76-1257-4b6a-a54d-1c7fc6ceb3fe';
+const secondPromptId = '9935d70a-986f-481f-abae-28fe255c8996';
 const successorDirectory = '/private/tmp/wmkf-expertise-sandbox-trial-1000339-v2-20261111';
 const predecessorJobId = 'd85b9e13-a7a1-44a9-ae39-5961f4a9696a';
 function candidateFile(digest) {
   if (digest === candidateDigest) return path.join(root, 'docs/plans/EXPERTISE_SANDBOX_1000339_CANDIDATE_2026-11-11.json');
   if (digest === successorDigest && /^[a-f0-9]{64}$/.test(successorDigest)) return path.join(root, 'docs/plans/EXPERTISE_SANDBOX_1000339_CANDIDATE_V2_2026-11-11.json');
+  if (digest === thirdDigest && /^[a-f0-9]{64}$/.test(thirdDigest)) return path.join(root, 'docs/plans/EXPERTISE_SANDBOX_1000339_CANDIDATE_V3_2026-11-11.json');
   throw new Error('Unknown candidate');
 }
 function readCandidate(digest) {
@@ -72,6 +78,12 @@ function checkPublicationRows(items, oldRow, row, oldCurrent, newCurrent, canoni
   const next = items.find(item => item.wmkf_ai_promptid === row.wmkf_ai_promptid);
   checkPublicationRow(old, oldRow, oldCurrent, canonical); checkPublicationRow(next, row, newCurrent, canonical);
   return { old, next };
+}
+function checkPublicationHistory(items, oldRow, row, ancestors, oldCurrent, newCurrent, canonical) {
+  if (items.length !== 2 + ancestors.length || new Set(items.map(item => item.wmkf_ai_promptid)).size !== items.length) throw new Error('Publication history mismatch');
+  for (const ancestor of ancestors) checkPublicationRow(items.find(item => item.wmkf_ai_promptid === ancestor.wmkf_ai_promptid), ancestor, false, canonical);
+  const ancestorIds = new Set(ancestors.map(item => item.wmkf_ai_promptid));
+  return checkPublicationRows(items.filter(item => !ancestorIds.has(item.wmkf_ai_promptid)), oldRow, row, oldCurrent, newCurrent, canonical);
 }
 function reservePublicationIntent(state, key) {
   if (!['promptWriteIntent','demoteIntent','promoteIntent'].includes(key) || state[key] || state.publicationComplete
@@ -135,7 +147,16 @@ function checkGuards() {
   const oldLive = { ...old, wmkf_ai_iscurrent: true, wmkf_ai_promptstatus: 682090001, _etag: 'old-etag' };
   const nextLive = { ...next, wmkf_ai_iscurrent: false, wmkf_ai_promptstatus: 682090001, _etag: 'new-etag' };
   const goodHistory = { value: [oldLive, nextLive], '@odata.count': 2 };
-  checkPublicationRows(strictHistory(goodHistory, value => value), old, next, true, false, canonical);
+  checkPublicationHistory(strictHistory(goodHistory, value => value), old, next, [], true, false, canonical);
+  const ancestor = { wmkf_ai_promptid: 'ancestor', wmkf_ai_promptbody: 'ancestor body', wmkf_ai_systemprompt: '' };
+  const ancestorLive = { ...ancestor, wmkf_ai_iscurrent: false, wmkf_ai_promptstatus: 682090001, _etag: 'ancestor-etag' };
+  checkPublicationHistory([ancestorLive, oldLive, nextLive], old, next, [ancestor], true, false, canonical);
+  for (const invalid of [[oldLive, nextLive], [ancestorLive, oldLive, oldLive], [{ ...ancestorLive, wmkf_ai_promptbody: 'changed' }, oldLive, nextLive]]) {
+    let denied = false; try { checkPublicationHistory(invalid, old, next, [ancestor], true, false, canonical); } catch { denied = true; }
+    if (!denied) throw new Error('Three-version history guard self-test failed');
+  }
+  let unknownCandidateDenied = false; try { candidateFile('f'.repeat(64)); } catch { unknownCandidateDenied = true; }
+  if (!unknownCandidateDenied) throw new Error('Unknown candidate guard self-test failed');
   const badHistories = [ { value: [oldLive, nextLive] }, { value: [oldLive, nextLive], '@odata.count': 2, '@odata.nextLink': 'x' },
     { value: [oldLive, { ...oldLive }], '@odata.count': 2 },
     { value: [oldLive, { ...nextLive, wmkf_ai_promptbody: 'changed' }], '@odata.count': 2 },
@@ -186,8 +207,8 @@ registerHooks({ resolve(specifier, context, next) {
 
 function checkCandidate(digest = candidateDigest) {
   const candidate = readCandidate(digest);
-  if (digest === successorDigest) {
-    const previous = readCandidate(candidateDigest);
+  if (digest === successorDigest || digest === thirdDigest) {
+    const previous = readCandidate(digest === thirdDigest ? successorDigest : candidateDigest);
     const { canonical } = req('./lib/services/prompt-jobs/profile.js');
     const { body, ...rest } = candidate.task;
     const { body: previousBody, ...previousRest } = previous.task;
@@ -202,7 +223,7 @@ function checkCandidate(digest = candidateDigest) {
   if (hashProfile(candidate.profile) !== candidate.profileHash) throw new Error('Profile hash mismatch');
   const task = candidate.task;
   const row = { wmkf_ai_promptid: crypto.randomUUID(), wmkf_ai_promptname: task.name,
-    wmkf_promptversion: 1, wmkf_ai_systemprompt: task.systemPrompt, wmkf_ai_promptbody: task.body,
+    wmkf_promptversion: digest === thirdDigest ? 3 : digest === successorDigest ? 2 : 1, wmkf_ai_systemprompt: task.systemPrompt, wmkf_ai_promptbody: task.body,
     wmkf_ai_promptvariables: task.variables, wmkf_ai_promptoutputschema: task.outputSchema,
     wmkf_ai_model: task.model, wmkf_ai_maxtokens: task.maxTokens, wmkf_ai_temperature: task.temperature };
   parseExecutionSpec(row);
@@ -237,14 +258,19 @@ function readPrivateJson(file) {
   }
   return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
-function initialize(directory, second = false) {
-  const digest = second ? successorDigest : candidateDigest;
+function initialize(directory, version = 1) {
+  if (![1, 2, 3].includes(version)) throw new Error('Unsupported trial');
+  const second = version > 1;
+  const third = version === 3;
+  const digest = third ? thirdDigest : second ? successorDigest : candidateDigest;
   checkCandidate(digest);
   let predecessor;
   if (second) {
-    if (directory !== successorDirectory) throw new Error('Invalid successor directory');
-    predecessor = readPrivateJson(predecessorStatePath);
-    if (predecessor.version !== 1 || predecessor.candidateDigest !== candidateDigest || predecessor.jobId !== predecessorJobId
+    if (directory !== (third ? thirdDirectory : successorDirectory)) throw new Error('Invalid successor directory');
+    predecessor = readPrivateJson(third ? secondStatePath : predecessorStatePath);
+    if (predecessor.version !== 1 || predecessor.candidateDigest !== (third ? successorDigest : candidateDigest)
+      || predecessor.jobId !== (third ? secondJobId : predecessorJobId) || (third && (predecessor.promptId !== secondPromptId
+        || predecessor.predecessorJobId !== predecessorJobId || !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(predecessor.predecessorPromptId || '')))
       || !predecessor.sourceProof || predecessor.providerPosts !== 1 || !predecessor.auditRunId
       || !predecessor.profilePublicationId || !predecessor.promptId) throw new Error('Invalid predecessor receipt');
   }
@@ -270,7 +296,8 @@ function initialize(directory, second = false) {
     scopeId: crypto.randomUUID(), idempotencyKey: crypto.randomUUID(), promptId: crypto.randomUUID(),
     profilePublicationId: second ? predecessor.profilePublicationId : crypto.randomUUID(), nonceSecret: crypto.randomBytes(32).toString('hex'),
     sourceProof: second ? predecessor.sourceProof : null, providerPosts: 0,
-    ...(second ? { predecessorJobId, predecessorPromptId: predecessor.promptId } : {}) };
+    ...(second ? { predecessorJobId: third ? secondJobId : predecessorJobId, predecessorPromptId: predecessor.promptId,
+      ...(third ? { ancestorPromptId: predecessor.predecessorPromptId } : {}) } : {}) };
   const fd = fs.openSync(path.join(directory, 'state.json'), 'wx', 0o600);
   try { fs.writeFileSync(fd, JSON.stringify(state)); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
   const dirFd = fs.openSync(directory, 'r');
@@ -390,11 +417,15 @@ async function liveStage(mode, directory) {
       || state.databaseIdentity !== ledger.databaseIdentity || !state.sourceProof || !Number.isInteger(state.providerPosts)
       || state.providerPosts < 0 || state.providerPosts > 1) throw new Error('Trial state mismatch');
     checkCandidate(state.candidateDigest);
-    const second = state.candidateDigest === successorDigest;
-    if (second !== Boolean(state.predecessorJobId) || (second && state.predecessorJobId !== predecessorJobId)) throw new Error('Invalid successor state');
+    const third = state.candidateDigest === thirdDigest;
+    const second = state.candidateDigest === successorDigest || third;
+    const priorJobId = third ? secondJobId : predecessorJobId;
+    if (second !== Boolean(state.predecessorJobId) || (second && state.predecessorJobId !== priorJobId)) throw new Error('Invalid successor state');
     if (second) {
-      const previous = readPrivateJson(predecessorStatePath);
-      if (previous.jobId !== predecessorJobId || previous.candidateDigest !== candidateDigest
+      const previous = readPrivateJson(third ? secondStatePath : predecessorStatePath);
+      if (previous.jobId !== priorJobId || previous.candidateDigest !== (third ? successorDigest : candidateDigest)
+        || (third && (previous.promptId !== secondPromptId || previous.predecessorJobId !== predecessorJobId
+          || state.ancestorPromptId !== previous.predecessorPromptId))
         || previous.promptId !== state.predecessorPromptId || previous.profilePublicationId !== state.profilePublicationId
         || ['requestId','profileId','systemUserId','azureId','applicationId','databaseIdentity','ledgerHostname','ledgerDatabase'].some(key => previous[key] !== state[key])
         || JSON.stringify(previous.sourceProof) !== JSON.stringify(state.sourceProof)) throw new Error('Successor pin mismatch');
@@ -404,7 +435,7 @@ async function liveStage(mode, directory) {
     const task = candidate.task;
     const row = { wmkf_ai_promptid: state.promptId, wmkf_ai_promptname: task.name, wmkf_ai_systemprompt: task.systemPrompt,
       wmkf_ai_promptbody: task.body, wmkf_ai_promptvariables: task.variables, wmkf_ai_promptoutputschema: task.outputSchema,
-      wmkf_ai_model: task.model, wmkf_ai_temperature: task.temperature, wmkf_ai_maxtokens: task.maxTokens, wmkf_promptversion: second ? 2 : 1 };
+      wmkf_ai_model: task.model, wmkf_ai_temperature: task.temperature, wmkf_ai_maxtokens: task.maxTokens, wmkf_promptversion: third ? 3 : second ? 2 : 1 };
     const save = () => {
       const next = path.join(directory, 'state.next');
       const fd = fs.openSync(next, 'wx', 0o600);
@@ -524,16 +555,18 @@ async function liveStage(mode, directory) {
           || verifiedProfiles[0].requestId !== state.profilePublicationId
           || canonical(verifiedProfiles[0].profile) !== canonical(candidate.profile)) throw new Error('Profile readback mismatch');
         if (second) {
-          const oldTask = readCandidate(candidateDigest).task;
+          const oldTask = readCandidate(third ? successorDigest : candidateDigest).task;
           const oldRow = { ...row, wmkf_ai_promptid: state.predecessorPromptId, wmkf_ai_promptbody: oldTask.body,
-            wmkf_promptversion: 1 };
+            wmkf_promptversion: third ? 2 : 1 };
+          const ancestorRow = third ? { ...row, wmkf_ai_promptid: state.ancestorPromptId,
+            wmkf_ai_promptbody: readCandidate(candidateDigest).task.body, wmkf_promptversion: 1 } : null;
           // Query the complete small history directly: the shared list helper
           // normalizes missing value arrays and cannot prove completeness.
           const { DynamicsService } = req('./lib/services/dynamics-service.js');
           const rows = async () => {
             const params = new URLSearchParams({
               '$select': [...Object.keys(row), 'wmkf_ai_iscurrent', 'wmkf_ai_promptstatus'].join(','),
-              '$filter': "wmkf_ai_promptname eq 'expertise.recommendations'", '$top': '3', '$count': 'true',
+              '$filter': "wmkf_ai_promptname eq 'expertise.recommendations'", '$top': '4', '$count': 'true',
             });
             const token = await DynamicsService.getAccessToken();
             const response = await fetch(`https://orgd9e66399.crm.dynamics.com/api/data/v9.2/wmkf_ai_prompts?${params}`,
@@ -543,7 +576,7 @@ async function liveStage(mode, directory) {
             return strictHistory(data, item => DynamicsService.processAnnotations(item));
           };
           const checkRow = (item, expected, current) => checkPublicationRow(item, expected, current, canonical);
-          const checkRows = (items, oldCurrent, newCurrent) => checkPublicationRows(items, oldRow, row, oldCurrent, newCurrent, canonical);
+          const checkRows = (items, oldCurrent, newCurrent) => checkPublicationHistory(items, oldRow, row, third ? [ancestorRow] : [], oldCurrent, newCurrent, canonical);
           if (state.publicationComplete) {
             checkRows(await rows(), false, true);
             const actual = await aiPrompt.getExecutorPromptById(state.promptId, 'https://orgd9e66399.crm.dynamics.com');
@@ -552,9 +585,11 @@ async function liveStage(mode, directory) {
           }
           if (state.promptWriteIntent || state.demoteIntent || state.promoteIntent) throw new Error('Publication requires reconciliation');
           const beforeRows = await rows();
-          if (beforeRows.length !== 1) throw new Error('Publication history mismatch');
-          checkRow(beforeRows[0], oldRow, true);
-          const initialEtag = beforeRows[0]._etag;
+          if (beforeRows.length !== (third ? 2 : 1) || new Set(beforeRows.map(item => item.wmkf_ai_promptid)).size !== beforeRows.length) throw new Error('Publication history mismatch');
+          if (third) checkRow(beforeRows.find(item => item.wmkf_ai_promptid === ancestorRow.wmkf_ai_promptid), ancestorRow, false);
+          const initialOld = beforeRows.find(item => item.wmkf_ai_promptid === oldRow.wmkf_ai_promptid);
+          checkRow(initialOld, oldRow, true);
+          const initialEtag = initialOld._etag;
           if (typeof initialEtag !== 'string' || !initialEtag || initialEtag === '*' || /[\r\n]/.test(initialEtag)) throw new Error('Old ETag unavailable');
           await aiPrompt.create({ ...row, wmkf_ai_iscurrent: false, wmkf_ai_promptstatus: 682090001 });
           const beforeDemote = checkRows(await rows(), true, false);
@@ -643,7 +678,9 @@ async function main() {
   else if (process.argv.length === 3 && process.argv[2] === 'guard-test') result = checkGuards();
   else if (process.argv.length === 3 && process.argv[2] === 'offline-check-v2') result = checkCandidate(successorDigest);
   else if (process.argv.length === 4 && process.argv[2] === 'init') result = initialize(process.argv[3]);
-  else if (process.argv.length === 4 && process.argv[2] === 'init-second') result = initialize(process.argv[3], true);
+  else if (process.argv.length === 3 && process.argv[2] === 'offline-check-v3') result = checkCandidate(thirdDigest);
+  else if (process.argv.length === 4 && process.argv[2] === 'init-second') result = initialize(process.argv[3], 2);
+  else if (process.argv.length === 4 && process.argv[2] === 'init-third') result = initialize(process.argv[3], 3);
   else if (process.argv.length === 4 && process.argv[2] === 'prepare') result = await prepareSource(process.argv[3]);
   else if (process.argv.length === 4 && ['publish','preflight','admit','tick','recover','inspect','expire'].includes(process.argv[2])) result = await liveStage(process.argv[2], process.argv[3]);
   else throw new Error('Invalid trial stage');

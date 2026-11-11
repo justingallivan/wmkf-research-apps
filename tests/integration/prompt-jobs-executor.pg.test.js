@@ -20,7 +20,7 @@ import { canonical, hashProfile, sha256 } from '../../lib/services/prompt-jobs/p
 import { composeProfileTask, prepareContextSnapshot, recommendationSourceProof, sandboxRecommendationSourceProof } from '../../lib/services/prompt-jobs/context.js';
 import { createRecommendationsReader } from '../../lib/services/prompt-jobs/recommendations-reader.js';
 import { readStaffRecommendation } from '../../lib/services/prompt-jobs/staff-recommendations-service.js';
-import { readRecommendationsAccessPolicy, readRecommendationsTrialPolicy, RECOMMENDATIONS_SANDBOX_ORIGIN, RECOMMENDATIONS_TRIAL_PREDECESSOR_JOB_ID } from '../../lib/services/prompt-jobs/recommendations-sandbox-policy.js';
+import { readRecommendationsAccessPolicy, readRecommendationsTrialPolicy, RECOMMENDATIONS_SANDBOX_ORIGIN, RECOMMENDATIONS_TRIAL_PREDECESSOR_JOB_ID, RECOMMENDATIONS_TRIAL_SECOND_JOB_ID } from '../../lib/services/prompt-jobs/recommendations-sandbox-policy.js';
 import { admitSandboxRecommendationTrial, advanceSandboxRecommendationTrial, preflightSandboxRecommendationTrial } from '../../lib/services/prompt-jobs/sandbox-recommendations-trial.js';
 import { EXPERTISE_RESULT_CONTRACT, EXPERTISE_TASK_KEY } from '../../lib/services/prompt-jobs/capabilities.js';
 import { buildRecommendationsSnapshot, validateRecommendationsOutput } from '../../lib/services/expertise-finder/recommendations-contract.js';
@@ -912,13 +912,13 @@ suite('local Sandbox recommendation admission and controlled stages', () => {
       promptHash: sha256(canonical(promptRow)), ...grantPatch };
     activateGrant(grant);
     const deps = { ...first.deps, prompt: jest.fn(async () => promptRow), source };
-    return { grant, policy: readRecommendationsTrialPolicy(), deps,
+    return { ...first, promptRow, grant, policy: readRecommendationsTrialPolicy(), deps,
       admit: () => admitSandboxRecommendationTrial(deps), tick: () => advanceSandboxRecommendationTrial({}, deps) };
   }
 
-  async function admitRecordedFirst(first) {
-    await pool.query(`ALTER TABLE prompt_jobs ALTER COLUMN id SET DEFAULT '${RECOMMENDATIONS_TRIAL_PREDECESSOR_JOB_ID}'::uuid`);
-    try { expect(await admitted(first)).toBe(RECOMMENDATIONS_TRIAL_PREDECESSOR_JOB_ID); }
+  async function admitRecorded(trial, jobId) {
+    await pool.query(`ALTER TABLE prompt_jobs ALTER COLUMN id SET DEFAULT '${jobId}'::uuid`);
+    try { expect(await admitted(trial)).toBe(jobId); }
     finally { await pool.query('ALTER TABLE prompt_jobs ALTER COLUMN id SET DEFAULT gen_random_uuid()'); }
   }
 
@@ -989,7 +989,7 @@ suite('local Sandbox recommendation admission and controlled stages', () => {
 
   test('one explicit successor is concurrently idempotent, executes once, and leaves both permanent receipts counted', async () => {
     const first = trial();
-    await admitRecordedFirst(first);
+    await admitRecorded(first, RECOMMENDATIONS_TRIAL_PREDECESSOR_JOB_ID);
     await failFirst(first);
     first.deps.audit = jest.fn(async () => {});
     expect(await first.tick()).toEqual({ stage: 'audit_delivered' });
@@ -1017,7 +1017,7 @@ suite('local Sandbox recommendation admission and controlled stages', () => {
     const expectLimit = async next => expect(next.admit()).rejects.toMatchObject({ code: 'prompt_job_trial_limit' });
     await expectLimit(successor(first));
     activateGrant(first.grant);
-    await admitRecordedFirst(first);
+    await admitRecorded(first, RECOMMENDATIONS_TRIAL_PREDECESSOR_JOB_ID);
     await expectLimit(successor(first));
     activateGrant(first.grant);
     await failFirst(first);
@@ -1050,6 +1050,70 @@ suite('local Sandbox recommendation admission and controlled stages', () => {
     await expectLimit(successor(first));
     expect((await pool.query('SELECT 1 FROM prompt_jobs')).rowCount).toBe(1);
     expect(mockComplete).toHaveBeenCalledTimes(1);
+  });
+
+  test('third admission requires both exact audited failures and retains all three idempotent receipts', async () => {
+    const first = trial();
+    await admitRecorded(first, RECOMMENDATIONS_TRIAL_PREDECESSOR_JOB_ID);
+    await failFirst(first);
+    first.deps.audit = jest.fn(async () => {});
+    expect(await first.tick()).toEqual({ stage: 'audit_delivered' });
+
+    const second = successor(first);
+    const makeThird = (grantPatch = {}, promptPatch = {}) =>
+      successor(second, { grantPatch: { predecessorJobId: RECOMMENDATIONS_TRIAL_SECOND_JOB_ID, ...grantPatch }, promptPatch });
+    const expectLimit = async trial => expect(trial.admit()).rejects.toMatchObject({ code: 'prompt_job_trial_limit' });
+    await expectLimit(makeThird());
+    activateGrant(second.grant);
+    await admitRecorded(second, RECOMMENDATIONS_TRIAL_SECOND_JOB_ID);
+    await expectLimit(makeThird());
+
+    activateGrant(second.grant);
+    mockComplete.mockResolvedValueOnce({ ...providerResponse(JSON.stringify(second.output)), stopReason: 'max_tokens' });
+    expect(await second.tick()).toEqual({ stage: 'failed_validation' });
+    const secondReceipt = await store.readJob({ ...second.policy, jobId: RECOMMENDATIONS_TRIAL_SECOND_JOB_ID });
+    expect(secondReceipt.attempts[0]).toMatchObject({ state: 'failed_validation', error_code: 'claude_output_truncated', audit_state: 'pending' });
+    await expectLimit(makeThird());
+    activateGrant(second.grant);
+    expect(await second.tick()).toEqual({ stage: 'audit_delivered' });
+
+    for (const [jobId, version, policy] of [
+      [RECOMMENDATIONS_TRIAL_PREDECESSOR_JOB_ID, 1, first.policy],
+      [RECOMMENDATIONS_TRIAL_SECOND_JOB_ID, 2, second.policy],
+    ]) {
+      const digest = sha256(canonical({ kind: `expertise-recommendations-trial-v${version}`, policy }));
+      expect((await pool.query('SELECT payload_hash FROM prompt_jobs WHERE id=$1', [jobId])).rows[0].payload_hash).toBe(digest);
+      await pool.query('UPDATE prompt_jobs SET payload_hash=$2 WHERE id=$1', [jobId, '0'.repeat(64)]);
+      await expectLimit(makeThird());
+      await pool.query('UPDATE prompt_jobs SET payload_hash=$2 WHERE id=$1', [jobId, digest]);
+    }
+    await expectLimit(makeThird({ azureId: randomUUID() }));
+    await expectLimit(makeThird({}, { wmkf_promptversion: 4 }));
+    await expectLimit(makeThird({}, { wmkf_ai_promptid: first.promptRow.wmkf_ai_promptid }));
+
+    const third = makeThird();
+    const receipts = await Promise.all([third.admit(), third.admit()]);
+    expect(receipts.map(r => r.replayed).sort()).toEqual([false, true]);
+    const [{ jobId }] = receipts;
+    expect(receipts[1].jobId).toBe(jobId);
+    expect(await third.tick()).toEqual({ stage: 'snapshot_saved' });
+    expect(await third.tick()).toEqual({ stage: 'validated' });
+    expect(mockComplete).toHaveBeenCalledTimes(3);
+
+    const previousJobs = [RECOMMENDATIONS_TRIAL_PREDECESSOR_JOB_ID, RECOMMENDATIONS_TRIAL_SECOND_JOB_ID];
+    await pool.query("UPDATE prompt_job_content SET expires_at=clock_timestamp()-interval '1 second' WHERE job_id=ANY($1::uuid[]) AND kind='configuration'", [previousJobs]);
+    for (const [past, id] of [[first, previousJobs[0]], [second, previousJobs[1]]]) {
+      expect(await store.expireSandboxRecommendationContent({ ...past.policy, jobId: id })).toBe(1);
+      activateGrant(past.grant);
+      await expect(past.admit()).resolves.toEqual({ jobId: id, replayed: true });
+    }
+    activateGrant(third.grant);
+    await expect(third.admit()).resolves.toEqual({ jobId, replayed: true });
+    await expectLimit(makeThird());
+    await expect(makeThird({ predecessorJobId: jobId }).admit()).rejects.toMatchObject({ code: 'recommendations_trial_disabled' });
+    expect((await pool.query('SELECT 1 FROM prompt_jobs')).rowCount).toBe(3);
+    expect((await pool.query('SELECT 1 FROM prompt_job_attempts')).rowCount).toBe(3);
+    expect(mockComplete).toHaveBeenCalledTimes(3);
   });
 
   test('rejects a mismatched database and same idempotency key with different binding', async () => {

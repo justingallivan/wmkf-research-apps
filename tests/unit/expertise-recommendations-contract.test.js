@@ -279,3 +279,46 @@ test('checks both entire raw and canonical result byte ceilings', () => {
   expect(Buffer.byteLength(JSON.stringify(result(35)))).toBeLessThan(128 * 1024);
   expect(() => validateRecommendationsOutput(result(35), fixture)).toThrow('Canonical recommendations exceed their byte limit.');
 });
+
+// These fixtures prove the prompt's concise envelope can preserve all conflicts
+// for the trial's 40 visible profiles. They do not prove model/token compliance
+// or change the shared production output validator's broader limits.
+test.each([0, 1, 10, 27, 39, 40, '27-disjoint'])('compact trial envelope preserves %s conflicts within the character target', count => {
+  const profiles = Array.from({ length: 40 }, (_, index) => profile(index + 1, {
+    role_type: index < 5 ? 'Research Program Staff' : index < 30 ? 'Consultant' : 'Board',
+    lead_pd_eligible: index < 2,
+    dataverse_user_id: index < 2 ? guid(index + 101) : null,
+  }));
+  const fixture = buildRecommendationsSnapshot({ complete: true, profiles,
+    users: [101, 102].map(index => ({ userGuid: guid(index), disabled: false })) });
+  const conflictRows = count === '27-disjoint' ? [...profiles.slice(10, 30), ...profiles.slice(33)] : profiles.slice(0, count);
+  const conflicted = new Set(conflictRows.map(row => row.profile_guid));
+  const explanation = 'Specific scientific overlap. '.padEnd(160, 'x');
+  const reference = row => row && !conflicted.has(row.profile_guid)
+    ? { profile_guid: row.profile_guid, rationale: explanation } : null;
+  const shortlist = (start, end, limit) => profiles.slice(start, end).filter(row => !conflicted.has(row.profile_guid))
+    .slice(0, limit).map(reference);
+  const value = {
+    proposal_summary: {},
+    staff_assignment: { primary: reference(profiles[0]), secondary: reference(profiles[1]) },
+    staff_consultation: shortlist(2, 5, 3),
+    consultant_overlap: shortlist(5, 30, 5).map(row => ({ ...row, relevance: 'partial' })),
+    board_interest: shortlist(30, 40, 3).map(row => ({ ...row, note: 'Relevant interest. '.padEnd(80, 'x') })),
+    expertise_gaps: { has_gaps: true, description: 'Missing central expertise. '.padEnd(400, 'x') },
+    conflicts: [...conflicted].map(profile_guid => ({ profile_guid, reason: 'Named collaborator. '.padEnd(80, 'x') })),
+  };
+  const result = validateRecommendationsOutput(value, fixture);
+  expect(result.conflicts).toHaveLength(conflictRows.length);
+  if (count === '27-disjoint') {
+    expect(value.staff_consultation).toHaveLength(3);
+    expect(value.consultant_overlap).toHaveLength(5);
+    expect(value.board_interest).toHaveLength(3);
+    expect(value.staff_assignment.primary).not.toBeNull();
+    expect(value.staff_assignment.secondary).not.toBeNull();
+  }
+  expect(JSON.stringify(value).length).toBeLessThanOrEqual(8000);
+  const recommendations = [value.staff_assignment.primary, value.staff_assignment.secondary,
+    ...value.staff_consultation, ...value.consultant_overlap, ...value.board_interest].filter(Boolean);
+  expect(new Set(recommendations.map(row => row.profile_guid)).size).toBe(recommendations.length);
+  expect(recommendations.every(row => !conflicted.has(row.profile_guid))).toBe(true);
+});
