@@ -1832,6 +1832,7 @@ export default function StaffDeliberationsTab({
           // once a slot exists; before that, the site-visit party.
           suggestedTo={session ? sessionAttendees.map((person) => person.email) : (siteVisitContext?.suggestedTo || EMPTY_LIST)}
           suggestedCc={session ? EMPTY_LIST : (siteVisitContext?.suggestedCc || EMPTY_LIST)}
+          recipientWarnings={session ? EMPTY_LIST : (siteVisitContext?.recipientWarnings || EMPTY_LIST)}
           onHistory={onDistributionHistory}
           composer={composerOpen ? 'dialog' : 'hidden'}
           onCloseComposer={() => setComposerOpen(false)}

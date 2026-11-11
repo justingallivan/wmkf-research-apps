@@ -86,3 +86,32 @@ lifecycle cases, full matching persistence, admission/drain, allocator completio
 for editor-created profiles, and final cutover/rollback remain release gates.
 New synthetic editor profiles remain unbound and excluded from numeric consumers.
 No full migration or Production-readiness claim is made.
+
+
+## Autonomous follow-up — consumer failure paths
+
+[VERIFIED via source trace, 213 tests across six suites, and independent review]
+The Workbench suggestion hook previously discarded roster exclusion warnings.
+It now retains them, reports selected attendees without a resolvable email, and
+passes them through the Staff Deliberations tab into the actual composer dialog.
+Warnings do not change recipients or delivery behavior. The existing request
+cancellation guard prevents late directory responses crossing request switches.
+
+| Invariant | Evidence |
+|---|---|
+| Exclusions reach the user choosing recipients | Hook, parent-prop and real composer-dialog tests |
+| Missing selected attendees are explicit | Hook test with unavailable numeric roster ID |
+| Stale results do not cross requests | Deferred directory response after rerender test |
+| Roster outage does not destroy a retryable upload | Finalizer 503 regression preserves Ready registry, retries same document, exactly one upload |
+
+Review found the initial warning placement was behind the modal; the final change
+renders it inside `PreSiteDistributionPanel`'s composer body. Independent re-review
+confirmed that repair with no remaining blocker in this bounded scope. Types and
+final production build passed. Scoped lint reported zero errors and 30 hook
+warnings across the affected components.
+
+These are local component/service tests with controlled dependencies. No new live
+attachment upload, email, staff sign-in, cutover or rollback occurred. The populated
+full-import fixture cannot use the old empty-fixture SQL rehearsal script; its
+explicit empty-identity precondition correctly prevents that reuse. Full rollback
+with post-cutover edits remains unverified. No new infrastructure was added.

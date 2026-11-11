@@ -113,6 +113,10 @@ formatter parity. The editor inactive-create gap and HTTP-200 error propagation 
 repaired, Fable-cleared and live-canary verified (two 204 operations, stable replay,
 conflicting payload 409). See
 `docs/plans/data/expertise-roster/CONSUMER_WRITE_REHEARSAL_2026-11-10.md`.
+Autonomous follow-up repaired dropped recipient-exclusion warnings through the
+Workbench hook into the actual composer dialog. A stale-response regression and
+attachment roster-outage/retry regression pass; 213 tests across six suites and
+independent review pass. These close bounded failure-path checks, not live uploads.
 Next: independent signed-in browser UAT, attachments, linked-person lifecycle,
 full matching persistence and cutover/rollback. Component tests are not browser UAT.
 The local import fixture is not a full application schema; do not claim full app UAT.

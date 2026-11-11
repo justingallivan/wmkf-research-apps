@@ -7,7 +7,7 @@
  * fail-open contract.
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import useSiteVisitContext from '../../shared/components/workbench/useSiteVisitContext';
 import { presentationMaterialsStatus } from '../../shared/components/workbench/ResearchPresentationMaterialsCard';
 
@@ -106,6 +106,7 @@ test.each([
     materials: [],
     suggestedTo: ['guest@example.org'],
     suggestedCc: [],
+    recipientWarnings: ['Some scheduled attendees have no available email address. Review the recipients before sharing.'],
     presentationMaterialsStatus: 'disabled',
     presentationMaterials: [],
     presentationMaterialConflicts: [],
@@ -219,3 +220,28 @@ test('passes the presentation and staff discussion summaries through with a read
   }));
 });
 
+
+
+test('preserves roster exclusion warnings and reports a selected unavailable attendee', async () => {
+  global.fetch = jest.fn(async url => String(url).includes('/logistics')
+    ? response({siteVisit: {requiredAttendees: [{kind:'roster',rosterId:35}]}})
+    : response({staff:[],external:[],warnings:[{message:'A roster profile is unavailable for selection.'}]}));
+  render(<Harness requestId={REQUEST_ID} />);
+  await waitFor(() => expect(JSON.parse(screen.getByTestId('context').textContent)?.recipientWarnings).toEqual([
+    'A roster profile is unavailable for selection.',
+    'Some scheduled attendees have no available email address. Review the recipients before sharing.',
+  ]));
+});
+
+test('a late directory warning cannot cross a request switch', async () => {
+  let settleOld; let directories=0;
+  global.fetch=jest.fn(async url => String(url).includes('/logistics')
+    ? response({siteVisit:null})
+    : ++directories===1 ? new Promise(resolve=>{settleOld=resolve;}) : response({staff:[],external:[]}));
+  const view=render(<Harness requestId={REQUEST_ID} />);
+  await waitFor(()=>expect(settleOld).toBeDefined());
+  view.rerender(<Harness requestId="22222222-2222-4222-8222-222222222222" />);
+  await waitFor(()=>expect(directories).toBe(2));
+  await act(async()=>settleOld(response({warnings:[{message:'Old request warning'}]})));
+  expect(JSON.parse(screen.getByTestId('context').textContent)?.recipientWarnings).toBeUndefined();
+});

@@ -74,6 +74,11 @@ export default function useSiteVisitContext(requestId) {
           ...(directoryBody.staff || []).map((row) => [refKey(row), row]),
           ...(directoryBody.external || []).map((row) => [refKey(row), row]),
         ]);
+        const recipientWarnings = (directoryBody.warnings || []).map((warning) => warning.message).filter(Boolean);
+        const selectedRefs = visit ? [visit.organizer, ...(visit.requiredAttendees || []), ...(visit.optionalAttendees || [])].filter(Boolean) : [];
+        if (selectedRefs.some((ref) => ref.kind !== 'manual' && !lookup.get(refKey(ref))?.email)) {
+          recipientWarnings.push('Some scheduled attendees have no available email address. Review the recipients before sharing.');
+        }
         const emails = (refs) => (refs || []).filter(Boolean).map((ref) => (
           ref.kind === 'manual' ? ref : lookup.get(refKey(ref))
         )).filter((row) => row?.email).map((row) => row.email);
@@ -82,6 +87,7 @@ export default function useSiteVisitContext(requestId) {
           ...(value || {}),
           suggestedTo: visit ? emails([visit.organizer, ...(visit.requiredAttendees || [])]) : [],
           suggestedCc: visit ? emails(visit.optionalAttendees) : [],
+          ...(recipientWarnings.length ? { recipientWarnings: [...new Set(recipientWarnings)] } : {}),
         }));
       });
     }).catch(() => {

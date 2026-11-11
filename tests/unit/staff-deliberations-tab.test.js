@@ -1921,3 +1921,11 @@ test.each(['draftDirty', 'recoveryPending', 'mutationPending'])('retains a close
   await act(async () => lastDistributionProps.onRetentionChange({ draftDirty: false, editorDirty: false, mutationPending: false, recoveryPending: false }));
   expect(screen.queryByTestId('mock-source-artifact-id')).toBeNull();
 });
+
+
+test('shows roster recipient exclusions beside the distribution composer', async () => {
+  siteVisitContextFeed={siteVisit:null,suggestedTo:[],suggestedCc:[],recipientWarnings:['A roster profile is unavailable for selection.']};
+  queueRoute('briefGet',statusResponse({currentArtifact:briefArtifact(REVIEW)}));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  await waitFor(() => expect(lastDistributionProps?.recipientWarnings).toEqual(['A roster profile is unavailable for selection.']));
+});

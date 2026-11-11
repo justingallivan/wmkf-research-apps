@@ -1263,3 +1263,10 @@ test('beforeHistory renders between the briefing-link card and Email history, an
   rerender(<PreSiteDistributionPanel {...props} record={false} beforeHistory={<div data-testid="slot">slot</div>} />);
   expect(screen.queryByTestId('slot')).not.toBeInTheDocument();
 });
+
+
+test('recipient exclusion warnings are visible inside the composer dialog', async () => {
+  global.fetch=jest.fn(async()=>response({success:true,attempts:[]}));
+  render(<PreSiteDistributionPanel requestId={REQUEST_ID} sourceArtifact={{artifactId:ARTIFACT_ID}} composer="dialog" recipientWarnings={['A roster profile is unavailable for selection.']} />);
+  expect(within(screen.getByRole('dialog')).getByText('A roster profile is unavailable for selection.')).toBeInTheDocument();
+});

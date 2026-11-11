@@ -262,6 +262,7 @@ export default function PreSiteDistributionPanel({
   // site visit materials; the composer no longer offers them.
   suggestedTo = EMPTY_LIST,
   suggestedCc = EMPTY_LIST,
+  recipientWarnings = EMPTY_LIST,
   onHistory = null,
   // Once the current document's materials have gone out, composing another
   // send is a secondary action: the composer folds behind a closed disclosure
@@ -830,6 +831,11 @@ export default function PreSiteDistributionPanel({
 
   const composerBody = (
     <>
+        {recipientWarnings.length > 0 && (
+          <div role="alert" className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+            {recipientWarnings.map((warning) => <p key={warning}>{warning}</p>)}
+          </div>
+        )}
 
         {error && (
           <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">

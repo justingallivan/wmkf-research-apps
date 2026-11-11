@@ -393,3 +393,17 @@ describe('finalizeAttachmentUpload — crash points and loser-side cleanup', () 
     expect(deps.uploadFile).not.toHaveBeenCalled();
   });
 });
+
+
+test('a roster outage preserves the Ready attachment for retry without a second upload', async () => {
+  const outage=new ServiceHttpError('Roster identity unavailable',{httpStatus:503,code:'roster_identity_unavailable',body:{reason:'roster_identity_unavailable'}});
+  const deps=baseDeps({writeFeedbackEntry:jest.fn().mockRejectedValueOnce(outage).mockResolvedValue({id:'9'})});
+  const args={requestId:REQUEST_ID,actorProfileId:7,file:file(),stagingId:STAGING_ID,newEntry:{consultantRosterId:5,receivedOn:'2026-09-01'}};
+  await expect(finalizeAttachmentUpload(args,deps)).rejects.toBe(outage);
+  expect(deps.uploadFile).toHaveBeenCalledTimes(1);
+  expect(deps.supersedeDocument).not.toHaveBeenCalled();
+  expect(deps.discardPortalUploadCandidate).not.toHaveBeenCalled();
+  deps.findDocumentByGenerationKey.mockResolvedValue({records:[{wmkf_requestdocumentid:REGISTRY_ID,wmkf_filename:'x.pdf',wmkf_operationstatus:100000001,wmkf_lifecyclestate:100000000}]});
+  expect((await finalizeAttachmentUpload(args,deps)).requestdocumentId).toBe(REGISTRY_ID);
+  expect(deps.uploadFile).toHaveBeenCalledTimes(1);
+});
