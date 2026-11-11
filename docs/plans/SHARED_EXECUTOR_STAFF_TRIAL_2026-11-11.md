@@ -1,6 +1,6 @@
 # Staff drafts and controlled proposal trial
 
-The staff workflow passed local verification on the isolated branch. The Opus 5.5 follow-up verdict was READY. The owner-approved live trial for Request 1003384 retained an Executive Summary that passed format validation and needs staff review for PI attribution. The Methodology hit the output-token limit and failed validation. The second call reused the cached proposal prefix. The trial made no Request-field writes or deployment.
+The staff workflow passed local verification on the isolated branch. The Opus 5.5 follow-up verdict was READY. Two separately approved Request 1003384 cohorts each settled at `needs_attention`. The revised Executive Summary is ready for staff review with grounding caveats. The revised Methodology exceeded its word limit and had substantive grounding errors. Both cohorts reused the cached proposal prefix and made no Request-field writes or deployments.
 
 ## Surface and review
 
@@ -184,7 +184,7 @@ Dataverse reads or active actor. Physical deletion has not yet been verified.
 node scripts/run-proposal-trial-1003384.cjs --approved-request-1003384 expire /private/tmp/wmkf-proposal-trial-1003384
 ```
 
-## Unpublished follow-up candidate
+## Prompt revisions for the second trial
 
 The [corrected task inputs](SHARED_EXECUTOR_PROPOSAL_RETRY_CANDIDATE_2026-11-11.json)
 instruct both tasks to omit PI and personnel names and institutional or
@@ -197,9 +197,68 @@ The current contract requires the frozen PI declaration and its
 `{{pi_name}}` placeholder. Admin preview rejected the candidate when the
 placeholder was omitted. Restoring it as context-only allowed both task
 inputs to pass offline validation. That checks configuration and the declared
-output contract. Live behavior of the corrected tasks is unverified. The one-shot
-runner is bound to the original v1 publication and cohort. The candidate
-is unpublished, and no further provider calls were authorized or made.
+output contract. The separately approved follow-up published both task
+revisions as v2. The first runner remains bound to its original publication
+and cohort.
+
+## Second controlled trial
+
+[VERIFIED 2026-11-11 via publication and scoped service readback] The owner
+approved both v2 task updates and one fresh two-call Sonnet 4.6 cohort under
+the same 1,536-token budget and an estimated cost below $1. Preflight confirmed
+the actor, all migration 097 tables and the unchanged profile revision 1.
+The publisher created v2 for both tasks and conditionally demoted the
+exact v1 rows. Readback found both v2 rows current and both v1 rows no
+longer current. No settings, schema, Request, Graph, Blob or deployment
+writes occurred in this cohort.
+
+Cohort `2fe01641-1860-4233-9233-7864946feb68` admitted job
+`c4fa16dc-867a-417e-977f-f9cfae962c70`. The approved PDF hash was unchanged
+and the stored snapshot matched the approved canonical hash. Both provider
+calls completed with `end_turn`. The final receipt is v17, `needs_attention`,
+with both content-free audits delivered. Readback confirmed the Request,
+actor, exact v2 prompt links and absent raw-output/prompt-override fields.
+The [sanitized second-trial receipt](../audits/SHARED_EXECUTOR_CONTROLLED_TRIAL_V2_2026-11-11.json)
+records the IDs, hashes and readback.
+
+| Task | Outcome | Uncached input | Output | Cache write | Cache read |
+|---|---|---:|---:|---:|---:|
+| Executive Summary | Retained. 186 words and 1,520 characters. | 441 | 304 | 21,507 | 0 |
+| Methodology | `failed_validation` / `profile_output_invalid`. Finished at 419 words against the 400-word maximum. | 478 | 783 | 0 | 21,507 |
+
+Both usage records are complete. The second call reused all 21,507 prefix
+tokens. The usage-based estimate is **$0.10617** at the published rates.
+Billing was not independently verified.
+
+The Opus 5.5-only qualitative review found the retained summary ready for
+staff review. The v1 identity/affiliation association was absent. Staff
+should attribute the applicant's novelty claim and distinguish proteome-wide
+length evidence from topology evidence on the reader-domain panel.
+Scientific claims were not independently verified, and the reviewer
+did not read the bibliography tail.
+
+The rejected Methodology also contained grounding errors. It misstated the
+oligomer range for crystallography, mischaracterized the role of chemical
+synthesis despite an existing branched trimer, and overstated the phasing
+precedent and program-wide dependencies. The prompt asks for material gaps.
+The issue is presenting unsupported inference as source fact. Offline
+replay of the exact validator reproduced rejection at 400 words. A
+hypothetical 419-word limit accepted the format, leaving the grounding
+issues unresolved. No live policy change or third call occurred. The
+failed job remains intact. Further work uses saved evidence for offline
+length and grounding checks.
+
+### Second cohort retention
+
+The operator must verify exact-scope cleanup after 2026-11-12 19:11:55.608 UTC
+for source and responses, and after 2026-11-18 19:11:55.608 UTC for
+configuration, results and deferred audit payloads. No scheduler was
+installed. Physical deletion is pending. Preserve the first cohort's
+separate deadlines and private state.
+
+```sh
+node scripts/run-proposal-trial-1003384-v2.cjs --approved-request-1003384-v2 expire /private/tmp/wmkf-proposal-trial-1003384-v2
+```
 
 ## Verification and review
 
@@ -207,4 +266,4 @@ is unpublished, and no further provider calls were authorized or made.
 
 Opus 5.5's build review requested a larger timing window. The staff worker now uses a 240-second coordination lease within a 300-second function limit, preserving the existing model timeout and persisted prompt output budget. Source expiry now terminates before preparation; a race at snapshot persistence also terminates. Known source admission failures have safe actionable responses. Discovery retries a version race. The drain reports terminal receipt state, and the CLI treats only `complete` as exit zero. Targeted and integrated regression tests pass. The [Opus review receipt](../audits/SHARED_EXECUTOR_STAFF_OPUS55_REVIEW_2026-11-11.md) records the READY follow-up, dispositions and verification limits.
 
-The branch remains undeployed. The scoped run exercised the provider, cache, validator, result readback and impersonated audit delivery. Review the PI-attribution prompt contract and the Methodology length and token budget before any future live trial. A new live cohort or additional model calls require separate approval. Keep the private cleanup state until both expiry steps are verified.
+The branch remains undeployed. Both scoped runs exercised the provider, cache, validator, result readback and impersonated audit delivery. The next bounded work is offline Methodology length and grounding review using saved evidence. Keep each cohort’s private cleanup state until both of its expiry steps are verified.

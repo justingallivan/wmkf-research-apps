@@ -1,6 +1,6 @@
 {
-  "status": "UNPUBLISHED_RETRY_CANDIDATE",
-  "note": "Prepared after the first controlled trial. Not published or executed. Existing profile revision 1 is unchanged. Both task updates expect current version 1. A new cohort and explicit approval are required before another two-call trial; do not change or reuse the first job receipt.",
+  "status": "CONTROLLED_TRIAL_V2_PUBLICATION_INPUT",
+  "note": "Exact task updates used in the separately approved second Request 1003384 cohort. Both updates published v2 from expected current version 1. The published profile remains revision 1. Retain these inputs as a dated publication receipt.",
   "profile": {
     "key": "proposal-staff-trial",
     "revision": 1,

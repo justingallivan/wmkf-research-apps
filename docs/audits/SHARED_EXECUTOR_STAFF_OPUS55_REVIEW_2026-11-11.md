@@ -221,3 +221,16 @@ Owner: Codex orchestrator. Branch: `codex/coordinated-start-2026-11-10-b`, isola
 Status: staff workflow, source adapter, controlled runner, Admin capability extension and scoped SQL reads/quota/expiry are committed and verified locally. Runtime closure is `5652c96dd`; follow-up evidence is this receipt. No push, merge, deployment, or Request-field write occurred. The separately approved live generation and its limitations are recorded below. Documentation is committed with the receipt; the final worktree check must be clean.
 
 The owner-approved service-level trial used the verified narrative and process-scoped activation. It exercised two application calls and cache reuse. The Executive Summary passed format validation and requires PI-attribution review. The Methodology hit the output-token limit and failed validation. See the [live trial outcome](../plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md#live-generation-outcome).
+
+
+## Second-cohort follow-up
+
+The separately approved v2 cohort settled at `needs_attention`. Its
+Opus 5.5-only operation review required positive/negative interlock checks
+before publication and validation of the durable provider counter. The runner
+implemented both before writes, with a safe-integer counter bounded from
+zero to two across invocations. The Opus 5.5-only outcome review found the
+summary ready for staff review with grounding caveats. The Methodology
+exceeded its word cap and had substantive grounding errors. The prompt
+requested analysis of gaps and dependencies. The accepted finding concerns unsupported inference. No third call was made.
+See the [sanitized v2 receipt](SHARED_EXECUTOR_CONTROLLED_TRIAL_V2_2026-11-11.json).

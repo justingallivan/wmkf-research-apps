@@ -228,7 +228,7 @@ the post-flip Workbench smoke emitted `mode=on` and no denial.
 ### Optional — Shared Executor staff draft trial
 
 **[VERIFIED via branch source, 2026-11-11]** The staff proposal draft trial
-defaults off. The owner-approved Request 1003384 trial activated the gate
+defaults off. The separately approved Request 1003384 cohorts activated the gate
 only inside a local process. The trial left environment files, cron scheduling
 and deployments unchanged. It used the real Dataverse target and a
 short-lived, collection-POST-only rehearsal grant for the approved profile,
@@ -248,9 +248,9 @@ target/write interlock still governs the actual operation. A valid configured
 drain deletes only expired content in that exact scope before rechecking the actor. Disabled or malformed
 policy does no database work. Keep the trial policy available through the
 seven-day expiry and authorized cleanup, or retain the exact scope for
-direct cleanup after deactivation. The Request 1003384 trial uses the direct
-cleanup path. Its [retention receipt](plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md#scoped-retention-follow-up)
-records the command and deadlines. Physical deletion has not yet been verified.
+direct cleanup after deactivation. Both Request 1003384 cohorts use the direct
+cleanup path. The [first retention receipt](plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md#scoped-retention-follow-up)
+and [second retention receipt](plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md#second-cohort-retention) record distinct commands and deadlines. Physical deletion has not yet been verified.
 
 The controlled loopback runner, `scripts/run-prompt-job-trial.mjs`, advances
 an existing configured job through the protected drain. It requires

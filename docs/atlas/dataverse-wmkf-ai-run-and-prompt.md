@@ -61,7 +61,8 @@ invocations. Request linkage is present only when the Executor caller supplies
 - **[VERIFIED 2026-11-11 via scoped live write and readback]** The Request
   1003384 trial delivered two deferred audit rows, one for a retained result
   and one for a truncated response. Readback confirmed both stable IDs, the
-  v1 prompt and Request links, and current actor impersonation.
+  v1 prompt and Request links, and current actor impersonation. The
+  second cohort also read back both content-free audits linked to v2.
   [Trial receipt](../plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md#live-generation-outcome).
 - `pages/api/phase-i-dynamics/summarize.js` — Phase I summarization
 - `pages/api/grant-reporting/extract.js` — Grant Reporting extraction and goals assessment; writes a best-effort `wmkf_ai_run` audit row, not extracted values to `akoya_request` (`lib/services/grant-reporting/extract-service.js`)
@@ -441,7 +442,7 @@ Runtime and checkpoint recovery read that snapshot. Later profile publication
 does not advance existing pins. [VERIFIED 2026-11-11 via controlled live service
 publication] The approved Request 1003384 trial created one revision at
 `executor.profiles.proposal-staff-trial.v000001` and v1 rows for the two
-proposal tasks. The Admin HTTP route remains branch-only. The trial used
+proposal tasks. The second cohort reused that profile revision and published both v2 rows, which are current. The Admin HTTP route remains branch-only. The trial used
 the owner-uploaded narrative and retained one format-validated draft for
 review without writing Request fields. See the [staff trial receipt](../plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md#authorized-live-trial).
 

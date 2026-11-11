@@ -676,7 +676,7 @@ revision and both v1 task rows. The local trial used process-scoped
 configuration. Its second invocation reused the cached document prefix.
 The summary passed format validation and needs attribution review. The
 Methodology reached the output cap and was rejected. Both AI-run audits
-were delivered. The Workbench, Admin and cron HTTP endpoints remain undeployed. See the [staff trial receipt](plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md#authorized-live-trial).
+were delivered. A separately approved v2 cohort reused profile revision 1 and published both v2 tasks. The v2 summary passed validation and needs staff review for grounding caveats. The v2 Methodology finished but failed its word cap and had substantive grounding errors. Both v2 audits were delivered. The Workbench, Admin and cron HTTP endpoints remain undeployed. See the [staff trial receipts](plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md#second-controlled-trial).
 
 ### Admin authoring and sample preview
 

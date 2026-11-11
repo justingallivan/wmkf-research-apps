@@ -1,6 +1,6 @@
 # Shared Executor and durable prompt jobs
 
-Status: **SYNTHETIC FOUNDATION, ADMIN AUTHORING, AND DEFAULT-OFF STAFF PROPOSAL DRAFT TRIAL BUILT ON THE BRANCH.** The synthetic and Admin increments have local integration evidence. The staff trial passed local integrated verification and read-only source preparation. The owner-approved Request 1003384 live trial used a controlled local process. Deployed staff and Power Automate integration remain planned.
+Status: **SYNTHETIC FOUNDATION, ADMIN AUTHORING, AND DEFAULT-OFF STAFF PROPOSAL DRAFT TRIAL BUILT ON THE BRANCH.** The synthetic and Admin increments have local integration evidence. The staff trial passed local integrated verification and read-only source preparation. Two separately approved Request 1003384 trials used controlled local processes and settled at `needs_attention`. Deployed staff and Power Automate integration remain planned.
 Owner: Justin. Design branch: `codex/coordinated-start-2026-11-10-b`.
 Evidence baseline: `a20e5f749`; source inspected on 2026-11-10 Pacific.
 
@@ -10,13 +10,13 @@ Keep task instructions in the shared Dataverse prompt library. Add an opt-in exe
 
 Power Automate owns when to request work and what business follow-up to perform. The backend owns authorized document resolution, frozen inputs and configuration, model execution, retained results and conditional writeback. This is a bounded request/task runner, not a general workflow designer or a second PA model implementation.
 
-The owner chose one backend Executor in the [Session 673 handoff](PREFLIGHT_PROMPTS_HANDOFF_2026-11-10.md). Sections marked [PLANNED] describe the broader integration. Branch evidence covers internal synthetic execution, Admin authoring, and the narrowly scoped staff draft implementation. The owner authorized a one-cohort live trial for Request 1003384 after read-only source preparation. The local service run applied migration 097 and published the pinned profile and task rows. Deployment and Request-field writes were outside scope.
+The owner chose one backend Executor in the [Session 673 handoff](PREFLIGHT_PROMPTS_HANDOFF_2026-11-10.md). Sections marked [PLANNED] describe the broader integration. Branch evidence covers internal synthetic execution, Admin authoring, and the narrowly scoped staff draft implementation. The owner authorized a one-cohort live trial for Request 1003384 after read-only source preparation. The first local service run applied migration 097 and published the profile and v1 task rows. A separately approved second cohort reused profile revision 1 and published both v2 task rows. Deployment and Request-field writes were outside scope.
 
 ## Owner decisions for autonomous work
 
 [OWNER DECIDED in chat, 2026-11-10] Pilot tasks are Executive Summary and Methodology. Executive Summary is staff-facing, at most 200 words, covering hypothesis, innovation, approach, what is tested and potential impact. Inputs vary by task: applicant-submitted documents or assemblages of them, plus named Dataverse fields for directly stored PI information. Structured PI values take precedence over document inference; missing fields remain missing unless the task explicitly permits an identified inference. Request fields are the intended output destination; not every production field must be assigned to prove the architecture.
 
-Authorized work: implement and commit on this branch, local tests and synthetic trial writeback, OAuth adversarial plan/build reviews (initially Claude Fable; changed by the owner to Opus 5.5 on 2026-11-11), and scoped Sol/Luna/Terra subagents at the orchestrator’s discretion. The original build authorization excluded merge, deployment, production changes, live publication and provider spend. The owner subsequently approved one Request 1003384 live trial with storage preflight, publication of one profile and two task versions, at most two paid application calls, and related content-free audit writes. Preflight found the ledger absent. The approved trial setup applied only the reviewed additive migration 097. The orchestrator may end review iteration when material issues are resolved and further rounds are unlikely to improve correctness.
+Authorized work: implement and commit on this branch, local tests and synthetic trial writeback, OAuth adversarial plan/build reviews (initially Claude Fable; changed by the owner to Opus 5.5 on 2026-11-11), and scoped Sol/Luna/Terra subagents at the orchestrator’s discretion. The original build authorization excluded merge, deployment, production changes, live publication and provider spend. The owner subsequently approved one Request 1003384 live trial with storage preflight, publication of one profile and two task versions, at most two paid application calls, and related content-free audit writes. Preflight found the ledger absent. The approved trial setup applied only the reviewed additive migration 097. The owner later approved both v2 task updates and a second two-call Sonnet 4.6 trial for the same Request. The orchestrator may end review iteration when material issues are resolved and further rounds are unlikely to improve correctness.
 
 ## Contract surface
 
@@ -347,7 +347,7 @@ stable nonce secret, and unscheduled cron guard are recorded in the
 [Credentials Runbook](../CREDENTIALS_RUNBOOK.md#optional--shared-executor-staff-draft-trial).
 The drain deletes only expired content in the exact configured scope, before
 checking whether the actor still has access. The approved Request 1003384
-trial has two operator cleanup deadlines and retains its receipts. See the
+trial cohorts each have two operator cleanup deadlines and retain their receipts. See the
 [retention receipt](SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md#scoped-retention-follow-up).
 
 Proposed broader temporary-content retention: seven days for source snapshots/raw response checkpoints, thirty days for validated unpublished results. Freeze retention at admission; do not extend it silently on polling. At source expiry, pending work becomes expired/needs_attention rather than re-extracting a changed source. Published artifacts follow the destination's own policy. The Postgres driver expires exact content rows while retaining references/receipt metadata. A future Blob driver must delete only exact persisted object keys, never broad prefixes.
@@ -361,7 +361,7 @@ Record prompt/profile/context hashes; concrete model; provider attempt and audit
 1. **Synthetic profile and authoring foundation [BRANCH-BUILT]:** strict Admin publication and fabricated preview, profile composer and prepared-context guard. Production task authoring requires an approved runtime capability.
 2. **Synthetic durable foundation [BRANCH-BUILT]:** migration 097, content references, job/attempt/publication ledgers, checkpoint recovery, and worker. The scoped staff draft slice reuses these tables for status/results without enabling a Request-field writer.
 3. **PA admission:** Entra service policy, submit/status routes and no-model authentication/duplicate-delivery proof with Connor. Prove foreign tenant, wrong audience, role-less/delegated token, revoked local principal and cross-request job access denial.
-4. **Two-task pilot:** The synthetic fixture proves shared context and initialize-once fixture writeback. The default-off staff proposal draft implementation uses one candidate proposal PDF plus the direct PI name and has no Request-field destination. The owner-uploaded narrative passed read-only preparation. The approved live trial passed scoped preflight and exercised two provider calls. It retained a format-validated Executive Summary requiring PI-attribution review and rejected the truncated Methodology. Enable real destinations individually after mapping and writeback approval.
+4. **Two-task pilot:** The synthetic fixture proves shared context and initialize-once fixture writeback. The default-off staff proposal draft implementation uses one candidate proposal PDF plus the direct PI name and has no Request-field destination. The owner-uploaded narrative passed read-only preparation. Each live cohort used two calls and retained an Executive Summary. The v1 Methodology truncated. The v2 Methodology finished, exceeded its word cap and had substantive grounding errors. The v2 summary is ready for staff review with grounding caveats. Enable real destinations individually after mapping and writeback approval.
 5. **Controlled rollout:** new admission off by default, synthetic end-to-end app and PA delivery, then explicitly authorized metered cache/quality measurement. Migrate remaining tasks individually. No automatic rerun on file replacement.
 
 Required tests include identical prefix bytes across two tasks and app/PA callers; changed document/profile/native schema/model separation; missing/ambiguous/oversized/untrusted inputs; duplicate admission and simultaneous claim; source/permission change; worker death before dispatch, after dispatch, after response checkpoint and after remote write; audit failure after valid output; expired lease and late response; invalid raw prose/JSON/refusal/truncation; partial tasks; staff edit/clear; initialization under new event/prompt ids; expired retained content with surviving tombstone; polling/navigation races; and unknown enum handling. Real SQL tests must exercise unique constraints/locks, not mock them.
@@ -495,5 +495,7 @@ also passed read-only source preparation. The separately approved
 worker services directly. The second call read 21,507 cached prefix tokens.
 The Methodology hit its output cap. The retained Executive Summary passed
 format validation and needs attribution review. Both deferred audits were
-delivered and read back under the configured actor. The app routes remain
-undeployed. See the [staff trial plan](SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md).
+delivered and read back under the configured actor. The separately
+approved v2 cohort reused the profile and cached proposal prefix. Its
+summary is ready for staff review, and its Methodology failed the word-cap validator and showed grounding errors
+in review. The app routes remain undeployed. See the [staff trial plan](SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md).
