@@ -317,6 +317,14 @@ const SURFACES = [
     callSiteFiles: ['lib/services/execute-prompt.js'],
   },
   {
+    id: 'shared-executor-expertise-fixture',
+    inv: 36,
+    status: 'migrated',
+    promptFiles: ['shared/config/prompts/expertise-finder-roster-v2.js'],
+    callSiteFiles: ['lib/services/prompt-jobs/context.js'],
+    builders: [{ name: 'buildRosterV2Variables', routePreamble: true }],
+  },
+  {
     // Service-local prompt — wrap + preamble live in the service. Stage 6 of
     // the ContactEnrichmentService decomposition moved claudeWebSearch (and
     // both markers) to the search-tiers cluster; the facade is now a thin

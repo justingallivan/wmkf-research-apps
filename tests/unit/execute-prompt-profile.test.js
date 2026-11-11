@@ -16,7 +16,7 @@ jest.mock('../../lib/services/prompt-store.js', () => ({
 }));
 import { executePrompt } from '../../lib/services/execute-prompt.js';
 import { LLMClient } from '../../lib/services/llm-client.js';
-import { canonical, hashProfile, MAX_PROFILE_RESPONSE_BYTES } from '../../lib/services/prompt-jobs/profile.js';
+import { canonical, hashProfile, MAX_PROFILE_RESPONSE_BYTES, sha256 } from '../../lib/services/prompt-jobs/profile.js';
 import { SYNTHETIC_MAX_OUTPUT_TOKENS } from '../../lib/services/prompt-jobs/capabilities.js';
 import { prepareContextSnapshot } from '../../lib/services/prompt-jobs/context.js';
 import { buildUntrustedContentPreamble } from '../../lib/utils/ai-payload-boundary.js';
@@ -77,6 +77,9 @@ test('awaits intent and response save; retained checkpoint replays without provi
   const args=options({onDispatch:async()=>{await Promise.resolve();events.push('intent');},onResponse:async c=>{await Promise.resolve();checkpoint=c;events.push('saved');}});
   const result=await executePrompt(args);events.push('parsed');
   expect(events).toEqual(['intent','provider','saved','parsed']);
+  expect(checkpoint).toMatchObject({version:1,binding:sha256(canonical({
+    promptRow:args.promptSnapshot,snapshotIntegrity:snapshot.integrity,requestId,maxTokens:1000,
+  }))});
   const replay=await executePrompt({...args,onDispatch:null,onResponse:null,responseCheckpoint:checkpoint});
   expect(replay.parsed).toEqual(result.parsed);expect(mockComplete).toHaveBeenCalledTimes(1);
   const older = {...checkpoint,response:{...checkpoint.response,content:[{type:'text',text:checkpoint.response.text}],stopDetails:null}};

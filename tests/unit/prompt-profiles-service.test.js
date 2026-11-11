@@ -63,7 +63,7 @@ it('resolves historical pins, rejects changed content, and never falls back to n
   await expect(previewSharedTask({ task }, deps)).rejects.toMatchObject({ code: 'profile_pin_mismatch' });
 });
 it.each([
-  { name: 'real.task' }, { systemPrompt: 'override' }, { maxTokens: 100000 },
+  { name: 'real.task' }, { systemPrompt: 'override' }, { maxTokens: 1537 },
   { body: 'Read {{proposal_context}}' }, { body: 'Read {{other}}' },
   { outputSchema: JSON.stringify({ parseMode: 'raw', outputs: [{ name: 'summary', target: { kind: 'dataverse' }, maxWords: 200 }] }) },
 ])('rejects unsupported execution contract %j', async patch => {
@@ -72,6 +72,22 @@ it.each([
 });
 it('reserves synthetic names even when both execution markers are absent', async () => {
   await expect(validateSharedTaskPublication({ name: 'synthetic.executive-summary', payload: { variables: null } }, store().deps)).rejects.toMatchObject({ code: 'invalid_shared_task' });
+});
+it('keeps offline recommendations out of Admin catalog, preview and legacy publication', async () => {
+  const { task, deps } = await fixture();
+  const name = 'expertise.recommendations';
+  expect((await getPromptProfiles(deps)).tasks.map(entry => entry.name)).not.toContain(name);
+  await expect(previewSharedTask({ task: { ...task, name } }, deps)).rejects.toThrow('limited to offline fixtures');
+  await expect(validateSharedTaskPublication({ name, payload: { variables: null }, creating: true }, deps))
+    .rejects.toMatchObject({ code: 'invalid_shared_task' });
+});
+it('refuses a structured execution marker under a text publication name', async () => {
+  const { task, deps } = await fixture();
+  const metadata = JSON.parse(task.variables);
+  Object.assign(metadata.execution, { contractVersion: 2, resultContract: 'expertise-recommendations-v1', compilerVersion: 1 });
+  await expect(validateSharedTaskPublication({ name: task.name, payload: { ...task, variables: JSON.stringify(metadata) },
+    requestId: id, creating: true,
+  }, deps)).rejects.toThrow('text contract does not match capability');
 });
 it('requires explicit concurrency/idempotency and prevents marker removal or conversion', async () => {
   const { task, deps } = await fixture();
