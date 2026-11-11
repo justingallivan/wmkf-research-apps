@@ -86,3 +86,9 @@ profiles remained unchanged, and cleanup removed the schema with public fingerpr
 unchanged. Display follow-up tests, READY review, rebuild and read-only browser verification passed; attachments, full matching
 and public admission are outside this pass.
 See `docs/plans/data/expertise-roster/ENGINEERING_CHECKS_2026-11-10.md`.
+
+The subsequent real linked-Contact walkthrough passed link/reload, linked-email
+restriction, canary activation/deactivation and unlink/restore. The Contact itself
+was never written: exact fields/ETag were unchanged, with zero links remaining.
+All 45 other roster profiles and public SQL were unchanged; the owned fixture was
+removed. See `docs/plans/data/expertise-roster/LINKED_CONTACT_REHEARSAL_2026-11-11.md`.

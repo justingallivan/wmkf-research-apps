@@ -159,8 +159,14 @@ Display guards for NaN latency/blank roster footer passed three UI tests, an Opu
 READY review, rebuild and a second real OAuth read-only browser check; its 46-profile
 census and public SQL were unchanged and its fixture was removed. See
 `docs/plans/data/expertise-roster/ENGINEERING_CHECKS_2026-11-10.md`.
-Next: actual attachment and linked-person
-lifecycle checks, full application matching smoke, and deliberate public cutover
+[VERIFIED via the real linked-Contact browser run and cleanup receipts] Link/save/
+reload, linked email restriction, canary reactivation/deactivation and unlink/restore
+passed. Exact Contact fields/ETag and all 45 other profiles remained unchanged;
+46 profiles retained, signed-in canary attribution verified and public SQL preserved.
+Strict attachment destination resolution is source-built, Opus READY and build/gate
+verified. See `docs/plans/data/expertise-roster/LINKED_CONTACT_REHEARSAL_2026-11-11.md`.
+Next: actual shared-storage attachment proof and live model matching, each pending
+its named authorization, and deliberate public cutover
 and deployment admission. Bounded SQL rollback is verified; this browser pass is
 limited to the named editor/history surfaces.
 The local import fixture is not a full application schema; do not claim full app UAT.

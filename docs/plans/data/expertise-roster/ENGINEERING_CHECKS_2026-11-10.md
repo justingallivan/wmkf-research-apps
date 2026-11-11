@@ -96,8 +96,9 @@ node --import ./scripts/lib/use-extensionless.mjs scripts/probe-roster-editor-em
 
 Never commit private environment or receipt directories. The SQL tests use controlled
 authentication/provider dependencies, not independent SSO or paid model execution.
-The full application/browser, actual attachment upload, linked-Contact lifecycle,
-public new-profile numeric allocation and operational cutover/rollback gates remain open.
+At this historical checkpoint, browser, attachment, linked-Contact and operational
+proofs were open; subsequent bounded browser, linked-Contact and disposable-schema
+rollback evidence appears below. Public allocation/cutover remains outside those proofs.
 No push, deployment, Production mutation or shared-database write occurred.
 
 
@@ -202,8 +203,12 @@ connection-string refusal, no NextAuth error and no preference/Dataverse write e
 That observation is bounded log evidence, not proof that all global notifications
 are impossible; the source guards and pinned environment remain the isolation basis.
 No model submission, upload, Production write, push or deployment occurred.
-Attachments, linked-person lifecycle, full application matching and deliberate
-public cutover/deployment admission remain separate checks.
+Actual shared-storage attachments, live model matching and deliberate public
+cutover/deployment admission remain separate checks. The later real linked-Contact
+run passed link/save/reload, linked-email restriction, canary activation/deactivation
+and unlink/restore. All 46 profiles were retained, all 45 non-canaries and exact
+Contact fields/ETag were unchanged, zero Contact links remained, and cleanup
+preserved public SQL. See [linked-Contact evidence](LINKED_CONTACT_REHEARSAL_2026-11-11.md).
 
 ## Historical Fable empty-text source review transcript
 

@@ -5,6 +5,9 @@
  *
  * @jest-environment node
  */
+jest.mock('../../lib/dataverse/adapters/sharepoint-document-location.js', () => ({ findByRegardingObject: jest.fn(), findByParentIds: jest.fn() }));
+import * as locations from '../../lib/dataverse/adapters/sharepoint-document-location.js';
+import { getRequestSharePointBuckets } from '../../lib/utils/sharepoint-buckets.js';
 import { mintAttachmentUpload, finalizeAttachmentUpload, CONSULTANT_FEEDBACK_CONTENT_TYPES } from '../../lib/services/consultant-feedback-attachment-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 import { PORTAL_UPLOAD_SCOPES } from '../../lib/services/portal-upload-staging';
@@ -406,4 +409,18 @@ test('a roster outage preserves the Ready attachment for retry without a second 
   deps.findDocumentByGenerationKey.mockResolvedValue({records:[{wmkf_requestdocumentid:REGISTRY_ID,wmkf_filename:'x.pdf',wmkf_operationstatus:100000001,wmkf_lifecyclestate:100000000}]});
   expect((await finalizeAttachmentUpload(args,deps)).requestdocumentId).toBe(REGISTRY_ID);
   expect(deps.uploadFile).toHaveBeenCalledTimes(1);
+});
+
+
+test('finalize requests strictly resolved complete buckets before Graph writes',async()=>{
+ const deps=baseDeps();await finalizeAttachmentUpload({requestId:REQUEST_ID,actorProfileId:7,file:file(),stagingId:STAGING_ID,entryId:9},deps);
+ expect(deps.getSharePointBuckets).toHaveBeenCalledWith(REQUEST_ID,'1002379',{requireResolvedParents:true,requireCompleteResults:true});
+});
+test.each(['missing parent','truncated locations','truncated parents'])('actual bucket resolver refuses %s before Graph writes',async kind=>{
+ const parent='44444444-4444-4444-8444-444444444444';
+ locations.findByRegardingObject.mockResolvedValue({records:[{relativeurl:'Synthetic',_parentsiteorlocation_value:parent}],hasMore:kind==='truncated locations'});
+ locations.findByParentIds.mockResolvedValue({records:kind==='missing parent'?[]:[{sharepointdocumentlocationid:parent,relativeurl:'akoya_request'}],hasMore:kind==='truncated parents'});
+ const deps=baseDeps({getSharePointBuckets:getRequestSharePointBuckets});
+ await expect(finalizeAttachmentUpload({requestId:REQUEST_ID,actorProfileId:7,file:file(),stagingId:STAGING_ID,entryId:9},deps)).rejects.toMatchObject({httpStatus:503,code:'folder_unavailable'});
+ expect(deps.ensureFolderPath).not.toHaveBeenCalled();expect(deps.uploadFile).not.toHaveBeenCalled();
 });

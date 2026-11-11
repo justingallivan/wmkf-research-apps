@@ -6,6 +6,7 @@ jest.mock('../../lib/services/expertise-finder/roster-rehearsal-target.cjs', () 
 jest.mock('../../lib/services/expertise-finder/roster-lifecycle.cjs', () => ({ ...jest.requireActual('../../lib/services/expertise-finder/roster-lifecycle.cjs'), withRosterWrite: jest.fn() }));
 import * as profiles from '../../lib/dataverse/adapters/expertise-profile';
 import * as users from '../../lib/dataverse/adapters/system-user';
+import * as contacts from '../../lib/dataverse/adapters/contact';
 import { saveRoster, listRoster } from '../../lib/services/expertise-finder/roster-service';
 import { processAnnotations } from '../../lib/services/dynamics/annotations';
 const contract = require('../../lib/services/expertise-finder/roster-contract.cjs');
@@ -149,4 +150,42 @@ test('absent lifecycle permits updating a profile without a stored creation key'
  lease.active=false;delete row.wmkf_creationkey;
  await expect(saveRoster({id:ID,etag:'W/"123"',name:'Renamed'},ACTOR)).resolves.toMatchObject({success:true});
  expect(profiles.update).toHaveBeenCalledTimes(1);
+});
+
+
+test('new active Contact is read before linking',async()=>{
+ row.wmkf_category=contract.CATEGORIES.Consultant;row.wmkf_leadpdeligible=false;row._wmkf_staffuser_value=null;
+ contacts.getByIdWithSelect.mockResolvedValue({statecode:0});
+ await saveRoster({id:ID,etag:'W/"123"',dataverse_contact_id:USER},ACTOR);
+ expect(contacts.getByIdWithSelect).toHaveBeenCalledWith(USER,'contactid,statecode');
+ expect(profiles.update).toHaveBeenCalledWith(ID,expect.objectContaining({wmkf_contactguid:USER}),'W/"123"',ACTOR);
+});
+test.each(['inactive','missing'])('%s new Contact refuses before intent and write',async kind=>{
+ row.wmkf_category=contract.CATEGORIES.Consultant;row.wmkf_leadpdeligible=false;row._wmkf_staffuser_value=null;
+ if(kind==='inactive')contacts.getByIdWithSelect.mockResolvedValue({statecode:1});else contacts.getByIdWithSelect.mockRejectedValue(Object.assign(new Error('Contact missing'),{status:404}));
+ await expect(saveRoster({id:ID,etag:'W/"123"',dataverse_contact_id:USER},ACTOR)).rejects.toBeDefined();
+ expect(lease.beforeMutation).not.toHaveBeenCalled();expect(profiles.update).not.toHaveBeenCalled();
+});
+test('new enabled User is validated and bound',async()=>{
+ row._wmkf_staffuser_value=null;row.wmkf_leadpdeligible=false;
+ await saveRoster({id:ID,etag:'W/"123"',dataverse_user_id:ACTOR,lead_pd_eligible:true},ACTOR);
+ expect(users.getById).toHaveBeenCalledWith(ACTOR);
+ expect(profiles.update).toHaveBeenCalledWith(ID,expect.objectContaining({wmkf_leadpdeligible:true,'wmkf_StaffUser@odata.bind':`/systemusers(${ACTOR})`}), 'W/"123"',ACTOR);
+});
+test('missing new User refuses before intent and write',async()=>{
+ row._wmkf_staffuser_value=null;row.wmkf_leadpdeligible=false;users.getById.mockRejectedValue(Object.assign(new Error('User missing'),{status:404}));
+ await expect(saveRoster({id:ID,etag:'W/"123"',dataverse_user_id:ACTOR},ACTOR)).rejects.toMatchObject({status:404});
+ expect(lease.beforeMutation).not.toHaveBeenCalled();expect(profiles.update).not.toHaveBeenCalled();
+});
+test('reactivation retains historical disabled User without restoring lead eligibility',async()=>{
+ row.statecode=1;row.wmkf_leadpdeligible=false;users.getById.mockResolvedValue({isdisabled:true});
+ await saveRoster({id:ID,etag:'W/"123"',is_active:true},ACTOR);
+ expect(users.getById).not.toHaveBeenCalled();
+ expect(profiles.update).toHaveBeenCalledWith(ID,expect.objectContaining({statecode:0,wmkf_leadpdeligible:false,'wmkf_StaffUser@odata.bind':`/systemusers(${USER})`}), 'W/"123"',ACTOR);
+});
+test('category change requires clearing incompatible link and persists the explicit clear',async()=>{
+ await expect(saveRoster({id:ID,etag:'W/"123"',role_type:'Consultant',lead_pd_eligible:false},ACTOR)).rejects.toMatchObject({status:400});
+ expect(lease.beforeMutation).not.toHaveBeenCalled();expect(profiles.update).not.toHaveBeenCalled();
+ await saveRoster({id:ID,etag:'W/"123"',role_type:'Consultant',lead_pd_eligible:false,dataverse_user_id:null},ACTOR);
+ expect(profiles.update).toHaveBeenCalledWith(ID,expect.objectContaining({wmkf_category:contract.CATEGORIES.Consultant,'wmkf_StaffUser@odata.bind':null}), 'W/"123"',ACTOR);
 });
