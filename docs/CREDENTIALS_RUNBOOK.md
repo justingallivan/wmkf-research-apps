@@ -277,9 +277,36 @@ requires exactly `requestId`, `jobId`, `profileId`, `systemUserId`,
 `profileId` is a positive safe integer. The grant binds one current linked
 staff subject and one exact Sandbox Request/job to the machine app and
 cohort. The reader independently checks the active Sandbox app grant.
-Unset, invalid or mismatched configuration withholds access. No enabled
-grant or compatible live Sandbox job is established by this increment.
-[Sandbox recommendations contract](plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#sandbox-recommendations-read).
+Unset, invalid or mismatched configuration withholds access. The read grant
+confers no admission rights. An enabled grant with a compatible live
+Sandbox job remains pending. [Sandbox recommendations contract](plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#sandbox-recommendations-read).
+
+### Optional — Local Sandbox recommendations trial
+
+**[VERIFIED via branch source, 2026-11-11]** A separate process-only trial
+requires `EXPERTISE_RECOMMENDATIONS_TRIAL=on`, the literal Sandbox
+enforcement settings above, and no Vercel deployment markers or
+production Node environment. It requires a stable server-only
+`PROMPT_JOB_NONCE_SECRET` of at least 32 bytes. The trial grant cannot
+enable the GET.
+
+`EXPERTISE_RECOMMENDATIONS_TRIAL_ACCESS` is a server-only JSON object with
+exact keys `requestId`, `systemUserId`, `azureId`, `applicationId`,
+`scopeId`, `idempotencyKey`, `promptId`, `profileId`, `promptHash`,
+`profileHash`, `sourceSiteId`, `sourceDriveId`, `sourceHash` and
+`databaseIdentity`. The first seven values are lowercase GUIDs and
+`profileId` is a positive safe integer. `DYNAMICS_CLIENT_ID` must exactly
+match `applicationId`. The hash pins are lowercase SHA-256 values.
+`sourceHash` binds the canonical target-bound PDF proof, and
+`databaseIdentity` binds the PostgreSQL cluster identifier and database
+name. The trial verifies the configured ledger before preflight,
+admission and worker advancement.
+
+The trial uses 24-hour source/response expiry and seven-day
+configuration/result/audit expiry. Physical deletion requires a separate
+operator step scoped to the exact database, job and owner tuple. The
+shared read route applies its own authorization, source/roster and
+expiry checks. [Local trial contract](plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#local-sandbox-recommendations-trial).
 
 ### Optional — Research APIs
 

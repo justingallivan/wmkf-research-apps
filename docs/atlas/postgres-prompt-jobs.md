@@ -70,6 +70,26 @@ target-bound `ai-materials-combined-pdf-v1` proof before observing source
 or roster. Fixture proof cannot support a Sandbox payload. This read
 path adds no tables, admission or dispatch. [Shared task interfaces](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md).
 
+## Local Sandbox recommendations trial
+
+[VERIFIED via branch source at `2a0f4d6bd` and loopback PostgreSQL]
+The local, default-off operator trial reuses the six migration 097 tables.
+Admission pins the configured PostgreSQL cluster and database. The same
+transaction takes a Sandbox singleton advisory lock, checks exact replay,
+and counts every `expertise.recommendations` job across `local-sandbox`
+and `preview-sandbox` regardless of state, cohort or app. Fixture jobs
+are outside the predicate. The sole draft task carries a typed v2 seal
+and checkpoint, one fenced dispatch attempt and no field reservation.
+A response saved before an unavailable currentness or access check can
+recover only through explicit zero-call validation.
+
+Configuration, results and audit outbox content expire after seven days.
+Source and response content expire after 24 hours. The bounded cleanup
+checks the pinned database, exact job, owner tuple and task before
+deleting expired content. Receipts remain and continue to count against
+the singleton. Operator cleanup and live admission evidence are pending.
+[Local trial contract](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#local-sandbox-recommendations-trial).
+
 ## Synthetic safeguard follow-up (2026-11-11)
 
 [VERIFIED via branch store, Executor, and worker source] The follow-up

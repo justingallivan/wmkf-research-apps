@@ -1,6 +1,6 @@
 # Shared Executor task interfaces
 
-**Status [BRANCH-BUILT, offline fixture and read facade], [BRANCH-BUILT, default-off Sandbox read], and [PLANNED, live caller integration].**
+**Status [BRANCH-BUILT, offline fixture and read facade], [BRANCH-BUILT, default-off Sandbox read and local admission], and [PLANNED, live caller integration].**
 This checkpoint coordinates the proposal-draft and expertise recommendation
 streams. The shared infrastructure owner controls the capability
 registry, Admin compiler, authorization, Executor, worker and ledger. The roster
@@ -120,10 +120,65 @@ match the retained Sandbox target and input fingerprints before result
 projection. The route reuses the offline facade's receipt, owner,
 authorization and expiry fences.
 
-This increment supplies the read path only. No compatible live Sandbox
-job or configured grant has been established. Expertise admission and
-dispatch remain fixture-only. Production, PA, deployment and live
-activation remain outside this slice. Local integrated verification passed.
+The GET remains read-only. The local operator trial below supplies a
+separate admission path. An authenticated live GET with a compatible
+Sandbox result remains pending. Production, PA and deployment remain
+outside the trial.
+
+## Local Sandbox recommendations trial
+
+[VERIFIED via branch source at `2a0f4d6bd` and loopback PostgreSQL]
+The default-off operator service reuses migration 097. It pins the
+registered local Sandbox target, the configured PostgreSQL database,
+one staff actor, one backend app, one Request and a fixed cohort and
+idempotency key. The service verifies current staff access and checks the
+exact prompt, profile, combined PDF, complete roster and budget before
+new admission. A transaction lock spans both Sandbox environment labels
+in the pinned database. Exact replay precedes a singleton quota that
+counts every existing Sandbox recommendations job, including expired
+or terminal jobs. The only task is a typed draft without a destination.
+
+The producer extracts text from the exact verified PDF bytes and
+freezes the source proof and roster digest. The worker rechecks
+staff access, source and roster before dispatch and after checkpointing
+the response, before retaining an accepted result. Confirmed input or
+access changes fail validation. Unavailable evidence can leave a saved
+response for explicit zero-call recovery. The shared Executor pins
+Sonnet 4.6 and 4,096 output tokens, with a 195,000 encoded-input bound
+and 5,000 additional tokens in the cost estimate. It makes at most one
+provider request, with retries, fallback, parameter repair and redirects
+disabled. The reviewed worst-case estimate is $1.665101. The existing
+content-free audit stays pending without an adapter. Source and response
+content expire at 24 hours, and configuration, result and audit content
+at seven days. Exact-job operator cleanup preserves receipts and quota
+history. [Executor contract](../EXECUTOR_CONTRACT.md#local-sandbox-recommendations-trial),
+[configuration](../CREDENTIALS_RUNBOOK.md#optional--local-sandbox-recommendations-trial).
+
+[VERIFIED via approved SharePoint copy journal and governed read-only preparation]
+On 2026-11-11 the operator copied the combined PDF from Production Request
+1003384 to the newly created `AI Materials` folder of Sandbox Request
+1000339. The approved copy created that folder and
+`ProposalNarrative_1000339.pdf` only. The 1,311,649-byte file matched the
+Production source SHA-256
+`d7e31d37ed2163e29ade2bf878720af34582bcf10e7c8252a223c3dd79a20c44`.
+The Sandbox source adapter verified the file identity and version and
+successfully prepared it read-only. Production was read-only, and the
+Sandbox copy remains in place.
+
+[VERIFIED via local commands] The runtime regression passed 436 tests
+across 19 suites, including all three real loopback PostgreSQL job
+suites. Coverage includes replay and quota isolation, the zero-retry
+transport, and retaining a saved response when the app-grant lookup
+cannot establish access. The environment-file-free guarded build at
+the same revision exited zero with four existing DOCX tracing warnings.
+Scoped lint, types, DAL/context, Atlas, enum, migration, model and prompt
+tagging gates passed. The read-only application ledger probe found no
+fixture-only schema constraint or existing expertise job. The reviewed
+plan and implementation summary returned READY WITH NAMED CHANGES
+from Opus 5.5. The operator runner
+and source-level review are pending. No Sandbox trial prompt publication,
+job admission, provider call, audit delivery or signed GET has been
+verified.
 
 ## Capability and result path
 

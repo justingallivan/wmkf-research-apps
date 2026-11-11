@@ -21,8 +21,14 @@ The same route reads only the granted Sandbox Request, exact staff
 SystemUser and active expertise app-grant row. The Request's own
 active location selects one combined narrative and bibliography PDF on
 the registered shared SharePoint site. The scope includes no PI lookup,
-Dataverse write, assignment, job admission or generation. No compatible
-live Sandbox recommendation job or enabled grant has been established.
+Dataverse write, assignment, job admission or generation. The separate
+default-off local trial uses the same strict roster and staff reads and
+pins the Sandbox prompt version and source location. Its producer
+extracts from the same verified combined PDF bytes. An unavailable app
+grant observation can withhold a saved response for explicit recovery.
+The approved PDF copy was verified in Sandbox Request 1000339. A live
+trial job, audit delivery and enabled read grant remain pending.
 
+[Local trial contract](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#local-sandbox-recommendations-trial),
 [Recommendation read contract](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#sandbox-recommendations-read),
 [Postgres ledger](postgres-prompt-jobs.md#typed-recommendations-fixture).

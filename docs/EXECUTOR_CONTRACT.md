@@ -665,8 +665,33 @@ ledger and expiry fences still hold. Its status method reads ledger
 metadata without proof/result payloads or freshness observations. A
 separate default-off GET branch reads only compatible Sandbox recommendation
 receipts after exact staff authorization and same-target freshness checks.
-Expertise admission and dispatch remain fixture-only. Production delivery,
-machine authorization and PA remain planned. [Sandbox read contract](plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#sandbox-recommendations-read).
+The local operator trial below is the only Sandbox admission path.
+Production delivery, machine HTTP authorization and PA remain planned.
+[Sandbox read contract](plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#sandbox-recommendations-read).
+
+### Local Sandbox recommendations trial
+
+**[BRANCH-BUILT, default off]** The operator service verifies an exact
+registered Sandbox target, ledger database identity, staff/app scope
+and current prompt/profile definition before admitting a sole
+`expertise.recommendations` draft. A durable singleton fence counts every
+Sandbox recommendations receipt across the two Sandbox environment labels
+in that database. Exact authorized replay keeps the original frozen job.
+The source producer extracts the same bounded PDF bytes it hashes, with
+no PI lookup. The v2 snapshot seals the proof and exact roster. The
+target-bound source proof retains its `ai-materials-combined-pdf-v1`
+version.
+
+The Executor uses the frozen Sonnet 4.6 prompt, pins the configured and
+effective output to 4,096 tokens and checks the 195,000 encoded-input
+bound before dispatch. The durable attempt precedes the single
+transport request. An uncertain attempt cannot resend. After the
+response is checkpointed, the worker rechecks access and both inputs
+before persisting an accepted typed result. Confirmed changes are
+terminal. An unavailable check can retain the response for explicit
+zero-call recovery. The operator path supplies no Request writer or
+scheduler. Audit delivery and the separate authenticated read route
+require their own verification. [Trial evidence](plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#local-sandbox-recommendations-trial).
 
 ### Staff proposal draft trial
 
