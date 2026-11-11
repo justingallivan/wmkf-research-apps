@@ -97,12 +97,18 @@ The approved sandbox editor role is now assigned to John, Beth and Jean, with
 exactly five roster privileges verified after removing nine platform-added defaults.
 Existing roles and Production were unchanged. Evidence and limits:
 `docs/plans/data/expertise-roster/SANDBOX_PERMISSIONS_2026-11-10.md`.
-Consumer/matching integration remains uncommitted WIP in this worktree; preserve it.
-Focused unit tests pass, but live consumer proof is blocked because the Vercel SQL
-client cannot connect to the pinned local TCP fixture. A minimal rehearsal-only
-transport proposal awaits the owner; no full application rehearsal is claimed.
-Next: resolve that transport boundary, verify dependent consumers, signed-in staff
-writes/audit and linked-person lifecycle, then operational cutover/rollback.
+The branch consumer/matching implementation now uses an owner-approved minimal
+rehearsal SQL seam with the installed `pg` driver and existing target guard;
+normal mode delegates unchanged to Vercel. Live read-only consumer checks passed
+39 mapped profiles, 37 active, 33 Board/Consultant selections, seven historical
+feedback references (one excluded placeholder explicitly unavailable), and three
+eligible leads. The adapter's missing lifecycle filter and transaction-client
+retention during hydration were repaired and regression-tested; independent review
+confirmed the bounded repairs. See
+`docs/plans/data/expertise-roster/CONSUMER_TRANSPORT_2026-11-10.md`.
+Next: live v2 prompt provisioning/parity, full dependent-consumer write/UI checks,
+signed-in staff audit attribution, linked-person lifecycle and cutover/rollback.
+The local import fixture is not a full application schema; do not claim full app UAT.
 Justin approved the minimal matching contract: active explicitly lead-eligible staff
 with enabled User links only for lead; other active staff may be consulted; validated
 profile GUIDs; no lead when none qualify; expertise wording/scoring unchanged.

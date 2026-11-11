@@ -31,6 +31,7 @@ export const ADMIN_PROMPT_CALLER_DESTINATIONS = Object.freeze({
   'expense-reporter.extract-document': returned,
   'expense-reporter.extract-image': returned,
   // pages/api/expertise-finder/match.js + expertise-finder/batch-match-service.js.
+  'expertise-finder.match.roster-v2': { summary: 'Sandbox rehearsal GUID/eligibility match results in dedicated Postgres.', fields: ['expertise_matches.match_results'] },
   'expertise-finder.match': { summary: 'Match results in Postgres.', fields: ['expertise_matches.match_results'] },
   // field-primer/generate-service.js generateForRequest vs generateStandalone.
   'field-primer.generate': {

@@ -43,6 +43,11 @@ export const ADMIN_PROMPT_CATALOG = Object.freeze({
     usedBy: "Expense Reporter → receipt and invoice images",
     usage: "application",
   },
+  "expertise-finder.match.roster-v2": {
+    group: "reviewers", title: "Match using the rehearsal expertise roster",
+    description: "Uses profile identities and explicit lead eligibility; other active staff remain available for consultation.",
+    usedBy: "Expertise Finder sandbox rehearsal → single and batch matching", usage: "application",
+  },
   "expertise-finder.match": {
     group: "reviewers",
     title: "Match a proposal to the internal expertise roster",

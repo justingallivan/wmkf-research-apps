@@ -18,6 +18,7 @@ export default async function handler(req, res) {
         success: true,
         staff: directory.staff.map(({ systemUserId: _systemUserId, ...row }) => row),
         external: directory.external,
+        ...(directory.warnings?.length?{warnings:directory.warnings}:{}),
       });
     } catch (error) {
       console.error('workbench Site Visit recipient directory error:', error);

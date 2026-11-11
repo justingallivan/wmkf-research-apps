@@ -50,9 +50,9 @@ test('executeToolSeed preflights: one refusal writes nothing', async () => {
   expect(seedPromptRow).not.toHaveBeenCalled();
 });
 
-test('manifest table covers the five apps; unknown key or missing file errors clearly', async () => {
+test('manifest table covers the five apps and isolated roster v2; unknown key or missing file errors clearly', async () => {
   expect(Object.keys(APP_MANIFEST_FILES).sort()).toEqual(
-    ['expense-reporter', 'expertise-finder', 'funding-gap', 'literature-analyzer', 'multi-perspective']);
+    ['expense-reporter', 'expertise-finder', 'expertise-finder-roster-v2', 'funding-gap', 'literature-analyzer', 'multi-perspective']);
   await expect(loadManifestRows('nope')).rejects.toThrow(/Unknown app "nope"/);
   await expect(loadManifestRows('multi-perspective')).resolves.toHaveLength(6);
 });

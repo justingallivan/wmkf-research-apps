@@ -87,6 +87,9 @@ function MatchResults({ results, metadata }) {
       </Card>
 
       {/* Consultant Overlap */}
+      {results.no_lead_recommendation && <p role="status" className="mb-4 text-sm text-amber-800">No eligible lead recommendation is available for this proposal.</p>}
+      {results.roster_warnings?.length>0 && <p role="status" className="mb-4 text-sm text-amber-800">{[...new Set(results.roster_warnings)].join(' ')}</p>}
+      {results.staff_consultation?.length>0 && <section className="mb-6"><h3 className="font-semibold">Staff consultation</h3>{results.staff_consultation.map(person=><div key={person.profile_guid} className="mt-2"><p className="font-medium">{person.name}</p><p className="text-sm">{person.rationale}</p></div>)}</section>}
       {consultant_overlap?.length > 0 && (
         <Card>
           <h3 className="text-lg font-semibold text-gray-900 mb-3">Consultant Overlap</h3>

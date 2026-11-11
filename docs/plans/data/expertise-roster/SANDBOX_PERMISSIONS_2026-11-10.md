@@ -46,11 +46,9 @@ Signed-in staff editing, native end-user audit attribution, linked-person lifecy
 and full dependent-consumer testing remain open. The import audit probe confirms an
 existing service-principal event only; it does not establish an end-user write.
 
-The current uncommitted consumer integration has focused passing unit tests but is
-not live certified. The pinned local Postgres fixture uses TCP `pg`; the consumers'
-`@vercel/postgres` transport rejects its connection string. No transport expansion
-was made as part of this permission change. The proposed minimal rehearsal-only
-transport awaits the owner's response; no full application rehearsal is claimed.
+The later owner-approved minimal rehearsal transport and live consumer read proof
+are recorded in `CONSUMER_TRANSPORT_2026-11-10.md`. They do not close the signed-in
+staff-write or full-application gates above.
 
 ## Bounded reconciliation
 

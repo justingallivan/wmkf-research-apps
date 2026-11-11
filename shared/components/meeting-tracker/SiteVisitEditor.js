@@ -394,6 +394,7 @@ export default function SiteVisitEditor() {
         {(!visit || editing) && <p className="mt-2 text-sm text-gray-600">The date here feeds the Staff Deliberations rail, the cycle view, the proposal review packet, and the Share email's calendar entry.</p>}
       </div>
 
+      {recipients.warnings?.length>0 && <p role="status" className="mb-3 text-sm text-amber-800">{[...new Set(recipients.warnings.map(w=>w.message))].join(' ')}</p>}
       {error && <div role="alert" className="mb-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</div>}
       {notice && <div role="status" className="mb-5 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">{notice}</div>}
 

@@ -9,6 +9,7 @@ jest.mock('../../lib/dataverse/core/context', () => ({ withDalContext: jest.fn((
 jest.mock('../../lib/services/consultant-feedback-service', () => ({
   listConsultantFeedback: jest.fn(),
   listEligibleConsultants: jest.fn(),
+  eligibleConsultantPicker: jest.fn(),
   writeFeedbackEntry: jest.fn(),
   updateFeedbackEntry: jest.fn(),
   deleteFeedbackEntry: jest.fn(),
@@ -34,7 +35,7 @@ jest.mock('../../lib/services/portal-upload-staging', () => ({
 import { requireAppAccess } from '../../lib/utils/auth';
 import {
   listConsultantFeedback,
-  listEligibleConsultants,
+  eligibleConsultantPicker,
   writeFeedbackEntry,
   updateFeedbackEntry,
   deleteFeedbackEntry,
@@ -156,11 +157,11 @@ describe('consultants route', () => {
     requireAppAccess.mockResolvedValueOnce(null);
     const res = mockRes();
     await consultantsHandler({ method: 'GET' }, res);
-    expect(listEligibleConsultants).not.toHaveBeenCalled();
+    expect(eligibleConsultantPicker).not.toHaveBeenCalled();
   });
 
   test('GET lists eligible consultants', async () => {
-    listEligibleConsultants.mockResolvedValueOnce([{ id: 1, name: 'Ada', affiliation: null }]);
+    eligibleConsultantPicker.mockResolvedValueOnce({items:[{ id: 1, name: 'Ada', affiliation: null }]});
     const res = mockRes();
     await consultantsHandler({ method: 'GET' }, res);
     expect(res.statusCode).toBe(200);

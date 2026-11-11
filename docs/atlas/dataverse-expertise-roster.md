@@ -4,7 +4,10 @@
 
 `wmkf_expertiseprofile` / `wmkf_expertiseprofiles` is provisioned in sandbox
 `orgd9e66399.crm.dynamics.com` for the roster migration. It is not a Production
-roster backend. Existing app reads/writes still use Postgres `expertise_roster`.
+roster backend. Normal-mode app reads/writes still use Postgres `expertise_roster`.
+The branch rehearsal path uses Dataverse values and the target-scoped local numeric
+bridge. Its live read proof and limits are in
+`docs/plans/data/expertise-roster/CONSUMER_TRANSPORT_2026-11-10.md`.
 
 Schema source: `lib/dataverse/schema/wave-expertise-roster/wmkf_expertiseprofile.json`.
 Owner mapping decisions: `docs/plans/data/expertise-roster/OWNER_MAPPING_DECISIONS_2026-11-09.md`.

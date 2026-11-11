@@ -213,6 +213,7 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
   const [items, setItems] = useState([]);
   const [itemsRequestId, setItemsRequestId] = useState(null);
   const [consultants, setConsultants] = useState([]);
+  const [rosterWarnings,setRosterWarnings]=useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -301,6 +302,7 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
       setItems(entriesEnv.data.items || []);
       setItemsRequestId(loadRequestId);
       setConsultants(consultantsEnv.ok ? (consultantsEnv.data.items || []) : []);
+      setRosterWarnings(consultantsEnv.ok?(consultantsEnv.data.warnings||[]):[{message:'The consultant directory is unavailable. Retry before selecting a new author.'}]);
     } catch (e) {
       if (fetchId !== fetchIdRef.current || loadRequestId !== currentRequestIdRef.current) return;
       setError(e.message);
@@ -625,6 +627,7 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
       </div>
 
       {(loading || !requestLoaded) && <p className="mt-2 text-sm text-gray-500">Loading…</p>}
+      {requestLoaded && rosterWarnings.length>0 && <p role="status" className="mb-3 text-sm text-amber-800">{[...new Set(rosterWarnings.map(w=>w.message))].join(' ')}</p>}
       {currentError && <p className="mt-2 text-sm text-red-600">{currentError}</p>}
 
       {currentFormOpen && (

@@ -11,7 +11,7 @@
 import { requireAppAccess } from '../../../../lib/utils/auth';
 import { withDalContext } from '../../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../../lib/services/service-http-error';
-import { listEligibleConsultants } from '../../../../lib/services/consultant-feedback-service';
+import { eligibleConsultantPicker } from '../../../../lib/services/consultant-feedback-service';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -23,7 +23,7 @@ export default async function handler(req, res) {
 
   return withDalContext('workbench-consultant-feedback-consultants', async () => {
     try {
-      return res.status(200).json({ items: await listEligibleConsultants() });
+      return res.status(200).json(await eligibleConsultantPicker());
     } catch (error) {
       if (error instanceof ServiceHttpError) {
         return res.status(error.httpStatus).json(error.body ?? { error: error.message });

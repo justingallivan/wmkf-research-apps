@@ -26,6 +26,7 @@ export const PROMPTSTATUS_PUBLISHED = 682090001;
 /** App key -> manifest module (shared/config/prompts/<file>-dynamics.js). */
 export const APP_MANIFEST_FILES = Object.freeze({
   'expertise-finder': 'expertise-finder',
+  'expertise-finder-roster-v2': 'expertise-finder-roster-v2',
   'funding-gap': 'funding-gap',
   'expense-reporter': 'expense-reporter',
   'literature-analyzer': 'literature-analyzer',
@@ -149,6 +150,7 @@ async function main() {
   }
 
   loadDotEnvOnce();
+  if(appKey==='expertise-finder-roster-v2'){const {default:target}=await import('../lib/services/expertise-finder/roster-rehearsal-target.cjs');target.assertTarget();}
   const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
   const { resolveInterlockMode } = await import('../lib/dataverse/core/interlock.js');
   const { planSeed, seedPromptRow, SeedRefused } = await import('../lib/services/prompt-seed.js');

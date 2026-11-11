@@ -250,6 +250,8 @@ const SURFACES = [
     promptFiles: [
       // Seam-backed row definition + variables helper (convergence plan Stage 1).
       'shared/config/prompts/expertise-finder-dynamics.js',
+      'shared/config/prompts/expertise-finder-roster-v2.js',
+      'shared/config/prompts/expertise-finder-roster-v2-dynamics.js',
     ],
     callSiteFiles: [
       'pages/api/expertise-finder/match.js',

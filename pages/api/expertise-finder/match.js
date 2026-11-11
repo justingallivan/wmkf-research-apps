@@ -1,3 +1,7 @@
+import {withDalContext} from '../../../lib/dataverse/core/context';
+import {ServiceHttpError} from '../../../lib/services/service-http-error';
+import rehearsal from '../../../lib/services/expertise-finder/roster-rehearsal-target.cjs';
+import {matchRosterSnapshot,assertRosterPrompt,validateRosterMatch,EXPERTISE_FINDER_ROSTER_V2_ROW,buildRosterV2Variables} from '../../../lib/services/expertise-finder/roster-match-contract';
 import { requireAcceptedLlmResponse } from '../../../lib/utils/llm-response';
 /**
  * API Route: /api/expertise-finder/match
@@ -15,7 +19,7 @@ import { requireAcceptedLlmResponse } from '../../../lib/utils/llm-response';
  */
 
 import pdf from 'pdf-parse';
-import { sql } from '@vercel/postgres';
+import { sql } from '../../../lib/services/expertise-finder/roster-sql.cjs';
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { BASE_CONFIG } from '../../../shared/config/baseConfig';
 import { resolveToolPrompt, toolPromptUnavailable } from '../../../lib/services/tool-prompt-resolver';
@@ -45,12 +49,12 @@ export default async function handler(req, res) {
 
   const access = await requireAppAccess(req, res, APP_KEY);
   if (!access) return;
-  if (process.env.EXPERTISE_ROSTER_REHEARSAL && process.env.EXPERTISE_ROSTER_REHEARSAL !== 'off') return res.status(503).json({ error:'Matching is unavailable during roster rehearsal until the new prompt contract is enabled.' });
 
   const startTime = Date.now();
   let resolved = null; // set once the prompt row resolves; used for error-path usage logging
 
   try {
+    if(rehearsal.enabled())rehearsal.assertTarget();
     const { file, additionalNotes } = req.body;
 
     if (!file || !file.url) {
@@ -78,7 +82,9 @@ export default async function handler(req, res) {
     }
 
     // Fetch active roster
-    const rosterResult = await sql`
+    const modern=rehearsal.enabled();
+    const snapshot=modern?await withDalContext('expertise-roster-match',()=>matchRosterSnapshot()):null;
+    const rosterResult = snapshot||await sql`
       SELECT * FROM expertise_roster WHERE is_active = true ORDER BY role_type, name
     `;
 
@@ -99,12 +105,15 @@ export default async function handler(req, res) {
       label: 'research proposal',
     });
 
-    const variables = buildExpertiseMatchVariables({
+    const variables = (modern?buildRosterV2Variables:buildExpertiseMatchVariables)({
+      ...(modern?{leadGuids:snapshot.leadGuids}:{}),
       rosterMembers: rosterResult.rows,
       wrappedProposal: proposalPayload.text,
       additionalNotes,
     });
-    resolved = await resolveToolPrompt(EXPERTISE_FINDER_MATCH_ROW.promptName, EXPERTISE_FINDER_MATCH_ROW);
+    const definition=modern?EXPERTISE_FINDER_ROSTER_V2_ROW:EXPERTISE_FINDER_MATCH_ROW;
+    resolved = await resolveToolPrompt(definition.promptName, definition);
+    if(modern)assertRosterPrompt(resolved);
     const { systemPrompt, body: userPrompt } = composeToolPromptPair(
       { systemPrompt: resolved.systemPrompt, body: resolved.body },
       variables,
@@ -136,7 +145,7 @@ export default async function handler(req, res) {
     // Validate against the per-app schema (A7 Part 5) before the result is
     // persisted to expertise_matches — drop any keys an injected model added,
     // enforce types/enums.
-    const validatedMatch = validateAiJson(matchResults, EXPERTISE_MATCH_SCHEMA);
+    const validatedMatch = modern?{ok:true,value:validateRosterMatch(matchResults,snapshot)}:validateAiJson(matchResults, EXPERTISE_MATCH_SCHEMA);
     if (!validatedMatch.ok) {
       console.error('[ExpertiseFinder] Output schema validation failed:', validatedMatch.errors.join('; '));
       return res.status(502).json({ error: 'Claude returned structurally invalid matching results' });
@@ -210,6 +219,7 @@ export default async function handler(req, res) {
 
     // Missing/ambiguous prompt row: actionable 503 for staff, not the generic 500.
     if (unavailable) return res.status(503).json(unavailable);
+    if(error instanceof ServiceHttpError)return res.status(error.httpStatus).json(error.body??{error:error.message});
 
     return res.status(500).json({
       error: BASE_CONFIG.ERROR_MESSAGES.PROCESSING_FAILED,
