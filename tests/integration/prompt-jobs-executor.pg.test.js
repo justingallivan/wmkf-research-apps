@@ -17,8 +17,10 @@ import { executePrompt } from '../../lib/services/execute-prompt.js';
 import { createPromptJobStore } from '../../lib/services/prompt-jobs/store.js';
 import { advanceJob } from '../../lib/services/prompt-jobs/worker.js';
 import { canonical, hashProfile, sha256 } from '../../lib/services/prompt-jobs/profile.js';
-import { composeProfileTask, prepareContextSnapshot, recommendationSourceProof } from '../../lib/services/prompt-jobs/context.js';
+import { composeProfileTask, prepareContextSnapshot, recommendationSourceProof, sandboxRecommendationSourceProof } from '../../lib/services/prompt-jobs/context.js';
 import { createRecommendationsReader } from '../../lib/services/prompt-jobs/recommendations-reader.js';
+import { readStaffRecommendation } from '../../lib/services/prompt-jobs/staff-recommendations-service.js';
+import { readRecommendationsAccessPolicy, RECOMMENDATIONS_SANDBOX_ORIGIN } from '../../lib/services/prompt-jobs/recommendations-sandbox-policy.js';
 import { EXPERTISE_RESULT_CONTRACT, EXPERTISE_TASK_KEY } from '../../lib/services/prompt-jobs/capabilities.js';
 import { buildRecommendationsSnapshot, validateRecommendationsOutput } from '../../lib/services/expertise-finder/recommendations-contract.js';
 import roster from '../../lib/services/expertise-finder/roster-contract.cjs';
@@ -685,6 +687,141 @@ suite('shared prompt job synthetic vertical trial',()=>{
     const mismatch = await typedTrial(conflicting);
     expect((await mismatch.tick()).stage).toBe('failed_pre_dispatch');
     expect((await mismatch.read()).tasks[0].error_code).toBe('invalid_prompt_job_snapshot');
+  });
+
+  // Future read-compatible receipt only in the disposable SQL schema. The
+  // actual admission/Executor paths continue to reject Sandbox expertise tasks.
+  async function sandboxReceipt() {
+    const f = expertiseFixture();
+    const jobId = randomUUID(), requestId = f.owner.requestId, azureId = randomUUID();
+    const ids = { jobId, requestId, systemUserId: randomUUID(), applicationId: randomUUID(), scopeId: randomUUID(), profileId: 7 };
+    const policy = readRecommendationsAccessPolicy({ DYNAMICS_URL: RECOMMENDATIONS_SANDBOX_ORIGIN,
+      DATAVERSE_TARGET_INTERLOCK: 'on', DATAVERSE_DAL_ENFORCEMENT: 'on', EXPERTISE_RECOMMENDATIONS_READ_ACCESS: JSON.stringify(ids) }, 'local');
+    const { environment, principalKey, authorizationScope, targetHost, profileId, systemUserId } = policy;
+    const scope = { environment, authorizationScope, requestId };
+    const { tasks: [task] } = f.input;
+    const sourceProof = sandboxRecommendationSourceProof(targetHost, task.configuration.profile.documentRoles, f.sourceObservation.documents);
+    const configuration = { ...task.configuration, scope, sourceProof };
+    await expect(store.admit({ ...f.input, ...scope, principalKey, tasks: [{ ...task, configuration }] }))
+      .rejects.toMatchObject({ code: 'invalid_prompt_job_admission' });
+    await pool.query(`INSERT INTO prompt_jobs (id,environment,principal_key,authorization_scope,request_id,idempotency_key,payload_hash,operation,source_expires_at,result_expires_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,'generate-draft',clock_timestamp()-interval '1 second',clock_timestamp()+interval '1 hour')`,
+    [jobId, environment, principalKey, authorizationScope, requestId, randomUUID(), 'a'.repeat(64)]);
+    async function content(kind, value) {
+      const payload = canonical(value), hash = sha256(payload);
+      const { rows: [row] } = await pool.query(`INSERT INTO prompt_job_content(job_id,kind,payload,sha256,size_bytes,expires_at)
+        SELECT id,$2,$3,$4,$5,result_expires_at FROM prompt_jobs WHERE id=$1 RETURNING id`,
+      [jobId, kind, payload, hash, Buffer.byteLength(payload)]);
+      return { id: row.id, hash };
+    }
+    const cfg = await content('configuration', configuration);
+    const result = validateRecommendationsOutput(f.output, f.built);
+    const saved = await content('result', { contractVersion: EXPERTISE_RESULT_CONTRACT, result });
+    const { rows: [row] } = await pool.query(`INSERT INTO prompt_job_tasks(job_id,task_key,prompt_hash,profile_hash,model,configuration_content_id,configuration_hash,state,writeback_state,result_content_id,result_hash)
+      VALUES($1,$2,$3,$4,$5,$6,$7,'validated','not_requested',$8,$9) RETURNING id`,
+    [jobId, EXPERTISE_TASK_KEY, sha256(canonical(f.promptRow)), hashProfile(configuration.profile), f.promptRow.wmkf_ai_model, cfg.id, cfg.hash, saved.id, saved.hash]);
+    const access = { profileId, session: { user: { userType: 'staff', profileId, azureId, dynamicsSystemuserId: systemUserId } } };
+    const deps = { store, policy: jest.fn(() => policy),
+      profile: jest.fn(async () => ({ id: profileId, is_active: true, needs_linking: false, azure_id: azureId, dynamics_systemuser_id: systemUserId })),
+      user: jest.fn(async () => ({ systemuserid: systemUserId, azureactivedirectoryobjectid: azureId, isdisabled: false, internalemailaddress: 'fixture@wmkeck.org' })),
+      hasGrant: jest.fn(async () => true),
+      observeSource: jest.fn(async () => ({ ...f.sourceObservation, version: sourceProof.version, targetHost })),
+      observeRoster: jest.fn(async () => ({ targetHost, projection: f.rosterProjection })),
+    };
+    const input = { requestId, jobId, access };
+    return { ...f, cfg, taskId: row.id, configuration, deps, policy, input, result, read: () => readStaffRecommendation(input, deps) };
+  }
+
+  test('Sandbox staff facade requires live-version retained proof and matching source and roster target', async () => {
+    const t = await sandboxReceipt();
+    expect(await t.read()).toMatchObject({ requestId: t.input.requestId, jobId: t.input.jobId,
+      status: 'available', freshness: 'current', result: t.result });
+    expect(t.deps.profile).toHaveBeenCalledTimes(2);
+    expect(t.deps.user).toHaveBeenCalledTimes(2);
+    expect(t.deps.hasGrant).toHaveBeenCalledTimes(2);
+    expect(t.deps.observeSource).toHaveBeenCalledWith({ requestId: t.input.requestId, version: t.configuration.sourceProof.version });
+    const unknown = expect.objectContaining({ status: 'unavailable', freshness: 'unknown' });
+    t.deps.observeRoster.mockResolvedValueOnce({ targetHost: 'wmkf.crm.dynamics.com', projection: t.rosterProjection });
+    expect(await t.read()).toEqual(unknown);
+    t.deps.observeSource.mockResolvedValueOnce({ ...t.sourceObservation, version: t.configuration.sourceProof.version, targetHost: 'wmkf.crm.dynamics.com' });
+    expect(await t.read()).toEqual(unknown);
+    const wrongProof = recommendationSourceProof(t.configuration.profile.documentRoles, t.sourceObservation.documents);
+    const hash = await replacePayload(t.cfg.id, { ...t.configuration, sourceProof: wrongProof });
+    await pool.query('UPDATE prompt_job_tasks SET configuration_hash=$2 WHERE id=$1', [t.taskId, hash]);
+    t.deps.observeSource.mockClear();
+    const result = await t.read();
+    expect(result).toEqual(unknown);
+    expect(result).not.toHaveProperty('result');
+    expect(t.deps.observeSource).not.toHaveBeenCalled();
+  });
+
+  test('fresh exact Sandbox staff grants and Request/job binding fail closed before evidence reads', async () => {
+    const t = await sandboxReceipt();
+    expect(await readStaffRecommendation({ ...t.input, requestId: randomUUID() }, t.deps)).toBeNull();
+    expect(await readStaffRecommendation({ ...t.input, jobId: randomUUID() }, t.deps)).toBeNull();
+    expect(await readStaffRecommendation({ ...t.input, access: { ...t.input.access, authBypassed: true } }, t.deps)).toBeNull();
+    expect(t.deps.profile).not.toHaveBeenCalled();
+    const profile = await t.deps.profile();
+    const user = await t.deps.user();
+    for (const malformed of [{ ...profile, needs_linking: true }, { ...profile, dynamics_systemuser_id: randomUUID() }, { ...profile, is_active: false }]) {
+      t.deps.profile.mockResolvedValueOnce(malformed);
+      expect(await t.read()).toBeNull();
+    }
+    for (const invalid of [{ ...user, azureactivedirectoryobjectid: randomUUID() }, { ...user, isdisabled: true }, { ...user, isdisabled: undefined }]) {
+      t.deps.user.mockResolvedValueOnce(invalid);
+      expect(await t.read()).toBeNull();
+    }
+    t.deps.hasGrant.mockResolvedValueOnce(false);
+    expect(await t.read()).toBeNull();
+    expect(t.deps.observeSource).not.toHaveBeenCalled();
+    expect(t.deps.observeRoster).not.toHaveBeenCalled();
+    t.deps.hasGrant.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    expect(await t.read()).toBeNull();
+    expect(t.deps.observeSource).toHaveBeenCalledTimes(1);
+  });
+
+  test('Sandbox read rejects each incompatible frozen binding and keeps the fixture reader separate', async () => {
+    const t = await sandboxReceipt();
+    function changePin(promptRow, patch) {
+      const metadata = JSON.parse(promptRow.wmkf_ai_promptvariables);
+      Object.assign(metadata.execution.profile, patch);
+      promptRow.wmkf_ai_promptvariables = JSON.stringify(metadata);
+    }
+    const cases = [
+      ['foreign scope', ({ configuration }) => { configuration.scope.requestId = randomUUID(); }],
+      ['extra scope key', ({ configuration }) => { configuration.scope.actor = 'forged'; }],
+      ['foreign prompt', ({ configuration }) => { configuration.promptRow.wmkf_ai_promptname = 'synthetic.executive-summary'; }],
+      ['different model', state => { state.model = 'wrong-model'; }],
+      ['different prompt hash', state => { state.promptHash = 'b'.repeat(64); }],
+      ['different receipt profile hash', state => { state.profileHash = 'b'.repeat(64); }],
+      ['different profile content', ({ configuration }) => { configuration.profile.sharedInstructions += ' changed'; }],
+      ['wrong profile key', ({ configuration }) => { changePin(configuration.promptRow, { key: 'other-profile' }); }],
+      ['wrong profile revision', ({ configuration }) => { changePin(configuration.promptRow, { revision: 2 }); }],
+      ['wrong source roles', ({ configuration }) => { configuration.profile.documentRoles = ['fixture-appendix']; }],
+    ];
+    const observations = [];
+    for (const [label, change] of cases) {
+      const state = { configuration: JSON.parse(canonical(t.configuration)), profileHash: hashProfile(t.configuration.profile), model: t.promptRow.wmkf_ai_model };
+      change(state);
+      const cfgHash = await replacePayload(t.cfg.id, state.configuration);
+      await pool.query('UPDATE prompt_job_tasks SET configuration_hash=$2,prompt_hash=$3,profile_hash=$4,model=$5 WHERE id=$1',
+        [t.taskId, cfgHash, state.promptHash || sha256(canonical(state.configuration.promptRow)), state.profileHash, state.model]);
+      const value = await t.read();
+      observations.push([label, value?.status, value?.freshness, value && Object.hasOwn(value, 'result')]);
+    }
+    expect(observations).toEqual(cases.map(([label]) => [label, 'unavailable', 'unknown', false]));
+    expect(t.deps.observeSource).not.toHaveBeenCalled();
+    expect(t.deps.observeRoster).not.toHaveBeenCalled();
+    expect(await store.readRecommendationState(t.policy, { includeProof: true })).toBeNull();
+    expect(await store.readValidatedRecommendations(t.policy)).toBeNull();
+    const fixture = await readyRecommendation();
+    const sandboxReader = createRecommendationsReader({ sandbox: true, store,
+      authorizeStaffRead: async () => ({ profileId: 7, systemUserId: randomUUID() }),
+      resolveJobOwner: async () => ({ environment: fixture.owner.environment, principalKey: fixture.owner.principalKey,
+        authorizationScope: fixture.owner.authorizationScope }),
+    });
+    expect(await sandboxReader.readResult({ requestId: fixture.owner.requestId, jobId: fixture.jobId })).toBeNull();
+    expect(await store.readSandboxRecommendationState({ ...t.policy, requestId: fixture.owner.requestId, jobId: fixture.jobId })).toBeNull();
   });
 
 });

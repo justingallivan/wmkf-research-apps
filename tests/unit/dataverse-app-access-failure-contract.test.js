@@ -23,6 +23,7 @@ const {
 const { withDalContext } = require('../../lib/dataverse/core/context');
 const {
   grantApps,
+  hasActiveExpertiseAppGrant,
   listAppKeysForUser,
   listAllGrantsForAdmin,
   revokeApps,
@@ -131,4 +132,26 @@ test('app-grant read uses the explicit opt-in mapping and reads grants for that 
 
   expect(resolveProfileToSystemUser).toHaveBeenCalledWith(1, { allowSupervisedTestRead: true });
   expect(client.get).toHaveBeenCalledWith(expect.stringContaining(encodeURIComponent(`_wmkf_user_value eq ${SYSTEM_USER_ID}`)));
+});
+
+
+test('exact Sandbox expertise grant rejects inactive, wrong-user, duplicate and paged data', async () => {
+  const origin = 'https://orgd9e66399.crm.dynamics.com';
+  const grant = { wmkf_appuserappaccessid: GRANTER_ID, _wmkf_user_value: SYSTEM_USER_ID, wmkf_appkey: 'expertise-finder', statecode: 0 };
+  const getWithOptions = jest.fn().mockResolvedValue({ ok: true, body: { value: [grant] } });
+  createClient.mockReturnValue({ getWithOptions });
+  const read = (id = SYSTEM_USER_ID, target = origin) => withDalContext('exact-expertise-grant-test', () => hasActiveExpertiseAppGrant(id, target));
+  await expect(read(`${SYSTEM_USER_ID} or statecode eq 0`)).resolves.toBe(false);
+  await expect(read(SYSTEM_USER_ID, 'https://wmkf.crm.dynamics.com')).resolves.toBe(false);
+  expect(getAccessToken).not.toHaveBeenCalled();
+  await expect(read()).resolves.toBe(true);
+  expect(getAccessToken).toHaveBeenCalledWith(origin);
+  expect(getWithOptions).toHaveBeenCalledWith(expect.stringContaining(encodeURIComponent(`_wmkf_user_value eq ${SYSTEM_USER_ID} and wmkf_appkey eq 'expertise-finder' and statecode eq 0`)), {},
+    { redirect: 'error', timeoutMs: 10_000 });
+  expect(resolveProfileToSystemUser).not.toHaveBeenCalled();
+  for (const body of [{ value: [{ ...grant, statecode: 1 }] }, { value: [{ ...grant, _wmkf_user_value: GRANTER_ID }] },
+    { value: [{ ...grant, wmkf_appkey: 'other' }] }, { value: [grant, grant] }, { value: [grant], '@odata.nextLink': 'untrusted' }, {}]) {
+    getWithOptions.mockResolvedValueOnce({ ok: true, body });
+    await expect(read()).resolves.toBe(false);
+  }
 });
