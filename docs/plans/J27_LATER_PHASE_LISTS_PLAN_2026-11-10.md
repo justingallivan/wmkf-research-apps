@@ -21,8 +21,16 @@ with three findings, all confirmed against the source and worked into
 finding 4, step 1 and section 5. Its second review, of that amended text,
 returned "needs attention" again with four findings, also confirmed; three
 are worked in below (marked "second Codex review") and the fourth, offramp
-enforcement on the review transitions, is in section 5 as a separate
-change. The text after those amendments has not been reviewed. The build
+enforcement on the review transitions, became a separate change. Both guards (no group review before a
+presentation in 2027 and later cycles; no review transition for an
+offramped request) were then written by Codex, reviewed by Claude and
+committed on `claude/j27-cycle-page` at `91fc83581`. **The owner approved
+building this plan on 2026-11-10**, with Codex adversarial review of the
+plan and of each piece, and accepted the one remaining list-and-page
+difference (review-summary freshness, step 3). Step 1 below is the settled
+design, with citations at `91fc83581`; section 2's citations are at
+`c6292bbf1`, and the three transition files have since moved by a few
+lines. The build
 plan's section 3a requires this plan, a whole-flow review of it, and a Codex
 review before any code.
 
@@ -160,68 +168,73 @@ no more than that status. The rows in this plan carry no file link.
 
 ### Step 1: one server rule for the later-phase facts
 
-A new server function takes a list of request ids and returns, per request,
-the four keys the stage model already expects: `presentation`, `roster`,
-`boardDraft`, `transition`. It does not look at who is asking.
+**Design as settled after two Codex reviews and a reading of how the page
+owns its facts (read-model plan, step E).** One server module works out the
+four keys the stage model expects, `presentation`, `roster`, `boardDraft`
+and `transition`, from rows it is given. It does not look at who is asking.
+Every server read that reports one of these keys uses it, and each read
+supplies a **whole key from one snapshot**. Nothing merges half a key from
+one read into half from another.
 
 | Key | Rule | Reuses |
 |---|---|---|
-| `boardDraft.exists` | **Worked out after `transition`.** When a committed Final row exists the draft exists (`true`): starting group review moves the draft row to the Final lifecycle `[VERIFIED via lib/services/final-writeup/transition-claims.js:194-200]`, so the eligibility check below would otherwise report a draft in group review as missing and the model would offer "write the Board draft" during review (second Codex review). A draft row in the Final lifecycle with no Final pointer is `unavailable`, as the status read treats it today `[VERIFIED via transition-state.js:62-69]`. Otherwise: the request's current draft resolves and is eligible. No current draft (`final_writeup_source_missing`) and a draft not yet shared for review (`final_writeup_source_ineligible`) are both `exists: false`: the Final Writeup tab already treats them as "a draft is needed", not as errors. A broken pointer, an unknown registry state or a missing SharePoint identity is `unavailable`. | `resolveSource`, `assertEligibleSource` |
-| `transition.phase` | The current Final row passes the committed check; its stage is group review or leadership review. No Final pointer is `null`; a pointer to a missing or wrong-type row, or a Final row that fails the check, is `unavailable`. | `findCurrentFinal`, `committedFinal`, `stageOf` |
-| `presentation.exists` | At least one presentation record in an accepted state. | To be settled in review: which of the two classifiers (finding 5) |
-| `presentation.ended` | Exactly one eligible record whose scheduled end has passed. More than one, or an unclassified record, is `null` (unknown). | The schedule check's classification, without its per-record re-read |
-| `presentation.legacyException` | Always `false` for 2027 and later cycles (owner, 2026-11-10: no group review before a presentation). The stage model offers "start group review" on it `[VERIFIED via j27-read-model.js:280-282]`, so it must not be true for a J27 request. | The classification part of `assertScheduledEnd`, moved into a function both the start action and this rule call |
-| `roster` | The stored attendance for that presentation: present, stale when its binding no longer matches, absent. | `storedRosters` and the binding from the attendance service |
+| `transition.phase` | Worked out first. The current Final row passes the committed check; its stage is group review or leadership review. No Final pointer is `null`. A pointer to a missing or wrong-type row, or a Final row that fails the check, is `unavailable`. | `findCurrentFinal`, `committedFinal`, `stageOf` |
+| `boardDraft.exists` | `true` when a committed Final row exists (starting group review moves the draft row to the Final lifecycle `[VERIFIED via lib/services/final-writeup/transition-claims.js:195-201]`). Otherwise the request's current draft resolves and is eligible: `true`. No current draft (`final_writeup_source_missing`) and a draft not yet shared for review (`final_writeup_source_ineligible`) are `false`, as the Final Writeup tab treats them. A draft row in the Final lifecycle with no Final pointer, a broken pointer, an unknown registry state or a missing SharePoint identity is `unavailable`. | `resolveSource`, `assertEligibleSource` |
+| `presentation.exists` | At least one presentation record in one of the three state and status pairs the attendance service accepts (open, completed, scheduled), so the phase agrees with the attendance panel. | The pairs in `meeting-roster-service.js`, moved to the shared module |
+| `presentation.ended` | The start guard's classification: every record classifies under the configured pairs, exactly one is eligible, and its scheduled end has passed. Scheduled end in the future is `false`. Anything else, including no configured pairs, is `null` (unknown), so the task and the guard cannot disagree. No per-record re-read. | The classification in `assertScheduledEnd`, moved to the shared module and called by the guard too |
+| `presentation.legacyException` | Always `false` for 2027 and later cycles (D63, built). | — |
+| `roster` | The stored attendance for the one accepted presentation: present, stale when its binding no longer matches, absent. | `storedRosters` and the binding from the attendance service |
 
-- **Both callers use it.** The request list feed calls it once for the rows
-  it returns; request resolution calls it for one request. The page's first
-  render then has the same facts as the list, for every viewer.
-- **A tab's read must not erase what the server knows.** Today the
-  Overview's meeting read sets the presentation's end to unknown, and the
-  Final Writeup read does the same when its schedule check did not run
-  `[VERIFIED via shared/utils/j27PageStage.js:40-43,67,70-71]`; both are
-  spread over the server input `[VERIFIED via j27PageStage.js:80,87]`. With
-  server facts that would bring the viewer difference straight back. A
-  "never replace known with unknown" rule is not enough either: it has no
-  check that the tab's read and the server's fact describe the same
-  presentation, so a rescheduled or replaced presentation could keep the
-  old one's "ended" (Codex review, 2026-11-10). **Rule adopted instead:
-  the server is the only source of these four keys.** Tabs stop reporting
-  them. The page asks the server for the request's facts again, and
-  replaces all four together, whenever something signals they may have
-  changed: an action on the page (saving attendance, starting or advancing
-  group review, saving the Board draft), and also every signal the tabs
-  give today, namely a successful status load, the end of polling, automatic
-  preparation finishing, and a manual reload
-  `[VERIFIED via shared/components/workbench/FinalWriteupTab.js:329-333; the Staff Deliberations tab's equivalent was reported by Codex and not re-read]`.
-  Otherwise a colleague starting group review while the page is open would
-  leave the strip behind the tab (second Codex review). Each re-fetch is
-  guarded by the route generation and by "latest request wins".
+- **Who calls it.**
+  - The request list feed, once for the in-scope rows it returns (batched).
+  - Request resolution, for one request, so the page's first render has the
+    same facts as the list.
+  - The Final Writeup status read, which today checks the schedule only for
+    a viewer who can start group review; it reports the schedule for every
+    viewer. Starting group review keeps its own authorization and its
+    per-record re-read.
+  - The attendance read, which reports the presentation's timing with it.
+- **The page keeps its tab reports** (step E: facts owned by the current
+  route, every status write published through one effect). What changes is
+  that each report now carries a whole key worked out by the same rule, so
+  the latest read simply replaces the key. The Overview's meeting read no
+  longer writes a presentation with an unknown end over a known one,
+  because it no longer writes half a presentation at all.
+  This replaces both earlier drafts of this step ("never downgrade", then
+  "server is the only source with re-fetch"): it needs no new read route and
+  loses none of today's synchronization.
 - **Schema not set up is not a failure.** Where the Final Writeup or
   attendance schema is off for a deployment, the keys read
-  `not-provisioned`, as the memo keys do since Session 672, so the rows are
-  not marked as failed reads.
-- **Starting group review changes in one respect.** For 2027 and later
-  cycles the start action no longer accepts the exception: it requires one
-  ended presentation. This is a change to a write path's guard, so it gets
-  its own tests (a J27 draft with a complete review milestone and no
-  presentation record is refused; the same draft on a D26 request is still
-  accepted). Its authorization, per-record re-read and error handling are
-  otherwise untouched. The list only reads.
-- **Failure.** A failed or capped batch read makes that key `unavailable` on
-  every row, which the list already reports once
-  (`degradedEverywhere`). A later-phase read failure is not to fail the
-  feed.
+  `not-provisioned`, as the memo keys do, so rows are not marked as failed
+  reads.
 - **Request columns.** The draft and Final rules read the request's two
-  current-document pointers `[VERIFIED via transition-model.js:96,177,198-199]`.
-  The feed and the resolver do not select them today `[VERIFIED via git grep
-  for both column names in dashboard-service.js, j27-read-model-inputs.js and
-  resolve-request-service.js: no match]`, so the select gains them, gated on
-  the same schema check.
+  current-document pointers `[VERIFIED via transition-model.js:108,189,210-211]`.
+  The feed and the resolver do not select them today, so the select gains
+  them only when the Final Writeup schema check passes; an ungated column
+  would fail the whole list on a target without it.
+- **Slim document read.** Gains the four fields of finding 4.
+- **Failure.** A failed or capped batch read makes that key `unavailable` on
+  every row, which the list already reports once (`degradedEverywhere`). A
+  later-phase read failure is not to fail the feed.
 - **Cost.** Three added batched reads per feed load (draft documents, Final
-  documents, presentation records), each chunked by the adapter; no read
-  per row. Measured on the 20 sandbox fixtures in the slice, and again with
-  December's requests.
+  documents, presentation records), each chunked by the adapter, for
+  in-scope rows only; no read per row. Timed on the sandbox fixtures in the
+  slice and again with December's requests.
+- **Preview.** The configured pairs
+  (`STAFF_DELIBERATIONS_SITE_VISIT_STATE_STATUS_PAIRS`) are set for
+  Production only `[VERIFIED via vercel env ls, 2026-11-10]`. On the Preview
+  every presentation's end reads unknown, and since D63 nobody can start
+  group review there, until the owner adds that setting for the Preview
+  branch.
+
+**Build order** (each piece reviewed by Codex after it is committed):
+
+1. The shared module and its tests. Nothing calls it yet.
+2. The feed and the two lists together, so no request leaves Peer Review
+   for a tab that cannot list it. The row rule is checked for every task and
+   waiting line that becomes reachable once rows stop being "partial".
+3. The request page: resolution, the status read for every viewer, the
+   attendance read, and whole-key replacement in the page's composer.
 
 ### Step 2: the two lists
 
@@ -255,8 +268,8 @@ are, with a tab count from the same row rules.
   summary is out of date is known only to the page
   `[VERIFIED via shared/utils/j27PageStage.js:83-85 and lib/services/workbench/j27-read-model-inputs.js:77-85]`,
   so the page can say "read the reports" where the list says nothing is
-  waiting. Either the server works that out for both, or the difference is
-  accepted and written down. To be settled before build.
+  waiting. **Accepted by the owner, 2026-11-10**, to be revisited in the
+  polish pass; the parity test excludes this one fact and says so.
 - A negative test for each "unavailable" mapping, with the failing fact
   present in the setup.
 - Gates for the surfaces touched: route matrix, Atlas (request document and
@@ -279,8 +292,6 @@ support stays later.
 
 ## 5. Open before review
 
-- Which classifier decides "a presentation exists" (finding 5). The two can
-  disagree about one request.
 - **Decided (owner, 2026-11-10): J27 does not enter group review until a
   presentation has been seen, and an offramped request does not go to the
   Board.** The schedule check's exception was not limited to earlier
@@ -289,15 +300,12 @@ support stays later.
   configured `[VERIFIED via transition-schedule.js:24-38]` (Codex review,
   2026-11-10; this draft had assumed otherwise). The exception is therefore
   closed for 2027 and later cycles; earlier cycles keep it.
-- **Offramp is not enforced on the review transitions** (second Codex
-  review). Neither starting group review nor sending to leadership reads
-  the Phase II status: the transition's request fields do not include it
-  `[VERIFIED via transition-model.js:13-17; git grep for phaseiistatus and offramp under lib/services/final-writeup returned nothing]`.
-  A request offramped after its presentation, or during group review,
-  could still be moved forward. The owner's rule (D63) is that an offramped
-  request does not go to the Board. This is a guard on two write paths and
-  is independent of the lists; recommended as its own small change, not
-  part of this plan.
+- **Offramp on the review transitions: built** (second Codex review; `91fc83581`
+  on the J27 line). Both transitions refuse an offramped request, at their
+  commit-time re-reads too, and the status read withdraws the action.
+- **Which classifier decides "a presentation exists": settled** in step 1
+  (the attendance service's pairs for "exists", the start guard's
+  classification for "ended").
 - How the Staff deliberations list classifies timing (finding 5, last
   point).
 - Codex's second and fourth points are confirmed only in part: the Final
