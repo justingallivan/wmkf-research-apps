@@ -117,8 +117,8 @@ lost-COMMIT reruns. Every fixture cleanup verifies the populated public fingerpr
 Three UI regressions verify warning retention, stable create retries and paused edit
 retention; the existing disabled fieldset already prevents in-flight cancellation.
 
-The combined 97-test run and production build passed. Fable phase review failed with
-"out of usage credits"; runtime review is pending. Build review is incomplete.
+The combined 97-test run and production build passed. Both Fable build reviews exited unsuccessfully with
+"out of usage credits"; neither completed. Build review is incomplete.
 Rollback reconciliation is not built. No control table or phase is applied to public, and the CLI refuses
 public before connecting. Abandoning an uncertain create via explicit Cancel remains
 an accepted disposable-schema dead end; there is no force-clearing repair command.

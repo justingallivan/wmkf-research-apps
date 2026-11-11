@@ -132,9 +132,14 @@ operational implementation gaps are in
 [VERIFIED via branch source and isolated PostgreSQL tests] Slice A now includes
 dedicated-client write admission, durable write intents, numeric binding allocation,
 and disposable-schema prepare/activate/pause/resume/abort commands. Ten allocator and
-eight phase tests passed with unchanged public fingerprints. The combined 97-test run and production build passed. Fable phase review failed
-with "out of usage credits"; runtime review is pending. Build review is incomplete;
+eight phase tests passed with unchanged public fingerprints. The combined 97-test run and production build passed. Both Fable build reviews exited unsuccessfully
+with "out of usage credits"; neither completed. Build review is incomplete;
 rollback reconciliation is not built. Public phase execution is refused.
+Local implementation checkpoint: `a876c0efd`; preceding reviewed plan: `60c7e7558`.
+Resume with the same Fable build reviews when its quota permits, resolve material
+findings, then begin separately reviewed Slice B rollback. Do not substitute a paid
+review product. No push/deployment was authorized for this continuation. The worktree
+is preserved; no milestone log entry is required for this unreleased rehearsal.
 The accepted design and remaining boundaries are in
 `docs/plans/data/expertise-roster/ALLOCATOR_CUTOVER_DESIGN_2026-11-10.md`.
 Next: independent signed-in browser UAT, attachments, linked-person lifecycle,

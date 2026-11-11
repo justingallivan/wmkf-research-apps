@@ -25,8 +25,8 @@ or runtime allocator exists. Existing full-import receipts remain immutable evid
 
 [VERIFIED via source and isolated SQL tests] Slice A runtime and operational commands
 are source-built. Ten allocator and eight phase tests pass against disposable schemas
-with unchanged public fingerprints. The combined 97-test run and production build passed. Fable phase review failed with
-"out of usage credits"; runtime review is pending. Build review is incomplete.
+with unchanged public fingerprints. The combined 97-test run and production build passed. Both Fable build reviews exited unsuccessfully with
+"out of usage credits"; neither completed. Build review is incomplete.
 Slice B remains unbuilt; no public phase or runtime allocation canary ran.
 
 ## Invariants
