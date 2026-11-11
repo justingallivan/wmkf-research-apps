@@ -1,12 +1,14 @@
 # Confirmed roster import decisions — November 9, 2026
 
 Owner-confirmed decisions, not changes to Production records.
-Private GUID-bearing receipt: `/private/tmp/wmkf-roster-inventory-20261109-final/confirmed-owner-decisions.json`.
+The original temporary GUID receipt was lost. Current verified sandbox mappings
+and approval evidence are private under
+`/Users/gallivan/.local/share/wmkf-roster/full-import-20261110`.
 Raw source export remains unchanged. These overrides must be applied explicitly by
 the planner/executor through explicit `roleType`, `exclude`, and `newProfiles` mapping
-entries. These mechanisms are implemented on the import branch and tested with synthetic
-fixtures; no real mappings or new-person staging were executed. See `README.md` for
-the input and replay contract.
+entries. They were applied in the full sandbox import on November 10, including
+Amy allocated local ID 40 and excluded ID 35 retained without a profile. Full field
+parity and stable replay passed; see `FULL_IMPORT_REHEARSAL_2026-11-10.md`.
 
 | Existing roster ID | Decision |
 |---|---|
@@ -35,5 +37,8 @@ Keep the remaining roster entries editable with a visible Active/Inactive contro
 a way to include inactive entries in the list, and reactivation. Inactive profiles
 are excluded from new matching and new recipient/author selection, while historical
 references remain resolvable. Other retirements can be decided through the editor.
-The existing 10 Contact links are verified healthy; do not invent new links or
-Contacts. Real-data migration still needs reviewed final mappings.
+The ten Production Contact links remain preserved in the raw export. Five exact-email
+sandbox counterparts were verified. Justin approved null sandbox Contact links for
+IDs 9, 10, 24, 30 and 39 for this rehearsal; no guessed links or Contacts were created.
+Four approved staff User links were reverified enabled in sandbox. Production
+cutover still requires its own final export and target-specific mapping review.

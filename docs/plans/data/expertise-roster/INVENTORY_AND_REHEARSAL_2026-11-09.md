@@ -1,4 +1,9 @@
-# Real inventory and isolated rehearsal preparation
+# Historical checkpoint: real inventory and isolated rehearsal preparation
+
+This records the November 9 checkpoint, not current execution instructions. Its
+temporary export and UUID were subsequently lost; owner-authorized fresh lineage
+and the separate full fixture are documented in `FULL_IMPORT_REHEARSAL_2026-11-10.md`.
+Use that record for current evidence locations and container ownership.
 
 [VERIFIED via live read-only probes, November 9, 2026 Pacific]
 Scope authorized by Justin: full roster export, feedback roster IDs, saved Site Visit
@@ -92,7 +97,7 @@ required lineage and Git-destination rejection; existing planner tests remain gr
 (15 tests total). Live initialized-database rerun refused with
 `Database is not empty; no changes made`.
 
-## Next boundaries
+## Boundaries remaining at that checkpoint
 
 1. Slot field investigation is resolved: use parent-session attendee references for
    migration parity. No slot-local column is required.

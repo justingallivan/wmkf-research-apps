@@ -2,16 +2,17 @@
 
 [VERIFIED via source and synthetic tests] Branch implementation of
 `docs/plans/EXPERTISE_ROSTER_DATAVERSE_MIGRATION_PLAN_2026-11-09.md`.
-The app still uses its existing roster. Sandbox schema and synthetic rehearsal status
-are recorded in `SANDBOX_REHEARSAL_2026-11-09.md`; no Production migration occurred.
+The app still uses its existing roster. Sandbox full-import parity and stable replay
+passed on November 10; see `FULL_IMPORT_REHEARSAL_2026-11-10.md`. Earlier schema
+and synthetic evidence is in `SANDBOX_REHEARSAL_2026-11-09.md`. No Production migration occurred.
 
 ## Artifacts and boundaries
 
 - `lib/dataverse/schema/wave-expertise-roster/wmkf_expertiseprofile.json`:
   proposed entity, preserved optional fields, category choices, default-false lead
   eligibility, optional User lookup and Contact GUID text, three alternate keys.
-  Choice labels/values still require operator metadata verification; the importer
-  does not compare option labels. Audit configuration,
+  Choice labels/values passed operator metadata verification for the November 10
+  full import; the importer does not compare option labels automatically. Audit configuration,
   actor attribution, permissions, concurrency and key activation are separate
   release gates. This specification is now provisioned in sandbox only.
 - `identity-bridge.sql`: inert DDL draft, deliberately outside auto-discovered
@@ -173,40 +174,41 @@ the immutable source, mint new mutation/dataset UUIDs, or change the reviewed pa
 merely to bypass the conflict. A killed process may leave a started-only receipt;
 inspect current keyed state and apply the same recovery/reconciliation distinction.
 
-The authorized retained-profile canary and replay now pass under the explicit text
-policy; see the live record below. Before full import, recover the private real source
-and quantify exact-empty and whitespace-only text fields offline. Real-source evidence
-remains unavailable. Whitespace-only/Memo normalization and full-import parity are not
-proved by this one-role-field canary.
+The retained-profile canary and full real-source sandbox import both pass under the
+explicit text policy. The original November 9 export/UUID could not be recovered;
+Justin authorized a fresh read-only export and new lineage after a complete sandbox
+census found no prior real-import keys. The new export has no exact-empty,
+whitespace-only or edge-whitespace optional text. All managed target values passed
+exact comparison; this does not generalize platform normalization to other inputs.
 
 Dataverse requests have 30-second timeouts so transport failure can release database
 locks. This is a per-request bound, not a bound on total transaction duration. The
 exclusive mode-0600 receipt contains identities/status, not expertise text; retain it
 privately with the inputs.
 
-No real roster data was imported. The synthetic flow now has live evidence for
-inactive create/deactivate commit, SQL rollback on exact-value mismatch, retained-row
-binding allocation/COMMIT, and stable replay. Unit tests additionally cover mocked
-failure paths. Forced live changeset rollback, permissions/audit events, linked-person
-lifecycle cases and full import/consumer parity still need rehearsal. Target comparison
-remains exact against the approved canonical values.
+The full import created 39 sandbox profiles, reserved 40 local identities and bound
+39 profiles; one excluded legacy identity remains for feedback. Replay attempted no
+Dataverse writes and preserved GUIDs, ETags, source/feedback rows and sequence 40.
+The earlier synthetic flow also proved SQL rollback on exact-value mismatch and
+retained-row recovery. Forced live changeset rollback, permissions/audit events,
+linked-person lifecycle cases and consumer parity remain separate rehearsal gates.
 
 Final Fable plan review: `docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_4_2026-11-09.md`.
 This review does not certify the implementation or live readiness.
 
 ## Next stage and remaining gates
 
-Real inventory and a dedicated local PostgreSQL 17 synthetic fixture were prepared on November 9. The fixture was recovered on November 10, but the prior private inventory directories remain unavailable. Recover the source or obtain an authorized fresh export with the same source lineage before a real import;
-see `INVENTORY_AND_REHEARSAL_2026-11-09.md` for verified counts and limitations.
-Staff eligibility, new PD staging and placeholder exclusion are recorded in
-`OWNER_MAPPING_DECISIONS_2026-11-09.md`. Slot storage is parent-session inheritance.
-Complete the remaining
-schema/audit/keys/permissions verification, integrate consumers, and rehearse
-actual import plus rollback. The atomic inactive-create repair is Fable-reviewed and live-verified.
-Justin approved exact empty optional text as null while preserving original source.
-The planner implements this explicit policy; Fable review, retained-profile canary
-commit and stable replay passed. Target comparison remains exact against canonical planned values. The owner-reviewed minimal matching
-prompt contract and verified old-deployment admission/drain remain cutover prerequisites.
+The fresh-lineage full import and replay are complete in sandbox and a separate local
+PostgreSQL 17.11 fixture. See `FULL_IMPORT_REHEARSAL_2026-11-10.md` for evidence,
+exact approved mappings, preserved canary volume and rerun commands. Production
+links remain in the immutable export; five unmatched sandbox Contact links are null
+with owner approval. Staff eligibility, Amy staging and placeholder exclusion were
+applied as recorded in `OWNER_MAPPING_DECISIONS_2026-11-09.md`.
+
+Next: integrate and verify dependent consumers, permissions/audit attribution and
+linked-person lifecycle behavior; rehearse operational cutover/rollback. The
+owner-reviewed minimal matching prompt contract and verified old-deployment
+admission/drain remain cutover prerequisites. No Production release is authorized.
 
 ## Historical verification record — November 9, 2026
 
@@ -245,8 +247,8 @@ search for “not yet apply,” “later writer,” and “planning-only” in t
 surfaces found no remaining stale statement. Remote state was not re-probed.
 
 At that pre-canary checkpoint, SQL execution and platform behavior were untested.
-The live record below supersedes that operational status; full import parity, restored
-private source evidence, consumer integration and Production release remain pending.
+At that checkpoint, full import parity, private source recovery, consumer integration
+and Production release were pending. The full-import record now supersedes its import status.
 
 
 ## Historical initial canary — November 10, 2026
@@ -331,7 +333,7 @@ mapping decisions are unchanged. Evidence traces CLI → executor → atomic Dat
 → exact-value rejection → SQL rollback → receipt → independent readback; no UI consumer is involved.
 
 
-## Source-preserving normalization canary — November 10, 2026
+## Historical source-preserving normalization canary — November 10, 2026
 
 [VERIFIED via commit `ab0e0e7e3`, Fable 5.2 review, CLI receipts and independent reads]
 Justin approved treating exact empty optional text as null while preserving original
@@ -375,7 +377,7 @@ The original source/mapping files are kept alongside them, separate from the new
 
 Narrow sweep mode A: README, Atlas, migration-plan optional-text contract and session
 handoff reflect the approved policy and successful bounded canary; earlier dated
-failure records are historical. Remaining gates are real-source recovery/census,
+failure records are historical. At this checkpoint, remaining gates were real-source recovery/census,
 full-import parity, linked-person/permission/audit cases, forced live atomic rollback,
 consumer integration and separately authorized Production release. No real-data import,
 Production change, deletion or existing-profile PATCH was performed by this rerun.

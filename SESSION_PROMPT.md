@@ -80,14 +80,22 @@ no Dataverse writes. Raw input content hashes are preserved; plans canonicalize 
 exact empty optional text. New evidence is private at
 `/Users/gallivan/.local/share/wmkf-roster/canary-20261110`. Temporary synthetic inputs
 were reconstructed against original receipt hashes after their directory disappeared;
-real exports were not recovered. Next: recover real source, count empty/whitespace
-text, then complete full-import and consumer/permission/audit rehearsal gates.
-No real import has been performed. The local
-fixture was recovered, but prior private inventory files remain unavailable; do not
-invent replacements for their source lineage or GUIDs. Evidence and runbook:
-`docs/plans/data/expertise-roster/README.md`. Real inventory and a synthetic-only
-local PostgreSQL 17.11 rehearsal database are prepared; see
-`docs/plans/data/expertise-roster/INVENTORY_AND_REHEARSAL_2026-11-09.md`.
+the original real export/UUID could not be recovered. Justin authorized a fresh lineage
+only after a complete sandbox census found zero prior real-import keys. The fresh
+read-only export and full import now pass: 39 sandbox profiles, 40 local identities,
+39 bindings and seven preserved feedback references. Amy is local ID 40; excluded
+ID 35 remains identity-only. Four User links and five Contact links are verified;
+five unmatched Contacts are null in sandbox with explicit owner approval. Replay
+attempted zero Dataverse writes and preserved GUIDs/ETags/SQL state and sequence 40.
+Evidence: `docs/plans/data/expertise-roster/FULL_IMPORT_REHEARSAL_2026-11-10.md`;
+private files: `/Users/gallivan/.local/share/wmkf-roster/full-import-20261110`.
+New fixture/probe commits: `04ec9148f`, `5f33594ac`. The old canary container/volume
+is backed up, stopped and preserved. Separate container/volume
+`wmkf-roster-full-import17-20261110` owns loopback port 55439. Never run the canary
+against the full fixture or copy its sandbox allocations into shared Postgres.
+Next: dependent-consumer, permissions/audit and linked-person lifecycle verification,
+then operational cutover/rollback rehearsal and the owner-reviewed matching contract.
+The historical November 9 inventory reported
 39 roster rows, 10 healthy Contact links, 7 feedback references. Slot attendee maps are inherited from parent sessions; the reported missing-field
 issue was an inventory interpretation error, now resolved. TBD profile is excluded from migration while its numeric identity is retained for
 one verified historical feedback reference. Sandbox schema/keys and synthetic SQL

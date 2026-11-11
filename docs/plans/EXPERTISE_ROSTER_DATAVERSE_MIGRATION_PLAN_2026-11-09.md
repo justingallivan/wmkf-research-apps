@@ -15,7 +15,7 @@ related:
 
 ## Status and authority
 
-**IN PROGRESS — sandbox schema provisioned; no real roster import, Production schema change, or runtime cutover.**
+**IN PROGRESS — sandbox full import and stable replay verified; no Production schema change or runtime cutover.**
 Owner decisions below were settled with Justin on November 9, 2026. Justin developed the recovered design with Codex and sent it to Connor; Justin confirms Connor supports it. Connor's previous matcher embedded expertise in a Claude prompt executed by Power Automate. It is not evidence of an existing Expertise Profile table.
 
 This plan replaces the recovered email's proposed Short ID, program partition, Match Type and roster dates. It also supersedes the roster comparison/selection task in J27 alignment log D15/X1/T8: the destination is a shared Dataverse roster, not an unresolved choice between two verified roster tables. Scoring, lead assignment, load balancing, and expertise prose are separate future work.
@@ -53,7 +53,7 @@ Source baseline: `f03936e3e`; recheck affected source before implementation.
 | Contact links | One active roster row per Contact enforced by a partial unique index; linked unavailable/email-less Contact never falls back to manual email | `lib/db/migrations/050_expertise_roster_contact_link.sql`; recipient directory above |
 | Other writers | Seed/backfill tools can write the old roster | `scripts/seed-expertise-roster.js`; `scripts/link-roster-contacts.js` |
 
-**VERIFIED in this chat, November 9:** approved Production metadata search returned 2,189 entity definitions, no clearly named expertise/PD/consultant roster; User has unused `wmkf_expertise`. This is not proof that no differently named table exists. The approved non-null User-field query returned no rows. The Postgres staff query returned four profiles (Beth, Jean, Justin, Kevin), all active; new PDs were absent from that category. At that planning baseline no full-roster/contact census or import parity had been performed. The subsequent authorized inventory is recorded in `docs/plans/data/expertise-roster/INVENTORY_AND_REHEARSAL_2026-11-09.md`: full roster/contact checks and a synthetic-only local rehearsal database are prepared; import parity remains pending. Do not treat these observations as schema provisioning evidence.
+**VERIFIED in this chat, November 9:** approved Production metadata search returned 2,189 entity definitions, no clearly named expertise/PD/consultant roster; User has unused `wmkf_expertise`. This is not proof that no differently named table exists. The approved non-null User-field query returned no rows. The Postgres staff query returned four profiles (Beth, Jean, Justin, Kevin), all active; new PDs were absent from that category. At that planning baseline no full-roster/contact census or import parity had been performed. The subsequent authorized inventory is recorded in `docs/plans/data/expertise-roster/INVENTORY_AND_REHEARSAL_2026-11-09.md`: that dated checkpoint established full roster/contact checks and a synthetic-only local rehearsal. A separately authorized fresh-lineage export, full sandbox import and exact field/reference parity now pass; see `docs/plans/data/expertise-roster/FULL_IMPORT_REHEARSAL_2026-11-10.md`. Consumer/prompt parity remains pending. Do not treat these observations as schema provisioning evidence.
 
 ## 3. Proposed physical schema
 
@@ -167,7 +167,7 @@ Implementation adds meaningful unit, integration and browser contract tests. Run
 
 Code work uses a fresh implementation branch under the release strategy. This document's existence authorizes neither schema deployment nor import. No feature work is included in this planning commit.
 
-Review status: final Claude Fable 5.2 OAuth plan check returned **READY**, confirming N1/N2 resolved with no named repairs. See `docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_4_2026-11-09.md`. This is a plan-text verdict, not platform verification. The offline foundation (schema specification, inert bridge SQL draft, file-only import planner and synthetic tests) is implemented on `codex/expertise-roster-foundation-2026-11-09`; see `docs/plans/data/expertise-roster/README.md`. Sandbox schema and synthetic rehearsal work are now recorded in `docs/plans/data/expertise-roster/SANDBOX_REHEARSAL_2026-11-09.md`; no Production or runtime cutover occurred. Platform rehearsal and owner prompt gates remain prerequisites.
+Review status: final Claude Fable 5.2 OAuth plan check returned **READY**, confirming N1/N2 resolved with no named repairs. See `docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_4_2026-11-09.md`. This is a plan-text verdict, not platform verification. The offline foundation (schema specification, inert bridge SQL draft, file-only import planner and synthetic tests) is implemented on `codex/expertise-roster-foundation-2026-11-09`; see `docs/plans/data/expertise-roster/README.md`. Sandbox schema and synthetic rehearsal work are recorded in `docs/plans/data/expertise-roster/SANDBOX_REHEARSAL_2026-11-09.md`; the subsequent real-source full import and replay are recorded in `docs/plans/data/expertise-roster/FULL_IMPORT_REHEARSAL_2026-11-10.md`. No Production or runtime cutover occurred. Platform rehearsal and owner prompt gates remain prerequisites.
 
 ## 8. Durable context and limits
 

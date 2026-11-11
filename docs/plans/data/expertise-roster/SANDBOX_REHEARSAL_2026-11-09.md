@@ -1,4 +1,8 @@
-# Roster sandbox schema and foundation rehearsal — November 9, 2026
+# Historical checkpoint: roster sandbox schema and foundation rehearsal — November 9, 2026
+
+This is the November 9 checkpoint. Current import status and retained fixture
+locations are in `FULL_IMPORT_REHEARSAL_2026-11-10.md`; the temporary paths below
+are historical receipt locations, not current recovery instructions.
 
 [VERIFIED via sandbox Web API and isolated PostgreSQL execution]
 Owner authorized saving mappings, verifying John, sandbox setup and rehearsal.
@@ -75,7 +79,7 @@ led to exact key-set checking, explicit null projections, local preflight before
 writes and restoring synthetic links so later imports are not blocked.
 
 This is a schema/identity foundation rehearsal, not the full application migration.
-Still required: actual import writer with owner overrides/exclusions/new profiles,
+At that checkpoint, still required: actual import writer with owner overrides/exclusions/new profiles,
 interrupted-create recovery, durable deployment admission/freeze, sequence high-water
 setup, editor controls, dependent runtime consumers, end-user audit attribution and
 staff permissions, Contact lifecycle cases, matching prompt contract, full app/rollback
