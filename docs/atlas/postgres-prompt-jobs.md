@@ -62,8 +62,13 @@ the hash-checked proof from configuration after source cleanup. It compares
 current fabricated observations before reading and projecting the result.
 A database clock sample plus monotonic elapsed time fences expiry across
 the final authorization check. The text reader and fixture publication
-consume text only. Production staff delivery and live adapters remain
-planned. [Shared task interfaces](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md).
+consume text only. Production staff delivery remains planned. Separate Sandbox read-only
+accessors use the existing ledger rows with exact environment, app
+principal, authorization scope, Request and job predicates. The read facade
+checks the fixed draft-only task, retained compatible configuration and
+target-bound `ai-materials-combined-pdf-v1` proof before observing source
+or roster. Fixture proof cannot support a Sandbox payload. This read
+path adds no tables, admission or dispatch. [Shared task interfaces](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md).
 
 ## Synthetic safeguard follow-up (2026-11-11)
 

@@ -260,6 +260,27 @@ an existing configured job through the protected drain. It requires
 files or admit a job. A drain run exits zero only for a confirmed `complete` stage.
 Disabled or empty idle stages exit two.
 
+### Optional — Sandbox expertise recommendations read
+
+**[VERIFIED via branch source, 2026-11-11]** The read route defaults off and
+allows local or Preview with the registered Sandbox Dataverse target only.
+`DYNAMICS_URL` must be the exact string `https://orgd9e66399.crm.dynamics.com`.
+If set, `DYNAMICS_SANDBOX_URL` must have the same exact value.
+Both `DATAVERSE_DAL_ENFORCEMENT` and `DATAVERSE_TARGET_INTERLOCK` require the
+literal value `on`. The SharePoint configuration must resolve to the
+registered shared akoyaGO site. The exact Sandbox Request controls file
+selection at that site.
+
+`EXPERTISE_RECOMMENDATIONS_READ_ACCESS` is a server-only JSON grant. It
+requires exactly `requestId`, `jobId`, `profileId`, `systemUserId`,
+`applicationId` and `scopeId`. The five IDs are lowercase GUIDs and
+`profileId` is a positive safe integer. The grant binds one current linked
+staff subject and one exact Sandbox Request/job to the machine app and
+cohort. The reader independently checks the active Sandbox app grant.
+Unset, invalid or mismatched configuration withholds access. No enabled
+grant or compatible live Sandbox job is established by this increment.
+[Sandbox recommendations contract](plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#sandbox-recommendations-read).
+
 ### Optional — Research APIs
 
 | Variable | Purpose | Source | Cost |

@@ -1,6 +1,6 @@
 # Shared Executor task interfaces
 
-**Status [BRANCH-BUILT, offline fixture and read facade] and [PLANNED, live caller integration].**
+**Status [BRANCH-BUILT, offline fixture and read facade], [BRANCH-BUILT, default-off Sandbox read], and [PLANNED, live caller integration].**
 This checkpoint coordinates the proposal-draft and expertise recommendation
 streams. The shared infrastructure owner controls the capability
 registry, Admin compiler, authorization, Executor, worker and ledger. The roster
@@ -94,6 +94,36 @@ retained. Source and roster freshness are bounded observations.
 This fixture does not select a real source placement or install HTTP,
 DAL, real authorization or source/roster adapters, PA, scheduling or
 deployment. [Ledger](../atlas/postgres-prompt-jobs.md#typed-recommendations-fixture).
+
+## Sandbox recommendations read
+
+[VERIFIED via branch source] `GET /api/expertise-finder/recommendations` accepts
+exactly a Request GUID and job GUID. A coarse default-off target check
+precedes the generic app guard. The route requires a linked staff session
+with the Expertise Finder app and an exact server-owned grant for one
+Request, job, staff profile/SystemUser, machine app and cohort. The service
+rechecks the linked Postgres profile, enabled Sandbox SystemUser and active
+Sandbox app grant around the read. The DAL context supplies trusted
+execution. The grant supplies entitlement. Foreign or unmatched jobs
+return the same non-enumerating 404 and responses are private, no-store.
+[Configuration](../CREDENTIALS_RUNBOOK.md#optional--sandbox-expertise-recommendations-read).
+
+The read-only ledger accessor selects the sole recommendations draft
+under the exact five-part owner scope. Result delivery requires a retained
+`ai-materials-combined-pdf-v1` proof bound to the registered Sandbox host
+and the `proposal` role. A fixture proof cannot establish a current
+Sandbox result. The source observer resolves the Request's one exact
+accepted AI Materials PDF, verifies identity and version before and after
+a bounded 20 MiB PDF download and hashes the actual bytes. It loads no PI
+record and performs no extraction. Both source and roster observations must
+match the retained Sandbox target and input fingerprints before result
+projection. The route reuses the offline facade's receipt, owner,
+authorization and expiry fences.
+
+This increment supplies the read path only. No compatible live Sandbox
+job or configured grant has been established. Expertise admission and
+dispatch remain fixture-only. Production, PA, deployment and live
+activation remain outside this slice. Local integrated verification passed.
 
 ## Capability and result path
 
@@ -353,3 +383,37 @@ authorization. The application build exited zero in an environment-file-free
 source copy with the non-loopback Node TCP guard. Four existing DOCX
 tracing warnings remain. Scoped lint, types and repository gates passed.
 All staff, source and roster observations were fabricated.
+
+
+## Sandbox read verification
+
+Runtime commit `6fe01c88e` integrates the common read path and strict roster
+transport. The ordinary Opus 5.5 OAuth plan review returned READY WITH NAMED CHANGES.
+Its dispositions pin staff identity and app grants to the same Sandbox
+target, require an exact active grant row, withhold unmatched jobs behind
+a common 404, derive Request number from the bound Sandbox row, and preserve
+the existing PI-dependent staff source behavior. Roster transport and
+common route code have separate owners.
+
+The build review returned READY WITH NAMED CHANGES. It required strict
+helper arguments and default adapter wiring tests, inverse Sandbox ledger
+and fixture-scope cases, and landing the strict roster transport with its
+common route caller. The fixes and their inverse tests passed locally.
+Both completed reviews named only
+`claude-opus-5-5` in model usage. The automatic approval review rejected
+sending the final source diff to Claude because it found the existing
+authorization insufficient for that transfer. No final closure verdict
+was returned.
+
+
+[VERIFIED via local commands] The final regression run passed 527 tests
+across 32 suites, including all three job suites against disposable
+loopback PostgreSQL. It covered strict Request/User adapter wiring,
+complete roster paging and same-host inputs, legacy v1 source behavior,
+inverse frozen configuration and owner-scope cases, and the route's
+non-enumerating access checks. The environment-file-free source-copy
+build exited zero with the non-loopback Node TCP guard and included the
+new route. Four existing DOCX tracing warnings remained. Scoped lint,
+types and repository gates passed. Test receipts and observations were
+fabricated. No compatible live Sandbox job, route activation, model run,
+or deployment was verified.
