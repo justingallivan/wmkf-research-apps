@@ -1,7 +1,8 @@
 # Roster allocator and operational rehearsal design
 
-Status: revision 3, addressing both Fable plan reviews. Owner authorized
-unattended implementation and OAuth Fable plan/build reviews. No Production writes,
+Status: revision 3, addressing both historical Fable plan reviews. Owner authorized
+unattended implementation and switched this continuation's future plan/build reviews
+to OAuth Opus 5.5. No Production writes,
 push/deployment, shared-database mutation, new server or paid inference is authorized.
 
 ## Scope and sequencing
@@ -25,9 +26,17 @@ or runtime allocator exists. Existing full-import receipts remain immutable evid
 
 [VERIFIED via source and isolated SQL tests] Slice A runtime and operational commands
 are source-built. Ten allocator and eight phase tests pass against disposable schemas
-with unchanged public fingerprints. The combined 97-test run and production build passed. Both Fable build reviews exited unsuccessfully with
-"out of usage credits"; neither completed. Build review is incomplete.
-Slice B remains unbuilt; no public phase or runtime allocation canary ran.
+with unchanged public fingerprints. The combined 97-test run and production build
+passed at the checkpoint. Historical Fable runtime/phase review attempts exited
+with "out of usage credits" without completing. The subsequent owner-authorized
+OAuth Opus 5.5 source review returned READY with no material blockers; it did not
+rerun tests or the build. Its four low-severity findings and receipt-fsync nit are
+fixed; the final 109-test/five-suite run, isolated SQL/public-fingerprint checks,
+types and scoped lint passed. The coordinating session reviewed the final diffs and
+closed the review loop without another Opus cycle. The prior full build predates
+these fixes; no fresh full build is claimed.
+See [the archived review and disposition](SLICE_A_OPUS_5_5_REVIEW_2026-11-11.md).
+Slice B planning is underway; its implementation remains unbuilt. No public phase or runtime allocation canary ran.
 
 ## Invariants
 
@@ -243,7 +252,7 @@ negative checks; old INSERT/UPDATE/DELETE/TRUNCATE refusal; sequence unchanged o
 rejected insert; activate without guard refusal; abort and resume; lost receipt
 recovery; unchanged public snapshots. Runtime unit tests cover actor, same-key retry,
 post-update partial success and release on every failure. Then relevant gates/build
-and Fable adversarial build review. No public runtime allocation canary in this slice.
+and OAuth Opus 5.5 adversarial build review. No public runtime allocation canary in this slice.
 
 Review only changed contracts after named findings are fixed. Do not reopen the
 accepted row-lock allocator algorithm. Begin slice B only after slice A is stable,

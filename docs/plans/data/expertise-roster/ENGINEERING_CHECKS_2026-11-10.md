@@ -117,8 +117,18 @@ lost-COMMIT reruns. Every fixture cleanup verifies the populated public fingerpr
 Three UI regressions verify warning retention, stable create retries and paused edit
 retention; the existing disabled fieldset already prevents in-flight cancellation.
 
-The combined 97-test run and production build passed. Both Fable build reviews exited unsuccessfully with
-"out of usage credits"; neither completed. Build review is incomplete.
+The combined 97-test run and production build passed at the implementation checkpoint.
+Historically, both Fable build reviews exited with "out of usage credits" without
+completing. The owner switched future plan/build reviews for this continuation to
+OAuth Opus 5.5. Its source review returned READY with no material blockers and four
+low-severity findings. Those four findings and the receipt-directory fsync nit are
+fixed. The final combined run passed 109 tests across five suites, including isolated
+SQL tests with unchanged public fingerprints; types and scoped lint passed. The
+coordinating session reviewed the final diffs and closed the review loop without
+another Opus cycle. The reviewer did not rerun tests or the build, and the earlier
+full build predates these follow-up fixes. Slice B planning is underway, not its
+implementation. See the full
+[archived review and disposition](SLICE_A_OPUS_5_5_REVIEW_2026-11-11.md).
 Rollback reconciliation is not built. No control table or phase is applied to public, and the CLI refuses
 public before connecting. Abandoning an uncertain create via explicit Cancel remains
 an accepted disposable-schema dead end; there is no force-clearing repair command.

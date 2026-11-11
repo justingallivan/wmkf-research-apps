@@ -6,6 +6,7 @@ const { randomUUID } = require('node:crypto');
 const dotenv = require('dotenv');
 const { createRosterPgFixture } = require('../helpers/roster-pg-fixture.cjs');
 const { runCutover } = require('../../scripts/lib/expertise-roster-cutover.cjs');
+const { main: cutoverCli } = require('../../scripts/rehearse-roster-cutover.cjs');
 const { planImport, TEXT_POLICY } = require('../../scripts/lib/expertise-roster-import-plan.cjs');
 
 const host = 'orgd9e66399.crm.dynamics.com';
@@ -16,6 +17,12 @@ test.each(['prepare', 'activate', 'pause', 'resume', 'abort'])('%s refuses publi
   const connect = jest.fn();
   await expect(runCutover({ schema: 'public', phase, connect, execute: true })).rejects.toThrow(/public is refused/);
   expect(connect).not.toHaveBeenCalled();
+});
+
+test('CLI tags its explicit argument refusal for safe display', async () => {
+  await expect(cutoverCli(['--invalid', 'value'])).rejects.toMatchObject({
+    code: 'roster_cutover_refused', message: 'Invalid cutover arguments.',
+  });
 });
 
 live('disposable roster operational phases', () => {
@@ -125,10 +132,27 @@ live('disposable roster operational phases', () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'baseline.json')));
     expect(await run('prepare')).toMatchObject({ status: 'observed', generation: manifest.generation });
     expect(await run('abort')).toMatchObject({ currentPhase: 'legacy' });
-    expect(await run('abort')).toMatchObject({ status: 'observed' });
     await expect(run('activate')).rejects.toThrow(/incompatible/);
     expect((await db.primary.query(
       "INSERT INTO expertise_roster (name,role_type) VALUES ('After abort','Consultant') RETURNING id",
     )).rows[0].id).toBe(43);
+    expect(await run('abort')).toMatchObject({ status: 'observed', generation: manifest.generation });
+  });
+
+  test('an unlock failure does not mask the committed result or receipt', async () => {
+    const receiptPath = path.join(dir, 'unlock.json');
+    const connect = async () => {
+      const client = await db.connect();
+      const query = client.query.bind(client);
+      client.query = async (...args) => {
+        if (args[0].startsWith('SELECT pg_advisory_unlock')) throw Error('Synthetic unlock failure');
+        return query(...args);
+      };
+      return client;
+    };
+    const result = await run('prepare', { connect, receiptPath });
+    expect(result).toMatchObject({ status: 'committed', currentPhase: 'prepared' });
+    expect(JSON.parse(fs.readFileSync(receiptPath))).toEqual(result);
+    expect(await run('prepare')).toMatchObject({ status: 'observed', generation: result.generation });
   });
 });

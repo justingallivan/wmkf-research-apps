@@ -3,7 +3,7 @@ jest.mock('../../lib/dataverse/adapters/expertise-profile', () => ({ get: jest.f
 jest.mock('../../lib/dataverse/adapters/system-user', () => ({ getById: jest.fn() }));
 jest.mock('../../lib/dataverse/adapters/contact', () => ({ getByIdWithSelect: jest.fn() }));
 jest.mock('../../lib/services/expertise-finder/roster-rehearsal-target.cjs', () => ({ assertTarget: jest.fn() }));
-jest.mock('../../lib/services/expertise-finder/roster-lifecycle.cjs', () => ({ withRosterWrite: jest.fn() }));
+jest.mock('../../lib/services/expertise-finder/roster-lifecycle.cjs', () => ({ ...jest.requireActual('../../lib/services/expertise-finder/roster-lifecycle.cjs'), withRosterWrite: jest.fn() }));
 import * as profiles from '../../lib/dataverse/adapters/expertise-profile';
 import * as users from '../../lib/dataverse/adapters/system-user';
 import { saveRoster, listRoster } from '../../lib/services/expertise-finder/roster-service';
@@ -17,7 +17,7 @@ const ACTOR = '33333333-3333-4333-8333-333333333333';
 let row;
 const oldImpersonation = process.env.DYNAMICS_IMPERSONATION_ENABLED;
 beforeEach(() => {
- jest.resetAllMocks(); lifecycle.withRosterWrite.mockImplementation(work => work(lease));
+ jest.resetAllMocks(); lease.active=false; lifecycle.withRosterWrite.mockImplementation(work => work(lease));
  lease.beforeMutation.mockResolvedValue('44444444-4444-4444-8444-444444444444'); lease.complete.mockResolvedValue(1);
  process.env.DYNAMICS_IMPERSONATION_ENABLED = 'true';
  row = processAnnotations({wmkf_expertiseprofileid:ID,wmkf_name:'Test Staff',wmkf_category:contract.CATEGORIES['Research Program Staff'],statecode:0,wmkf_leadpdeligible:true,_wmkf_staffuser_value:USER,'@odata.etag':'W/"123"'});
@@ -131,4 +131,22 @@ test('confirmed update with binding failure returns a saved warning', async () =
 test('request cannot choose a creation key', async () => {
  await expect(saveRoster({name:'Synthetic',role_type:'Consultant',is_active:false,mutation_id:ID,wmkf_creationkey:'app_'+USER},ACTOR,{create:true})).rejects.toMatchObject({status:400});
  expect(profiles.create).not.toHaveBeenCalled(); expect(lease.beforeMutation).not.toHaveBeenCalled();
+});
+
+
+test.each([undefined,null,'','app_invalid','legacy_'+ID+'_0','direct_'+USER.toUpperCase().replace('2','A')])('active lifecycle refuses invalid stored creation key %s before mutation',async key=>{
+ lease.active=true;row.wmkf_creationkey=key;
+ await expect(saveRoster({id:ID,etag:'W/"123"',name:'Renamed'},ACTOR)).rejects.toMatchObject({status:503,code:'roster_reconciliation_required'});
+ expect(lease.beforeMutation).not.toHaveBeenCalled();expect(profiles.update).not.toHaveBeenCalled();expect(lease.complete).not.toHaveBeenCalled();
+});
+test.each(['app_'+ID,'direct_'+ID,'legacy_'+ID+'_42'])('active lifecycle accepts stored creation key %s',async key=>{
+ lease.active=true;row.wmkf_creationkey=key;
+ await saveRoster({id:ID,etag:'W/"123"',name:'Renamed'},ACTOR);
+ expect(profiles.update).toHaveBeenCalledTimes(1);
+ expect(lease.complete).toHaveBeenCalledWith(expect.objectContaining({creationKey:key}));
+});
+test('absent lifecycle permits updating a profile without a stored creation key',async()=>{
+ lease.active=false;delete row.wmkf_creationkey;
+ await expect(saveRoster({id:ID,etag:'W/"123"',name:'Renamed'},ACTOR)).resolves.toMatchObject({success:true});
+ expect(profiles.update).toHaveBeenCalledTimes(1);
 });

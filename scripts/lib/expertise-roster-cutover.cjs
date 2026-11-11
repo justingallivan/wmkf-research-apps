@@ -57,12 +57,15 @@ function save(fd, value) {
   fs.writeSync(fd, JSON.stringify(value, null, 2) + '\n', 0, 'utf8');
   fs.fsyncSync(fd);
 }
+function syncParent(filename) {
+  const parent = fs.openSync(path.dirname(filename), 'r');
+  try { fs.fsyncSync(parent); } finally { fs.closeSync(parent); }
+}
 function writeManifest(filename, manifest) {
   const fd = fs.openSync(filename, 'wx', 0o600);
   try {
     save(fd, manifest);
-    const parent = fs.openSync(path.dirname(filename), 'r');
-    try { fs.fsyncSync(parent); } finally { fs.closeSync(parent); }
+    syncParent(filename);
   } finally {
     fs.closeSync(fd);
   }
@@ -282,6 +285,7 @@ async function runCutover({ env, schema, phase, acknowledge, manifestPath, recei
   let session, transaction = false, committing = false, committed = false;
   try {
     record({ phase, schema, status: 'started' });
+    if (receiptFile) syncParent(receiptFile);
     const lifecycle = createLifecycle({ env, schema, connect });
     session = await lifecycle.open({ operational: true, exclusive: true });
     const { client } = session;
@@ -305,7 +309,7 @@ async function runCutover({ env, schema, phase, acknowledge, manifestPath, recei
     if (!state || state.phase === 'legacy') await assertNoFreeze(client);
     else await verifyFreeze(client);
     if (state) {
-      verifyFrozenSource(local, metadata, original, !identityFK);
+      if (state.phase !== 'legacy') verifyFrozenSource(local, metadata, original, !identityFK);
       if (!identityFK) same(metadata.feedbackFK, original.originalFeedbackFK, 'Legacy feedback foreign key changed.');
       check(!identityFK || state.high_water >= Math.max(local.sequence.last_value, 0, ...local.ids), 'Allocator high-water is behind reserved identities.');
     }
@@ -365,7 +369,7 @@ async function runCutover({ env, schema, phase, acknowledge, manifestPath, recei
     record({ phase, schema, status: committed ? 'committed' : committing ? 'commit-unknown' : 'refused', message: outcome(error) });
     throw error;
   } finally {
-    try { if (session) await session.close(); } finally { if (fd !== null) fs.closeSync(fd); }
+    try { if (session) await session.close().catch(() => {}); } finally { if (fd !== null) fs.closeSync(fd); }
   }
 }
 
