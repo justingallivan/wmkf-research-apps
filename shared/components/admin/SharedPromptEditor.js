@@ -39,12 +39,15 @@ export default function SharedPromptEditor() {
 
 function Editor() {
   const [catalog,setCatalog] = useState(null);
+  const [catalogLoading,setCatalogLoading] = useState(true);
+  const [pendingProfile,setPendingProfile] = useState(null);
+  const [profileReviewed,setProfileReviewed] = useState(false);
   const [models,setModels] = useState(null);
   const [profileDraft,setProfileDraft] = useState(emptyProfile);
   const [historyId,setHistoryId] = useState('');
   const [taskName,setTaskName] = useState('');
   const [task,setTask] = useState(newTask);
-  const [taskState,setTaskState] = useState('idle');
+  const [taskState,setTaskState] = useState('loading');
   const [taskVersion,setTaskVersion] = useState(null);
   const [conflictCurrent,setConflictCurrent] = useState(null);
   const [preview,setPreview] = useState(null);
@@ -54,24 +57,23 @@ function Editor() {
   const [reload,setReload] = useState(0);
   const [taskRetry,setTaskRetry] = useState(0);
   const mounted = useRef(true), loadGeneration = useRef(0), taskGeneration = useRef(0), editGeneration = useRef(0);
-  const profileRequest = useRef({}), taskRequest = useRef({}), taskDrafts = useRef({});
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; loadGeneration.current++; taskGeneration.current++; editGeneration.current++; }; }, []);
+  const profileRequest = useRef({}), taskRequest = useRef({}), taskDrafts = useRef({}), catalogRef = useRef(null), pendingProfileRef = useRef(null);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => {
     const generation = ++loadGeneration.current;
-    setError('');
     Promise.all([requestEnvelope('/api/admin/prompt-profiles'),requestEnvelope('/api/admin/models')]).then(([profiles, modelResponse]) => {
       if (!mounted.current || generation !== loadGeneration.current) return;
       if (!profiles.ok || !modelResponse.ok || !Array.isArray(profiles.data?.profiles) || !Array.isArray(profiles.data?.tasks)) throw new Error('load');
-      setCatalog(profiles.data); setModels(modelResponse.data);
+      catalogRef.current = profiles.data; setCatalog(profiles.data); setModels(modelResponse.data); setCatalogLoading(false); if (pendingProfileRef.current) setProfileReviewed(true);
       setTaskName(current => current || profiles.data.tasks.find(item => Object.hasOwn(LABELS,item.name))?.name || '');
-    }).catch(() => { if (mounted.current && generation === loadGeneration.current) setError('Could not load shared profiles and reviewed models. Try again.'); });
+    }).catch(() => { if (mounted.current && generation === loadGeneration.current) { setError('Could not load shared profiles and reviewed models. Try again.'); setCatalogLoading(false); } });
   }, [reload]);
   useEffect(() => {
     if (!taskName) return undefined;
     const generation = ++taskGeneration.current;
-    setTaskState('loading'); setTask(newTask()); setTaskVersion(null); setConflictCurrent(null); setPreview(null); setError('');
+    let active = true;
     requestEnvelope(`/api/admin/prompts/${encodeURIComponent(taskName)}`).then(envelope => {
-      if (!mounted.current || generation !== taskGeneration.current) return;
+      if (!mounted.current || !active || generation !== taskGeneration.current) return;
       const draft = taskDrafts.current[taskName];
       if (envelope.status === 404) {
         if (draft) setTask(draft.task);
@@ -83,23 +85,26 @@ function Editor() {
       if (!envelope.ok || envelope.data?.invariantError || !current || !Number.isSafeInteger(current.version) || current.version < 1) { setTaskState('blocked'); setError('This task has no single current version. Resolve its history before editing.'); return; }
       let reference;
       try { reference = JSON.parse(current.variables).execution.profile; } catch { setTaskState('blocked'); setError('This task does not have a valid shared profile reference.'); return; }
-      const publication = catalog?.profiles.find(item => item.profile.key === reference?.key && item.profile.revision === reference?.revision && item.sha256 === reference?.sha256);
+      const publication = catalogRef.current?.profiles.find(item => item.profile.key === reference?.key && item.profile.revision === reference?.revision && item.sha256 === reference?.sha256);
       if (!publication || current.systemPrompt !== '') { setTaskState('blocked'); setError('This task references an unavailable profile or incompatible system prompt.'); return; }
       setTask(draft?.task || {body:current.body || '',model:current.model || '',maxTokens:String(current.maxTokens || ''),profileId:id(publication)});
       if (draft && (draft.state !== 'existing' || draft.baseVersion !== current.version)) {
         setTaskVersion(draft.baseVersion); setConflictCurrent(current); setTaskState('blocked');
         setError('The task changed while your draft was open. Compare the current instructions before using the latest version.');
       } else { setTaskVersion(current.version); setTaskState('existing'); }
-    }).catch(() => { if (mounted.current && generation === taskGeneration.current) { setTaskState('blocked'); setError('Could not load this task. Try again.'); } });
-    return () => { taskGeneration.current++; };
+    }).catch(() => { if (mounted.current && active && generation === taskGeneration.current) { setTaskState('blocked'); setError('Could not load this task. Try again.'); } });
+    return () => { active = false; };
   }, [taskName, taskRetry]);
   const invalidate = () => { editGeneration.current++; setPreview(null); setNotice(''); };
+  const beginTaskLoad = () => { invalidate(); setTaskState('loading'); setTask(newTask()); setTaskVersion(null); setConflictCurrent(null); setError(''); };
   const updateProfile = (key,value) => { invalidate(); setProfileDraft(current => ({...current,[key]:value})); };
   const updateTask = (key,value) => { invalidate(); const next = {...task,[key]:value}; const prior = taskDrafts.current[taskName]; taskDrafts.current[taskName] = {task:next,baseVersion:prior?.baseVersion ?? taskVersion,state:prior?.state ?? taskState}; setTask(next); };
   const profiles = catalog?.profiles || [];
   const latest = profiles.filter(item => item.profile.key === profileDraft.key).reduce((max,item) => Math.max(max,item.profile.revision),0);
   const roles = names(profileDraft.documentRoles), records = names(profileDraft.recordNames);
   const caps = catalog?.profileLimits || {};
+  const draftProfile = {key:profileDraft.key,wrapperVersion:1,sharedInstructions:profileDraft.sharedInstructions,documentRoles:roles,recordNames:records,limits:profileDraft.limits};
+  const pendingMatches = !pendingProfile || JSON.stringify(draftProfile) === pendingProfile.draftKey;
   const profileValid = validName(profileDraft.key) && profileDraft.sharedInstructions.trim() && profileDraft.sharedInstructions.length <= 16000 && !/\{\{/.test(profileDraft.sharedInstructions) && roles.length > 0 && roles.length <= 16 && records.length <= 16 && [...roles,...records].every(validName) && new Set(roles).size === roles.length && new Set(records).size === records.length && Object.entries(profileDraft.limits).every(([key,value]) => Number.isSafeInteger(value) && value > 0 && Number.isSafeInteger(caps[key]) && value <= caps[key]) && roles.length <= profileDraft.limits.maxDocuments;
   const selectedProfile = profiles.find(item => id(item) === task.profileId);
   const capability = catalog?.tasks.find(item => item.name === taskName && Object.hasOwn(LABELS,item.name));
@@ -115,17 +120,19 @@ function Editor() {
     return {name:taskName,body:task.body,systemPrompt:'',variables:JSON.stringify({execution:{contractVersion:1,mode:'shared-document-task',profile:{key:selectedProfile.profile.key,revision:selectedProfile.profile.revision,sha256:selectedProfile.sha256}},variables:[{name:'proposal_context',source:{kind:'prepared_context'},required:true},...declarations]}),outputSchema:JSON.stringify({parseMode:'raw',outputs:[{name:capability.outputName,target:{kind:'none'},...(capability.maxWords ? {maxWords:capability.maxWords} : {}),...(capability.maxChars ? {maxChars:capability.maxChars} : {})}]}),model:task.model,maxTokens:tokenValue};
   }
   async function publishProfile() {
-    if (!profileValid || busy) return;
-    const payload = {profile:{key:profileDraft.key,revision:latest+1,wrapperVersion:1,sharedInstructions:profileDraft.sharedInstructions,documentRoles:roles,recordNames:records,limits:profileDraft.limits},expectedVersion:latest};
-    const requestId = requestIdentity(profileRequest,payload), generation = editGeneration.current;
+    if (!profileValid || !pendingMatches || busy || catalogLoading) return;
+    const payload = pendingProfile?.payload || {profile:{...draftProfile,revision:latest+1},expectedVersion:latest};
+    const requestId = pendingProfile?.requestId || requestIdentity(profileRequest,payload), generation = editGeneration.current;
+    if (!pendingProfile) { const pending = {payload,requestId,draftKey:JSON.stringify(draftProfile)}; pendingProfileRef.current = pending; setPendingProfile(pending); setProfileReviewed(false); }
     setBusy('profile'); setError(''); setNotice('');
     try {
       const result = await requestEnvelope('/api/admin/prompt-profiles',{method:'PUT',body:{...payload,requestId}});
       if (!mounted.current || generation !== editGeneration.current) return;
       if (!result.ok || !['completed','already_published'].includes(result.data?.status) || !result.data.publication) { setError(safeMessage(result,'Could not publish the profile. Your draft is still here.')); return; }
       const publication = result.data.publication;
-      setCatalog(current => ({...current,profiles:[...current.profiles.filter(item => id(item)!==id(publication)),publication]}));
-      setHistoryId(id(publication)); setProfileDraft(asDraft(publication.profile)); setNotice(`Published ${publication.profile.key}, revision ${publication.profile.revision}.`);
+      const nextCatalog = {...catalogRef.current,profiles:[...catalogRef.current.profiles.filter(item => id(item)!==id(publication)),publication]};
+      catalogRef.current = nextCatalog; setCatalog(nextCatalog);
+      pendingProfileRef.current = null; setPendingProfile(null); setProfileReviewed(false); setHistoryId(id(publication)); setProfileDraft(asDraft(publication.profile)); setNotice(`Published ${publication.profile.key}, revision ${publication.profile.revision}.`);
     } catch { if (mounted.current && generation === editGeneration.current) setError('Could not publish the profile. Retry the same draft.'); }
     finally { if (mounted.current && generation === editGeneration.current) setBusy(''); }
   }
@@ -159,25 +166,26 @@ function Editor() {
   }
   const setLimit = key => event => updateProfile('limits',{...profileDraft.limits,[key]:event.target.value === '' ? null : Number(event.target.value)});
   return <div className="space-y-6">
-    {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error} {!catalog ? <Button type="button" variant="link" onClick={() => setReload(value => value+1)}>Retry</Button> : <Button type="button" variant="link" disabled={Boolean(busy)} onClick={() => { invalidate(); setReload(value => value+1); }}>Refresh profiles</Button>}</p>}
+    {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error} {!catalog ? <Button type="button" variant="link" onClick={() => { setError(''); setCatalogLoading(true); setReload(value => value+1); }}>Retry</Button> : <Button type="button" variant="link" disabled={Boolean(busy) || catalogLoading} onClick={() => { invalidate(); setError(''); setCatalogLoading(true); setReload(value => value+1); }}>Refresh profiles</Button>}</p>}
     {notice && <p role="status" className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">{notice}</p>}
     {!catalog ? !error && <p className="text-sm text-gray-600">Loading shared profiles…</p> : <>
-      <fieldset disabled={Boolean(busy)} className="space-y-3"><legend className="text-base font-semibold text-gray-900">Shared profile</legend>
+      <fieldset disabled={Boolean(busy) || catalogLoading} className="space-y-3"><legend className="text-base font-semibold text-gray-900">Shared profile</legend>
         <p className="text-sm text-gray-600">Profiles define shared instructions and permitted inputs. Publishing creates a new immutable revision.</p>
         <label className="block text-sm font-medium text-gray-700">Published revisions<select className={INPUT} value={historyId} onChange={event => { const value=event.target.value; invalidate(); setHistoryId(value); setProfileDraft(value ? asDraft(profiles.find(item => id(item)===value).profile) : emptyProfile()); }}><option value="">New profile</option>{profiles.map(item => <option key={id(item)} value={id(item)}>{item.profile.key} — revision {item.profile.revision}</option>)}</select></label>
-        <div className="grid gap-3 sm:grid-cols-2"><label className="block text-sm font-medium text-gray-700">Profile key<input className={INPUT} value={profileDraft.key} onChange={event => updateProfile('key',event.target.value)} /></label><div className="self-end text-sm text-gray-600">Next revision: {latest+1}</div></div>
+        <div className="grid gap-3 sm:grid-cols-2"><label className="block text-sm font-medium text-gray-700">Profile key<input className={INPUT} value={profileDraft.key} onChange={event => updateProfile('key',event.target.value)} /></label><div className="self-end text-sm text-gray-600">Next revision: {pendingProfile ? pendingProfile.payload.profile.revision : latest+1}</div></div>
         <label className="block text-sm font-medium text-gray-700">Shared instructions<textarea className={INPUT} rows={5} value={profileDraft.sharedInstructions} onChange={event => updateProfile('sharedInstructions',event.target.value)} /></label>
         <div className="grid gap-3 sm:grid-cols-2"><label className="block text-sm font-medium text-gray-700">Document roles <span className="font-normal">(comma-separated)</span><input className={INPUT} value={profileDraft.documentRoles} onChange={event => updateProfile('documentRoles',event.target.value)} /></label><label className="block text-sm font-medium text-gray-700">Record names <span className="font-normal">(comma-separated)</span><input className={INPUT} value={profileDraft.recordNames} onChange={event => updateProfile('recordNames',event.target.value)} /></label></div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{[['maxDocuments','Document count'],['maxDocumentBytes','Bytes per document'],['maxTotalDocumentBytes','Total document bytes'],['maxRecordBytes','Bytes per record']].map(([key,label]) => <label key={key} className="block text-sm font-medium text-gray-700">{label}<input className={INPUT} type="number" min="1" max={caps[key]} value={profileDraft.limits[key] ?? ''} onChange={setLimit(key)} /><span className="mt-1 block text-xs font-normal text-gray-600">Maximum {caps[key]?.toLocaleString() || 'unavailable'}</span></label>)}</div>
         {!profileValid && <p className="text-xs text-gray-600">Enter a lowercase key, shared instructions, at least one unique document role, and limits within the displayed maximums.</p>}
-        <Button type="button" size="sm" disabled={!profileValid} onClick={publishProfile} loading={busy==='profile'}>Publish profile revision</Button>
+        {pendingProfile && <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><p>The prior publication may have completed. Retry the same revision to resolve it, or refresh and review the latest history before starting a different revision. Latest loaded revision for this key: {latest}.</p>{!pendingMatches && <Button type="button" variant="outline" size="sm" onClick={() => { invalidate(); setProfileDraft(asDraft(pendingProfile.payload.profile)); }}>Restore prior draft</Button>} <Button type="button" variant="link" disabled={!profileReviewed} onClick={() => { invalidate(); pendingProfileRef.current = null; setPendingProfile(null); setProfileReviewed(false); setError(''); }}>Start a different revision after review</Button></div>}
+        <Button type="button" size="sm" disabled={!profileValid || !pendingMatches} onClick={publishProfile} loading={busy==='profile'}>{pendingProfile ? 'Retry profile publication' : 'Publish profile revision'}</Button>
       </fieldset>
-      <fieldset disabled={Boolean(busy) || taskState==='loading'} className="space-y-3 border-t border-gray-200 pt-5"><legend className="sr-only">Synthetic task</legend><h4 className="text-base font-semibold text-gray-900">Synthetic task</h4>
+      <fieldset disabled={Boolean(busy) || catalogLoading || taskState==='loading'} className="space-y-3 border-t border-gray-200 pt-5"><legend className="sr-only">Synthetic task</legend><h4 className="text-base font-semibold text-gray-900">Synthetic task</h4>
         <p className="text-sm text-gray-600">Choose a published profile and preview with fabricated sample data before publishing. No model is called.</p>
-        <div className="grid gap-3 sm:grid-cols-2"><label className="block text-sm font-medium text-gray-700">Task<select className={INPUT} value={taskName} onChange={event => { invalidate(); setTaskName(event.target.value); }}>{catalog.tasks.filter(item => Object.hasOwn(LABELS,item.name)).map(item => <option key={item.name} value={item.name}>{LABELS[item.name]}</option>)}</select></label><label className="block text-sm font-medium text-gray-700">Published profile<select className={INPUT} value={task.profileId} onChange={event => updateTask('profileId',event.target.value)}><option value="">Choose a revision</option>{profiles.map(item => <option key={id(item)} value={id(item)}>{item.profile.key} — revision {item.profile.revision}</option>)}</select></label></div>
+        <div className="grid gap-3 sm:grid-cols-2"><label className="block text-sm font-medium text-gray-700">Task<select className={INPUT} value={taskName} onChange={event => { beginTaskLoad(); setTaskName(event.target.value); }}>{catalog.tasks.filter(item => Object.hasOwn(LABELS,item.name)).map(item => <option key={item.name} value={item.name}>{LABELS[item.name]}</option>)}</select></label><label className="block text-sm font-medium text-gray-700">Published profile<select className={INPUT} value={task.profileId} onChange={event => updateTask('profileId',event.target.value)}><option value="">Choose a revision</option>{profiles.map(item => <option key={id(item)} value={id(item)}>{item.profile.key} — revision {item.profile.revision}</option>)}</select></label></div>
         {taskState==='loading' && <p className="text-sm text-gray-600">Loading task…</p>}
-        {taskState==='blocked' && !conflictCurrent && <Button type="button" variant="link" onClick={() => setTaskRetry(value => value+1)}>Retry task load</Button>}
-        {taskState==='existing' && error && <Button type="button" variant="link" onClick={() => { invalidate(); setTaskRetry(value => value+1); }}>Reload task version</Button>}
+        {taskState==='blocked' && !conflictCurrent && <Button type="button" variant="link" onClick={() => { beginTaskLoad(); setTaskRetry(value => value+1); }}>Retry task load</Button>}
+        {taskState==='existing' && error && <Button type="button" variant="link" onClick={() => { beginTaskLoad(); setTaskRetry(value => value+1); }}>Reload task version</Button>}
         {conflictCurrent && <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3"><details><summary className="cursor-pointer text-sm font-medium text-amber-900">Current version {conflictCurrent.version} instructions</summary><pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words text-xs text-gray-800">{conflictCurrent.body}</pre></details><Button type="button" variant="outline" size="sm" onClick={() => { invalidate(); setTaskVersion(conflictCurrent.version); taskDrafts.current[taskName] = {task,baseVersion:conflictCurrent.version,state:'existing'}; setConflictCurrent(null); setTaskState('existing'); setError(''); }}>Use latest version with my draft</Button></div>}
         <p className="text-xs text-gray-600">{taskState==='new' ? 'New task; publishing creates version 1.' : taskState==='existing' ? `Editing version ${taskVersion}; publishing creates a new version.` : taskState==='blocked' ? 'Task editing is unavailable until its current version is resolved.' : ''}</p>
         <label className="block text-sm font-medium text-gray-700">Task instructions<textarea aria-label="Task instructions" className={INPUT} rows={6} value={task.body} onChange={event => updateTask('body',event.target.value)} /><span className="mt-1 block text-xs font-normal text-gray-600">Use {'{{record_name}}'} for a record declared by the selected profile. Missing values remain explicit.</span></label>
