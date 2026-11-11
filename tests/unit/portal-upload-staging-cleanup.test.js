@@ -8,12 +8,12 @@
  */
 
 jest.mock('@vercel/postgres', () => ({ sql: jest.fn() }));
-jest.mock('@vercel/blob', () => ({ del: jest.fn(), get: jest.fn() }));
+jest.mock('@vercel/blob', () => ({ BlobNotFoundError: jest.requireActual('@vercel/blob').BlobNotFoundError, del: jest.fn(), get: jest.fn() }));
 jest.mock('@vercel/blob/client', () => ({ generateClientTokenFromReadWriteToken: jest.fn() }));
 jest.mock('../../lib/services/sharepoint-cleanup', () => ({ cleanupSharePointItemsDetailed: jest.fn() }));
 
 import { sql } from '@vercel/postgres';
-import { del } from '@vercel/blob';
+import { BlobNotFoundError, del } from '@vercel/blob';
 import { createHash } from 'node:crypto';
 import {
   DEFAULT_CLEANUP_DEPENDENCIES,
@@ -537,4 +537,18 @@ test('a cleanup claim lost to admission performs no remote work', async () => {
   expect(deps.findDocumentByGenerationKey).not.toHaveBeenCalled();
   expect(deps.deleteSiteVisitMaterialCandidate).not.toHaveBeenCalled();
   expect(del).not.toHaveBeenCalled();
+});
+
+
+test('SDK not-found cleanup is settled while unrelated deletion failure stays retryable', async () => {
+  const rows = [
+    candidateRow({ scope: PORTAL_UPLOAD_SCOPES.CONSULTANT_FEEDBACK, candidate: null, id: 'missing' }),
+    candidateRow({ scope: PORTAL_UPLOAD_SCOPES.CONSULTANT_FEEDBACK, candidate: null, id: 'outage' }),
+  ];
+  mockSql(rows);
+  del.mockRejectedValueOnce(new BlobNotFoundError()).mockRejectedValueOnce(new Error('service unavailable'));
+  const result = await cleanupExpiredPortalUploads({}, makeDependencies());
+  expect(result).toMatchObject({ deleted: 1, errors: 1 });
+  const prune = sql.mock.calls.find(([strings]) => strings.join('').includes('DELETE FROM portal_upload_staging'));
+  expect(prune.slice(1)).toContainEqual(['outage']);
 });

@@ -68,7 +68,7 @@ export default async function handler(req, res) {
     }
 
     const fileBuffer = await fileResponse.arrayBuffer();
-    const pdfData = await pdf(Buffer.from(fileBuffer));
+    const pdfData = await pdf(new Uint8Array(fileBuffer));
     const proposalText = pdfData.text;
     const proposalFilename = file.filename;
 

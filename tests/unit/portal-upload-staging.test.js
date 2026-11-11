@@ -1,7 +1,7 @@
 /** @jest-environment node */
 
 jest.mock('@vercel/postgres', () => ({ sql: jest.fn() }));
-jest.mock('@vercel/blob', () => ({
+jest.mock('@vercel/blob', () => ({ BlobNotFoundError: jest.requireActual('@vercel/blob').BlobNotFoundError,
   del: jest.fn(),
   get: jest.fn(),
   head: jest.fn(),
@@ -14,7 +14,7 @@ jest.mock('../../lib/services/sharepoint-cleanup', () => ({
 }));
 
 import { sql } from '@vercel/postgres';
-import { del, get, head } from '@vercel/blob';
+import { BlobNotFoundError, del, get, head } from '@vercel/blob';
 import { generateClientTokenFromReadWriteToken } from '@vercel/blob/client';
 import {
   PORTAL_UPLOAD_SCOPES,
@@ -235,15 +235,25 @@ test('Blob download retries on an ambiguous outage but rejects confirmed absence
   };
   get.mockRejectedValueOnce(Object.assign(new Error('temporary timeout'), { status: 503 }));
   await expect(loadClaimedPortalDocument(args)).rejects.toMatchObject({ code: 'staged_upload_unavailable', httpStatus: 503 });
-  get.mockRejectedValueOnce(Object.assign(new Error('gone'), { name: 'BlobNotFoundError' }));
+  get.mockRejectedValueOnce(new BlobNotFoundError());
   await expect(loadClaimedPortalDocument(args)).rejects.toMatchObject({ code: 'staged_upload_missing', httpStatus: 409 });
+});
+
+test('SDK null download means missing, while undefined remains unavailable', async () => {
+  const args = {
+    row: { id: STAGING_ID, pathname: 'exact', filename: 'x.vtt', declared_content_type: 'text/vtt', max_bytes: 100 },
+    leaseToken: '33333333-3333-4333-8333-333333333333',
+  };
+  get.mockResolvedValueOnce(null).mockResolvedValueOnce(undefined);
+  await expect(loadClaimedPortalDocument(args)).rejects.toMatchObject({ code: 'staged_upload_missing', httpStatus: 409 });
+  await expect(loadClaimedPortalDocument(args)).rejects.toMatchObject({ code: 'staged_upload_unavailable', httpStatus: 503 });
 });
 
 test('metadata admission distinguishes an outage from a missing Blob and an unverified privacy probe', async () => {
   const args = { row: { pathname: 'exact', declared_content_type: 'text/vtt', max_bytes: 100 } };
   head.mockRejectedValueOnce(Object.assign(new Error('temporary timeout'), { status: 503 }));
   await expect(inspectClaimedPortalUploadMetadata(args)).rejects.toMatchObject({ code: 'staged_upload_unavailable', httpStatus: 503 });
-  head.mockRejectedValueOnce(Object.assign(new Error('gone'), { name: 'BlobNotFoundError' }));
+  head.mockRejectedValueOnce(new BlobNotFoundError());
   await expect(inspectClaimedPortalUploadMetadata(args)).rejects.toMatchObject({ code: 'staged_upload_missing', httpStatus: 409 });
   head.mockResolvedValueOnce({ pathname: 'exact', contentType: 'text/vtt', size: 5, url: 'https://private.example/exact' });
   global.fetch.mockRejectedValueOnce(new Error('network down'));
