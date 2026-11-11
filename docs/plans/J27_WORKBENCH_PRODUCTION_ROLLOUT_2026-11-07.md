@@ -79,6 +79,11 @@ these changes:
   exception only when the request's linked Grant Cycle resolves to a cycle
   before 2027. Confirm that every D26 request still to start group review
   has that link; an unlinked one would be refused.
+- **Preview needs `FINAL_WRITEUP_SCHEMA_READY=on`** for its branch to show
+  the review stages (group and leadership review) and to rehearse the Final
+  Assessment list's standing chips. It is set for Production and another
+  rehearsal branch only `[VERIFIED via vercel env ls, 2026-11-11]`, which
+  is why the Preview reported Final writeup review tracking as unavailable.
 - **Preview needs a fourth setting to rehearse group review:**
   `STAFF_DELIBERATIONS_SITE_VISIT_STATE_STATUS_PAIRS` is set for Production
   only. Without it on the Preview a presentation's end reads unknown and,
