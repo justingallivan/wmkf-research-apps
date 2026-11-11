@@ -17,23 +17,24 @@ export default function ReviewerRosterOverview({ candidates, reviewers, loading,
   }
 
   return (
-    <section aria-labelledby="reviewer-roster-heading" className="rounded-xl border border-gray-200 bg-white">
-      <h2 id="reviewer-roster-heading" className="px-5 py-4 text-lg font-semibold text-gray-900">Reviewer roster</h2>
+    // No visible heading: the Roster view button above already names it (owner,
+    // 2026-11-11). The accessible name stays for assistive technology.
+    <section aria-label="Reviewer roster" className="overflow-hidden rounded-xl border border-gray-200 bg-white">
 
       {loading ? (
-        <p role="status" className="border-t border-gray-200 px-5 py-4 text-sm text-gray-600">Loading reviewer roster…</p>
+        <p role="status" className="px-5 py-4 text-sm text-gray-600">Loading reviewer roster…</p>
       ) : (
         <>
           {incomplete && (
-            <p role="status" className="border-t border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900">
+            <p role="status" className="border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-900">
               Some reviewer information couldn’t be loaded.{' '}
               <Button type="button" variant="link" onClick={onRetry}>Retry</Button>
             </p>
           )}
           {people.size > 0 ? (
             <div className="overflow-x-auto">
-              <table aria-labelledby="reviewer-roster-heading" className="w-full text-left text-sm">
-                <thead className="border-y border-gray-200 bg-gray-50 text-gray-700">
+              <table aria-label="Reviewer roster" className="w-full text-left text-sm">
+                <thead className="border-b border-gray-200 bg-gray-50 text-gray-700">
                   <tr>
                     <th scope="col" className="px-5 py-2 font-semibold">Reviewer</th>
                     <th scope="col" className="px-4 py-2 font-semibold">Invitation</th>
@@ -72,8 +73,8 @@ export default function ReviewerRosterOverview({ candidates, reviewers, loading,
               </table>
             </div>
           ) : !incomplete && (
-            <p className="border-t border-gray-200 px-5 py-4 text-sm text-gray-600">
-              No reviewers on this roster yet. Use Find reviewers to search or add a reviewer.
+            <p className="px-5 py-4 text-sm text-gray-600">
+              No reviewers on this roster yet. Use Find to search for or add a reviewer.
             </p>
           )}
         </>
