@@ -59,6 +59,15 @@ these changes:
   are off because their settings are absent. To rehearse them the owner
   adds the first three settings in the table, scoped to the Preview branch,
   after a read-only check that the sandbox has the two fields.
+- **Before promotion: D26 Grant Cycle links (owner-run Production read).**
+  Since `91fc83581` the group-review start guard grants the earlier-cycle
+  exception only when the request's linked Grant Cycle resolves to a cycle
+  before 2027. Confirm that every D26 request still to start group review
+  has that link; an unlinked one would be refused.
+- **Preview needs a fourth setting to rehearse group review:**
+  `STAFF_DELIBERATIONS_SITE_VISIT_STATE_STATUS_PAIRS` is set for Production
+  only. Without it on the Preview a presentation's end reads unknown and,
+  since D63, nobody can start group review there.
 - **Still true below:** the rationale and attendance gates refuse a
   Production deployment whatever the setting says
   (`lib/utils/initial-assessment-rationale-readiness.js`,
