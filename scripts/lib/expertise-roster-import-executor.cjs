@@ -2,7 +2,7 @@
  * atomic bridge transaction. No credentials, schema provisioning, update/delete,
  * consumer cutover, or inferred identity. Inputs are copied before the first await.
  */
-const {planImport, fingerprint} = require('./expertise-roster-import-plan.cjs');
+const {planImport, fingerprint, TEXT_POLICY} = require('./expertise-roster-import-plan.cjs');
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 function check(value, message) { if (!value) throw Error(message); }
 function sameProfile(profile, row) {
@@ -15,6 +15,7 @@ function sameProfile(profile, row) {
 async function executeImport(input, store) {
   const {source, mapping, reviewedPlan} = structuredClone(input);
   check(reviewedPlan && !reviewedPlan.blocked, 'A nonblocked reviewed plan is required');
+  check(reviewedPlan.textPolicy === TEXT_POLICY, 'Text policy changed; review a fresh plan');
   check(reviewedPlan.sourceHash === fingerprint(source) && reviewedPlan.mappingHash === fingerprint(mapping), 'Reviewed inputs changed');
   check(reviewedPlan.targetHost === store.targetHost && mapping.targetHost === store.targetHost, 'Target binding mismatch');
   const floor = source.sequenceHighWater;
@@ -22,12 +23,12 @@ async function executeImport(input, store) {
   // The fresh complete census catches collisions and intervening edits before writes.
   const plan = planImport(source, await store.readTarget(), mapping, [store.targetHost]);
   check(!plan.blocked, 'Fresh target conflicts with the reviewed import');
-  const projection = rows => rows.map(r => ({legacyId:r.legacyId, creationKey:r.creationKey, values:r.values, excluded:r.action==='exclude'}));
+  const projection = rows => rows.map(r => ({legacyId:r.legacyId, creationKey:r.creationKey, values:r.values, normalizedEmptyFields:r.normalizedEmptyFields, excluded:r.action==='exclude'}));
   check(fingerprint(projection(plan.rows)) === fingerprint(projection(reviewedPlan.rows)), 'Reviewed execution payload changed');
   const warnings = rows => rows.map(r => ({key:r.creationKey, warnings:r.warnings}));
   check(fingerprint(warnings(plan.rows)) === fingerprint(warnings(reviewedPlan.rows)), 'Target warnings changed; review a fresh plan');
   await store.preflight(plan);
-  const result = {version:2, targetHost:store.targetHost, datasetId:source.datasetId,
+  const result = {version:2, textPolicy:TEXT_POLICY, targetHost:store.targetHost, datasetId:source.datasetId,
     sourceHash:plan.sourceHash, mappingHash:plan.mappingHash, success:false, bridgeCommitted:false, rows:[]};
   let currentKey = null, currentRow = null, executionPhase = 'reserve-identities';
   try {
@@ -41,7 +42,7 @@ async function executeImport(input, store) {
       executionPhase = 'rows';
       for (const row of plan.rows) {
         currentKey = row.creationKey;
-        currentRow = {creationKey:row.creationKey, legacyId:row.legacyId, rosterId:null,
+        currentRow = {creationKey:row.creationKey, legacyId:row.legacyId, normalizedEmptyFields:row.normalizedEmptyFields, rosterId:null,
           status:'pending', createAttempted:false, profileOutcome:'not-checked'};
         result.rows.push(currentRow);
         const bound = row.legacyId === null ? null : await bridge.lookup(row.legacyId, store.targetHost);
@@ -80,7 +81,7 @@ async function executeImport(input, store) {
     result.rollbackSucceeded = error.rollbackSucceeded ?? null;
     if (currentKey && !currentRow) {
       const planned = plan.rows.find(row => row.creationKey === currentKey);
-      currentRow = {creationKey:currentKey, legacyId:planned.legacyId, rosterId:null,
+      currentRow = {creationKey:currentKey, legacyId:planned.legacyId, normalizedEmptyFields:planned.normalizedEmptyFields, rosterId:null,
         status:'pending', createAttempted:false, profileOutcome:'not-checked'};
       result.rows.push(currentRow);
     }

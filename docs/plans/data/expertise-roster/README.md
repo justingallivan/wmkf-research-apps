@@ -57,7 +57,10 @@ All three files have `version: 1`; see fixtures for envelope shape.
   the maximum exported ID. Do not guess or regenerate lineage for a retry. Original audit columns may be retained and hashed;
   they are not written over Dataverse native audit fields. Preserve the original
   export for historical audit evidence. Unknown columns and excessive lengths
-  block rather than silently truncate. Empty text and null remain distinct.
+  block rather than silently truncate. Original exports and raw hashes preserve empty/null
+  distinctions. Under owner-approved `empty-string-to-null-v1`, the twelve optional
+  text fields map exact empty strings to null in planned target values only; whitespace
+  and nonempty text remain unchanged. Names, categories and identity keys are not normalized.
 - Target: registered exact hostname, `complete: true` and `profiles` from a complete
   paginated export. Every row has canonical `profileGuid`, and normalized `values`
   with explicit `wmkf_name`, `wmkf_creationkey`, `wmkf_contactguid` and
@@ -84,6 +87,10 @@ Stable creation keys derive from source lineage and old numeric ID. Exact keyed
 matches are unchanged; mismatches stop for reconciliation. Linked duplicates are
 blocked including inactive holders. Same-name candidates produce warnings without
 merging. Dataset/source/target/mapping hashes bind each report to its input evidence.
+Plans and execution receipts carry `textPolicy`; each row lists `normalizedEmptyFields`
+without duplicating text. Old plans without the policy marker are refused before the target census or writes
+(the CLI may already have authenticated and connected to Postgres). A new plan must be generated and reviewed; adding the marker to an old payload
+does not bypass the execution-projection guard. Raw source and mapping files stay unchanged.
 
 ## Contract verification
 
@@ -159,7 +166,7 @@ claim that its bridge binding committed.
 
 Replay unchanged inputs only for recoverable transport or transaction failures when
 the keyed profile still exactly matches the reviewed values. A keyed-value mismatch,
-including server normalization of empty strings/state, or a binding conflict **cannot
+including unapproved text/state normalization, or a binding conflict **cannot
 be fixed by unchanged replay**. Stop for separately authorized manual reconciliation
 outside this create-only tool; it never patches/deletes the retained row. Do not alter
 the immutable source, mint new mutation/dataset UUIDs, or change the reviewed payload
@@ -169,8 +176,8 @@ inspect current keyed state and apply the same recovery/reconciliation distincti
 Before a full import, separately authorize a one-row synthetic canary through this
 same executor: use a distinct synthetic lineage, an inactive staged new profile, and
 an empty-string text field. Verify exact read-back and retain the receipt. Count empty
-strings in the approved private source offline before deciding whether normalization
-needs a separately reviewed mapping policy. The November 10 rerun verified inactive creation, then failed because Dataverse
+strings in the approved private source offline before full import to quantify the
+owner-approved policy. The November 10 rerun verified inactive creation, then failed because Dataverse
 normalized the empty role to null; see the live record below. The private-source count remains
 unperformed because the private source evidence is unavailable.
 
@@ -199,8 +206,9 @@ Staff eligibility, new PD staging and placeholder exclusion are recorded in
 Complete the remaining
 schema/audit/keys/permissions verification, integrate consumers, and rehearse
 actual import plus rollback. The atomic inactive-create repair is Fable-reviewed and live-verified.
-The next blocker is an explicit policy for empty-string-to-null normalization; no
-comparison relaxation or mapping change has been authorized or implemented. The owner-reviewed minimal matching
+Justin approved exact empty optional text as null while preserving original source.
+The planner implements this explicit policy; Fable review and a newly planned canary
+rerun are pending. Target comparison remains exact against canonical planned values. The owner-reviewed minimal matching
 prompt contract and verified old-deployment admission/drain remain cutover prerequisites.
 
 ## Historical verification record — November 9, 2026
@@ -278,7 +286,7 @@ rows, zero identities/bindings, and unchanged sequence last_value 4 / is_called 
 No cleanup, PATCH, schema change or real-data import was attempted. Colima and the
 existing dedicated rehearsal container were started and left running.
 
-## Atomic inactive-create repair and live rerun — November 10, 2026
+## Historical atomic inactive-create repair and live rerun — November 10, 2026
 
 [VERIFIED via source, Fable review, batch response and independent readback]
 Commit `83cf6c93c` adds the sandbox-only client operation
@@ -312,10 +320,9 @@ three fixture roster rows, zero identities/bindings, sequence 4 / is_called true
 One inactive synthetic profile now remains; it was not patched or deleted afterward.
 No Production writes or real-data import occurred.
 
-Next: recover the private source and count empty strings, then explicitly review
-whether to canonicalize empty text to null while retaining the immutable source.
-Do not bypass exact comparisons or mutate the retained canary without a reviewed
-reconciliation decision. Unchanged replay is blocked by this known mismatch.
+At this checkpoint, unchanged replay was blocked by the empty/null mismatch.
+Justin subsequently approved canonicalizing exact empty optional text to null while
+retaining immutable source; the current policy is defined in the input contract above.
 Successful bridge allocation/COMMIT/replay and a live forced changeset rollback
 remain unverified; this run proves the two-operation commit and subsequent SQL rollback.
 

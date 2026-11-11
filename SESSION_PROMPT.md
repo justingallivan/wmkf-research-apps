@@ -77,8 +77,9 @@ The inactive-create repair `83cf6c93c` passed Fable review and the same-input li
 rerun: one atomic create/deactivate change set returned two 204s and retained an
 inactive synthetic profile. The canary then failed exact comparison because Dataverse
 converted empty role text to null. SQL rolled back; no bridge binding, sequence unchanged.
-Next: recover the source and count empty strings, review a normalization policy and
-reconcile the retained synthetic profile. Do not blindly replay or relax comparisons.
+Justin approved exact empty optional text as null while preserving original source.
+The versioned planner policy is implemented; Fable review and a new-plan canary rerun
+are pending. Old plans fail closed; target comparison remains exact.
 Successful bridge COMMIT remains unverified. No real import has been performed. The local
 fixture was recovered, but prior private inventory files remain unavailable; do not
 invent replacements for their source lineage or GUIDs. Evidence and runbook:

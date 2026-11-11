@@ -162,3 +162,43 @@ test('identity reservation failure names the unattempted row',async()=>{
  expect(r.failure).toMatchObject({phase:'reserve-identities',creationKey:f.reviewedPlan.rows[0].creationKey});
  expect(r.rows[0]).toMatchObject({status:'failed',createAttempted:false,profileOutcome:'not-checked'});
 });
+
+test('retained normalized new profile binds and replays without create or source mutation',async()=>{
+ const f=fixture(),s=memoryStore();f.mapping.newProfiles[0].row.role='';
+ f.source.rows[0].keywords='';
+ const before={source:structuredClone(f.source),mapping:structuredClone(f.mapping)};
+ f.reviewedPlan=planImport(f.source,await s.readTarget(),f.mapping,[HOST]);
+ for(const row of f.reviewedPlan.rows.filter(r=>r.action!=='exclude'))await s.create(row.values);
+ s.create.mockClear();
+ f.reviewedPlan=JSON.parse(JSON.stringify(planImport(f.source,await s.readTarget(),f.mapping,[HOST])));
+ expect(f.reviewedPlan.rows[2].action).toBe('unchanged');
+ const r=await executeImport(f,s);expect(r.success).toBe(true);expect(r.textPolicy).toBe('empty-string-to-null-v1');
+ expect(r.rows[0].normalizedEmptyFields).toEqual(['keywords']);expect(r.rows[2].normalizedEmptyFields).toEqual(['role']);
+ expect(r.rows[2]).toMatchObject({createAttempted:false,profileOutcome:'observed',rosterId:91});
+ expect(s.create).not.toHaveBeenCalled();expect(f.source).toEqual(before.source);expect(f.mapping).toEqual(before.mapping);
+ expect((await executeImport(f,s)).rows.map(r=>r.rosterId)).toEqual([1,35,91]);expect(s.create).not.toHaveBeenCalled();
+});
+test('old or unknown text policy refuses before target I/O',async()=>{
+ for(const policy of [undefined,'future-policy']){const f=fixture(),s=memoryStore();f.reviewedPlan.textPolicy=policy;
+ await expect(executeImport(f,s)).rejects.toThrow('Text policy changed; review a fresh plan');expect(s.readTarget).not.toHaveBeenCalled();}
+});
+test('normalization evidence tampering fails reviewed projection guard',async()=>{
+ const f=fixture(),s=memoryStore();f.reviewedPlan.rows[0].normalizedEmptyFields=['role'];
+ await expect(executeImport(f,s)).rejects.toThrow('Reviewed execution payload changed');expect(s.bridgeTransaction).not.toHaveBeenCalled();
+});
+test('raw empty-to-null input edits still fail the hash guard',async()=>{
+ const f=fixture(),s=memoryStore();f.mapping.newProfiles[0].row.role='';
+ f.reviewedPlan=planImport(f.source,await s.readTarget(),f.mapping,[HOST]);s.readTarget.mockClear();
+ f.mapping.newProfiles[0].row.role=null;
+ await expect(executeImport(f,s)).rejects.toThrow('Reviewed inputs changed');expect(s.readTarget).not.toHaveBeenCalled();
+});
+test('stale empty payload cannot execute merely by adding the new policy marker',async()=>{
+ const f=fixture(),s=memoryStore();f.mapping.newProfiles[0].row.role='';
+ f.reviewedPlan=planImport(f.source,await s.readTarget(),f.mapping,[HOST]);f.reviewedPlan.rows[2].values.wmkf_role='';
+ await expect(executeImport(f,s)).rejects.toThrow('Reviewed execution payload changed');expect(s.bridgeTransaction).not.toHaveBeenCalled();
+});
+
+test('policy marker without normalization metadata still refuses execution',async()=>{
+ const f=fixture(),s=memoryStore();delete f.reviewedPlan.rows[0].normalizedEmptyFields;
+ await expect(executeImport(f,s)).rejects.toThrow('Reviewed execution payload changed');expect(s.bridgeTransaction).not.toHaveBeenCalled();
+});

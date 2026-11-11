@@ -20,8 +20,10 @@ Content-ID changeset returned two 204 responses and created one inactive synthet
 profile (`statecode:1`, `statuscode:2`). Exact comparison then rejected the role field:
 Dataverse normalized empty string to null. The inactive profile remains, SQL rolled
 back, and final readback shows zero bridge identities/bindings and unchanged sequence 4.
-Successful binding/COMMIT/replay remains unverified. A reviewed empty-text policy and
-retained-row reconciliation are required before proceeding; unchanged replay blocks.
+Successful binding/COMMIT/replay remains unverified. Justin approved empty optional
+text as null with original source preserved. The planner implements versioned policy
+`empty-string-to-null-v1`; Fable review and a new-plan rerun are pending. Old plans
+are refused, and target comparison stays exact against canonical planned values.
 Real roster data has not been imported. See the live canary record in
 `docs/plans/data/expertise-roster/README.md` for receipts and the next blocker. The related
 `expertise_roster_identity` and `expertise_roster_binding` tables exist only in the

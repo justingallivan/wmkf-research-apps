@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { planImport } = require('../../scripts/lib/expertise-roster-import-plan.cjs');
+const { planImport, fingerprint, TEXT_POLICY } = require('../../scripts/lib/expertise-roster-import-plan.cjs');
 const HOST = 'orgd9e66399.crm.dynamics.com';
 const DATASET = '11111111-1111-4111-8111-111111111111';
 const CONTACT = '22222222-2222-4222-8222-222222222222';
@@ -16,11 +16,11 @@ function fixture() {
   return { source: { version: 1, datasetId: DATASET, rows: [row] }, target: { version: 1, complete: true, targetHost: HOST, profiles: [] }, mapping: { version: 1, datasetId: DATASET, targetHost: HOST, rows: [{ legacyId: 1, confirmed: true, staffUserGuid: null, contactGuid: null, active: true, leadPdEligible: false }] } };
 }
 const run = f => planImport(f.source, f.target, f.mapping, [HOST]);
-test('permanent unlinked Board row preserves null/empty text and has deterministic retry identity', () => {
+test('permanent unlinked Board row normalizes empty text while preserving source and has deterministic retry identity', () => {
   const f = fixture(); const r = run(f);
   expect(r.blocked).toBe(false); expect(r.executionAuthorized).toBe(false);
   expect(r.rows[0].creationKey).toBe(`legacy_${DATASET}_1`);
-  expect(r.rows[0].values.wmkf_keywords).toBe(''); expect(r.rows[0].values.wmkf_affiliation).toBeNull();
+  expect(r.rows[0].values.wmkf_keywords).toBeNull(); expect(f.source.rows[0].keywords).toBe(''); expect(r.rows[0].values.wmkf_affiliation).toBeNull();
   expect(run(f)).toEqual(r);
   f.target.profiles.push({ profileGuid: PROFILE, values: r.rows[0].values });
   expect(run(f).rows[0].action).toBe('unchanged');
@@ -101,3 +101,25 @@ test('same-name profiles require human review without merging unlinked people', 
     expect(row.warnings.join()).toContain(PROFILE);
   }
 });
+
+test('every optional empty text is normalized with field evidence while original hashes stay distinct',()=>{
+ const f=fixture(),fields=require('../../lib/services/expertise-finder/roster-contract.cjs').TEXT;
+ for(const key of fields)f.source.rows[0][key]='';
+ const before=structuredClone(f),sourceHash=fingerprint(f.source),rowHash=fingerprint(f.source.rows[0]);
+ const r=run(f);expect(r.blocked).toBe(false);expect(r.textPolicy).toBe(TEXT_POLICY);
+ expect(r.sourceHash).toBe(sourceHash);expect(r.rows[0].sourceHash).toBe(rowHash);
+ expect(r.rows[0].normalizedEmptyFields).toEqual(fields);
+ for(const key of fields)expect(r.rows[0].values['wmkf_'+key.replaceAll('_','')]).toBeNull();
+ expect(f).toEqual(before);
+ const nullSource=structuredClone(f);for(const key of fields)nullSource.source.rows[0][key]=null;
+ const n=run(nullSource);expect(n.rows[0].values).toEqual(r.rows[0].values);
+ expect(n.sourceHash).not.toBe(r.sourceHash);expect(n.rows[0].sourceHash).not.toBe(rowHash);
+ expect(n.rows[0].normalizedEmptyFields).toEqual([]);
+});
+test.each([' ', '\t', '\n', ' text ', '0'])('nonempty optional text %j remains exact',value=>{
+ const f=fixture();f.source.rows[0].role=value;const r=run(f);
+ expect(r.rows[0].values.wmkf_role).toBe(value);expect(r.rows[0].normalizedEmptyFields).not.toContain('role');
+ f.target.profiles=[{profileGuid:PROFILE,values:{...r.rows[0].values,wmkf_role:null}}];
+ expect(run(f).blocked).toBe(true);
+});
+test('empty required name still blocks',()=>{const f=fixture();f.source.rows[0].name='';expect(run(f).blocked).toBe(true);});

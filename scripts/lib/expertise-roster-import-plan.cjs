@@ -4,6 +4,7 @@
  */
 const { createHash } = require('node:crypto');
 const spec = require('../../lib/dataverse/schema/wave-expertise-roster/wmkf_expertiseprofile.json');
+const TEXT_POLICY = 'empty-string-to-null-v1';
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const fields = ['role', 'affiliation', 'orcid', 'preferred_email', 'primary_fields', 'keywords', 'subfields_specialties', 'methods_techniques', 'distinctions', 'expertise', 'keck_affiliation', 'keck_affiliation_details'];
 const category = Object.fromEntries(spec.attributes.find(a => a.schemaName === 'wmkf_Category').options.map(o => [o.label, o.value]));
@@ -67,7 +68,7 @@ function planImport(source, target, mapping, registeredHosts) {
   const entries = [...source.rows.map(row => ({row, m: mapped.get(row?.id), legacy: true})),
     ...additions.map(item => ({row: item.row, m: item.decision, legacy: false, mutationId: item.mutationId}))];
   for (const {row, m, legacy, mutationId} of entries) {
-    const errors = [], warnings = [];
+    const errors = [], warnings = [], normalizedEmptyFields = [];
     let values = null, creationKey = null, existing = null;
     try {
       assert(row && typeof row === 'object', 'source row must be an object');
@@ -97,7 +98,9 @@ function planImport(source, target, mapping, registeredHosts) {
         const value = row[key];
         assert(value === null || typeof value === 'string', `${key}: expected text or null`);
         assert(value === null || value.length <= maxLengths[fieldName(key)], `${key}: exceeds schema length`);
-        values[fieldName(key)] = value;
+        // Preserve the original row/hash; canonicalize only the planned optional text.
+        values[fieldName(key)] = value === '' ? null : value;
+        if (value === '') normalizedEmptyFields.push(key);
       }
       if (row.dataverse_contact_id && row.dataverse_contact_id !== contact) warnings.push('source Contact link differs: retain approved per-target mapping; do not copy source GUID');
       if (row.is_active !== m.active) warnings.push('owner lifecycle override differs from raw import');
@@ -118,7 +121,7 @@ function planImport(source, target, mapping, registeredHosts) {
         for (const [k, v] of Object.entries(values)) assert(Object.hasOwn(existing.values, k) && existing.values[k] === v, `existing keyed profile differs at ${k}; reconcile, do not overwrite`);
       }
     } catch (e) { errors.push(e.message); }
-    const result = { legacyId: legacy ? row?.id ?? null : null, creationKey, action: errors.length ? 'blocked' : m.exclude ? 'exclude' : existing ? 'unchanged' : 'create', profileGuid: existing?.profileGuid ?? null, sourceHash: fingerprint(row), values, errors, warnings };
+    const result = { legacyId: legacy ? row?.id ?? null : null, creationKey, action: errors.length ? 'blocked' : m.exclude ? 'exclude' : existing ? 'unchanged' : 'create', profileGuid: existing?.profileGuid ?? null, sourceHash: fingerprint(row), normalizedEmptyFields, values, errors, warnings };
     results.push(result);
     if (!errors.length) for (const key of linkNames) if (values[key]) sourceLinks.set(`${key}:${values[key]}`, result);
   }
@@ -132,6 +135,6 @@ function planImport(source, target, mapping, registeredHosts) {
     if (sourceMatches.length || targetMatches.length) result.warnings.push(`Possible duplicate name; human review required, never auto-merge. Source IDs: ${sourceMatches.join(',') || 'none'}; target GUIDs: ${targetMatches.join(',') || 'none'}`);
   }
   for (const id of mapped.keys()) assert(sourceIds.has(id), `mapping legacy ID ${id} is absent from source export`);
-  return { version: 1, mode: 'offline-dry-run', datasetId: source.datasetId, targetHost: target.targetHost, sourceHash: fingerprint(source), targetHash: fingerprint(target), mappingHash: fingerprint(mapping), executionAuthorized: false, blocked: results.some(r => r.errors.length > 0), summary: { total: results.length, create: results.filter(r => r.action === 'create').length, unchanged: results.filter(r => r.action === 'unchanged').length, blocked: results.filter(r => r.action === 'blocked').length, exclude: results.filter(r => r.action === 'exclude').length }, rows: results };
+  return { version: 1, textPolicy: TEXT_POLICY, mode: 'offline-dry-run', datasetId: source.datasetId, targetHost: target.targetHost, sourceHash: fingerprint(source), targetHash: fingerprint(target), mappingHash: fingerprint(mapping), executionAuthorized: false, blocked: results.some(r => r.errors.length > 0), summary: { total: results.length, create: results.filter(r => r.action === 'create').length, unchanged: results.filter(r => r.action === 'unchanged').length, blocked: results.filter(r => r.action === 'blocked').length, exclude: results.filter(r => r.action === 'exclude').length }, rows: results };
 }
-module.exports = { planImport, fingerprint };
+module.exports = { planImport, fingerprint, TEXT_POLICY };
