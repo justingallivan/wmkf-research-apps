@@ -83,7 +83,9 @@ describe('fact mapping', () => {
     });
     expect(j27FinalWriteupInputs({ error: true }, null)).toEqual({ boardDraft: { status: 'unavailable' }, transition: { status: 'unavailable' } });
     expect(j27FinalWriteupInputs({ error: true, code: 'final_writeup_source_missing' }, null)).toEqual({ boardDraft: { status: 'present', exists: false }, transition: { status: 'present', phase: null } });
-    expect(j27FinalWriteupInputs({ error: true, code: 'final_writeup_source_ineligible' }, null)).toEqual({ boardDraft: { status: 'unavailable' }, transition: { status: 'unavailable' } });
+    // A draft not yet shared for review is "no Board draft", as the server's documentFacts says
+    // (later-phase lists plan, step 1). Step E had mapped it to unavailable; list and page now agree.
+    expect(j27FinalWriteupInputs({ error: true, code: 'final_writeup_source_ineligible' }, null)).toEqual({ boardDraft: { status: 'present', exists: false }, transition: { status: 'present', phase: null } });
     expect(j27FinalWriteupInputs({ available: false, phase: 'unavailable' }, null)).toEqual({ boardDraft: { status: 'unavailable' }, transition: { status: 'unavailable' } });
   });
 });
@@ -269,5 +271,56 @@ describe('server-supplied later-phase facts (stageFacts)', () => {
       expect(pick(deriveJ27PageStage(server, pageFacts))).toEqual(pick(list));
       expect(list.phase).not.toBe('initial-assessment');
     });
+  });
+});
+
+describe('report order and reopened drafts (Codex build review 3)', () => {
+  const server = (over = {}) => ({
+    request: { status: 'present', cycleCode: 'J27', phaseIStatus: 100000003, requestStatus: 'Phase II Pending', statusClass: 'IN_FLIGHT' },
+    visitAssessment: { status: 'present' },
+    roster: { status: 'present', stale: false },
+    presentation: { status: 'present', exists: true, id: 'v1', ended: true, legacyException: false },
+    boardDraft: { status: 'present', exists: true },
+    transition: { status: 'present', phase: null },
+    ...over,
+  });
+
+  test('a reopened draft reported after resolution replaces the server\'s "draft exists"', () => {
+    const facts = { finalWriteup: { error: true, code: 'final_writeup_source_ineligible' }, order: { finalWriteup: 1 } };
+    const input = composeJ27PageInput(server(), facts);
+    expect(input.boardDraft).toEqual({ status: 'present', exists: false });
+    const stage = deriveJ27PageStage(server(), facts);
+    expect(stage.taskKeys).toContain('write-board-draft');
+    expect(stage.taskKeys).not.toContain('start-group-review');
+    // Any other failed status read leaves the server's facts alone.
+    expect(composeJ27PageInput(server(), { finalWriteup: { error: true, code: 'something_else' } }).boardDraft)
+      .toEqual({ status: 'present', exists: true });
+  });
+
+  const fwBefore = { stageFacts: {
+    presentation: { status: 'present', exists: true, id: 'v1', ended: false, legacyException: false },
+    boardDraft: { status: 'present', exists: true }, transition: { status: 'present', phase: null },
+  }, available: true };
+  const overviewAfter = { meeting: { presentation: true, stageFacts: {
+    presentation: { status: 'present', exists: true, id: 'v1', ended: true, legacyException: false },
+    roster: { status: 'present', stale: false },
+  } } };
+
+  test('a newer Overview read wins over an older Final Writeup read of the presentation', () => {
+    const facts = { finalWriteup: fwBefore, overview: overviewAfter, order: { finalWriteup: 1, overview: 2 } };
+    expect(composeJ27PageInput(server(), facts).presentation.ended).toBe(true);
+    expect(deriveJ27PageStage(server(), facts).blockerKeys).not.toContain('presentation-not-ended');
+  });
+
+  test('a newer Final Writeup read wins over an older Overview read', () => {
+    const facts = { finalWriteup: fwBefore, overview: overviewAfter, order: { overview: 1, finalWriteup: 2 } };
+    expect(composeJ27PageInput(server(), facts).presentation.ended).toBe(false);
+  });
+
+  test('with server facts loaded, a failed or older-shaped Overview meeting read leaves them alone', () => {
+    const failed = { overview: { meeting: null }, order: { overview: 1 } };
+    expect(composeJ27PageInput(server(), failed).presentation.ended).toBe(true);
+    const legacyShape = { overview: { meeting: { presentation: true, presentationId: 'v1', roster: true } }, order: { overview: 1 } };
+    expect(composeJ27PageInput(server(), legacyShape).presentation.ended).toBe(true);
   });
 });

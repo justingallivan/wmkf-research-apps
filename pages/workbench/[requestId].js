@@ -98,10 +98,17 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
   j27RouteRef.current = routeKey;
   // Only the request on the current route may report facts: a late callback from a
   // previous request is dropped, never merged and never allowed to replace the set.
+  // Each report is stamped with the order it landed in, so the composer can let
+  // the latest report of a shared key win (j27PageStage.js composeJ27PageInput).
+  const j27ReportSeq = useRef(0);
   const reportJ27Facts = useCallback((factsRequestId, patch) => {
     const key = String(factsRequestId || '').toLowerCase();
     if (!key || key !== j27RouteRef.current) return;
-    setJ27Facts((prev) => (prev.requestId === key ? { ...prev, ...patch } : { requestId: key, ...patch }));
+    j27ReportSeq.current += 1;
+    const stamp = Object.fromEntries(Object.keys(patch || {}).map((name) => [name, j27ReportSeq.current]));
+    setJ27Facts((prev) => (prev.requestId === key
+      ? { ...prev, ...patch, order: { ...(prev.order || {}), ...stamp } }
+      : { requestId: key, ...patch, order: stamp }));
   }, []);
   useEffect(() => { setJ27Facts({ requestId: routeKey }); }, [routeKey]);
   const routeStateRef = useRef({ key: routeKey, generation: 0 });
