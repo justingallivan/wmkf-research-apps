@@ -9,7 +9,8 @@ scoped lint, types, model-warming and DAL gates/self-tests passed. The transcrip
 pending final transport run is historical. The reviewer did not execute these checks.
 
 This closes source/build review for the minimal venue, not live attachment or model
-proof. Exact shared-storage and metered-model approval remains pending. D99 batch
+proof. The subsequently authorized run and final cleanup are recorded in
+[final results](LIVE_ATTACHMENT_MATCHING_RESULTS_2026-11-11.md). D99 batch
 execution, if approved, will be actual authenticated same-origin route proof, not
 cycle-picker proof. See [preflight evidence](LIVE_VENUE_PREFLIGHT_2026-11-11.md).
 

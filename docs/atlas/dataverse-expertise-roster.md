@@ -95,7 +95,14 @@ removed. See `docs/plans/data/expertise-roster/LINKED_CONTACT_REHEARSAL_2026-11-
 
 The minimal attachment/matching venue subsequently passed source review and build
 checks plus a real OAuth zero-write Reviews/form preflight. All 46 profiles and
-public SQL remained unchanged and the fixture was removed. No live attachment or
-model proof follows from this; exact storage/model approvals remain pending. See
+public SQL remained unchanged and the fixture was removed. This historical preflight alone established no live attachment or model proof;
+the subsequently authorized run is recorded below. See
 `docs/plans/data/expertise-roster/LIVE_VENUE_PREFLIGHT_2026-11-11.md` for known shell
 limitations and final 194-test/12-suite evidence.
+
+Authorized live attachments and batch route/service matching subsequently passed.
+The first paid single attempt failed before persistence; a successful live single
+rerun remains unproved. Final cleanup verified exact external objects absent,
+Superseded registry audit retained, owned SQL schema removed and all 46 roster
+values/ETags plus public SQL unchanged. No Production promotion occurred. See
+`docs/plans/data/expertise-roster/LIVE_ATTACHMENT_MATCHING_RESULTS_2026-11-11.md`.

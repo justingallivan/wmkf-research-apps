@@ -1,27 +1,24 @@
 # Remaining roster flow rehearsal
 
-Linked-Contact lifecycle passed; consultant-feedback attachments remain planned using
-the existing local real-Entra browser venue, the registered Dataverse sandbox
-and disposable Postgres. Keep prior public fixture and historical import receipts
-unchanged. Obtain an Opus 5.5 plan review before code or venue changes and a build
-review after verification. Opus 5.5 returned READY WITH NAMED CHANGES for the
-strict destination repair and linked-Contact rehearsal. Both now passed their
-bounded source/browser verification; see [evidence](LINKED_CONTACT_REHEARSAL_2026-11-11.md). Live attachments still
-require the venue changes and shared-resource approvals below. This plan proposes
-no new storage infrastructure.
+[VERIFIED via actual browser/route execution and final private cleanup receipts]
+Authorized live attachments passed save/reload, hash-exact download, consumed replay,
+wrong-request refusal and delete. The second approved model submission succeeded as
+batch route/service proof, persisted actor-owned results and rendered History; D99
+was not tested through the picker. The first paid single call failed before result
+persistence; its normalized-text repair is controlled-test verified but not live
+rerun. Exact Graph/Blob cleanup, owned schema drop, unchanged public SQL/all 46 roster
+profiles and temporary-file/server removal passed. The Superseded registry audit
+row remains. See [final results](LIVE_ATTACHMENT_MATCHING_RESULTS_2026-11-11.md).
+A successful live single rerun requires new metered authorization and a new temporary
+venue/storage setup. No full matching completion or Production promotion is claimed.
 
-## Current live-venue implementation and approval status
+## Executed venue contract
 
-[VERIFIED via source, final checks and Opus build review] The coordinating session accepted the minimal real-code-path design and
-[Opus named changes](LIVE_VENUE_PLAN_OPUS_5_5_REVIEW_2026-11-11.md). The minimal transport, staging, runner, model-pin and usage-logger changes are
-source-built, with Opus READY and 194 tests/12 suites passing. This establishes
-no live paid/storage proof; see [evidence](LIVE_VENUE_PREFLIGHT_2026-11-11.md).
-Approval has been requested and remains pending for two synthetic SharePoint copies
-plus the `Consultant Feedback` child folder, private and public Blob usage and two
-Anthropic `claude-sonnet-5-5` submissions. Exact targets and harmless PDF metadata
-are in the private `attachment-approval-candidate` manifest and `live-checks-proposal`
-metadata. No new storage infrastructure, Graph upload branch, credential alias or
-unique staging index is part of this work.
+The source-built minimal transport, staging, runner, model guard and logger passed
+Opus review and bounded tests/build. User approval covered the named storage objects
+and two model submissions; that bounded run is finished and cleaned up. The contract
+below records its authorized execution, not reusable authorization for another run.
+No new storage infrastructure or special Graph upload path was added.
 
 ## Verified boundaries
 
@@ -129,7 +126,7 @@ absence of unrelated platform automation. Verify the Contact independently.
 
 ## Attachment rehearsal and separate shared-resource approval
 
-[PLANNED] Candidate venue uses one existing synthetic Request in sandbox with
+[EXECUTED CONTRACT] Candidate venue uses one existing synthetic Request in sandbox with
 exactly one verified document location of any state, a known library/drive and an exact
 synthetic child folder on registered shared `akoyago-shared`. Use
 `wmkf-uploads-private` only with explicit owner approval for one exact
@@ -156,7 +153,7 @@ row deleting, supersedes the registry row and deletes SQL. It does not delete
 the successful SharePoint item. The staff feedback GET can sweep unfinished
 deletions, so even readback requires an isolated fixture.
 
-1. [PLANNED] After approval, pin the exact Request GUID/number and its active
+1. [EXECUTED CONTRACT] After approval, pin the exact Request GUID/number and its active
    sandbox location with complete read-only queries. Require exactly one
    Request location across all states. Verify its resolved parent library and
    actual Graph site/drive/folder IDs. Prove the resolved bucket library drive equals
@@ -190,7 +187,7 @@ deletions, so even readback requires an isolated fixture.
    flags alone do not choose among multiple valid locations. Map any resolver
    failure to the existing retryable `folder_unavailable` 503. Other writers
    using non-strict location lookup remain outside this change.
-4. [PLANNED] In the real browser, use one harmless synthetic PDF and a one-off
+4. [EXECUTED CONTRACT] In the real browser, use one harmless synthetic PDF and a one-off
    consultant name to exercise attachment-only create without depending on
    roster-binding setup. Capture staged lease scope, actual byte hash, private
    object behavior, Graph drive/item, registry ID/status, and feedback ID.
@@ -200,7 +197,7 @@ deletions, so even readback requires an isolated fixture.
    IDs and exactly one Graph object. This is consumed-staging replay evidence,
    not proof of intermediate recovery paths. No replacement or additional file is
    necessary for this bounded proof. Shared briefing is outside this run.
-5. [PLANNED] Delete through the UI and confirm absent feedback row, Superseded
+5. [EXECUTED CONTRACT] Delete through the UI and confirm absent feedback row, Superseded
    registry record, and refused staff attachment read. Remove only the
    separately approved exact Graph item and any exact persisted staged Blob
    path still present. Confirm both missing. Retain the superseded audit row as
@@ -214,7 +211,7 @@ deletions, so even readback requires an isolated fixture.
    removal while any staging row exists, feedback differs from its seeded baseline,
    or the retention query fails. Keep that SQL evidence for partial-success recovery.
 
-[PLANNED] Use synthetic bytes with the optional Cloudmersive scan off in this
+[EXECUTED CONTRACT] Use synthetic bytes with the optional Cloudmersive scan off in this
 venue, unless that named metered product is separately authorized. This proves
 the attachment pipeline under that configuration. Existing controlled tests
 cover scanner and intermediate transport failures. Real storage proof requires
@@ -222,7 +219,7 @@ the named approvals above and does not follow from green tests alone.
 
 ## Live venue preflight
 
-[PLANNED] Before any approved write or paid call, load the synthetic Request workbench
+[EXECUTED CONTRACT] Before any approved write or paid call, load the synthetic Request workbench
 with zero writes and inspect its actual dependencies. A 500 blocks continuation.
 The route import scan alone does not establish all Reviews-tab service compatibility.
 Keep scanning off; no Cloudmersive usage is authorized. Use the existing Graph path,
@@ -238,8 +235,8 @@ The snapshot contained 40 active profiles and three eligible leads. The
 synthetic prompt pair was 57,470 UTF-8 bytes. Treat a one-byte-per-token
 estimate only as a sizing heuristic. The probe made no inference call.
 
-[PLANNED] Continue controlled transport and persistence checks without paid
-calls. A live single/batch run requires explicit named Anthropic
+[EXECUTED CONTRACT] Continue controlled transport and persistence checks without paid
+calls. Any new live single/batch run requires explicit named Anthropic
 `claude-sonnet-5-5` authorization after disclosure that it may cost money.
 The implemented pre-inference guard pins `claude-sonnet-5-5` and maxTokens 4096 in browser mode inside
 `assertRosterPrompt`, covering single and batch before inference; refuse any mismatch.
@@ -257,9 +254,8 @@ to four attempts on 429/529 plus one corrective deprecated-parameter retry. Time
 are not retried but may still be billed; no fallback model is configured. Keep
 matching receipts separate from attachment and linked-person evidence.
 
-[PLANNED] After exact approval, temporarily serve the private inert
+[EXECUTED CONTRACT] After exact approval, temporarily serve the private inert
 `roster-batch-rehearsal.html` locally. Its ordinary HTML form POSTs once to the
 same-origin `/api/expertise-finder/batch-match` with the exact Request 1000339.
 Use the real signed-in browser and normal URL-encoded route parsing; no injected
-cookies, developer-console fetch, test auth, new API or picker change. The file
-has not been published or submitted. This is route/service proof, not picker proof.
+cookies, developer-console fetch, test auth, new API or picker change. The temporary route form was submitted during the authorized run and has been removed. This is route/service proof, not picker proof.

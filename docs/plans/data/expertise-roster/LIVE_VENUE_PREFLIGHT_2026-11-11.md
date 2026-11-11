@@ -1,5 +1,19 @@
 # Live attachment and matching venue — preflight evidence
 
+[VERIFIED via actual browser/route execution and final private cleanup receipts]
+Authorized live attachments passed save/reload, hash-exact download, consumed replay,
+wrong-request refusal and delete. The second approved model submission succeeded as
+batch route/service proof, persisted actor-owned results and rendered History; D99
+was not tested through the picker. The first paid single call failed before result
+persistence; its normalized-text repair is controlled-test verified but not live
+rerun. Exact Graph/Blob cleanup, owned schema drop, unchanged public SQL/all 46 roster
+profiles and temporary-file/server removal passed. The Superseded registry audit
+row remains. See [final results](LIVE_ATTACHMENT_MATCHING_RESULTS_2026-11-11.md).
+A successful live single rerun requires new metered authorization and a new temporary
+venue/storage setup. No full matching completion or Production promotion is claimed.
+
+## Historical preflight checkpoint
+
 [VERIFIED via the coordinating session's final checks and exact Opus review] The
 minimal venue is source-built and Opus returned READY. The final single command
 passed 194 tests across 12 suites (`outputs/roster-final-focused-tests.log`). Build
@@ -29,7 +43,7 @@ made that every request succeeded or all app surfaces work in this venue.
 Screenshot: `roster-attachment-preflight.jpg` in the session's private visualization
 artifacts. No actual attachment upload or model inference ran.
 
-Exact shared-storage and metered-model approval remains pending. The existing
+At this preflight checkpoint, exact shared-storage and metered-model approval was pending. The existing
 [remaining plan](REMAINING_FLOW_REHEARSAL_2026-11-11.md) governs scope, external
 object receipts, residual retention and cleanup. Runtime build/preflight success
 does not authorize or prove live attachment or paid matching execution.

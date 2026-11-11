@@ -10,13 +10,14 @@ credential alias or unique staging index is added. Browser-only model/max-token
 pinning belongs in `assertRosterPrompt`. The synchronous usage-logger SQL failure
 must be caught; documenting the missing row alone is insufficient.
 
-Owner approval has been requested and remains pending for two SharePoint PDF copies
+The owner subsequently approved the bounded run for two SharePoint PDF copies
 and their child folder, private/public Blob usage and two `claude-sonnet-5-5`
 submissions. The private `attachment-approval-candidate` manifest and
 `live-checks-proposal` metadata identify the exact proposed scope; this archive is
 not authorization to write or incur usage. The batch picker covers 2020 through
 next year and excludes D99, so the proposed fixture can support route/service proof,
-not picker proof. See the [revised contract](REMAINING_FLOW_REHEARSAL_2026-11-11.md).
+not picker proof. The authorized run is finished and cleaned up; see
+[final results](LIVE_ATTACHMENT_MATCHING_RESULTS_2026-11-11.md). See the [revised contract](REMAINING_FLOW_REHEARSAL_2026-11-11.md).
 
 Source transcript: `outputs/roster-live-venue-plan-opus.md`, preserved verbatim below.
 

@@ -171,10 +171,18 @@ A zero-write real OAuth Workbench Reviews/Add Feedback preflight loaded and canc
 without upload/save; all 46 profiles/public SQL were unchanged and fixture removed.
 Known direct-Vercel shell/synthesis limitations remain bounded in
 `docs/plans/data/expertise-roster/LIVE_VENUE_PREFLIGHT_2026-11-11.md`.
-Next: actual shared-storage attachment proof and live model matching, each pending
-its named authorization, and deliberate public cutover
-and deployment admission. Bounded SQL rollback is verified; this browser pass is
-limited to the named editor/history surfaces.
+[VERIFIED via final live receipts] Authorized attachment save/download/replay/delete
+and batch route/service matching passed, including actor-owned persistence/History.
+The first paid single call failed before save; normalized-text repair `102f19332`
+passed 40 focused tests/build, but no successful live single rerun occurred within
+the two-call limit. PDF/Blob repair `27fd99574` passed its separate 245-test/16-suite
+checkpoint; these overlapping runs are not summed. Exact Graph/Blob cleanup, owned
+schema drop, server/temporary-file removal and unchanged public SQL/all 46 profiles
+passed. The Superseded registry audit row remains. See
+`docs/plans/data/expertise-roster/LIVE_ATTACHMENT_MATCHING_RESULTS_2026-11-11.md`.
+Next: a successful live single rerun requires new metered approval and a new temporary
+venue/storage setup. Batch picker proof and deliberate public cutover/deployment
+admission remain separate; no full matching completion or Production promotion.
 The local import fixture is not a full application schema; do not claim full app UAT.
 Justin approved the minimal matching contract: active explicitly lead-eligible staff
 with enabled User links only for lead; other active staff may be consulted; validated

@@ -217,10 +217,23 @@ returned READY; the final single run passed 194 tests across 12 suites, with bui
 scoped lint, types and model-warming/DAL gates+self-tests passing. Reviews, Add
 Feedback and a one-off form loaded and were canceled without save/upload. All 46
 profiles and public SQL were unchanged; the disposable fixture was removed. Known
-shell/synthesis direct-Vercel errors limit this proof. Actual shared storage/model
-execution remains pending named approval; no Production write, push or deployment.
-See [bounded evidence](LIVE_VENUE_PREFLIGHT_2026-11-11.md). The proposed D99 batch
-HTML-form submission is planned authenticated route proof, not picker proof.
+shell/synthesis direct-Vercel errors limit this proof. At that preflight checkpoint actual shared storage/model execution was pending approval; no Production write, push or deployment.
+See [bounded evidence](LIVE_VENUE_PREFLIGHT_2026-11-11.md). At that checkpoint, D99 batch
+HTML-form submission was planned authenticated route proof, not picker proof.
+
+## Final authorized live results
+
+[VERIFIED via actual browser/route execution and final private cleanup receipts]
+Authorized live attachments passed save/reload, hash-exact download, consumed replay,
+wrong-request refusal and delete. The second approved model submission succeeded as
+batch route/service proof, persisted actor-owned results and rendered History; D99
+was not tested through the picker. The first paid single call failed before result
+persistence; its normalized-text repair is controlled-test verified but not live
+rerun. Exact Graph/Blob cleanup, owned schema drop, unchanged public SQL/all 46 roster
+profiles and temporary-file/server removal passed. The Superseded registry audit
+row remains. See [final results](LIVE_ATTACHMENT_MATCHING_RESULTS_2026-11-11.md).
+A successful live single rerun requires new metered authorization and a new temporary
+venue/storage setup. No full matching completion or Production promotion is claimed.
 
 ## Historical Fable empty-text source review transcript
 

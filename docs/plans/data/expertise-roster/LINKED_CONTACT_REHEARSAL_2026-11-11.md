@@ -22,8 +22,8 @@ The final focused run passed 77 tests across three suites: 29 attachment,
 12 controlled matching and 36 linked-service tests, without live inference.
 See the [exact review](REMAINING_CHECKS_BUILD_OPUS_5_5_REVIEW_2026-11-11.md).
 
-Actual shared-storage attachments remain pending exact fixture/store/folder approval,
-including named Blob usage. Live model execution remains pending named model/spend
-authorization. User lifecycle and inactive/missing Contact refusals remain controlled
+At this linked-Contact checkpoint, shared-storage attachments and live model
+execution remained pending authorization. The subsequent authorized run and cleanup
+are recorded in [final results](LIVE_ATTACHMENT_MATCHING_RESULTS_2026-11-11.md). User lifecycle and inactive/missing Contact refusals remain controlled
 test evidence, not live people mutations. Public cutover/deployment admission is
 separate. See the [remaining plan](REMAINING_FLOW_REHEARSAL_2026-11-11.md).
