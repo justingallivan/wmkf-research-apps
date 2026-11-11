@@ -8,16 +8,25 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 const mockComplete = jest.fn();
+const mockNativeSchemaOverride = jest.fn();
 jest.mock('../../lib/services/llm-client.js', () => ({
   DEFAULT_TIMEOUT_MS:120000,LLMClient:jest.fn().mockImplementation(()=>({complete:mockComplete})),
 }));
+jest.mock('../../lib/services/expertise-finder/recommendations-output-schema.js', () => ({
+  buildRecommendationsOutputSchema: args => {
+    const schema = jest.requireActual('../../lib/services/expertise-finder/recommendations-output-schema.js')
+      .buildRecommendationsOutputSchema(args);
+    return mockNativeSchemaOverride(schema);
+  },
+}));
 jest.mock('../../lib/dataverse/adapters/grant-request.js',()=>({getById:jest.fn(()=>{throw new Error('live read forbidden');}),updateById:jest.fn(()=>{throw new Error('live write forbidden');})}));
 jest.mock('../../lib/dataverse/adapters/ai-run.js',()=>({create:jest.fn(()=>{throw new Error('live audit forbidden');})}));
+import { LLMClient } from '../../lib/services/llm-client.js';
 import { executePrompt } from '../../lib/services/execute-prompt.js';
 import { createPromptJobStore } from '../../lib/services/prompt-jobs/store.js';
 import { advanceJob } from '../../lib/services/prompt-jobs/worker.js';
-import { canonical, hashProfile, sha256 } from '../../lib/services/prompt-jobs/profile.js';
-import { composeProfileTask, prepareContextSnapshot, recommendationSourceProof, sandboxRecommendationSourceProof } from '../../lib/services/prompt-jobs/context.js';
+import { canonical, hashProfile, parseExecutionSpec, sha256 } from '../../lib/services/prompt-jobs/profile.js';
+import { composeProfileTask, effectiveProviderOutputSchema, prepareContextSnapshot, recommendationSourceProof, sandboxRecommendationSourceProof } from '../../lib/services/prompt-jobs/context.js';
 import { createRecommendationsReader } from '../../lib/services/prompt-jobs/recommendations-reader.js';
 import { readStaffRecommendation } from '../../lib/services/prompt-jobs/staff-recommendations-service.js';
 import { readRecommendationsAccessPolicy, readRecommendationsTrialPolicy, RECOMMENDATIONS_SANDBOX_ORIGIN, RECOMMENDATIONS_TRIAL_PREDECESSOR_JOB_ID, RECOMMENDATIONS_TRIAL_SECOND_JOB_ID } from '../../lib/services/prompt-jobs/recommendations-sandbox-policy.js';
@@ -49,28 +58,34 @@ function providerResponse(text='RESULT_CANARY This synthetic response describes 
     usage:{inputTokens:100,outputTokens:20,cacheCreationTokens:80,cacheReadTokens:0}};
 }
 
-function expertiseFixture({ withSourceProof = false } = {}) {
-  const requestId = randomUUID();
-  const scope = { environment: 'test', authorizationScope: `expertise-fixture:${randomUUID()}`, requestId };
+function expertiseFixture({ withSourceProof = false, compilerVersion = 1, stable = false, roles = [], model, documentLimit } = {}) {
+  const id = stable ? n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}` : () => randomUUID();
+  const requestId = id(1);
+  const scope = { environment: 'test', authorizationScope: `expertise-fixture:${id(2)}`, requestId };
   const owner = { ...scope, principalKey: 'app:offline-fixture' };
   const documentRoles = withSourceProof ? ['proposal', 'fixture-appendix'] : ['proposal'];
   const expertiseProfile = { ...profile, documentRoles, recordNames: ['roster_block'],
-    limits: { ...profile.limits, maxDocuments: documentRoles.length, maxRecordBytes: 64_000 } };
-  const profileGuid = randomUUID();
-  const userGuid = randomUUID();
+    limits: { ...profile.limits, maxDocuments: documentRoles.length, maxRecordBytes: 64_000,
+      ...(documentLimit ? { maxDocumentBytes: documentLimit, maxTotalDocumentBytes: documentLimit } : {}) } };
+  const profileGuid = id(3);
+  const userGuid = id(4);
   const etag = 'W/"987654321"';
   const rosterProjection = { complete: true, users: [{ userGuid, disabled: false }], profiles: [{
     ...Object.fromEntries(roster.TEXT.map(key => [key, null])),
     profile_guid: profileGuid, etag, name: 'Fixture Lead', role_type: 'Research Program Staff',
     is_active: true, lead_pd_eligible: true, dataverse_user_id: userGuid, dataverse_contact_id: null,
     expertise: 'VISIBLE_ROSTER_CANARY first line\nSecond line',
-  }] };
+  }, ...roles.map((role, i) => ({
+    ...Object.fromEntries(roster.TEXT.map(key => [key, null])),
+    profile_guid: id(6 + i), etag, name: `Fixture ${role}`, role_type: role, is_active: true,
+    lead_pd_eligible: false, dataverse_user_id: null, dataverse_contact_id: null,
+  }))] };
   const built = buildRecommendationsSnapshot(rosterProjection);
-  const promptRow = { ...prompt('executive-summary'), wmkf_ai_promptname: EXPERTISE_TASK_KEY,
-    wmkf_ai_maxtokens: 4096, wmkf_ai_promptbody: 'Recommend expertise for this proposal. {{roster_block}}',
+  const promptRow = { ...prompt('executive-summary'), wmkf_ai_promptid: id(5), wmkf_ai_promptname: EXPERTISE_TASK_KEY,
+    ...(model ? { wmkf_ai_model: model } : {}), wmkf_ai_maxtokens: 4096, wmkf_ai_promptbody: 'Recommend expertise for this proposal. {{roster_block}}',
     wmkf_ai_promptvariables: JSON.stringify({ execution: { contractVersion: 2, mode: 'shared-document-task',
       profile: { key: expertiseProfile.key, revision: expertiseProfile.revision, sha256: hashProfile(expertiseProfile) },
-      resultContract: EXPERTISE_RESULT_CONTRACT, compilerVersion: 1 }, variables: [
+      resultContract: EXPERTISE_RESULT_CONTRACT, compilerVersion }, variables: [
       { name: 'proposal_context', source: { kind: 'prepared_context' }, required: true },
       { name: 'roster_block', source: { kind: 'frozen_record' }, required: true },
     ] }),
@@ -95,6 +110,43 @@ function expertiseFixture({ withSourceProof = false } = {}) {
     staff_assignment: { primary: { profile_guid: profileGuid }, secondary: null } };
   return { owner, input, promptRow, snapshotArgs, snapshot, built, rosterHash, etag, userGuid, output, rosterProjection, sourceObservation };
 }
+
+function fixtureExecution(f) {
+  const { profile: definition, scope } = f.snapshotArgs;
+  return {
+    promptName: EXPERTISE_TASK_KEY, requestId: f.owner.requestId, promptSnapshot: f.promptRow,
+    runSource: 'Vercel Test', requireNoPersistence: true, auditMode: 'deferred', auditRetention: 'content-free',
+    profiledContext: { profile: definition, scope, snapshot: f.snapshot, nonceSecret, rosterHash: f.rosterHash },
+    onDispatch: jest.fn(), onResponse: jest.fn(),
+  };
+}
+
+function mockProviderWire(output) {
+  const actual = jest.requireActual('../../lib/services/llm-client.js');
+  LLMClient.mockImplementationOnce(options => new actual.LLMClient(options));
+  return jest.spyOn(globalThis, 'fetch').mockImplementation(async (url, options) => {
+    expect(url).toBe('https://api.anthropic.com/v1/messages');
+    expect(options.method).toBe('POST');
+    return new Response(JSON.stringify({
+      model: 'claude-sonnet-4-6', stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify(output) }],
+      usage: { input_tokens: 100, output_tokens: 20, cache_creation_input_tokens: 80, cache_read_input_tokens: 0 },
+    }), { status: 200 });
+  });
+}
+
+function nativeFixtureOutput(fixture) {
+  return {
+    proposal_summary: {}, staff_assignment: {
+      primary: { ...fixture.output.staff_assignment.primary, rationale: 'Fabricated central claim match.' }, secondary: null,
+    },
+    staff_consultation: [],
+    ...(fixture.rosterProjection.profiles.some(row => row.role_type === 'Consultant') ? { consultant_overlap: [] } : {}),
+    ...(fixture.rosterProjection.profiles.some(row => row.role_type === 'Board') ? { board_interest: [] } : {}),
+    expertise_gaps: { has_gaps: false, description: null }, conflicts: [],
+  };
+}
+
+beforeEach(() => { mockNativeSchemaOverride.mockReset().mockImplementation(schema => schema); });
 
 suite('shared prompt job synthetic vertical trial',()=>{
   let admin,pool,store,schema;
@@ -254,6 +306,152 @@ suite('shared prompt job synthetic vertical trial',()=>{
       tick: extra => advanceJob({ ...args, ...extra }),
     };
   }
+
+  async function savedCheckpoint(trial) {
+    const { attempts: [attempt] } = await trial.read();
+    const { rows: [content] } = await pool.query('SELECT payload FROM prompt_job_content WHERE id=$1', [attempt.response_content_id]);
+    return JSON.parse(content.payload);
+  }
+
+  test('compiler 1 preserves the pre-native composed bytes, actual wire body and checkpoint binding', async () => {
+    const t = await typedTrial(expertiseFixture({ stable: true }));
+    const { system, body, userContent, prefixHash } = composeProfileTask({ ...t.snapshotArgs, snapshot: t.snapshot, promptRow: t.promptRow });
+    expect(sha256(canonical({ system, body, userContent, prefixHash }))).toBe('3d33d9440a506aaa9731974b4f43525b192ae673e83f938a793a6682b1b6d08c');
+    const wire = mockProviderWire(t.output);
+    try {
+      expect((await t.tick()).stage).toBe('snapshot_saved');
+      expect((await t.tick({ store: { ...store, saveValidated: async () => { throw new Error('worker loss'); } } })).stage).toBe('needs_attention');
+      expect(wire).toHaveBeenCalledTimes(1);
+      const request = wire.mock.calls[0][1].body;
+      expect(sha256(request)).toBe('323b4dde8768d91a0d31410668b7d65702220de1bfd2d008695cc6f43a019ddb');
+      expect(JSON.parse(request)).not.toHaveProperty('output_config');
+      expect(await savedCheckpoint(t)).toMatchObject({
+        version: 2, binding: 'c9814987af8200e690b92edf2a3ccebbdf08179ea3bd7320ed03b09139743b4d',
+      });
+      expect((await t.tick()).stage).toBe('validated');
+      expect(wire).toHaveBeenCalledTimes(1);
+      expect(mockComplete).not.toHaveBeenCalled();
+    } finally { wire.mockRestore(); }
+  });
+
+  test('compiler 2 sends exact role-constrained wire schema and recovers the saved response without transport', async () => {
+    const t = await typedTrial(expertiseFixture({ compilerVersion: 2, roles: ['Consultant', 'Board'] }));
+    const compiled = composeProfileTask({ ...t.snapshotArgs, snapshot: t.snapshot, promptRow: t.promptRow });
+    const providerSchema = effectiveProviderOutputSchema(compiled, parseExecutionSpec(t.promptRow));
+    const wire = mockProviderWire(nativeFixtureOutput(t));
+    try {
+      expect((await t.tick()).stage).toBe('snapshot_saved');
+      expect((await t.tick({ store: { ...store, saveValidated: async () => { throw new Error('worker loss'); } } })).stage).toBe('needs_attention');
+      expect(wire).toHaveBeenCalledTimes(1);
+      const request = JSON.parse(wire.mock.calls[0][1].body);
+      expect(request.output_config).toEqual({ format: { type: 'json_schema', schema: providerSchema.jsonSchema } });
+      const { properties } = request.output_config.format.schema;
+      const leadGuid = t.output.staff_assignment.primary.profile_guid;
+      const consultantGuid = t.rosterProjection.profiles.find(row => row.role_type === 'Consultant').profile_guid;
+      const boardGuid = t.rosterProjection.profiles.find(row => row.role_type === 'Board').profile_guid;
+      for (const slot of ['primary', 'secondary']) {
+        expect(properties.staff_assignment.properties[slot].anyOf[0].properties.profile_guid.enum).toEqual([leadGuid]);
+      }
+      expect(properties.staff_consultation.items.properties.profile_guid.enum).toEqual([leadGuid]);
+      expect(properties.consultant_overlap.items.properties.profile_guid.enum).toEqual([consultantGuid]);
+      expect(properties.board_interest.items.properties.profile_guid.enum).toEqual([boardGuid]);
+      expect(properties.conflicts.items.properties.profile_guid.enum).toEqual(expect.arrayContaining([leadGuid, consultantGuid, boardGuid]));
+      const serialized = JSON.stringify(request.output_config);
+      for (const privateValue of [t.etag, t.userGuid, t.rosterHash, 'Fixture Lead', 'VISIBLE_ROSTER_CANARY']) {
+        expect(serialized).not.toContain(privateValue);
+      }
+      expect(await savedCheckpoint(t)).toMatchObject({
+        version: 2, binding: sha256(canonical({
+          promptRow: t.promptRow, snapshotIntegrity: t.snapshot.integrity, requestId: t.owner.requestId, maxTokens: 4096,
+          capability: EXPERTISE_TASK_KEY, resultContract: EXPERTISE_RESULT_CONTRACT, compilerVersion: 2,
+          providerSchemaHash: sha256(canonical(providerSchema)),
+        })),
+      });
+      expect((await t.read()).tasks[0].state).toBe('response_saved');
+      expect((await t.tick()).stage).toBe('validated');
+      expect(wire).toHaveBeenCalledTimes(1);
+      expect(mockComplete).not.toHaveBeenCalled();
+      expect((await t.readResults()).results).toHaveLength(1);
+    } finally { wire.mockRestore(); }
+  });
+
+  test('compiler 2 refuses a saved checkpoint if the rebuilt schema changes', async () => {
+    const t = await typedTrial(expertiseFixture({ compilerVersion: 2 }));
+    mockComplete.mockResolvedValue(providerResponse(JSON.stringify(nativeFixtureOutput(t))));
+    expect((await t.tick()).stage).toBe('snapshot_saved');
+    expect((await t.tick({ store: { ...store, saveValidated: async () => { throw new Error('worker loss'); } } })).stage).toBe('needs_attention');
+    const [{ outputConfig }] = mockComplete.mock.calls[0];
+    expect(outputConfig.format.schema.properties).not.toHaveProperty('consultant_overlap');
+    expect(outputConfig.format.schema.properties).not.toHaveProperty('board_interest');
+    mockNativeSchemaOverride.mockImplementationOnce(schema => ({ ...schema, required: [...schema.required].reverse() }));
+    expect((await t.tick()).stage).toBe('failed_validation');
+    expect((await t.read()).attempts[0].error_code).toBe('profile_checkpoint_mismatch');
+    expect((await t.readResults()).results).toEqual([]);
+    expect(mockComplete).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([
+    ['wrong role', output => {
+      output.consultant_overlap = [{
+        profile_guid: output.staff_assignment.primary.profile_guid, relevance: 'strong', rationale: 'Wrong category.',
+      }];
+    }],
+    ['unknown GUID', output => {
+      output.staff_assignment.secondary = { profile_guid: '00000000-0000-4000-8000-000000000099', rationale: 'Outside the frozen roster.' };
+    }],
+    ['metadata wrapper', output => ({ resultContract: EXPERTISE_RESULT_CONTRACT, modelOutput: output })],
+    ['duplicate lead', output => { output.staff_assignment.secondary = { ...output.staff_assignment.primary }; }],
+    ['oversized rationale', output => { output.staff_assignment.primary.rationale = 'x'.repeat(4001); }],
+  ])('compiler 2 retains domain validation for %s after checkpointing', async (_case, mutate) => {
+    const t = await typedTrial(expertiseFixture({ compilerVersion: 2, roles: ['Consultant'] }));
+    const output = nativeFixtureOutput(t);
+    mockComplete.mockResolvedValue(providerResponse(JSON.stringify(mutate(output) ?? output)));
+    expect((await t.tick()).stage).toBe('snapshot_saved');
+    expect((await t.tick()).stage).toBe('failed_validation');
+    const { attempts } = await t.read();
+    expect(attempts[0]).toMatchObject({ state: 'failed_validation', error_code: 'profile_output_invalid',
+      response_content_id: expect.any(String) });
+    expect((await t.readResults()).results).toEqual([]);
+    expect(mockComplete).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([['refusal', 'claude_output_refused'], ['max_tokens', 'claude_output_truncated']])(
+    'compiler 2 retains terminal %s after checkpointing', async (stopReason, errorCode) => {
+      const t = await typedTrial(expertiseFixture({ compilerVersion: 2 }));
+      mockComplete.mockResolvedValue({ ...providerResponse(JSON.stringify(nativeFixtureOutput(t))), stopReason });
+      expect((await t.tick()).stage).toBe('snapshot_saved');
+      expect((await t.tick()).stage).toBe('failed_validation');
+      const { attempts } = await t.read();
+      expect(attempts[0]).toMatchObject({ state: 'failed_validation', error_code: errorCode, response_content_id: expect.any(String) });
+      expect((await t.readResults()).results).toEqual([]);
+      expect(mockComplete).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test('unknown compiler, missing native schema and unsupported native model fail before intent', async () => {
+    const unknown = expertiseFixture({ compilerVersion: 99 });
+    await expect(store.admit(unknown.input)).rejects.toMatchObject({ code: 'invalid_prompt_job_configuration' });
+    expect(await store.listJobs(unknown.owner)).toEqual([]);
+    const native = expertiseFixture({ compilerVersion: 2 });
+    const spec = parseExecutionSpec(native.promptRow);
+    expect(() => effectiveProviderOutputSchema({}, spec)).toThrow(/native recommendation schema unavailable/);
+    expect(() => effectiveProviderOutputSchema({}, { ...spec, compilerVersion: 99 })).toThrow(/native recommendation schema unavailable/);
+    expect(effectiveProviderOutputSchema({}, { ...spec, compilerVersion: 1 })).toBe(spec.outputSchema);
+
+    const unsupported = expertiseFixture({ compilerVersion: 2, model: 'claude-sonnet-4' });
+    const cases = [
+      [fixtureExecution(unknown), /recommendations contract does not match/],
+      [fixtureExecution(unsupported), /does not support native structured output/],
+      [fixtureExecution(native), /schema unavailable/],
+    ];
+    for (const [options, message] of cases) {
+      if (options.promptSnapshot === native.promptRow) mockNativeSchemaOverride.mockImplementationOnce(() => null);
+      await expect(executePrompt(options)).rejects.toThrow(message);
+      expect(options.onDispatch).not.toHaveBeenCalled();
+      expect(options.onResponse).not.toHaveBeenCalled();
+    }
+    expect(mockComplete).not.toHaveBeenCalled();
+  });
 
   test('expertise checkpoint resumes a structured result, with the visible roster rendered once', async () => {
     const t = await typedTrial();
@@ -873,8 +1071,7 @@ suite('local Sandbox recommendation admission and controlled stages', () => {
     });
   }
 
-  function trial(grantOverride = {}) {
-    const f = expertiseFixture();
+  function trial(grantOverride = {}, f = expertiseFixture()) {
     const { profile: definition } = f.input.tasks[0].configuration;
     const targetHost = new URL(RECOMMENDATIONS_SANDBOX_ORIGIN).hostname;
     const proof = sandboxRecommendationSourceProof(targetHost, definition.documentRoles, f.sourceObservation.documents);
@@ -929,6 +1126,40 @@ suite('local Sandbox recommendation admission and controlled stages', () => {
     expect(view.tasks[0]).toMatchObject({ state: 'failed_validation', error_code: 'profile_output_invalid' });
     expect(view.attempts[0]).toMatchObject({ state: 'failed_validation', audit_state: 'pending', error_code: 'profile_output_invalid' });
   }
+
+  test('compiler 2 budget counts effective provider schema in Sandbox preflight and before dispatch', async () => {
+    const t = trial({}, expertiseFixture({ compilerVersion: 2, roles: ['Consultant', 'Board'], documentLimit: 220_000 }));
+    const { environment, requestId, authorizationScope } = t.policy;
+    const scope = { environment, requestId, authorizationScope };
+    const prepared = await t.deps.source.prepare();
+    const spec = parseExecutionSpec(t.promptRow);
+    function compile(document) {
+      const snapshotArgs = { ...t.snapshotArgs, scope, documents: [document] };
+      const snapshot = prepareContextSnapshot(snapshotArgs);
+      const composed = composeProfileTask({ ...snapshotArgs, snapshot, promptRow: t.promptRow });
+      const schema = effectiveProviderOutputSchema(composed, spec);
+      const measure = outputSchema => Buffer.byteLength(canonical({
+        system: composed.system, messages: composed.userContent, outputSchema,
+      })) + 4096;
+      return { snapshot, oldBytes: measure(spec.outputSchema), nativeBytes: measure(schema) };
+    }
+    const initial = compile(prepared.document);
+    expect(await preflightSandboxRecommendationTrial(t.deps)).toMatchObject({ inputUpperBound: initial.nativeBytes });
+    const document = { ...prepared.document, text: prepared.document.text + 'x'.repeat(195_000 - initial.oldBytes) };
+    const grown = compile(document);
+    expect(grown.oldBytes).toBe(195_000);
+    expect(grown.nativeBytes).toBeGreaterThan(195_000);
+    t.deps.source.prepare.mockResolvedValue({ ...prepared, document });
+    await expect(preflightSandboxRecommendationTrial(t.deps)).rejects.toThrow(/exceeds budget/);
+    await expect(t.admit()).rejects.toThrow(/exceeds budget/);
+    expect(await store.listJobs(t.policy)).toEqual([]);
+    const options = fixtureExecution(t);
+    Object.assign(options.profiledContext, { scope, snapshot: grown.snapshot, beforeValidation: jest.fn() });
+    await expect(executePrompt(options)).rejects.toThrow(/exceeds budget/);
+    expect(options.onDispatch).not.toHaveBeenCalled();
+    expect(options.onResponse).not.toHaveBeenCalled();
+    expect(mockComplete).not.toHaveBeenCalled();
+  });
 
   test('bounded admission is idempotent before mutable inputs, then produces one typed draft and a separate audit intent', async () => {
     const fixture = await store.admit(expertiseFixture().input);
