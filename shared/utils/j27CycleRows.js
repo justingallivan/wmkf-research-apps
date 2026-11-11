@@ -77,7 +77,8 @@ export function rowChip(row) {
 /**
  * The line under the chip, in the plan's order:
  * closed → nothing; a main task → "Next"; waiting on the Chairs; Identify
- * reviewers on a Peer Review row; waiting on the Phase II status; idle.
+ * reviewers on a Peer Review row; waiting on the Phase II status; idle
+ * (said only when no read failed).
  * The optional offramp task never leads a row.
  */
 export function rowLine(row) {
@@ -99,6 +100,8 @@ export function rowLine(row) {
   if (blockerKeys.includes('phase-two-status-pending')) {
     return { kind: 'wait', key: 'phase-two-status-pending', text: J27_WAIT_LABEL['phase-two-status-pending'] };
   }
+  // "Nothing is waiting" is a claim about every fact; a failed read cannot back it.
+  if (stage.basis === 'degraded') return { kind: 'none', text: null };
   return { kind: 'idle', text: J27_IDLE_LABEL };
 }
 
@@ -128,13 +131,14 @@ export function rowNotes(row, { suppressDegraded = false } = {}) {
 }
 
 /**
- * True when every loaded request (two or more) could not be fully read. That
+ * True when every open loaded request (two or more) could not be fully read.
+ * Closed requests are left out: they read fewer facts and are usually hidden. That
  * is a condition of the deployment or of one failed batch read, not of any one
  * request, so the list says it once instead of on every row (seen on the
  * sandbox Preview, 2026-11-09).
  */
 export function degradedEverywhere(rows) {
-  const staged = (Array.isArray(rows) ? rows : []).filter((row) => stageOf(row));
+  const staged = (Array.isArray(rows) ? rows : []).filter((row) => stageOf(row) && !isClosedRow(row));
   return staged.length > 1 && staged.every((row) => stageOf(row).basis === 'degraded');
 }
 

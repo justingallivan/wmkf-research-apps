@@ -10,7 +10,7 @@
  */
 import { J27_BLOCKERS, J27_OUTCOMES, J27_PHASES, J27_TASKS } from '../../../lib/services/workbench/j27-read-model';
 
-import { J27_BLOCKER_LABEL, J27_OUTCOME_LABEL, J27_PHASE_LABEL, J27_TASK_LABEL } from '../../config/j27Labels';
+import { J27_BLOCKER_LABEL, J27_DEGRADED_NOTE, J27_OUTCOME_LABEL, J27_PHASE_LABEL, J27_TASK_LABEL } from '../../config/j27Labels';
 import { rowLine } from '../../utils/j27CycleRows';
 
 // Labels live in shared/config/j27Labels.js; re-exported under their original names.
@@ -19,7 +19,7 @@ export { J27_OUTCOMES };
 
 const BASIS_NOTE = {
   partial: 'Some facts load as you open tabs.',
-  degraded: 'Some facts could not be read.',
+  degraded: J27_DEGRADED_NOTE,
 };
 
 /**

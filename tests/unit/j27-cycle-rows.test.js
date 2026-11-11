@@ -109,6 +109,15 @@ describe('line ordering', () => {
     expect(r.j27.primaryTask).toBe('record-offramp');
     expect(rowLine(r)).toEqual({ kind: 'idle', text: J27_IDLE_LABEL });
   });
+  test('an idle row says nothing when a read failed', () => {
+    const r = invited({ requestStatus: 'Phase II Pending' }, {
+      integrity: { status: 'unavailable' },
+      reviewSummary: { status: 'present' },
+      reviewers: { status: 'present', anySuggestion: true, counts: counts({ candidates: 3, invited: 3, accepted: 3, received: 3, completed: 3 }) },
+    });
+    expect(r.j27.basis).toBe('degraded');
+    expect(rowLine(r)).toEqual({ kind: 'none', text: null });
+  });
   test('a memo-placed Deliberations row: plain phase chip, no optional task leading', () => {
     const r = invited({ requestStatus: 'Phase II Pending' }, {
       reviewSummary: { status: 'present' }, visitAssessment: { status: 'present' },
@@ -166,6 +175,10 @@ describe('notes, search, tabs and counts', () => {
     expect(degradedEverywhere([degraded(), degraded()])).toBe(true);
     expect(degradedEverywhere([degraded(), notScored()])).toBe(false);
     expect(degradedEverywhere([degraded()])).toBe(false);
+    // A closed request (usually hidden) does not stop the list saying it once.
+    const closed = row({ phaseIStatus: NOT_INVITED });
+    expect(closed.j27.basis).not.toBe('degraded');
+    expect(degradedEverywhere([degraded(), degraded(), closed])).toBe(true);
     expect(degradedEverywhere([])).toBe(false);
     expect(rowNotes(degraded(), { suppressDegraded: true })).toEqual([]);
   });

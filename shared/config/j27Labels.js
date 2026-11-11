@@ -65,7 +65,7 @@ export const J27_STANDING_LABEL = {
 /** The reviewer stage on a Peer Review row; keys are the dashboard's `workRemaining`. */
 export const J27_REVIEWER_STAGE_LABEL = {
   find: 'Find reviewers',
-  invite: 'Invite',
+  invite: 'Invite reviewers',
   awaiting: 'Awaiting replies',
   review: 'In review',
   done: 'Sufficient coverage',

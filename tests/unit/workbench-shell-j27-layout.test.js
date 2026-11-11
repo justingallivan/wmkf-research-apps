@@ -109,7 +109,7 @@ test('a J27 Research cycle opens on All requests with the six tabs, one row per 
   expect(screen.getByText('Recommended to Chairs')).toBeInTheDocument();
   expect(screen.getByText('Awaiting the Chairs’ outcome')).toBeInTheDocument();
   expect(screen.queryByText('Next: Identify reviewers')).not.toBeInTheDocument();
-  expect(screen.getByText('Invite')).toBeInTheDocument();
+  expect(screen.getByText('Invite reviewers')).toBeInTheDocument();
   expect(screen.getByText('Next: Send reviewer invitations')).toBeInTheDocument();
 
   // The closed request is hidden and counted; "Everything" lists it.
