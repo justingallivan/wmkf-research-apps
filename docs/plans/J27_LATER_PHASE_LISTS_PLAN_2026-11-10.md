@@ -19,6 +19,13 @@ reviewed by the owner or by Codex, and nothing here is built.** The build
 plan's section 3a requires this plan, a whole-flow review of it, and a Codex
 review before any code.
 
+This plan amends step C7 of the read-model plan
+(`J27_READ_MODEL_AND_DISCOVERY_PLAN_2026-11-08.md` on the J27 line), which
+makes the four later-phase keys "tier 2 (request page only; the dashboard
+passes not-loaded)" and accepts that a viewer who never opens the Final
+Writeup tab stays "partial" `[VERIFIED via that plan, lines 46 and 244]`.
+That plan was Codex-reviewed, so the amendment needs the same.
+
 All code was read on branch `claude/j27-cycle-page` at `c6292bbf1` (worktree
 `WMKF_Apps-claude-j27-read-model`), which is not on `main`. State claims
 carry `[VERIFIED via …]` or `[ASSUMED]`.
@@ -26,8 +33,8 @@ carry `[VERIFIED via …]` or `[ASSUMED]`.
 ## 1. What the owner is asked to decide
 
 1. **The request page changes too.** Today the page works out a request's
-   phase from whatever its tabs have loaded, and the answer differs by viewer
-   (finding 1). The list cannot "agree with the request page" until the page
+   phase from whatever tabs have been opened, and its tasks and waiting
+   lines differ by viewer (finding 1). The list cannot "agree with the request page" until the page
    has one answer. This plan moves the later-phase facts to the server, for
    both. Recommended.
 2. **What a Deliberations row shows before its presentation.** Decision 3 of
@@ -123,8 +130,8 @@ the four keys the stage model already expects: `presentation`, `roster`,
 
 | Key | Rule | Reuses |
 |---|---|---|
-| `boardDraft.exists` | The request's current draft resolves and is eligible. No current draft is `exists: false`; any other failure is `unavailable`. | `resolveSource`, `assertEligibleSource` |
-| `transition.phase` | The current Final row passes the committed check; its stage is group review or leadership review. No Final row is `null`; a Final row that fails the check is `unavailable`. | `findCurrentFinal`, `committedFinal`, `stageOf` |
+| `boardDraft.exists` | The request's current draft resolves and is eligible. No current draft (`final_writeup_source_missing`) and a draft not yet shared for review (`final_writeup_source_ineligible`) are both `exists: false`: the Final Writeup tab already treats them as "a draft is needed", not as errors. A broken pointer, an unknown registry state or a missing SharePoint identity is `unavailable`. | `resolveSource`, `assertEligibleSource` |
+| `transition.phase` | The current Final row passes the committed check; its stage is group review or leadership review. No Final pointer is `null`; a pointer to a missing or wrong-type row, or a Final row that fails the check, is `unavailable`. | `findCurrentFinal`, `committedFinal`, `stageOf` |
 | `presentation.exists` | At least one presentation record in an accepted state. | To be settled in review: which of the two classifiers (finding 5) |
 | `presentation.ended` | Exactly one eligible record whose scheduled end has passed. More than one, or an unclassified record, is `null` (unknown). | The schedule check's classification, without its per-record re-read |
 | `roster` | The stored attendance for that presentation: present, stale when its binding no longer matches, absent. | `storedRosters` and the binding from the attendance service |
@@ -132,8 +139,18 @@ the four keys the stage model already expects: `presentation`, `roster`,
 - **Both callers use it.** The request list feed calls it once for the rows
   it returns; request resolution calls it for one request. The page's first
   render then has the same facts as the list, for every viewer.
-- **The page's tabs still report.** After a save on a tab, the tab's fresh
-  read replaces the server's value, as now.
+- **A tab's read must not erase what the server knows.** Today the
+  Overview's meeting read sets the presentation's end to unknown, and the
+  Final Writeup read does the same when its schedule check did not run
+  `[VERIFIED via shared/utils/j27PageStage.js:40-43,67,70-71]`; both are
+  spread over the server input `[VERIFIED via j27PageStage.js:80,87]`. With
+  server facts that would bring the viewer difference straight back. New
+  merge rule: a tab's read replaces a server value only with a known value,
+  never with unknown or "not checked".
+- **Schema not set up is not a failure.** Where the Final Writeup or
+  attendance schema is off for a deployment, the keys read
+  `not-provisioned`, as the memo keys do since Session 672, so the rows are
+  not marked as failed reads.
 - **Starting group review is unchanged.** The start action keeps its own
   authorization, its per-record re-read and its error handling. The list
   only reads.
@@ -141,6 +158,12 @@ the four keys the stage model already expects: `presentation`, `roster`,
   every row, which the list already reports once
   (`degradedEverywhere`). A later-phase read failure is not to fail the
   feed.
+- **Request columns.** The draft and Final rules read the request's two
+  current-document pointers `[VERIFIED via transition-model.js:96,177,198-199]`.
+  The feed and the resolver do not select them today `[VERIFIED via git grep
+  for both column names in dashboard-service.js, j27-read-model-inputs.js and
+  resolve-request-service.js: no match]`, so the select gains them, gated on
+  the same schema check.
 - **Cost.** Three added batched reads per feed load (draft documents, Final
   documents, presentation records), each chunked by the adapter; no read
   per row. Measured on the 20 sandbox fixtures in the slice, and again with
@@ -194,8 +217,12 @@ support stays later.
   configured schedule map]`.
 - How the Staff deliberations list classifies timing (finding 5, last
   point).
+- Codex's second and fourth points are confirmed only in part: the Final
+  writeup's readiness check and the claim that batched reads fail as a
+  whole were not traced.
 - `docs/CLAUDE_REMEDIATION_PLAN.md` and the request-document Atlas page were
   not re-read for this draft; CLAUDE.md requires both before data-layer
   planning is final.
-- The design brief's Deliberations and Final Assessment wording was read
-  only in outline (its lines 92-93, 140-141 and 181).
+- The chips in step 2 are the design brief's (its standing-chip table and
+  tab descriptions). The brief's interim row, "Until the later phases are
+  derived … Some details could not be read", ends when this plan is built.

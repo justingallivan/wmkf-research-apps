@@ -330,8 +330,10 @@ and sent to Codex before anything is built. Starting requirements:
   need reminding). What is shared before a presentation is still to be
   decided (decision 3).
 
-From the second Codex review, as reported and not yet checked against the
-source:
+From the second Codex review, as reported. **2026-11-10:** the draft plan
+`docs/plans/J27_LATER_PHASE_LISTS_PLAN_2026-11-10.md` checks these against
+the source; the first and third are confirmed, the second and fourth in
+part (its section 5).
 
 - The request page learns that a presentation has ended only for someone
   allowed to start group review, on a request with an eligible draft. The
