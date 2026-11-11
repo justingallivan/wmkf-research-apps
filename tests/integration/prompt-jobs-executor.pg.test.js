@@ -1008,6 +1008,21 @@ suite('local Sandbox recommendation admission and controlled stages', () => {
     expect(mockComplete).toHaveBeenCalledTimes(1);
   });
 
+  test('post-response grant outage holds the checkpoint until a fresh verified grant', async () => {
+    const t = trial();
+    const jobId = await admitted(t);
+    mockComplete.mockImplementationOnce(async () => {
+      t.deps.authorize.mockRejectedValue(Object.assign(new Error('grant proof unavailable'), { code: 'expertise_grant_unavailable' }));
+      return providerResponse(JSON.stringify(t.output));
+    });
+    expect(await t.tick()).toEqual({ stage: 'needs_attention' });
+    const held = await store.readJob({ ...t.policy, jobId });
+    expect(held.attempts).toEqual([expect.objectContaining({ state: 'response_saved' })]);
+    t.deps.authorize.mockResolvedValue(true);
+    expect(await t.tick({ recoverResponse: true })).toEqual({ stage: 'validated' });
+    expect(mockComplete).toHaveBeenCalledTimes(1);
+  });
+
   test('confirmed post-response source change beats unknown roster, preserving a failed audit receipt', async () => {
     const t = trial();
     const jobId = await admitted(t);

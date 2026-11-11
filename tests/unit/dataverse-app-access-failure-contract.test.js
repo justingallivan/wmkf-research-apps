@@ -155,3 +155,26 @@ test('exact Sandbox expertise grant rejects inactive, wrong-user, duplicate and 
     await expect(read()).resolves.toBe(false);
   }
 });
+
+test('strict Sandbox grant proof distinguishes complete denials from failed or partial reads', async () => {
+  const origin = 'https://orgd9e66399.crm.dynamics.com';
+  const grant = { wmkf_appuserappaccessid: GRANTER_ID, _wmkf_user_value: SYSTEM_USER_ID, wmkf_appkey: 'expertise-finder', statecode: 0 };
+  const getWithOptions = jest.fn();
+  createClient.mockReturnValue({ getWithOptions });
+  const read = () => withDalContext('strict-expertise-grant-proof-test',
+    () => hasActiveExpertiseAppGrant(SYSTEM_USER_ID, origin, { throwOnUnavailable: true }));
+  for (const body of [{ value: [] }, { value: [grant, grant] }]) {
+    getWithOptions.mockResolvedValueOnce({ ok: true, body });
+    await expect(read()).resolves.toBe(false);
+  }
+  for (const response of [
+    { ok: false, status: 429 }, { ok: false, status: 503 }, { ok: true, body: {} },
+    { ok: true, body: { value: [grant], '@odata.nextLink': 'unexpected-page' } },
+    { ok: true, body: { value: [{ ...grant, statecode: undefined }] } },
+  ]) {
+    getWithOptions.mockResolvedValueOnce(response);
+    await expect(read()).rejects.toMatchObject({ code: 'expertise_grant_unavailable' });
+  }
+  getWithOptions.mockResolvedValueOnce({ ok: true, body: { value: [grant] } });
+  await expect(read()).resolves.toBe(true);
+});
