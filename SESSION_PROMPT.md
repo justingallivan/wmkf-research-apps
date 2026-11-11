@@ -1,345 +1,255 @@
-# Session 673 Prompt: Three open streams — J27 cycle page, expertise roster, Request narratives
+# Session 674 Prompt: Three open streams — J27 later phases built, expertise roster, Request narratives
 
 ## Start here, whichever agent you are
 
-This file holds three handoffs. Stream A was worked again on 2026-11-10
-(Session 672); Streams B and C were not touched that day and are carried as
-their authors wrote them on 2026-11-09. **Find out which stream the owner wants
-before doing anything; if he does not say, ask.** Then read that stream's
-section and the document it names. The other two streams are not yours to
-change.
+This file holds three handoffs. Stream A was worked in Session 673
+(2026-11-10 to 2026-11-11, Claude). Streams B and C were not touched by Claude
+that session and are carried as their authors wrote them on 2026-11-09.
+**Find out which stream the owner wants before doing anything; if he does not
+say, ask.** Then read that stream's section and the document it names. The
+other two streams are not yours to change.
 
 | Stream | Last worked by | Resume in | Read first | First step |
 |---|---|---|---|---|
-| **A. J27 cycle page and request page** | Claude, Session 672 (2026-11-10) | `/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model`, checked out on `claude/j27-cycle-page` at `0bfca223d`, pushed. `claude/j27-read-model` (the sandbox Preview branch) is at `393da5dde`, two documentation commits behind | Stream A below; alignment log D53 to D61 on the branch | Give the sandbox test requests J27-shaped files (Stream A, Verified Open 1) |
-| **B. Expertise roster** | Codex, Session 670 | `codex/expertise-roster-foundation-2026-11-09` at `1aedcb25d`, pushed (unverified work in progress; last verified foundation `d2b467e84`). Recorded worktree `/private/tmp/wmkf-codex-isolated-start-2026-11-09` | Stream B below; `docs/plans/EXPERTISE_ROSTER_HANDOFF_2026-11-09.md`, which is the authoritative resume boundary | Review and test the work in progress before extending it |
-| **C. Request narratives** | Codex, Session 669 | `codex/request-narratives-2026-11-09` at `06e1ba6a4`, pushed and verified. Recorded worktree `/private/tmp/wmkf-request-narratives` | Stream C below; `docs/plans/REQUEST_NARRATIVES_HANDOFF_2026-11-09.md` | Power Automate initialization contract with Connor, then the J27 integration review |
+| **A. J27 cycle page and request page** | Claude, Session 673 (2026-11-11) | `/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model`, on `claude/j27-cycle-page` at `01a798524`, pushed. `claude/j27-read-model` (the sandbox Preview branch) is still at `393da5dde`, far behind | Stream A below; `docs/plans/J27_LATER_PHASE_LISTS_PLAN_2026-11-10.md` section 6 (on `main`) | Owner moves the Preview and adds its settings (Stream A, Verified Open 1), then a browser walk-through |
+| **B. Expertise roster** | Codex, Session 670; Codex again 2026-11-10 | **Observed 2026-11-11 by Claude, not Codex's own record:** active work is on `codex/expertise-roster-import-2026-11-10` at `e59d1ecb6` in `/Users/gallivan/Code/WMKF_Apps-codex-roster-import`, clean, **not pushed** (no remote branch). Codex's own section below still names the 2026-11-09 branch | Stream B below; `docs/plans/EXPERTISE_ROSTER_HANDOFF_2026-11-09.md`; that branch's own handoff commits | Ask Codex or the owner for the current boundary; do not resume from the 2026-11-09 text alone |
+| **C. Request narratives** | Codex, Session 669 | `codex/request-narratives-2026-11-09` at `06e1ba6a4`, pushed and verified. Recorded worktree `/private/tmp/wmkf-request-narratives` is gone from disk | Stream C below; `docs/plans/REQUEST_NARRATIVES_HANDOFF_2026-11-09.md` | Power Automate initialization contract with Connor, then the J27 integration review |
 
-All four branch tips were confirmed on the remote at the close of Session 672
-`[VERIFIED via git ls-remote, 2026-11-10]`. Everything else in Streams B and C
-is copied from Codex's own handoffs and was not re-checked.
+Branch tips for A and C and the B foundation branch confirmed on the remote at
+the close of Session 673 `[VERIFIED via git ls-remote, 2026-11-11]`.
 
-**Session numbers.** Sessions 669 (Request narratives), 670 (roster) and 671
-(J27 cycle page) overlapped on 2026-11-09. Session 672 was Stream A on
-2026-11-10. The next session is 673 whichever stream it takes. Earlier
-handoffs: `git show b2c271344:SESSION_PROMPT.md` (the three-stream prompt as
-Session 671 left it), `git show 7b7e483b0:SESSION_PROMPT.md` (Request
-narratives), `git show 5782bad43:SESSION_PROMPT.md` (roster),
-`git show f03936e3e:SESSION_PROMPT.md` (Session 668).
+**Session numbers.** 669, 670 and 671 overlapped on 2026-11-09; 672 was
+Stream A on 2026-11-10; 673 was Stream A, 2026-11-10 to 2026-11-11. The next
+session is 674 whichever stream it takes. Earlier handoffs:
+`git show 33a233633:SESSION_PROMPT.md` (Session 672 close),
+`git show b2c271344:SESSION_PROMPT.md` (Session 671),
+`git show 7b7e483b0:SESSION_PROMPT.md` (Request narratives),
+`git show 5782bad43:SESSION_PROMPT.md` (roster).
 
-**Where the streams meet.** Stream C's Overview card must be reviewed against
-Stream A's J27 line before any runtime promotion (Stream C, Verified Open 2).
-Streams A and C both carry the same inherited J27 owner decisions; Stream A's
-list is the current wording. Stream A changed the Expertise Finder batch match
-(a file name only); Stream B's roster work should be checked against it when
-either is merged. The Test Request Factory (a Codex branch) still names its
-J27 scenarios with the retired terms and writes last cycle's file layout
-(Stream A, Verified Open 1 and Verify Before Acting 6).
+**Where the streams meet.**
+- Stream C's Overview card must be reviewed against Stream A's J27 line
+  before any runtime promotion (Stream C, Verified Open 2).
+- **Stream A changed shared files Stream B also changes:**
+  `pages/api/expertise-finder/batch-match.js` (J27 staff version name, Session
+  672) and `SESSION_PROMPT.md`. Whoever merges second reconciles.
+- The Test Request Factory (Codex branch `codex/j27-factory-scenarios`) still
+  writes last cycle's file layout and the retired scenario names (Stream A,
+  Verify Before Acting).
 
 ## Rules for every stream
 
 1. **Nothing is promoted.** All three streams' runtime work is on feature
    branches. `main` deploys to Production on push; only documentation lands
    there without the owner's explicit go.
-2. **Worktrees under `/private/tmp` are volatile.** If one is gone, the pushed
-   branch is the source; do not recreate another agent's local-only data.
+2. **Worktrees under `/private/tmp` are volatile.** All nine Codex ones listed
+   by `git worktree list` were gone from disk on 2026-11-10 (git marks them
+   prunable; not pruned). If one is gone, the pushed branch is the source.
 3. **Local runs read Production.** `.env.local` in the main checkout (linked
    from the J27 worktree) points at production Dataverse and the Production
-   Postgres database. Do not start the app locally to check something "against
-   the sandbox". Production reads are owner-run: hand him the command.
+   Postgres database. Production reads are owner-run: hand him the command.
+   A sandbox read is allowed only pinned to the sandbox host
+   (`scripts/probe-sandbox-j27-fields.cjs` is the pattern).
 4. **Sandbox Preview.** Only `claude/j27-read-model` has the branch-scoped
-   sandbox `DYNAMICS_URL`, and since 2026-11-10 its own Postgres database (a
-   Neon branch; Stream A, What Was Completed 6). Staff sign-in works only
-   through `wmkfresearchapps-preview.vercel.app`, the owner signs in himself
-   and repoints that alias himself, and it pointed at
-   `wmkfresearchapps-ksb8kwki6-justin-gallivans-projects.vercel.app` when
-   Session 672 closed. Check with `vercel inspect` before assuming.
+   sandbox `DYNAMICS_URL` and its own Postgres database (Neon branch
+   `j27-preview`). Staff sign-in works only through
+   `wmkfresearchapps-preview.vercel.app`; the owner signs in and repoints that
+   alias himself. It pointed at
+   `wmkfresearchapps-ksb8kwki6-justin-gallivans-projects.vercel.app`
+   (`393da5dde`) on 2026-11-11 `[VERIFIED via vercel inspect]`.
 5. **Preserve:** sandbox fixtures 1000368 to 1000387; the untracked
    `docs/plans/J27_WORKBENCH_DEVELOPMENT_BRIEF_2026-11-06.md` in the main
-   checkout; the uncommitted `package-lock.json` in the J27 worktree; every
-   other stream's branches, worktrees and settings.
+   checkout (Codex's); the uncommitted `package-lock.json` in the J27,
+   Codex dashboards and Codex J27 Factory worktrees; every other stream's
+   branches, worktrees and settings.
 
-## Stream A — J27 cycle page and request page (Claude, Session 672)
+## Stream A — J27 cycle page and request page (Claude, Session 673)
 
-Session 672 fixed the "could not be read" message, did the request-page
-wording from the staff flow audit, and rebuilt the J27 Proposal section and
-file readers around the file names and folders Connor gave the owner that day.
-Documentation landed on `main`; runtime work is on the J27 line and is **not
-promoted**. Session 671's summary (the cycle page itself) is in
-`git show b2c271344:SESSION_PROMPT.md`.
+Session 673 finished every list on the J27 cycle page and made the request
+page agree with it. The Deliberations and Final Assessment tabs are request
+lists built from facts worked out on the server for every viewer, and the
+request page uses the same facts. Two guards now stop group review before a
+presentation (2027 and later cycles) and stop any review step for an
+offramped request. Nothing is tied to the cycle named J27 any more. All on the
+J27 line; **not promoted, not on the Preview, not exercised in a browser or
+against live data.** The owner gave a standing go-ahead to build, with Codex
+adversarial review of plans and builds and Claude deciding when iteration
+stops (2026-11-10).
 
 #### What Was Completed
 
-1. **"Some details could not be read." traced and fixed.** Two causes.
-   (a) Memo fields whose schema wave is switched off were reported as failed
-   reads; they now read `not-provisioned`, which marks nothing (`e287e1bec`).
-   (b) The integrity read needs the table from migration 096, which exists only
-   on the J27 line; the Preview was using the shared Production database, which
-   lacks it. Fixed by giving the Preview its own database (item 6). The two
-   batch reads now log their error instead of swallowing it (`393da5dde`).
-   Seen gone on the Preview in the browser.
-2. **Request-page wording (owner decisions, 2026-11-10; staff flow audit
-   section 3 on `main` has the full list).** "Status" for "Phase I status";
-   the document is "Draft Writeup" and becomes the "Final Writeup"; "visit"
-   became "presentation"; the roster sub-tab is "Reviewers", not "Panel"; the
-   Peer Review chip reads "Invite reviewers"; a read-only Scoring card says
-   who can record it; the coordinator-attention line links to the meeting
-   record; two messages name the tab the layout actually has.
-3. **Stage strip and list agree.** The strip uses the cycle list's next-step
-   rule ("Awaiting the Chairs' outcome"), and "Nothing is waiting on staff
-   right now." appears on the strip only when every fact has loaded and on a
-   list row only when no read failed. A failed read is said once above the
-   list (`562a094a6`, `d30005fba`).
-4. **J27 file layout (Connor, via the owner; alignment log D57 to D61 on the
-   branch; `docs/POWER_AUTOMATE_PROPOSAL_FILE_CONTRACT.md` on the branch).**
-   - Individual files live in `Submission-Documents`: `Project-Narrative_`,
-     `Bibliography_`, `Biosketches_`, `Other-Support_`,
-     `Collaboration-Letters_` (each `{Request#}.pdf`) and
-     `Graphical-Abstract_{Request#}.jpg`. `[VERIFIED via owner-run read-only
-     listing of Production test request 1003384, 2026-11-10]`
-   - Staff version: `{AKA}_Staff-Version_{Request#}.pdf` at the request root
-     (dash, PDF). Not yet seen on a real request.
-   - Reviewer Finder input: `AI Materials/Narrative-Bibliography_{Request#}.pdf`,
-     built by Connor's flow; not yet created. Derived files go in
-     `AI Materials`; `Submission-Documents` holds originals only.
-   - No `Phase II` folder is expected; later budget detail goes in Dataverse,
-     fields to be decided.
-5. **Built for that layout, for J27 and every later cycle** (rule keyed on the
-   cycle code being J27 or later, or on the file being present; earlier cycles
-   unchanged):
-   - Proposal section: staff version first, then Reviewer Materials, then a
-     collapsed "Individual files" list; "not received yet" for a missing file;
-     no "Phase I documents" group; "Phase II documents" only when that folder
-     holds a file (`3e3c7e80f`, `17e9de95d`, `5f886b51a`).
-   - The governed narrative and bibliography readers (Initial Assessment,
-     Field Primer, Pre-Site draft, AI Review Panel, cycle dossier) also accept
-     the J27 names in `Submission-Documents`; exactly one copy across the
-     accepted places or the read fails closed (`ebb38322b`).
-   - Reviewer Finder loads the Narrative-Bibliography file by default when a
-     request has exactly one (`f43f2db77`). The owner was offered two defaults
-     and did not choose; the recommended one was built.
-   - Expertise Finder batch match accepts the J27 staff version name
-     (`e300877b9`, `0dcd87f5c`).
-6. **The J27 Preview has its own database.** Neon branch `j27-preview` of the
-   Production database (project `expert-reviewers-neon-db`, auto-delete
-   Never); `POSTGRES_URL` and `DATABASE_URL` scoped to Preview for
-   `claude/j27-read-model`; migration 096 applied there (owner-run, "1
-   applied, 94 skipped, 95 total"). Production does not have the J27 table.
-   Recorded in the rollout plan on the branch, with the removal step.
-7. **Decisions recorded with Connor (alignment log D53 to D56, D61).** The
-   staff decisions before the Chairs meeting stay in Phase I Status, including
-   Recommended Invite; no new staff state field; nothing existing reacts to
-   those values. No "program at submission" field: the program goes in
-   `akoya_programid`. Requested amount is `akoya_request`, total budget
-   `akoya_expenses`. The files-ready flag is `wmkf_readyforreview`. The apps
-   will not rerun or flag AI outputs when a submitted file is replaced.
-8. **Sandbox fixture titles.** #1000382 to #1000385 renamed to drop "First
-   Cut" and "Semi-finalist" (title only; sandbox write, read back).
-9. **Preview walk-through in Chrome** (owner signed in; read only). The wording
-   and layout changes were seen on #1000385 and #1000369.
+1. **Owner decisions, 2026-11-10** (alignment log D60, D62 to D65 on the
+   branch; the later-phase lists plan section 1 on `main`):
+   - The later-phase facts move to the server, for the list and the page.
+   - A Deliberations row shows a timing chip and no line until its
+     presentation has ended. What is prepared before a J27 presentation will
+     change and is undecided (D65 records the owner's account of how D26
+     worked and why J27 differs).
+   - Today's Staff deliberations and Final writeups panels are each tab's
+     second section ("Drafts", "Writeup review"); the Deliberations one is
+     temporary.
+   - **No group review before a presentation** for J27 and later (D63); an
+     offramped request does not go to the Board.
+   - **Nothing hard-coded to J27** (D64): "We don't want things like that as
+     hard coded." The owner expects the JXX / DXX cadence to continue and no
+     wholesale change for D27. Recorded in
+     `.claude-memory/feedback-minimize-per-cycle-configuration.md`.
+   - Accepted as built: a request with a final decision is on All requests
+     only (D62); Reviewer Finder's default stays the Narrative-Bibliography
+     file, which Connor must create at intake (D60).
+   - Accepted difference: only the request page knows when a saved review
+     summary is out of date.
+   - The Overview's tab-name links stay closed for now; polish waits until
+     the plumbing is done (staff flow audit on `main`).
+2. **Review of last session's file layout** (`2ad468d96`, `c6292bbf1`): the
+   narrative not-found message names all three accepted places; the Proposal
+   list's rule matches the readers.
+3. **2027-or-later rule** (`31ee18bb6`): twelve literal `'J27'` tests replaced;
+   seven `J27_`-named settings renamed (none was set in Vercel). Rollout plan
+   lists each setting and whether it is deleted after go-live.
+4. **Transition guards** (`91fc83581`, written by Codex, reviewed by Claude).
+5. **Later-phase facts and lists** in three pieces, each reviewed by Codex:
+   `75b73897f` (shared module `lib/services/workbench/j27-later-facts.js`),
+   `3d9e71363` (feed and both lists), `562717d42`, `4a2f9c82e`, `ffdeedb43`
+   (request page), `f5cbc0361` (Final Assessment hint fix, page test, probe).
+   Every Codex finding was reproduced or checked before it was fixed; the
+   review record is the plan's section 6.
+6. **Sandbox fields checked** (read-only, sandbox-pinned,
+   `scripts/probe-sandbox-j27-fields.cjs`): all eight fields the Preview
+   settings would switch on exist.
+7. **Records:** Atlas reader entries (request, request document, site visit),
+   read-model plan C7 and step E amended, wiki page, alignment log, rollout
+   plan, and the stale restatements on `main` reconciled (`33e2dc907`).
+8. **Failing test fixed** (`3cb22bbb8`): the reviewer follow-up test expected
+   the panel's loading text; the shell now shows "Loading…" until it knows
+   the layout, for earlier-cycle links without a cycle too.
 
-Verification on the branch tip `0bfca223d`: full Jest run, 1,560 suites pass,
-one fails (`tests/unit/reviewer-follow-up.test.js`, "announces the initial
-loading state", failing before this session); 40 of 41 gates pass
-(`check:agent-invariants` fails in that worktree only because its per-machine
-memory link is missing). Gate self-tests were run in the morning (71 of 72)
-but not after the later commits, except the J27 register's.
-
-**Not exercised:** anything behind a save button on the Preview; the "Status"
-label on an editable Scoring card; the new file readers against a request that
-has both a staff version and `Submission-Documents` files. `/contract-reconcile`
-was not run on the cross-layer file changes; the path was traced by hand.
+Verification at `f5cbc0361` (code unchanged since): full Jest, 1,562 suites
+pass; type check; every `check:*` gate and its self-test pass except
+`check:agent-invariants`, red only in the J27 worktree because its
+per-machine memory link is missing. CI on `main` green at `6c96aab57`.
+**Not exercised:** anything in a browser, the Preview, live Dataverse, the
+feed's cost at volume (three batched reads per load; Codex counts at least
+36 queries at 300 rows).
 
 #### Commits
 
-`main` (docs): `a873a1940`, `844f3bf23`, `435a887ce`, `e1454f389`,
-`f2774d2b1`, `f9e713073`, `e390e2f28`, `f66855d68`, plus this handoff.
-J27 line, `026143d7b..0bfca223d` (25 commits): `e287e1bec`, `eaf8758f1`,
-`562a094a6`, `0719afdf6`, `3e3c7e80f`, `89ab1e4ee`, `34ac78319`, `8e64d22e8`,
-`b99f5ea29`, `00e26813d`, `17e9de95d`, `e300877b9`, `0dcd87f5c`, `5f886b51a`,
-`ebb38322b`, `0af9c123c`, `f43f2db77`, `f4161adcd`, `128f0278e`, `686847fca`,
-`6ed76cbf7`, `d30005fba`, `393da5dde`, `ea7d8448f`, `0bfca223d`.
+J27 line (`claude/j27-cycle-page`, all pushed): `3cb22bbb8`, `2ad468d96`,
+`afad05e16`, `c6292bbf1`, `3f561b330`, `7ed3f9322`, `31ee18bb6`, `91fc83581`,
+`e64587bc8`, `75b73897f`, `3d9e71363`, `562717d42`, `981095662`, `078cecef3`,
+`4a2f9c82e`, `ffdeedb43`, `f5cbc0361`, `01a798524`.
+`main` (documentation only, pushed): `5231fb6b3` through `33e2dc907`,
+including the later-phase lists plan and this handoff.
 
 ### Next Items
 
 #### Verified Open
 
-1. **Give the sandbox test requests J27-shaped files.** On the Preview every
-   J27 fixture shows the staff version and the six individual files as "not
-   received yet", because `lib/services/test-requests/file-plan.js` writes
-   `Phase I` and `AI Materials` files with last cycle's names. Quickest:
-   upload `Submission-Documents` files and a staff version to a few existing
-   fixtures in sandbox SharePoint (a sandbox write; get the owner's go).
-   Durable: update the Factory's file plan, which belongs to the Factory
-   stream on a Codex branch. Then rehearse the Initial Assessment on the new
-   location.
-2. **See the staff version name on a real request.** Once Connor's flow builds
-   one on 1003384, an owner-run
-   `DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-external-files.js 1003384`
-   (main checkout) confirms `{AKA}_Staff-Version_1003384.pdf` at the root.
-3. **Small app items seen on the Preview.** The Overview's next steps name a
-   tab in plain text instead of linking to it (audit finding 10). A list row
-   says "Nothing is waiting on staff right now." while the request page stays
-   quiet until every fact loads (by design on each side; the owner was told
-   and did not ask for a change). #1000370 shows "Invite reviewers" with
-   "Next: Record Scored or Not Scored" (item Verify Before Acting 5).
-4. **Reconcile the restatements at promotion.** The Atlas, the agent wiki and
-   `.claude-memory/project-j27-doc-capture-evolution.md` describe the governed
-   AI input as `AI Materials` only; that is true of Production. The memory
-   note carries a pointer to the J27-line change. Run `/sweep` on the file
-   contract when the J27 line merges.
-5. **Deliberations and Final Assessment lists need their own plan** (build
-   plan, section 3a; carried, not started).
-6. **Promotion of the J27 line is an owner decision, not yet taken.** Path when
-   taken: Tier 2 per `docs/plans/J27_WORKBENCH_PRODUCTION_ROLLOUT_2026-11-07.md`
-   (on the branch), which now requires migration 096 on the Production
-   database first and lists the Preview database to remove.
-7. **Records not yet written:** the cycle-page decision in the alignment log
-   (redesign plan, section 10) and the agent wiki page
-   `docs/agent-wiki/topics/workbench-shell-handoffs.md` for the new layout
-   (carried).
-8. **Final Assessment tab on the sandbox Preview** showed "Checking the writeup
-   stage…" six seconds after loading on #1000369; Session 671 saw "Final
-   writeup review tracking is unavailable until its Dataverse schema is
-   verified." there. Not looked into.
-9. **Contract-reconcile reviews not run:** the terminology rename (carried) and
-   this session's file-layout changes.
-10. Carried: deferred UI mirroring of the Offramped refusals (read-model plan
-    §9 I6(a)); intake display and staff field contract with Connor.
+1. **Move the Preview and rehearse in a browser (owner steps).** Fast-forward
+   `claude/j27-read-model` to `claude/j27-cycle-page` (Claude pushes, with
+   the owner's go), the owner repoints the alias, and adds for the
+   `claude/j27-read-model` Preview branch: `INITIAL_RATIONALE_SCHEMA_READY=on`,
+   `MEETING_ROSTER_SCHEMA_READY=on`, `CHAIRS_RECOMMENDATION_ENABLED=on`,
+   `FINAL_WRITEUP_SCHEMA_READY=on`, and
+   `STAFF_DELIBERATIONS_SITE_VISIT_STATE_STATUS_PAIRS` (copy Production's
+   value). Evidence: rollout plan "Admission to implement" amendment;
+   `vercel env ls` 2026-11-11. Without the pairs setting no presentation's
+   end is known on the Preview, so nobody can start group review there.
+   Then walk every tab and a request in each phase, and time the feed.
+2. **Confirm one behaviour on the request page** (owner): the stage strip,
+   like the list, shows no next step in Deliberations until the presentation
+   has ended. His decision was about the list row.
+3. **D26 Grant Cycle links before promotion** (owner-run Production read):
+   since `91fc83581` only a request linked to a pre-2027 Grant Cycle keeps the
+   no-presentation exception. Rollout plan.
+4. **Factory file plan** for J27-shaped sandbox files and scenario names:
+   Codex's Factory stream; hand over a note rather than editing it.
+5. **Promotion** remains the owner's decision; path in the rollout plan on
+   the branch (migration 096 on Production first).
+6. Carried: the Final Assessment tab's "Checking the writeup stage…" seen on
+   #1000369 is likely the missing `FINAL_WRITEUP_SCHEMA_READY` on the Preview
+   (status returns unavailable); confirm on the walk-through.
 
 #### Owner Decision Needed
 
-1. **When Connor's J27 `AI Materials` folder arrives:** if it holds a
-   `Project-Narrative_{Request#}.pdf` while one is still in
-   `Submission-Documents`, the AI readers see two copies and stop. Decide
-   which wins once its contents are known (alignment log D59).
-2. **Reviewer Finder's J27 default** was built as "the Narrative-Bibliography
-   file wins when present". The alternative (reviewer copy first) was offered
-   and not chosen; confirm or change.
-3. What is shared with colleagues and the Chairs before a research
-   presentation (build plan decision 3; carried).
-4. Whether Initial Assessment chips gain colour (carried).
-5. Where the written offramp justification lives, and who sets Phase II status
-   to Offramped (carried; with Connor and Sarah).
-6. Who sets the status that opens reviewer invitations (carried).
-7. Whether staff keep the original Scoring answer once a Recommendation to
-   Chairs replaces the status (carried).
-8. Whether the AI fit flag affects Flagged for concerns, remaining intake
-   output formats and owners, staff queues, Chairs materials and calendar
-   changes; the November 15 target needs reconfirmation (carried).
-9. Which Dataverse fields hold the fuller budget information (D61: to be
-   decided).
+1. What is prepared and shared before a J27 research presentation (carried;
+   D65 records the context). Revisits the Deliberations "Drafts" section.
+2. When Connor's J27 `AI Materials` folder arrives: if it also holds a
+   `Project-Narrative_{#}.pdf`, the AI readers see two copies and stop (D59).
+3. Carried: offramp justification location and who sets Offramped; who sets
+   the status that opens invitations; keeping the original Scoring answer;
+   AI fit-flag meaning, intake outputs, queues, Chairs materials, calendar;
+   which fields hold fuller budget information (D61).
 
 #### Waiting On Connor
 
-1. **Reviewer copy flow.** The owner asked him on 2026-11-10 for a new Power
-   Automate flow: when Phase I Status becomes Recommended Invite, copy the
-   staff version to `Reviewer Materials/Proposal_{Request#}.pdf`. Keeping that
-   name means the reviewer portal and Reviewer Finder need no change. The
-   owner judged a reversed recommendation and a replaced staff version to be
-   edge cases the flow need not handle. Suggested to him, unanswered: skip
-   requests flagged `wmkf_istestrequest`.
-2. The Narrative-Bibliography file and the J27 `AI Materials` contents.
+1. Reviewer copy flow on Recommended Invite (asked 2026-11-10).
+2. The Narrative-Bibliography file at intake (D60) and the J27 `AI Materials`
+   contents.
 
 #### Parked
 
-1. The wide gap between request details and the status column on a large
-   screen (owner, 2026-11-09: later).
-2. Program Coordinator support in the Workbench. Tracked in
-   `docs/CURRENT_WORK_QUEUE.md`.
-3. Southern California as a separate app suite (D8). Re-open when the owner asks.
-4. Research readiness readback after the December 8 readiness date.
-5. Phase II, bulk edits, queues and packet exports; see the cycle plan.
-6. Lockfile drift: uncommitted `package-lock.json` in the read-model worktree;
-   hygiene only, left untouched.
-7. Six older sandbox rehearsal requests (#1000368, #1000373 to #1000375 and
-   others) still carry the retired terms in their titles; they belong to other
-   streams' rehearsals and are not flagged as test requests. The owner was
-   offered a rename and did not ask for it.
+1. Polish pass, including the Overview tab-name links and the four Grant
+   Cycle "Semi-Finalist" date labels (owner, 2026-11-10: after the plumbing).
+2. Review-summary freshness on the list (accepted difference).
+3. Carried: wide gap on large screens; Program Coordinator support; SoCal
+   as a separate suite; readiness readback after December 8; Phase II, bulk
+   edits, queues and packet exports; six older sandbox rehearsal titles.
 
 #### Verify Before Acting
 
-1. **Preview alias.** `wmkfresearchapps-preview.vercel.app` pointed at
-   `wmkfresearchapps-ksb8kwki6-justin-gallivans-projects.vercel.app` (built
-   from `claude/j27-read-model` at `393da5dde`) when this session closed.
-   Check with `vercel inspect` before assuming. The owner repoints it with
-   `vercel alias set <deployment> wmkfresearchapps-preview.vercel.app`.
-2. **Preview settings to remove when the J27 line is promoted or retired:**
-   the branch-scoped `DYNAMICS_URL`, `POSTGRES_URL` and `DATABASE_URL` for
-   `claude/j27-read-model`, and the Neon branch `j27-preview`. It is a copy of
-   Production data taken 2026-11-10; treat its connection string as a
-   Production secret. Its host begins `ep-aged-wave`; Production's begins
-   `ep-frosty-credit`.
-3. **Moving the Preview forward** is a fast-forward push of the cycle-page tip
-   to `claude/j27-read-model`, then the owner repoints the alias. The owner
-   approved it twice this session; ask again next time.
-4. **Applying a migration with a pasted connection string.** The string
-   contains `&`; pasted inline it split the command, and the script fell back
-   to `.env.local` (Production) from the wrong directory. It applied nothing.
-   Use `read -s POSTGRES_URL`, `export POSTGRES_URL`, print the host, then run
+1. **`ffdeedb43` and `f5cbc0361` had no Codex review** (stop rule: two rounds
+   per piece). Both are narrow, with tests that fail if their rule is
+   removed.
+2. **The stage model raises "presentation end not verified" when no
+   presentation exists.** Existing reviewed tests require it; the list does
+   not show it. Do not "fix" it without rechecking those tests.
+3. **A not-yet-shared draft now reads "no Board draft" on the page** (it was
+   "unavailable" under step E), to match the server.
+4. **Preview settings to remove at promotion or retirement:** the
+   branch-scoped `DYNAMICS_URL`, `POSTGRES_URL`, `DATABASE_URL`, the five
+   settings in Verified Open 1, and the Neon branch `j27-preview` (a copy of
+   Production data; treat its connection string as a Production secret).
+5. **Applying a migration with a pasted connection string:** use
+   `read -s POSTGRES_URL`, export, print the host, then run
    `node scripts/apply-migrations.js` from the J27 worktree.
-5. **#1000370's odd state is deliberate.** The rollout rehearsal uses it to
-   confirm a request with reviews and no formal outcome is handled. Do not
-   "correct" its Phase I status.
-6. **The Test Request Factory still uses the retired scenario names**
-   (`lib/services/test-requests/j27-sandbox-scenarios.js` on
-   `codex/j27-factory-scenarios`). Rebuilt fixtures would get the old titles
-   back. It checks only that a title starts with `TEST:`.
-7. **Local runs read Production**, Dataverse and Postgres both.
-8. **The colleague deck is out of date** (owner): do not start from
-   https://claude.ai/artifact/Q3dicY5DA2vGBrVPA2bXwj.
-9. **Mock-up.** https://claude.ai/artifact/Fov94msvFQit3QZCzv4TZZ is a static
-   mock-up with invented data; the built page is the reference.
-10. **Codex's untracked brief** in the main checkout: preserve it.
-11. **Memory on the branch.** `.claude-memory/project-vercel-cli-deploy-preview-auth.md`
-    differs on the J27 line; it arrives with the merge.
-12. Sandbox fixtures 1000368 to 1000387 stay; no deletion authorized.
+6. **#1000370's odd state is deliberate** (rollout rehearsal).
+7. **The colleague deck is out of date** (do not start from
+   https://claude.ai/artifact/Q3dicY5DA2vGBrVPA2bXwj); the mock-up
+   https://claude.ai/artifact/Fov94msvFQit3QZCzv4TZZ has invented data.
+8. **Codex sandbox and git:** a Codex build run could not write the
+   worktree's git index; Claude committed its work after review. Plan for it.
 
 #### Do Not Reopen Without New Decision
 
-1. Tabs and order on the cycle page; reviewer progress on the Peer Review list
-   only; unmapped Phase I statuses are closed; a Deliberations row shows no
-   next-step line before its presentation (Session 671).
-2. "First Cut" and "Semi-finalist" are retired, in text and in code. Steps are
-   "Scoring" (Scored, Not Scored) and "Recommendation to Chairs" (Recommended
-   Invite, Recommended Do Not Invite; shown on the strip as "Recommended to
-   Chairs" and "Not Recommended"); then Invited or Not Invited.
-3. Wording (owner, 2026-11-10): "Status"; "Draft Writeup" then "Final
-   Writeup"; "presentation"; "Reviewers".
-4. Staff decisions live in Phase I Status; no new staff state field; no
-   "program at submission" field (D53, D54).
-5. The apps do not rerun or flag AI outputs when a submitted file is replaced
-   (D26, dropped 2026-11-10).
-6. The J27 Proposal section does not show the cover page, abstract or
-   graphical abstract page (D20).
-7. D7 (offramp is `wmkf_phaseiistatus = 682090001`), D8 (the read model is
-   Research-only), and scenario 7's sandbox status being observed, not asserted.
+1. Everything in Session 672's list (tabs and order; retired terms; wording;
+   staff decisions in Phase I Status; no rerun on file replacement; J27
+   Proposal section; D7, D8): `git show 33a233633:SESSION_PROMPT.md`.
+2. Session 673's decisions above (D60, D62 to D65), and the closed Overview
+   link finding.
 
 ### Key Files Reference
 
 | File | Purpose |
 |---|---|
-| `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md` (branch) | Decisions D53 to D61 from 2026-11-10 |
-| `docs/POWER_AUTOMATE_PROPOSAL_FILE_CONTRACT.md` (branch) | J27 file names and folders, and which reader uses which |
-| `docs/plans/J27_WORKBENCH_PRODUCTION_ROLLOUT_2026-11-07.md` (branch) | Migration 096, the Preview database, removal steps |
-| `docs/plans/J27_STAFF_FLOW_AUDIT_2026-11-09.md` (`main`) | Which audit findings are fixed and which are open |
-| `shared/config/workbenchProposalDocuments.js` (branch) | Which cycles use the individual-files layout |
-| `lib/services/workbench-proposal-documents.js` (branch) | Proposal section listing and the governed narrative and bibliography readers |
-| `lib/services/reviewer-finder/load-proposal-service.js` (branch) | Reviewer Finder's default file |
-| `lib/services/expertise-finder/batch-match-service.js` (branch) | Staff version lookup |
-| `shared/utils/j27CycleRows.js`, `shared/config/j27Labels.js` (branch) | List row rules and every J27 label |
-| `lib/services/workbench/j27-read-model-inputs.js` (branch) | `not-provisioned`, and the logged batch reads |
+| `docs/plans/J27_LATER_PHASE_LISTS_PLAN_2026-11-10.md` (`main`) | The design, owner decisions, review record (section 6) |
+| `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md` (branch) | D53 to D65 |
+| `docs/plans/J27_WORKBENCH_PRODUCTION_ROLLOUT_2026-11-07.md` (branch) | Settings table, Preview steps, pre-promotion checks |
+| `lib/services/workbench/j27-later-facts.js` (branch) | The four later-phase facts, one rule for every reader |
+| `lib/services/final-writeup/transition-schedule.js`, `transition-state.js` (branch) | The two guards; `stageFacts` on the status read |
+| `shared/utils/j27PageStage.js` (branch) | The page's composer: whole keys, latest report wins |
+| `shared/utils/j27CycleRows.js`, `shared/config/j27Labels.js` (branch) | List rules and labels |
+| `shared/components/workbench/workbench-location.js`, `WorkbenchShell.js` (branch) | Tabs, second sections, old links |
 
 ### Testing
 
 ```bash
 cd /Users/gallivan/Code/WMKF_Apps-claude-j27-read-model
-npx jest --testPathPatterns "tests/unit/.*(workbench|proposal|j27)"
-npx jest --findRelatedTests lib/services/workbench-proposal-documents.js
-npx jest   # full run done at 0bfca223d: one pre-existing failure
+npx jest --testPathPatterns "tests/unit/(j27|workbench|final-writeup|staff-deliberations)"
+npx jest   # full run at f5cbc0361: 1,562 suites pass
+node scripts/probe-sandbox-j27-fields.cjs   # read-only, sandbox-pinned
 ```
 
-No DEVELOPMENT_LOG entry was required: nothing reached Production.
+No DEVELOPMENT_LOG entry: nothing reached Production.
 
 ## Stream B — Expertise roster (Codex, Session 670)
 
