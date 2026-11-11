@@ -399,14 +399,30 @@ The build review returned READY WITH NAMED CHANGES. It required strict
 helper arguments and default adapter wiring tests, inverse Sandbox ledger
 and fixture-scope cases, and landing the strict roster transport with its
 common route caller. The fixes and their inverse tests passed locally.
-Both completed reviews named only
-`claude-opus-5-5` in model usage. The automatic approval review rejected
-sending the final source diff to Claude because it found the existing
-authorization insufficient for that transfer. No final closure verdict
-was returned.
+Both completed reviews named only `claude-opus-5-5` in model usage.
+The first automatic approval review rejected sending the final source
+diff because it found the existing authorization insufficient for
+that transfer. The owner subsequently approved the exact payload with
+SHA-256 `a7af9f7d0a27ba9473998603d3641049966ca24b9edfaa511d5f34ce2ac43d24`.
+The resulting no-tools OAuth review reported only `claude-opus-5-5`.
+
+The closure review accepted the strict adapter changes, default wiring
+tests, binding mismatch tests, roster import and origin alignment. It
+identified one test gap in the reverse Sandbox-to-fixture read assertion.
+That assertion ran after corrupting the Sandbox receipt's binding, so
+the test lacked a positive read of the same valid Sandbox receipt.
+The review identified no new runtime defect and gave a qualified verdict.
+Test-only commit `ef5507ab8` adds an available/current positive control
+before the mismatch cases, restores the valid binding afterward, and proves
+that the Sandbox read succeeds while the fixture reader denies it. The
+fixture-to-Sandbox denial remains covered. The roster stream independently
+reviewed the revised test. All 33 targeted vertical tests passed against
+disposable loopback PostgreSQL, with scoped lint and diff checks passing.
+The amended test was verified locally after the approved external review.
 
 
-[VERIFIED via local commands] The final regression run passed 527 tests
+[VERIFIED via local commands] Before the test-only follow-up, the integrated
+regression run passed 527 tests
 across 32 suites, including all three job suites against disposable
 loopback PostgreSQL. It covered strict Request/User adapter wiring,
 complete roster paging and same-host inputs, legacy v1 source behavior,
