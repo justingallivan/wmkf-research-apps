@@ -173,26 +173,23 @@ the immutable source, mint new mutation/dataset UUIDs, or change the reviewed pa
 merely to bypass the conflict. A killed process may leave a started-only receipt;
 inspect current keyed state and apply the same recovery/reconciliation distinction.
 
-Before a full import, separately authorize a one-row synthetic canary through this
-same executor: use a distinct synthetic lineage, an inactive staged new profile, and
-an empty-string text field. Verify exact read-back and retain the receipt. Count empty
-strings in the approved private source offline before full import to quantify the
-owner-approved policy. The November 10 rerun verified inactive creation, then failed because Dataverse
-normalized the empty role to null; see the live record below. The private-source count remains
-unperformed because the private source evidence is unavailable.
+The authorized retained-profile canary and replay now pass under the explicit text
+policy; see the live record below. Before full import, recover the private real source
+and quantify exact-empty and whitespace-only text fields offline. Real-source evidence
+remains unavailable. Whitespace-only/Memo normalization and full-import parity are not
+proved by this one-role-field canary.
 
 Dataverse requests have 30-second timeouts so transport failure can release database
 locks. This is a per-request bound, not a bound on total transaction duration. The
 exclusive mode-0600 receipt contains identities/status, not expertise text; retain it
 privately with the inputs.
 
-No real roster data was imported. The authorized synthetic canary exercised the
-local SQL transaction through locks and rollback, but did not reach binding allocation,
-sequence advancement or COMMIT. Unit tests use in-memory durable stores and mocked
-transport/SQL boundaries. Successful PostgreSQL commit/replay, Dataverse null/empty
-round trips, permissions, audit events and linked-person lifecycle cases still
-need rehearsal. Exact comparison deliberately refuses a
-server normalization mismatch instead of silently losing source distinctions.
+No real roster data was imported. The synthetic flow now has live evidence for
+inactive create/deactivate commit, SQL rollback on exact-value mismatch, retained-row
+binding allocation/COMMIT, and stable replay. Unit tests additionally cover mocked
+failure paths. Forced live changeset rollback, permissions/audit events, linked-person
+lifecycle cases and full import/consumer parity still need rehearsal. Target comparison
+remains exact against the approved canonical values.
 
 Final Fable plan review: `docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_4_2026-11-09.md`.
 This review does not certify the implementation or live readiness.
@@ -207,8 +204,8 @@ Complete the remaining
 schema/audit/keys/permissions verification, integrate consumers, and rehearse
 actual import plus rollback. The atomic inactive-create repair is Fable-reviewed and live-verified.
 Justin approved exact empty optional text as null while preserving original source.
-The planner implements this explicit policy; Fable review and a newly planned canary
-rerun are pending. Target comparison remains exact against canonical planned values. The owner-reviewed minimal matching
+The planner implements this explicit policy; Fable review, retained-profile canary
+commit and stable replay passed. Target comparison remains exact against canonical planned values. The owner-reviewed minimal matching
 prompt contract and verified old-deployment admission/drain remain cutover prerequisites.
 
 ## Historical verification record — November 9, 2026
@@ -306,7 +303,8 @@ passed. These tests do not replace the live evidence below.
 
 The same source, mapping, plan, lineage and creation key were rerun through the CLI.
 `atomic-run-context.json`, `atomic-batch-response.json`, `atomic-client-confirmation.json`,
-`atomic-receipt.json`, and `atomic-verification.json` are in the private directory above.
+`atomic-receipt.json`, and `atomic-verification.json` were recorded in the temporary
+private directory above; that directory later disappeared (see recovery record below).
 The batch returned HTTP 200 with two embedded 204 responses; the client confirmed
 success directly (not by swallowing a parse failure and recovering through readback).
 Independent GET verified profile `db8e8f68-6add-f111-84ea-70a8a5b1c1c6` has
@@ -331,3 +329,53 @@ the successful inactive-create repair and normalization-blocked canary. Dated ea
 canary/test/review records remain historical. Owner
 mapping decisions are unchanged. Evidence traces CLI → executor → atomic Dataverse create/deactivate
 → exact-value rejection → SQL rollback → receipt → independent readback; no UI consumer is involved.
+
+
+## Source-preserving normalization canary — November 10, 2026
+
+[VERIFIED via commit `ab0e0e7e3`, Fable 5.2 review, CLI receipts and independent reads]
+Justin approved treating exact empty optional text as null while preserving original
+source. Fable returned READY with no named code repairs. Review artifact:
+`outputs/roster-null-fable-review-2026-11-10.md` (local ignored copy).
+239 tests across 19 suites passed; after adding Fable's missing-metadata and JSON
+round-trip coverage, all 75 tests in the four importer suites passed. Relevant lint,
+types, DAL/OData/GUID and documentation gates passed.
+
+The prior temporary evidence directory disappeared after interruption. The synthetic
+source and mapping were reconstructed from the recorded generation recipe, with both
+canonical content hashes required to match the original receipt before any live write:
+source `5b430bcb2f96611a5b8b0a97b930984941cc75e432a0f090c1cafb6ef40f1668`,
+mapping `0d7b5dd5ca0616c5c5a5eb920d3ebfedafa131d8699a95143de3ba23b0bdbbb6`.
+This recovers the original synthetic content, not the lost prior receipt files or any
+real roster export. New private evidence lives outside Git at
+`/Users/gallivan/.local/share/wmkf-roster/canary-20261110` (directory 0700, files 0600).
+It includes credentials: never commit or copy the directory wholesale.
+
+The fresh census plan shows one unchanged profile, zero creates/blocked, the original
+creation key and GUID, `textPolicy:empty-string-to-null-v1`, and only `role` in
+`normalizedEmptyFields`. Original input values remain empty in the mapping; only the
+planned target value is null. Live SQL preflight verified INTEGER identity/binding
+columns and computed next ID 5 from floor 0, sequence 4, roster max 3, bridge max 0.
+
+Both the first run and replay exited 0, with `success:true`, `bridgeCommitted:true`,
+`status:bound`, `createAttempted:false`, `profileOutcome:observed`, and numeric
+`rosterId:5`. Independent reads verified exactly one identity and one sandbox binding
+to profile `db8e8f68-6add-f111-84ea-70a8a5b1c1c6`; sequence advanced to 5 on first
+commit and stayed 5 on replay. Profile remained inactive (state 1/status 2), role null,
+and the entire selected profile including ETag stayed unchanged across replay.
+An operator guard refused all non-GET Dataverse requests; zero were attempted.
+Recovered source/mapping file SHA-256s were identical before and after both runs.
+
+Evidence files: `input-recovery.json`, `normalization-before.json`,
+`normalization-sql-preflight.json`, `normalization-target.json`,
+`normalization-reviewed-plan.json`, `normalization-run-context.json`,
+`normalization-receipt.json`, `normalization-replay-receipt.json`,
+`normalization-verification.json`, and `fable-normalization-review.md`.
+The original source/mapping files are kept alongside them, separate from the new plan.
+
+Narrow sweep mode A: README, Atlas, migration-plan optional-text contract and session
+handoff reflect the approved policy and successful bounded canary; earlier dated
+failure records are historical. Remaining gates are real-source recovery/census,
+full-import parity, linked-person/permission/audit cases, forced live atomic rollback,
+consumer integration and separately authorized Production release. No real-data import,
+Production change, deletion or existing-profile PATCH was performed by this rerun.

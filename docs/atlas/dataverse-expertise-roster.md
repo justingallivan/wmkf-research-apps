@@ -14,16 +14,17 @@ Three Active alternate keys cover `wmkf_creationkey`, nullable `wmkf_contactguid
 is enabled. Table-level auditing was enabled with a table-scoped metadata update.
 Complete actor attribution/audit-event/permissions validation remains a release gate.
 
-The authorized November 10 canary first failed on direct inactive creation. Repair
-`83cf6c93c` was Fable-reviewed and rerun with identical inputs: an atomic POST/PATCH
-Content-ID changeset returned two 204 responses and created one inactive synthetic
-profile (`statecode:1`, `statuscode:2`). Exact comparison then rejected the role field:
-Dataverse normalized empty string to null. The inactive profile remains, SQL rolled
-back, and final readback shows zero bridge identities/bindings and unchanged sequence 4.
-Successful binding/COMMIT/replay remains unverified. Justin approved empty optional
-text as null with original source preserved. The planner implements versioned policy
-`empty-string-to-null-v1`; Fable review and a new-plan rerun are pending. Old plans
-are refused, and target comparison stays exact against canonical planned values.
+The November 10 canary first exposed inactive-create and empty/null issues.
+Fable-reviewed repair `83cf6c93c` created an inactive synthetic profile atomically.
+Owner-approved normalization policy `empty-string-to-null-v1` in `ab0e0e7e3` preserves
+raw source hashes and maps exact empty optional text to null in planned values only.
+After Fable review, a new plan bound that retained profile to local numeric ID 5;
+COMMIT and replay passed, with one identity/binding and sequence stable at 5.
+Profile `db8e8f68-6add-f111-84ea-70a8a5b1c1c6` remains inactive, role null; no
+Dataverse writes occurred in the normalization run/replay. Old plans fail closed,
+and existing profiles must match canonical planned values exactly.
+Private evidence is now in `/Users/gallivan/.local/share/wmkf-roster/canary-20261110`;
+temporary inputs were recovered against original content hashes (see README).
 Real roster data has not been imported. See the live canary record in
 `docs/plans/data/expertise-roster/README.md` for receipts and the next blocker. The related
 `expertise_roster_identity` and `expertise_roster_binding` tables exist only in the

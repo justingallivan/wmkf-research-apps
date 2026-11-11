@@ -73,14 +73,16 @@ Roster continuation is on `codex/expertise-roster-import-2026-11-10` in
 `e90babb2a`. The temporary worktree disappeared; the pushed checkpoint was preserved.
 The branch now includes the file-only planner and a separate sandbox-only import
 executor with explicit overrides/exclusions/new-person staging and replay recovery.
-The inactive-create repair `83cf6c93c` passed Fable review and the same-input live
-rerun: one atomic create/deactivate change set returned two 204s and retained an
-inactive synthetic profile. The canary then failed exact comparison because Dataverse
-converted empty role text to null. SQL rolled back; no bridge binding, sequence unchanged.
-Justin approved exact empty optional text as null while preserving original source.
-The versioned planner policy is implemented; Fable review and a new-plan canary rerun
-are pending. Old plans fail closed; target comparison remains exact.
-Successful bridge COMMIT remains unverified. No real import has been performed. The local
+The inactive-create repair `83cf6c93c` and owner-approved empty-text normalization
+`ab0e0e7e3` passed Fable review. The normalization canary bound the retained inactive
+synthetic profile to local roster ID 5; COMMIT and replay passed, sequence stable at 5,
+no Dataverse writes. Raw input content hashes are preserved; plans canonicalize only
+exact empty optional text. New evidence is private at
+`/Users/gallivan/.local/share/wmkf-roster/canary-20261110`. Temporary synthetic inputs
+were reconstructed against original receipt hashes after their directory disappeared;
+real exports were not recovered. Next: recover real source, count empty/whitespace
+text, then complete full-import and consumer/permission/audit rehearsal gates.
+No real import has been performed. The local
 fixture was recovered, but prior private inventory files remain unavailable; do not
 invent replacements for their source lineage or GUIDs. Evidence and runbook:
 `docs/plans/data/expertise-roster/README.md`. Real inventory and a synthetic-only
