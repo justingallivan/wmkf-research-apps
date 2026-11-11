@@ -95,13 +95,13 @@ describePg('durable shared Executor ledger on PostgreSQL', () => {
     return { environment: command.environment, authorizationScope: command.authorizationScope, requestId: command.requestId };
   }
 
-  async function open(command = input(), fields = baseline) {
+  async function open(command = input(), fields = baseline, etag = 'W/"baseline"') {
     const admitted = await store.admit(command);
     const claim = await store.claim({ jobId: admitted.job.id });
     const fence = { jobId: claim.job.id, leaseToken: claim.leaseToken };
     const snapshot = { scope: scope(command), profileHash, documents: [{ text: 'Temporary fixture document.' }] };
     await store.saveSnapshot({ ...fence, snapshot });
-    if (command.operation === 'initialize') await store.captureTarget({ ...fence, etag: 'W/"baseline"', fields });
+    if (command.operation === 'initialize') await store.captureTarget({ ...fence, etag, fields });
     return { ...admitted, claim, fence, snapshot };
   }
 
@@ -120,6 +120,11 @@ describePg('durable shared Executor ledger on PostgreSQL', () => {
     const validated = await store.saveValidated({ ...fence, taskId, attemptId: attempt.id, result, deferredAudit: audit });
     expect(validated.state).toBe('validated');
     return { ...fence, taskId, attemptId: attempt.id };
+  }
+
+  async function deliverAudit(attempt) {
+    expect(await store.markAuditDispatching(attempt)).toMatchObject({ audit_state: 'dispatching' });
+    expect(await store.markAudit({ ...attempt, outcome: 'delivered' })).toMatchObject({ audit_state: 'delivered' });
   }
 
   it('atomically admits one job under concurrency, scopes replay, and preserves the original frozen configuration', async () => {
@@ -227,11 +232,82 @@ describePg('durable shared Executor ledger on PostgreSQL', () => {
     expect(await store.admit(input({ requestId: job.request_id, sourceEventId: 'event-again' }, [SUMMARY]))).toMatchObject({ replayed: false });
   });
 
+  it.each([
+    ['a released failed-validation slot', [SUMMARY, METHODOLOGY]],
+    ['disjoint field slots', [METHODOLOGY]],
+  ])('waits for the earlier Request baseline with %s', async (_case, firstKeys) => {
+    let version = 1;
+    const etag = () => `W/"${version}"`;
+    const firstFields = firstKeys.includes(SUMMARY) ? baseline : { fixture_methodology: blankField };
+    const first = await open(input({}, firstKeys), firstFields, etag());
+    if (firstKeys.includes(SUMMARY)) {
+      const summary = first.tasks.find(task => task.task_key === SUMMARY);
+      const saved = await checkpoint(first.fence, summary.id);
+      const attempt = { ...first.fence, taskId: summary.id, attemptId: saved.id };
+      expect(await store.markAttemptFailed({ ...attempt, outcome: 'failed_validation', errorCode: 'invalid_fixture', deferredAudit: { status: 'failed' } }))
+        .toMatchObject({ writeback_state: 'blocked' });
+      await deliverAudit(attempt);
+    }
+    const secondInput = input({ requestId: first.job.request_id, sourceEventId: 'event-2' }, [SUMMARY]);
+    const second = await store.admit(secondInput);
+    await store.releaseClaim(first.fence);
+    const blocked = await store.claim({ jobId: second.job.id });
+    const blockedFence = { jobId: second.job.id, leaseToken: blocked.leaseToken };
+    const fields = { fixture_summary: blankField };
+    await expect(store.captureTarget({ ...blockedFence, etag: etag(), fields }))
+      .rejects.toMatchObject({ code: 'prompt_job_request_publication_pending', httpStatus: 409 });
+    const secondView = await store.readJob({ jobId: second.job.id, environment: 'test', principalKey: second.job.principal_key });
+    expect(secondView.job.target_etag).toBeNull();
+    await store.releaseClaim(blockedFence);
+
+    async function publish(fence, taskId, expectedFields) {
+      await deliverAudit(await validate(fence, taskId, 'Ready for the Request.'));
+      const operation = await store.freezePublication(fence);
+      const publication = { ...fence, operationId: operation.id };
+      expect(await store.markPublicationDispatched(publication)).toMatchObject({ state: 'dispatching' });
+      expect(operation.expected_etag).toBe(etag());
+      expect(await store.readContent({ ...fence, contentId: operation.payload_content_id, expectedHash: operation.payload_hash }))
+        .toEqual(expectedFields);
+      version += 1;
+      expect(await store.finishPublication({ ...publication, outcome: 'applied' })).toMatchObject({ state: 'applied' });
+      await store.releaseClaim(fence);
+    }
+
+    const firstAgain = await store.claim({ jobId: first.job.id });
+    const firstFence = { jobId: first.job.id, leaseToken: firstAgain.leaseToken };
+    await publish(firstFence, first.tasks.find(task => task.task_key === METHODOLOGY).id, { fixture_methodology: 'Ready for the Request.' });
+    const secondAgain = await store.claim({ jobId: second.job.id });
+    const secondFence = { jobId: second.job.id, leaseToken: secondAgain.leaseToken };
+    await store.saveSnapshot({ ...secondFence, snapshot: { scope: scope(secondInput), profileHash } });
+    expect(await store.captureTarget({ ...secondFence, etag: etag(), fields })).toMatchObject({ target_etag: 'W/"2"' });
+    await publish(secondFence, second.tasks[0].id, { fixture_summary: 'Ready for the Request.' });
+  });
+
+  it('retains the frozen prompt for delayed audit after source expiry while fencing new dispatch', async () => {
+    const { job, tasks, fence } = await open();
+    const attempt = await validate(fence, tasks[0].id);
+    await store.releaseClaim(fence);
+    // Age every payload on the source deadline, independent of its content kind.
+    await pool.query(`UPDATE prompt_job_content SET expires_at = clock_timestamp() - interval '1 second'
+      WHERE job_id = $1 AND expires_at <= (SELECT source_expires_at FROM prompt_jobs WHERE id = $1)`, [job.id]);
+    await store.expireContent();
+    const recovered = await store.claim({ jobId: job.id });
+    const next = { jobId: job.id, leaseToken: recovered.leaseToken };
+    const read = (contentId, expectedHash) => store.readContent({ ...next, contentId, expectedHash });
+    expect(await read(recovered.job.snapshot_content_id, recovered.job.snapshot_hash)).toBeNull();
+    expect(await read(recovered.attempts[0].response_content_id, recovered.attempts[0].response_hash)).toBeNull();
+    expect(await read(tasks[0].configuration_content_id, tasks[0].configuration_hash))
+      .toMatchObject({ promptRow: { wmkf_ai_promptname: SUMMARY } });
+    expect(await read(recovered.attempts[0].audit_content_id, recovered.attempts[0].audit_hash)).toEqual(audit);
+    expect(await store.markDispatching({ ...next, taskId: tasks[1].id })).toBeNull();
+    await deliverAudit({ ...attempt, ...next });
+  });
+
   it('freezes one exact coalesced operation after both tasks, and a 412 cannot permit recapture or replay', async () => {
     const { job, fence, tasks } = await open();
-    await validate(fence, tasks[0].id, 'Summary output.');
+    await deliverAudit(await validate(fence, tasks[0].id, 'Summary output.'));
     expect(await store.freezePublication(fence)).toBeNull();
-    await validate(fence, tasks[1].id, 'Methodology output.');
+    await deliverAudit(await validate(fence, tasks[1].id, 'Methodology output.'));
     const publication = await store.freezePublication(fence);
     expect(publication).toMatchObject({ expected_etag: 'W/"baseline"', state: 'ready' });
     expect(publication.task_ids).toEqual(expect.arrayContaining(tasks.map(task => task.id)));
@@ -262,10 +338,26 @@ describePg('durable shared Executor ledger on PostgreSQL', () => {
     expect(await store.freezePublication(next)).toBeNull();
   });
 
+  it('blocks publication on pending or failed audit, including a previously frozen ready receipt', async () => {
+    const { fence, tasks } = await open(input({}, [SUMMARY]), { fixture_summary: blankField });
+    const attempt = await validate(fence, tasks[0].id);
+    expect(await store.freezePublication(fence)).toBeNull();
+    await deliverAudit(attempt);
+    const publication = await store.freezePublication(fence);
+    // Recreate a ready receipt from the former store, which froze before audit delivery.
+    await pool.query("UPDATE prompt_job_attempts SET audit_state = 'pending' WHERE id = $1", [attempt.attemptId]);
+    const operation = { ...fence, operationId: publication.id };
+    expect(await store.markPublicationDispatched(operation)).toBeNull();
+    await store.markAuditDispatching(attempt);
+    expect(await store.markAudit({ ...attempt, outcome: 'failed' })).toMatchObject({ audit_state: 'failed' });
+    expect(await store.freezePublication(fence)).toBeNull();
+    expect(await store.markPublicationDispatched(operation)).toBeNull();
+  });
+
   it('keeps a lost remote write receipt uncertain after content expiry and blocks a new initialization', async () => {
     const command = input({}, [SUMMARY]);
     const { job, fence, tasks } = await open(command, { fixture_summary: blankField });
-    await validate(fence, tasks[0].id);
+    await deliverAudit(await validate(fence, tasks[0].id));
     const publication = await store.freezePublication(fence);
     const operation = { ...fence, operationId: publication.id };
     await store.markPublicationDispatched(operation);
