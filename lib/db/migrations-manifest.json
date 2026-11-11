@@ -93,6 +93,7 @@
     "092_retraction_dataset.sql",
     "093_prompt_publish_audit_catalog_status.sql",
     "094_test_request_readiness_finalizations.sql",
-    "095_reviewer_reminder_events.sql"
+    "095_reviewer_reminder_events.sql",
+    "097_shared_prompt_jobs.sql"
   ]
 }

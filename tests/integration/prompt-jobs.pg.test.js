@@ -1,0 +1,286 @@
+/** @jest-environment node */
+import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import pg from 'pg';
+import { canonical, hashProfile, sha256 } from '../../lib/services/prompt-jobs/profile.js';
+import { createPromptJobStore } from '../../lib/services/prompt-jobs/store.js';
+
+const url = process.env.PROMPT_JOB_PG_TEST_URL || '';
+if (!url && process.env.PROMPT_JOB_PG_TEST_REQUIRE === '1') {
+  throw new Error('PROMPT_JOB_PG_TEST_URL is required for the real PostgreSQL proof.');
+}
+if (url) {
+  let parsed;
+  try { parsed = new URL(url); } catch { throw new Error('Invalid prompt-job scratch PostgreSQL URL.'); }
+  if (!['postgres:', 'postgresql:'].includes(parsed.protocol) || !['127.0.0.1', '[::1]'].includes(parsed.hostname)
+    || !parsed.port || parsed.pathname.length < 2 || parsed.search || parsed.hash || url === process.env.POSTGRES_URL) {
+    throw new Error('Prompt-job proof requires an explicit loopback scratch PostgreSQL URL without options.');
+  }
+}
+const describePg = url ? describe : describe.skip;
+
+const SUMMARY = 'synthetic.executive-summary';
+const METHODOLOGY = 'synthetic.methodology';
+const profile = {
+  key: 'proposal-analysis', revision: 1, wrapperVersion: 1, sharedInstructions: 'Analyze the fixture.',
+  documentRoles: ['proposal'], recordNames: [],
+  limits: { maxDocuments: 1, maxDocumentBytes: 3000, maxTotalDocumentBytes: 3000, maxRecordBytes: 1000 },
+};
+const profileHash = hashProfile(profile);
+const blankField = { blank: true, sha256: sha256('') };
+const baseline = { fixture_summary: blankField, fixture_methodology: blankField };
+const response = {
+  version: 1, binding: sha256('fixture'),
+  response: { text: 'Temporary fixture response.', model: 'claude-sonnet-4-6', stopReason: 'end_turn',
+    usageComplete: true, usage: { input_tokens: 120, output_tokens: 20, cache_creation_input_tokens: 0, cache_read_input_tokens: 10 } },
+};
+const audit = { status: 'completed' };
+
+function fixtureTask(taskKey, scope) {
+  const output = taskKey === SUMMARY ? { name: 'summary', maxWords: 200 } : { name: 'methodology', maxChars: 12_000 };
+  const promptRow = {
+    wmkf_ai_promptid: randomUUID(),
+    wmkf_ai_promptname: taskKey,
+    wmkf_promptversion: 1,
+    wmkf_ai_systemprompt: '',
+    wmkf_ai_promptbody: 'Analyze the synthetic proposal.',
+    wmkf_ai_model: 'claude-sonnet-4-6',
+    wmkf_ai_promptvariables: JSON.stringify({
+      execution: { contractVersion: 1, mode: 'shared-document-task', profile: { key: profile.key, revision: 1, sha256: profileHash } },
+      variables: [{ name: 'proposal_context', source: { kind: 'prepared_context' }, required: true }],
+    }),
+    wmkf_ai_promptoutputschema: JSON.stringify({ parseMode: 'raw', outputs: [{ ...output, target: { kind: 'none' } }] }),
+  };
+  return { taskKey, configuration: { promptRow, profile, scope } };
+}
+
+function input(overrides = {}, keys = [SUMMARY, METHODOLOGY]) {
+  const environment = 'test';
+  const requestId = randomUUID();
+  const now = Date.now();
+  const command = {
+    environment, principalKey: 'human:trial-staff', authorizationScope: 'proposal:fixture', requestId,
+    idempotencyKey: randomUUID(), operation: 'initialize', sourceEventId: 'event-1',
+    sourceExpiresAt: new Date(now + 60_000), resultExpiresAt: new Date(now + 120_000), ...overrides,
+  };
+  command.tasks = overrides.tasks || keys.map(taskKey => fixtureTask(taskKey, {
+    environment: command.environment, authorizationScope: command.authorizationScope, requestId: command.requestId,
+  }));
+  return command;
+}
+
+describePg('durable shared Executor ledger on PostgreSQL', () => {
+  let admin;
+  let pool;
+  let schema;
+  let store;
+
+  beforeAll(async () => {
+    admin = new pg.Client({ connectionString: url });
+    await admin.connect();
+    schema = `prompt_jobs_${randomUUID().replaceAll('-', '')}`;
+    await admin.query(`CREATE SCHEMA "${schema}"`);
+    pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}`, max: 6 });
+    await pool.query(readFileSync('lib/db/migrations/097_shared_prompt_jobs.sql', 'utf8'));
+    store = createPromptJobStore(pool);
+  });
+
+  afterAll(async () => {
+    if (pool) await pool.end();
+    if (schema) await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
+    if (admin) await admin.end();
+  });
+
+  function scope(command) {
+    return { environment: command.environment, authorizationScope: command.authorizationScope, requestId: command.requestId };
+  }
+
+  async function open(command = input(), fields = baseline) {
+    const admitted = await store.admit(command);
+    const claim = await store.claim({ jobId: admitted.job.id });
+    const fence = { jobId: claim.job.id, leaseToken: claim.leaseToken };
+    const snapshot = { scope: scope(command), profileHash, documents: [{ text: 'Temporary fixture document.' }] };
+    await store.saveSnapshot({ ...fence, snapshot });
+    if (command.operation === 'initialize') await store.captureTarget({ ...fence, etag: 'W/"baseline"', fields });
+    return { ...admitted, claim, fence, snapshot };
+  }
+
+  async function expireLease(jobId) {
+    await pool.query("UPDATE prompt_jobs SET lease_expires_at = clock_timestamp() - interval '1 second' WHERE id = $1", [jobId]);
+  }
+
+  async function checkpoint(fence, taskId) {
+    const attempt = await store.markDispatching({ ...fence, taskId });
+    const saved = await store.saveResponse({ ...fence, taskId, attemptId: attempt.id, response });
+    return saved;
+  }
+
+  async function validate(fence, taskId, result = 'Approved fixture prose.') {
+    const attempt = await checkpoint(fence, taskId);
+    const validated = await store.saveValidated({ ...fence, taskId, attemptId: attempt.id, result, deferredAudit: audit });
+    expect(validated.state).toBe('validated');
+    return { ...fence, taskId, attemptId: attempt.id };
+  }
+
+  it('atomically admits one job under concurrency, scopes replay, and preserves the original frozen configuration', async () => {
+    const command = input();
+    const [a, b] = await Promise.all([store.admit(command), store.admit(command)]);
+    expect(a.job.id).toBe(b.job.id);
+    expect([a.replayed, b.replayed].sort()).toEqual([false, true]);
+    expect(a.tasks).toHaveLength(2);
+    const replay = await store.admit({ ...command, tasks: [...command.tasks].reverse().map(({ taskKey }) => ({ taskKey })) });
+    expect(replay.tasks).toEqual(a.tasks);
+    await expect(store.admit({ ...command, sourceEventId: 'event-changed' })).rejects.toMatchObject({ code: 'prompt_job_idempotency_key_reused' });
+    await expect(store.admit({ ...command, authorizationScope: 'proposal:other' })).rejects.toMatchObject({ code: 'prompt_job_idempotency_key_reused' });
+    await expect(store.readJob({ jobId: a.job.id, environment: 'test', principalKey: 'human:other' })).resolves.toBeNull();
+    expect(a.tasks[0].prompt_hash).toBe(sha256(canonical(command.tasks[0].configuration.promptRow)));
+    expect((await pool.query('SELECT count(*)::int AS count FROM prompt_job_content WHERE job_id = $1', [a.job.id])).rows[0].count).toBe(2);
+  });
+
+  it('checks fixed task capabilities and scope before mutation', async () => {
+    const command = input();
+    const [summary, methodology] = command.tasks;
+    for (const tasks of [
+      [{ ...summary, promptHash: 'a'.repeat(64) }, methodology],
+      [{ ...summary, profileHash: 'a'.repeat(64) }, methodology],
+      [{ ...summary, model: 'other' }, methodology],
+      [{ ...summary, destinationField: 'real_field' }, methodology],
+      [{ ...summary, configuration: { ...summary.configuration, scope: { ...summary.configuration.scope, requestId: randomUUID() } } }, methodology],
+    ]) {
+      await expect(store.admit({ ...command, tasks })).rejects.toMatchObject({ code: 'invalid_prompt_job_configuration' });
+    }
+    const admitted = await store.admit(command);
+    expect(admitted.replayed).toBe(false);
+    expect(admitted.tasks.map(task => task.destination_field)).toEqual(['fixture_summary', 'fixture_methodology']);
+  });
+
+  it('arbitrates concurrent initialization slots across different events and rolls back the losing job', async () => {
+    const first = input();
+    const second = input({ requestId: first.requestId, sourceEventId: 'event-2' });
+    const results = await Promise.allSettled([store.admit(first), store.admit(second)]);
+    expect(results.map(x => x.status).sort()).toEqual(['fulfilled', 'rejected']);
+    expect(results.find(x => x.status === 'rejected').reason).toMatchObject({ code: 'prompt_job_initialization_reserved' });
+    expect((await pool.query('SELECT count(*)::int AS count FROM prompt_jobs WHERE request_id = $1', [first.requestId])).rows[0].count).toBe(1);
+    expect((await pool.query('SELECT count(*)::int AS count FROM prompt_job_initializations WHERE request_id = $1', [first.requestId])).rows[0].count).toBe(2);
+  });
+
+  it('allows one active claim per Request and fences late provider completion after uncertain dispatch', async () => {
+    const first = await open();
+    const siblingJob = await store.admit(input({ operation: 'generate-draft', requestId: first.job.request_id }));
+    const contenders = await Promise.all([store.claim({ jobId: first.job.id }), store.claim({ jobId: siblingJob.job.id })]);
+    expect(contenders).toEqual([null, null]);
+    const task = first.tasks[0];
+    const attempt = await store.markDispatching({ ...first.fence, taskId: task.id });
+    expect(attempt.audit_run_id).toBeTruthy();
+    await expireLease(first.job.id);
+    expect(await store.claim({ jobId: siblingJob.job.id })).toBeNull();
+    const recovered = await store.claim({ jobId: first.job.id });
+    expect(recovered.attempts[0]).toMatchObject({ id: attempt.id, state: 'unknown', usage_complete: null });
+    expect(await store.markDispatching({ jobId: first.job.id, leaseToken: recovered.leaseToken, taskId: first.tasks[1].id })).toBeNull();
+    expect(await store.saveResponse({ ...first.fence, taskId: task.id, attemptId: attempt.id, response })).toBeNull();
+    const unrelated = await store.admit(input({ operation: 'generate-draft' }));
+    const [one, two] = await Promise.all([store.claim({ jobId: unrelated.job.id }), store.claim({ jobId: unrelated.job.id })]);
+    expect([one, two].filter(Boolean)).toHaveLength(1);
+    expect((one || two).lease_expires_at).toBeInstanceOf(Date);
+  });
+
+  it('recovers the exact atomic response checkpoint and never repeats dispatch after worker death', async () => {
+    const { job, tasks, fence, snapshot } = await open();
+    const saved = await checkpoint(fence, tasks[0].id);
+    await expireLease(job.id);
+    const recovered = await store.claim({ jobId: job.id });
+    const next = { jobId: job.id, leaseToken: recovered.leaseToken, taskId: tasks[0].id, attemptId: saved.id };
+    expect(recovered.tasks[0].state).toBe('response_saved');
+    expect(recovered.attempts[0]).toMatchObject({ state: 'response_saved', usage_complete: true, usage: response.response.usage });
+    await expect(store.saveSnapshot({ ...next, snapshot: { ...snapshot, documents: [] } })).rejects.toMatchObject({ code: 'prompt_job_snapshot_frozen' });
+    expect(await store.markDispatching(next)).toBeNull();
+    expect(await store.readContent({ ...next, contentId: saved.response_content_id, expectedHash: saved.response_hash })).toEqual(response);
+    await expect(store.readContent({ ...next, contentId: saved.response_content_id, expectedHash: '0'.repeat(64) })).rejects.toMatchObject({ code: 'prompt_job_content_integrity' });
+    expect(await store.saveValidated({ ...next, result: 'Recovered fixture prose.', deferredAudit: audit })).toMatchObject({ state: 'validated' });
+    expect(await store.markAudit({ ...next, outcome: 'delivered' })).toBeNull();
+    expect(await store.markAuditDispatching(next)).toMatchObject({ audit_state: 'dispatching' });
+    expect(await store.markAudit({ ...next, outcome: 'delivered' })).toMatchObject({ audit_state: 'delivered' });
+    const publicReceipt = await store.readJob({ jobId: job.id, environment: 'test', principalKey: job.principal_key });
+    expect(JSON.stringify(publicReceipt)).not.toMatch(/Temporary fixture|Recovered fixture prose/);
+  });
+
+  it('releases known failure slots while preserving occupied fields and saves validation failure audit', async () => {
+    const command = input();
+    const occupied = { ...baseline, fixture_methodology: { blank: false, sha256: sha256('staff work') } };
+    const { job, fence, tasks } = await open(command, occupied);
+    expect(await store.markDispatching({ ...fence, taskId: tasks[1].id })).toBeNull();
+    const attempt = await checkpoint(fence, tasks[0].id);
+    const transition = { ...fence, taskId: tasks[0].id, attemptId: attempt.id };
+    expect(await store.markAttemptFailed({ ...transition, outcome: 'failed_validation', errorCode: 'invalid_fixture', deferredAudit: { status: 'failed' } }))
+      .toMatchObject({ state: 'failed_validation', writeback_state: 'blocked' });
+    expect(await store.markAuditDispatching(transition)).toMatchObject({ audit_state: 'dispatching' });
+    const retry = input({ requestId: job.request_id, sourceEventId: 'event-new' }, [SUMMARY]);
+    const retryAdmission = await store.admit(retry);
+    await expect(store.admit(input({ requestId: job.request_id, sourceEventId: 'event-occupied' }, [METHODOLOGY])))
+      .rejects.toMatchObject({ code: 'prompt_job_initialization_reserved' });
+    await store.releaseClaim(fence);
+    const replacement = await store.claim({ jobId: retryAdmission.job.id });
+    expect(await store.markAttemptFailed({
+      jobId: retryAdmission.job.id, leaseToken: replacement.leaseToken, taskId: retryAdmission.tasks[0].id,
+      outcome: 'failed_pre_dispatch', errorCode: 'before_provider',
+    })).toMatchObject({ state: 'failed_pre_dispatch' });
+    expect(await store.admit(input({ requestId: job.request_id, sourceEventId: 'event-again' }, [SUMMARY]))).toMatchObject({ replayed: false });
+  });
+
+  it('freezes one exact coalesced operation after both tasks, and a 412 cannot permit recapture or replay', async () => {
+    const { job, fence, tasks } = await open();
+    await validate(fence, tasks[0].id, 'Summary output.');
+    expect(await store.freezePublication(fence)).toBeNull();
+    await validate(fence, tasks[1].id, 'Methodology output.');
+    const publication = await store.freezePublication(fence);
+    expect(publication).toMatchObject({ expected_etag: 'W/"baseline"', state: 'ready' });
+    expect(publication.task_ids).toEqual(expect.arrayContaining(tasks.map(task => task.id)));
+    expect(publication.initialization_ids).toHaveLength(2);
+    expect(await store.readContent({ ...fence, contentId: publication.payload_content_id, expectedHash: publication.payload_hash }))
+      .toEqual({ fixture_summary: 'Summary output.', fixture_methodology: 'Methodology output.' });
+    const operation = { ...fence, operationId: publication.id };
+    expect(await store.markPublicationDispatched(operation)).toMatchObject({ state: 'dispatching' });
+    expect(await store.finishPublication({ ...operation, outcome: 'conflict' })).toMatchObject({ state: 'conflict' });
+    expect(await store.markPublicationDispatched(operation)).toBeNull();
+    await expect(store.captureTarget({ ...fence, etag: 'W/"staff-cleared"', fields: baseline })).rejects.toMatchObject({ code: 'prompt_job_target_frozen' });
+    await expect(store.admit(input({ requestId: job.request_id, sourceEventId: 'event-after-clear' }))).rejects.toMatchObject({ code: 'prompt_job_initialization_reserved' });
+    const view = await store.readJob({ jobId: job.id, environment: 'test', principalKey: job.principal_key });
+    expect(view.tasks.every(task => task.writeback_state === 'conflict')).toBe(true);
+  });
+
+  it('keeps audit uncertainty after lease expiry and blocks publication without replaying audit', async () => {
+    const command = input({}, [SUMMARY]);
+    const { job, fence, tasks } = await open(command, { fixture_summary: blankField });
+    const attempt = await validate(fence, tasks[0].id);
+    expect(await store.markAuditDispatching(attempt)).toMatchObject({ audit_state: 'dispatching' });
+    await expireLease(job.id);
+    const recovered = await store.claim({ jobId: job.id });
+    const next = { ...attempt, leaseToken: recovered.leaseToken };
+    expect(recovered.attempts[0].audit_state).toBe('unknown');
+    expect(await store.markAudit({ ...attempt, outcome: 'delivered' })).toBeNull();
+    expect(await store.markAuditDispatching(next)).toBeNull();
+    expect(await store.freezePublication(next)).toBeNull();
+  });
+
+  it('keeps a lost remote write receipt uncertain after content expiry and blocks a new initialization', async () => {
+    const command = input({}, [SUMMARY]);
+    const { job, fence, tasks } = await open(command, { fixture_summary: blankField });
+    await validate(fence, tasks[0].id);
+    const publication = await store.freezePublication(fence);
+    const operation = { ...fence, operationId: publication.id };
+    await store.markPublicationDispatched(operation);
+    await expireLease(job.id);
+    const recovered = await store.claim({ jobId: job.id });
+    const next = { ...operation, leaseToken: recovered.leaseToken };
+    expect(recovered.publication).toMatchObject({ id: publication.id, state: 'unknown', payload_hash: publication.payload_hash, expected_etag: publication.expected_etag });
+    expect(await store.finishPublication({ ...operation, outcome: 'applied' })).toBeNull();
+    await pool.query("UPDATE prompt_job_content SET expires_at = clock_timestamp() - interval '1 second' WHERE job_id = $1", [job.id]);
+    expect(await store.expireContent()).toBe(6);
+    expect(await store.readContent({ ...next, contentId: publication.payload_content_id, expectedHash: publication.payload_hash })).toBeNull();
+    expect(await store.freezePublication(next)).toMatchObject({ id: publication.id, state: 'unknown' });
+    expect(await store.markPublicationDispatched(next)).toBeNull();
+    expect(await store.admit(command)).toMatchObject({ replayed: true, publication: { state: 'unknown' } });
+    await expect(store.admit(input({ requestId: job.request_id, sourceEventId: 'event-new' }, [SUMMARY])))
+      .rejects.toMatchObject({ code: 'prompt_job_initialization_reserved' });
+  });
+});

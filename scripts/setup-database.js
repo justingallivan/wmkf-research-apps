@@ -2146,6 +2146,7 @@ function getBootstrapGroups() {
 async function runMigration() {
   const connectionString = loadDatabaseUrl();
   const { Client } = require('pg');
+  // The manifest supplies migration-owned tables, including the shared prompt-job ledger.
   const { bootstrapFreshDatabase } = require('./lib/fresh-database-bootstrap');
   const client = new Client({ connectionString });
   await client.connect();
