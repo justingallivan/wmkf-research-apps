@@ -18,7 +18,11 @@ Author: Claude for Justin Gallivan, 2026-11-10 (Session 673). **Draft;
 nothing here is built.** The owner answered its four decisions on
 2026-11-10. Codex reviewed it the same day and returned "needs attention"
 with three findings, all confirmed against the source and worked into
-findings 4, step 1 and section 5; it has not re-reviewed the amended text. The build
+finding 4, step 1 and section 5. Its second review, of that amended text,
+returned "needs attention" again with four findings, also confirmed; three
+are worked in below (marked "second Codex review") and the fourth, offramp
+enforcement on the review transitions, is in section 5 as a separate
+change. The text after those amendments has not been reviewed. The build
 plan's section 3a requires this plan, a whole-flow review of it, and a Codex
 review before any code.
 
@@ -162,7 +166,7 @@ the four keys the stage model already expects: `presentation`, `roster`,
 
 | Key | Rule | Reuses |
 |---|---|---|
-| `boardDraft.exists` | The request's current draft resolves and is eligible. No current draft (`final_writeup_source_missing`) and a draft not yet shared for review (`final_writeup_source_ineligible`) are both `exists: false`: the Final Writeup tab already treats them as "a draft is needed", not as errors. A broken pointer, an unknown registry state or a missing SharePoint identity is `unavailable`. | `resolveSource`, `assertEligibleSource` |
+| `boardDraft.exists` | **Worked out after `transition`.** When a committed Final row exists the draft exists (`true`): starting group review moves the draft row to the Final lifecycle `[VERIFIED via lib/services/final-writeup/transition-claims.js:194-200]`, so the eligibility check below would otherwise report a draft in group review as missing and the model would offer "write the Board draft" during review (second Codex review). A draft row in the Final lifecycle with no Final pointer is `unavailable`, as the status read treats it today `[VERIFIED via transition-state.js:62-69]`. Otherwise: the request's current draft resolves and is eligible. No current draft (`final_writeup_source_missing`) and a draft not yet shared for review (`final_writeup_source_ineligible`) are both `exists: false`: the Final Writeup tab already treats them as "a draft is needed", not as errors. A broken pointer, an unknown registry state or a missing SharePoint identity is `unavailable`. | `resolveSource`, `assertEligibleSource` |
 | `transition.phase` | The current Final row passes the committed check; its stage is group review or leadership review. No Final pointer is `null`; a pointer to a missing or wrong-type row, or a Final row that fails the check, is `unavailable`. | `findCurrentFinal`, `committedFinal`, `stageOf` |
 | `presentation.exists` | At least one presentation record in an accepted state. | To be settled in review: which of the two classifiers (finding 5) |
 | `presentation.ended` | Exactly one eligible record whose scheduled end has passed. More than one, or an unclassified record, is `null` (unknown). | The schedule check's classification, without its per-record re-read |
@@ -183,9 +187,16 @@ the four keys the stage model already expects: `presentation`, `roster`,
   presentation, so a rescheduled or replaced presentation could keep the
   old one's "ended" (Codex review, 2026-11-10). **Rule adopted instead:
   the server is the only source of these four keys.** Tabs stop reporting
-  them. After an action that can change one (saving attendance, starting
-  or advancing group review, saving the Board draft), the page asks the
-  server for the request's facts again and replaces all four together.
+  them. The page asks the server for the request's facts again, and
+  replaces all four together, whenever something signals they may have
+  changed: an action on the page (saving attendance, starting or advancing
+  group review, saving the Board draft), and also every signal the tabs
+  give today, namely a successful status load, the end of polling, automatic
+  preparation finishing, and a manual reload
+  `[VERIFIED via shared/components/workbench/FinalWriteupTab.js:329-333; the Staff Deliberations tab's equivalent was reported by Codex and not re-read]`.
+  Otherwise a colleague starting group review while the page is open would
+  leave the strip behind the tab (second Codex review). Each re-fetch is
+  guarded by the route generation and by "latest request wins".
 - **Schema not set up is not a failure.** Where the Final Writeup or
   attendance schema is off for a deployment, the keys read
   `not-provisioned`, as the memo keys do since Session 672, so the rows are
@@ -236,8 +247,16 @@ are, with a tab count from the same row rules.
   input: draft without presentation, presentation without invitation
   (Codex's first review), two presentation records, a Final row failing the
   committed check, each batch read failing in turn.
-- One test proves the list and the request page derive the same phase from
-  the same server facts for a lead Program Director and for another viewer.
+- Parity is tested on more than the phase: the task list, the leading
+  task, the waiting lines and the rendered next-step text are the same on
+  the list and the page, for a lead Program Director and for another
+  viewer, before and after tab reads (second Codex review).
+- One fact outside the four keys still differs: whether the saved review
+  summary is out of date is known only to the page
+  `[VERIFIED via shared/utils/j27PageStage.js:83-85 and lib/services/workbench/j27-read-model-inputs.js:77-85]`,
+  so the page can say "read the reports" where the list says nothing is
+  waiting. Either the server works that out for both, or the difference is
+  accepted and written down. To be settled before build.
 - A negative test for each "unavailable" mapping, with the failing fact
   present in the setup.
 - Gates for the surfaces touched: route matrix, Atlas (request document and
@@ -270,6 +289,15 @@ support stays later.
   configured `[VERIFIED via transition-schedule.js:24-38]` (Codex review,
   2026-11-10; this draft had assumed otherwise). The exception is therefore
   closed for 2027 and later cycles; earlier cycles keep it.
+- **Offramp is not enforced on the review transitions** (second Codex
+  review). Neither starting group review nor sending to leadership reads
+  the Phase II status: the transition's request fields do not include it
+  `[VERIFIED via transition-model.js:13-17; git grep for phaseiistatus and offramp under lib/services/final-writeup returned nothing]`.
+  A request offramped after its presentation, or during group review,
+  could still be moved forward. The owner's rule (D63) is that an offramped
+  request does not go to the Board. This is a guard on two write paths and
+  is independent of the lists; recommended as its own small change, not
+  part of this plan.
 - How the Staff deliberations list classifies timing (finding 5, last
   point).
 - Codex's second and fourth points are confirmed only in part: the Final
