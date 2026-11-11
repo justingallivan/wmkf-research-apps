@@ -193,9 +193,9 @@ automation direction.
 [PLANNED; owner decisions, November 11] The next expertise direction is
 recommendations-only through the shared Executor/Power Automate backend, not staff
 assignment. Future assignment requires a separate contract with Connor. No future
-Phase I staff-version document is assumed. The authoritative source remains OPEN
-pending shared source/cache work: Submission-Documents project narrative versus
-AI Materials combined narrative–bibliography. Existing runtime callers and dated
+Phase I staff-version document is assumed. Justin selected the initial policy: AI Materials combined narrative–bibliography.
+General future document placement and cache compatibility remain unsettled; this
+does not select Submission-Documents as a fallback. Existing runtime callers and dated
 rehearsals are preserved; this decision does not remove them.
 
 [VERIFIED via `lib/services/expertise-finder/recommendations-contract.js`]
@@ -209,20 +209,22 @@ the unit suite imports this module; no production caller is wired. This module d
 persist or establish currentness. `complete: true` is a trusted future adapter's
 assertion, not pagination proof. Its 4 MiB cap bounds the roster extension only;
 the shared full sealed-snapshot/prompt budget still requires integration checks.
-No live calls or assignment writes were added. Source choice remains OPEN.
+No live calls or assignment writes were added. The initial source policy is AI Materials combined narrative–bibliography; broader future placement remains open.
 
 The shared offline typed fixture is built at runtime `7d0cf0392`, checkpoint
 `eb0010163` (coordinating-session source verification; reported 380 tests/25 suites,
 Opus READY). The agreed earlier interface is `a756735fa`; `0c4b8d39c` remains its
-historical runtime baseline. The staff access/currentness facade is in progress
-with injected fabricated readers, not an HTTP/live-DAL integration or PA release.
+historical runtime baseline. The shared staff access/currentness facade is offline-built at `c9777bc87`
+(docs `4a2eb6fa6`), with reported 409 tests/26 suites and Opus READY, and coordinating-
+session source review. It uses injected fabricated readers; no HTTP/live-DAL bridge
+or PA release is established.
 The roster-only freshness comparator is source-built with 21 new passing tests
 (final combined 120 tests across seven suites); Opus source review returned READY with no concrete defects. It compares a
 retained hash to a trusted complete fresh projection, returning only current/stale/
 unknown. Auth, contract version, expiry and document/source proof remain caller
 obligations. See `docs/plans/data/expertise-roster/ROSTER_FRESHNESS_CONTRACT_BUILD_2026-11-11.md`.
 Machine audit attribution, revocation-safe cleanup, PA operations and roster cutover
-remain release gates; source choice stays OPEN.
+remain release gates; the initial source is selected but broader future placement remains open.
 
 The shared infrastructure owner confirmed clean runtime baseline `0c4b8d39c` and retains
 common source/cache contracts, PA authentication, typed storage/results, worker,

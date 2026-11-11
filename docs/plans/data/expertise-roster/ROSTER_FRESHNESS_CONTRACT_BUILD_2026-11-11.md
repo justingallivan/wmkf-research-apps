@@ -22,7 +22,8 @@ shared slice. This supersedes treating all typed integration as unbuilt. The sta
 access/currentness facade is being implemented with injected fabricated readers;
 no HTTP or live DAL bridge is claimed. Auth, version/expiry, source proof, result
 projection and machine-principal release controls belong to that facade/shared
-infrastructure. Source choice remains OPEN and results are recommendations only.
+infrastructure. The initial source is AI Materials combined narrative–bibliography; broader future
+placement remains open and results are recommendations only.
 
 ## Final review and scope closure
 
@@ -35,6 +36,7 @@ across runtime versions. Neither note required a source change.
 
 Scoped Mode A reconciliation updated the roster plan, Session, Atlas, catalog and
 prior receipt routing. Doc-currency, doc-symbol-reference and Atlas gates with
-sequential self-tests and diff checks passed. The shared staff facade is still
-being built; source selection, live authorization/observations and release are not
-established by this pure helper or the shared offline fixture.
+sequential self-tests and diff checks passed. The shared staff facade is now offline-built at `c9777bc87` (docs `4a2eb6fa6`),
+with reported 409 tests/26 suites and Opus READY. Live authorization/observations
+and release remain unproved. The initial source policy is selected, not wired by
+this pure helper.

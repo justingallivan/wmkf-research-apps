@@ -17,9 +17,9 @@ Batch picker, full-application and Production readiness are not claimed.
 [PLANNED; owner decisions, November 11] The next expertise direction is
 recommendations-only through the shared Executor/Power Automate backend, not staff
 assignment. Future assignment requires a separate contract with Connor. No future
-Phase I staff-version document is assumed. The authoritative source remains OPEN
-pending shared source/cache work: Submission-Documents project narrative versus
-AI Materials combined narrative–bibliography. Existing runtime callers and dated
+Phase I staff-version document is assumed. Justin selected the initial policy: AI Materials combined narrative–bibliography.
+General future document placement and cache compatibility remain unsettled; this
+does not select Submission-Documents as a fallback. Existing runtime callers and dated
 rehearsals are preserved; this decision does not remove them.
 
 The shared infrastructure owner confirmed clean baseline `0c4b8d39c` and retains

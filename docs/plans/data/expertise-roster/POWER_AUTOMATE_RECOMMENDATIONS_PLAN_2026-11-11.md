@@ -1,8 +1,8 @@
 # Expertise recommendations through the shared Executor
 
-Status: REVIEWED PLAN; pure domain contract source-built, shared offline typed fixture built; staff/live integration PLANNED; recommendations-only direction approved by Justin on November 11,
-2026. This document does not activate a flow, authorize provider spending, select a
-proposal source, or approve Production cutover. Opus review disposition is recorded
+Status: REVIEWED PLAN; pure domain contract source-built, shared offline typed fixture built; staff facade offline-built; live integration PLANNED; recommendations-only direction approved by Justin on November 11,
+2026. This document does not activate a flow, authorize provider spending or approve Production cutover. The initial source
+policy is owner-selected below; general future placement remains unsettled. Opus review disposition is recorded
 in the companion review document. Owner: roster stream; shared infrastructure remains owned by
 “Prompt Calling Architecture.”
 
@@ -19,10 +19,11 @@ in the companion review document. Owner: roster stream; shared infrastructure re
 - There will be no future Phase I staff-version document. Its existing code and
   successful rehearsal remain historical/current-runtime evidence, not the future
   source contract. Do not remove those live callers as part of planning.
-- Document selection is OPEN pending shared source/caching work: project narrative
-  in Submission-Documents, or combined narrative–bibliography in AI Materials.
-  No fallback, preferred filename, assemblage, extraction rule or cache-compatibility
-  claim is selected here. Existing proposal-pilot narrative selection is not inherited.
+- Justin selected AI Materials combined narrative–bibliography as the initial
+  policy, confirmed from his yes to the preceding shared-stream question. General
+  future placement is not settled. Exact source/cache adapter rules still require
+  implementation/review; no fallback or broader cache-compatibility claim follows.
+
 
 ## Verified baseline and coordination boundary
 
@@ -73,7 +74,7 @@ the unit suite imports this module; no production caller is wired. This module d
 persist or establish currentness. `complete: true` is a trusted future adapter's
 assertion, not pagination proof. Its 4 MiB cap bounds the roster extension only;
 the shared full sealed-snapshot/prompt budget still requires integration checks.
-No live calls or assignment writes were added. Source choice remains OPEN.
+No live calls or assignment writes were added. The initial source policy is AI Materials combined narrative–bibliography; broader future placement remains open.
 
 The agreed shared interface checkpoint is `a756735fa`, documented in the shared
 owner's `docs/plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md`; the historical
@@ -87,8 +88,10 @@ worker operations. The pure contract is not shared integration or PA readiness.
 The shared offline typed fixture is built at runtime `7d0cf0392`, checkpoint
 `eb0010163` (coordinating-session source verification; reported 380 tests/25 suites,
 Opus READY). The agreed earlier interface is `a756735fa`; `0c4b8d39c` remains its
-historical runtime baseline. The staff access/currentness facade is in progress
-with injected fabricated readers, not an HTTP/live-DAL integration or PA release.
+historical runtime baseline. The shared staff access/currentness facade is offline-built at `c9777bc87`
+(docs `4a2eb6fa6`), with reported 409 tests/26 suites and Opus READY, and coordinating-
+session source review. It uses injected fabricated readers; no HTTP/live-DAL bridge
+or PA release is established.
 The roster-only freshness comparator is source-built with 21 new passing tests
 (final combined 120 tests across seven suites); Opus source review returned READY with no concrete defects. It compares a
 retained hash to a trusted complete fresh projection, returning only current/stale/
@@ -126,9 +129,9 @@ obligations. See [freshness receipt](ROSTER_FRESHNESS_CONTRACT_BUILD_2026-11-11.
 
 The source interface must return approved document roles, Request association,
 item/version identities, byte hashes, extraction revision, bounded text and any
-required assemblage lineage. Until the infrastructure owner and Justin settle
-this interface/policy, only fabricated snapshots may be used for implementation
-proof; real-source wiring and publication are blocked.
+required assemblage lineage. The initial policy is AI Materials combined narrative–bibliography. Until the
+shared source/cache interface is implemented and reviewed, fabricated snapshots
+remain the integration proof; real-source wiring/publication are not established.
 
 The roster component contains ordered active profile GUIDs, canonical names,
 categories and existing formatted expertise, plus the eligible lead GUIDs.
@@ -325,7 +328,7 @@ must cover every terminal/unknown state. Reuse existing real-Postgres tests for
 locks/uniqueness rather than mocking their guarantees. Tests must assert zero
 assignment/Contact/User/Request-field writes with actual proposed writers present.
 
-Release is blocked on authoritative source/cache decision, machine authorization
+Release is blocked on implementing/verifying the selected initial source/cache policy, machine authorization
 proof with Connor, operational worker/recovery/retention, explicit roster cutover,
 and accepted typed-result/read contracts. Work on pure expertise adapters and
 fabricated tests may proceed after shared ownership agreement. Do not claim that
@@ -377,3 +380,20 @@ hidden records after source inspection. Both streams require checkpoint binding
 of extension integrity plus frozen capability/validator versions, bounded metadata
 only in configuration, source TTL for full roster data, and v1 text replay
 compatibility. The selected representation remains planned pending shared build.
+
+## Proposed sandbox roster read adapter and aggregate probe
+
+[VERIFIED via the coordinating session's read-only probe at 2026-11-11T20:44Z]
+`scripts/probe-recommendations-roster-read.mjs` read the registered sandbox under
+explicit DAL context and target checks: 46 profiles, 40 active, three enabled
+candidate Users, three eligible leads, zero warnings, every selected field present
+including nulls and all ETags present, with a complete count. This is aggregate
+read evidence from the old helper/single-page response, not strict multipage live
+verification, an implemented runtime adapter or authorization proof.
+Combined Opus plan review returned READY WITH NAMED CHANGES, accepted by the
+coordinating session. The read-only sandbox adapter and opt-in strict pagination/read behavior are
+source-built; 207 tests/ten suites and the final one-page strict-adapter probe passed.
+Opus initial review returned READY WITH NAMED CHANGES; all named tests passed; focused Opus closure returned READY. See
+[adapter build evidence](SANDBOX_ROSTER_READ_ADAPTER_BUILD_2026-11-11.md). It is sandbox-
+only, with no Production cutover or cross-environment assembly. No writes, generation
+or deployment were performed. Source/cache policy work remains shared-owner scope.
