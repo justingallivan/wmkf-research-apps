@@ -95,6 +95,7 @@ export default function ReviewersTab({
   const [candidates, setCandidates] = useState([]);
   const [removedCandidates, setRemovedCandidates] = useState([]);
   const [candidatesLoading, setCandidatesLoading] = useState(true);
+  const [landing, setLanding] = useState(null); // { requestId, sub }: the phase layout's opening view
   const [candidateLoadError, setCandidateLoadError] = useState(null);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [campaignOpen, setCampaignOpen] = useState(false);
@@ -467,8 +468,21 @@ export default function ReviewersTab({
   };
 
   // Explicit sub-tab links retain their tools. Otherwise every layout opens on
-  // the step with work waiting, once reviewer data has loaded.
-  const current = activeSub || (loading ? null : computeDefaultSub(reviewers));
+  // the step with work waiting, once reviewer data has loaded. The phase
+  // layout also opens on Invite when saved candidates wait (owner,
+  // 2026-11-11), so it waits for the candidate read too, and it settles the
+  // opening view once per request: the candidate list reloads after every
+  // invitation, and a recomputed default would move staff off Invite as soon
+  // as the last candidate was invited.
+  const landingReady = !loading && !(phaseLayout && candidatesLoading);
+  const settledLanding = landing && landing.requestId === requestId ? landing.sub : null;
+  const computedLanding = landingReady
+    ? computeDefaultSub(reviewers, phaseLayout ? { candidatesToInvite } : {})
+    : null;
+  useEffect(() => {
+    if (phaseLayout && landingReady && settledLanding === null) setLanding({ requestId, sub: computedLanding });
+  }, [phaseLayout, landingReady, settledLanding, requestId, computedLanding]);
+  const current = activeSub || (phaseLayout ? (settledLanding || computedLanding) : computedLanding);
   const pendingReviewDocumentKey = current === 'track'
     ? reviewers
       .filter(reviewerDocumentIsPending)

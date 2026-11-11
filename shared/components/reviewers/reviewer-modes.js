@@ -87,11 +87,13 @@ export function workRemainingForMode(reviewers, mode) {
 }
 
 // State-aware default sub-tab: drop staff into Track whenever any post-
-// acceptance reviewer exists; otherwise (no reviewers) the Find tab, where
-// reviewer-finding starts.
-export function computeDefaultSub(reviewers) {
+// acceptance reviewer exists; otherwise Invite when saved candidates are
+// waiting to be invited and the caller counted them (J27 phase layout; owner,
+// 2026-11-11); otherwise the Find tab, where reviewer-finding starts.
+export function computeDefaultSub(reviewers, { candidatesToInvite = 0 } = {}) {
   if (workRemainingForMode(reviewers, 'track') > 0) return 'track';
   if (countForMode(reviewers, 'track') > 0) return 'track';
+  if (Number(candidatesToInvite) > 0) return 'candidates';
   return 'find';
 }
 

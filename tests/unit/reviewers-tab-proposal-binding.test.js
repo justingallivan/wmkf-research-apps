@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 let findPanelProps = null;
 let invitePanelProps = null;
@@ -236,4 +236,65 @@ test('J27 opens on one roster with invitation, response and review progress, and
   router.query = { ...router.query, sub: 'candidates' };
   rerender(<ReviewersTab requestId={REQ} phaseLayout />);
   expect(invitePanelProps.candidates.map((candidate) => candidate.suggestionId)).toEqual(['p', 'd', 's', 'a']);
+});
+
+test('J27 opens on Invite when saved candidates wait and nobody has accepted, and stays there after inviting', async () => {
+  router.query = { requestId: REQ, tab: 'peer-review', section: 'panel' };
+  const originalFetch = global.fetch;
+  let candidates = [{ suggestionId: 's', name: 'Saved candidate' }];
+  global.fetch = jest.fn((url) => {
+    if (url.includes('/api/reviewer-finder/my-candidates')) {
+      return Promise.resolve({ ok: true, json: async () => ({ proposals: [{ candidates }] }) });
+    }
+    if (url.includes('/api/review-manager/reviewers')) {
+      return Promise.resolve({ ok: true, json: async () => ({ success: true, proposals: [{ reviewers: [] }] }) });
+    }
+    return originalFetch(url);
+  });
+  render(<ReviewersTab requestId={REQ} phaseLayout />);
+  const views = await screen.findByRole('navigation', { name: 'Reviewer panel views' });
+  await waitFor(() => expect(within(views).getByRole('button', { name: /^Invite/ })).toHaveAttribute('aria-current', 'page'));
+  expect(invitePanelProps.candidates.map((candidate) => candidate.suggestionId)).toEqual(['s']);
+  expect(findPanelProps).toBeNull();
+
+  // The candidate list reloads after an invitation; the opening view does not move to Find.
+  candidates = [{ suggestionId: 's', name: 'Saved candidate', invited: true }];
+  await act(async () => { await invitePanelProps.onRefresh(); });
+  await waitFor(() => expect(invitePanelProps.candidates[0].invited).toBe(true));
+  expect(within(views).getByRole('button', { name: /^Invite/ })).toHaveAttribute('aria-current', 'page');
+  expect(findPanelProps).toBeNull();
+});
+
+test('J27 opens on Find when every saved candidate is already invited', async () => {
+  router.query = { requestId: REQ, tab: 'peer-review', section: 'panel' };
+  const originalFetch = global.fetch;
+  global.fetch = jest.fn((url) => {
+    if (url.includes('/api/reviewer-finder/my-candidates')) {
+      return Promise.resolve({ ok: true, json: async () => ({ proposals: [{ candidates: [{ suggestionId: 'p', name: 'Pending', invited: true }] }] }) });
+    }
+    if (url.includes('/api/review-manager/reviewers')) {
+      return Promise.resolve({ ok: true, json: async () => ({ success: true, proposals: [{ reviewers: [] }] }) });
+    }
+    return originalFetch(url);
+  });
+  render(<ReviewersTab requestId={REQ} phaseLayout />);
+  const views = await screen.findByRole('navigation', { name: 'Reviewer panel views' });
+  await waitFor(() => expect(within(views).getByRole('button', { name: 'Find' })).toHaveAttribute('aria-current', 'page'));
+});
+
+test('earlier cycles keep opening on Find even with saved candidates waiting', async () => {
+  router.query = { requestId: REQ, tab: 'reviewers' };
+  const originalFetch = global.fetch;
+  global.fetch = jest.fn((url) => {
+    if (url.includes('/api/reviewer-finder/my-candidates')) {
+      return Promise.resolve({ ok: true, json: async () => ({ proposals: [{ candidates: [{ suggestionId: 's', name: 'Saved candidate' }] }] }) });
+    }
+    if (url.includes('/api/review-manager/reviewers')) {
+      return Promise.resolve({ ok: true, json: async () => ({ success: true, proposals: [{ reviewers: [] }] }) });
+    }
+    return originalFetch(url);
+  });
+  render(<ReviewersTab requestId={REQ} />);
+  await screen.findByTestId('persist-proposal');
+  expect(invitePanelProps).toBeNull();
 });

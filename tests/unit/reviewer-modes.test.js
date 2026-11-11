@@ -162,6 +162,15 @@ describe('computeDefaultSub (state-aware landing)', () => {
   it('lands on Track when everything is complete', () => {
     expect(computeDefaultSub([rev('complete'), rev('complete')])).toBe('track');
   });
+  it('lands on Invite when saved candidates wait and nobody has accepted (J27 phase layout)', () => {
+    expect(computeDefaultSub([], { candidatesToInvite: 2 })).toBe('candidates');
+    expect(computeDefaultSub(null, { candidatesToInvite: 1 })).toBe('candidates');
+  });
+  it('Track still outranks Invite, and no count means Find', () => {
+    expect(computeDefaultSub([rev('accepted')], { candidatesToInvite: 2 })).toBe('track');
+    expect(computeDefaultSub([], { candidatesToInvite: 0 })).toBe('find');
+    expect(computeDefaultSub([])).toBe('find');
+  });
   it('lands on Track when only review_received remains', () => {
     // review_received is in MODE_STATUSES.track but NOT MODE_WORK_REMAINING.track,
     // so track work-remaining is 0; track count > 0 → track.
