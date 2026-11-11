@@ -29,6 +29,7 @@ const profile = {
   limits: { maxDocuments: 1, maxDocumentBytes: 3000, maxTotalDocumentBytes: 3000, maxRecordBytes: 1000 },
 };
 const profileHash = hashProfile(profile);
+const proposalProfile = { ...profile, recordNames: ['pi_name'] };
 const blankField = { blank: true, sha256: sha256('') };
 const baseline = { fixture_summary: blankField, fixture_methodology: blankField };
 const response = {
@@ -39,6 +40,10 @@ const response = {
 const audit = { status: 'completed' };
 
 function fixtureTask(taskKey, scope) {
+  const proposal = taskKey.startsWith('proposal.');
+  const taskProfile = proposal ? proposalProfile : profile;
+  const variables = [{ name: 'proposal_context', source: { kind: 'prepared_context' }, required: true }];
+  if (proposal) variables.push({ name: 'pi_name', source: { kind: 'frozen_record' }, required: true });
   const output = taskKey.endsWith('.executive-summary') ? { name: 'summary', maxWords: 200 }
     : { name: 'methodology', maxChars: 12_000 };
   const promptRow = {
@@ -46,17 +51,17 @@ function fixtureTask(taskKey, scope) {
     wmkf_ai_promptname: taskKey,
     wmkf_promptversion: 1,
     wmkf_ai_systemprompt: '',
-    wmkf_ai_promptbody: 'Analyze the synthetic proposal.',
+    wmkf_ai_promptbody: proposal ? 'Analyze the proposal using {{pi_name}}.' : 'Analyze the synthetic proposal.',
     wmkf_ai_model: 'claude-sonnet-4-6',
     wmkf_ai_maxtokens: 1000,
     wmkf_ai_temperature: 0,
     wmkf_ai_promptvariables: JSON.stringify({
-      execution: { contractVersion: 1, mode: 'shared-document-task', profile: { key: profile.key, revision: 1, sha256: profileHash } },
-      variables: [{ name: 'proposal_context', source: { kind: 'prepared_context' }, required: true }],
+      execution: { contractVersion: 1, mode: 'shared-document-task', profile: { key: taskProfile.key, revision: 1, sha256: hashProfile(taskProfile) } },
+      variables,
     }),
     wmkf_ai_promptoutputschema: JSON.stringify({ parseMode: 'raw', outputs: [{ ...output, target: { kind: 'none' } }] }),
   };
-  return { taskKey, configuration: { promptRow, profile, scope } };
+  return { taskKey, configuration: { promptRow, profile: taskProfile, scope } };
 }
 
 function input(overrides = {}, keys = [SUMMARY, METHODOLOGY]) {
@@ -164,6 +169,32 @@ describePg('durable shared Executor ledger on PostgreSQL', () => {
     const replay = await store.admit({ ...command, tasks, sourceExpiresAt: undefined, resultExpiresAt: undefined });
     expect(replay).toMatchObject({ job: { id: a.job.id }, tasks: a.tasks, replayed: true });
     await expect(store.admit({ ...command, requestId: randomUUID() })).rejects.toMatchObject({ code: 'prompt_job_idempotency_key_reused' });
+  });
+
+  it('expires only matching trial content while preserving live content, receipts and quota', async () => {
+    const command = proposalInput();
+    const selected = await store.admit(command);
+    const otherCommand = proposalInput({ requestId: command.requestId });
+    const other = await store.admit(otherCommand);
+    const selectedScope = { ...scope(command), principalKey: command.principalKey };
+    const expiredIds = [selected.tasks[0].configuration_content_id, other.tasks[0].configuration_content_id];
+    await pool.query("UPDATE prompt_job_content SET expires_at = clock_timestamp() - interval '1 second' WHERE id = ANY($1::uuid[])", [expiredIds]);
+    await expect(store.expireContent({ scope: { ...selectedScope, requestId: undefined } })).rejects.toMatchObject({ code: 'invalid_prompt_job_id' });
+    for (const changed of [
+      { environment: 'preview-sandbox' }, { principalKey: 'human:other' },
+      { authorizationScope: `proposal-trial:${randomUUID()}` }, { requestId: randomUUID() },
+    ]) {
+      expect(await store.expireContent({ scope: { ...selectedScope, ...changed } })).toBe(0);
+    }
+    expect(await store.expireContent({ scope: selectedScope })).toBe(1);
+    const { rows } = await pool.query('SELECT id FROM prompt_job_content WHERE job_id = ANY($1::uuid[])', [[selected.job.id, other.job.id]]);
+    expect(rows.map(row => row.id).sort()).toEqual([
+      selected.tasks[1].configuration_content_id, ...other.tasks.map(task => task.configuration_content_id),
+    ].sort());
+    expect(await store.listJobs(selectedScope)).toEqual([{ job: selected.job, tasks: selected.tasks, attempts: [], publication: null }]);
+    expect(await store.admit(command)).toMatchObject({ job: { id: selected.job.id }, replayed: true });
+    await expect(store.admit({ ...command, idempotencyKey: randomUUID() })).rejects.toMatchObject({ code: 'prompt_job_trial_limit' });
+    expect(await store.expireContent({ scope: { ...scope(otherCommand), principalKey: otherCommand.principalKey } })).toBe(1);
   });
 
   it('refuses proposal admission outside the bounded draft capability or with a destination override', async () => {
