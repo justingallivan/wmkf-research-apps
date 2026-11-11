@@ -308,7 +308,7 @@ describe('single-submission layout (J27 onward)', () => {
     expect(result.aiMaterials.find((item) => item.key === 'graphicalAbstract').found).toBe(false);
   });
 
-  test('files outside the Submission-Documents folder, another request\'s files and both narrative names do not fill a row', async () => {
+  test('files outside the Submission-Documents folder and another request\'s files do not fill a row; the D26 narrative name is ignored there', async () => {
     listFiles.mockResolvedValue([
       pdf('Biosketches_1002379.pdf', `${ROOT}/AI Materials`),
       pdf('Other-Support_1009999.pdf'),
@@ -318,7 +318,10 @@ describe('single-submission layout (J27 onward)', () => {
 
     const result = await listProposalDocuments(REQUEST_ID, REQUEST_NUMBER, 'J27');
 
-    expect(result.aiMaterials.every((item) => item.found === false)).toBe(true);
+    // As in the governed reader, only the J27 name counts in Submission-Documents,
+    // so a stray D26-named copy beside it neither fills the row nor empties it.
+    expect(result.aiMaterials.filter((item) => item.found).map((item) => [item.key, item.name]))
+      .toEqual([['proposalNarrative', 'Project-Narrative_1002379.pdf']]);
     // No phase folder is configured, so nothing is swept into "Other documents".
     expect(result.otherDocuments).toEqual([]);
   });
