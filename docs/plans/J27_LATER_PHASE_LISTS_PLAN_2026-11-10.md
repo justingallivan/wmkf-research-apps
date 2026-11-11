@@ -36,20 +36,44 @@ carry `[VERIFIED via …]` or `[ASSUMED]`.
    phase from whatever tabs have been opened, and its tasks and waiting
    lines differ by viewer (finding 1). The list cannot "agree with the request page" until the page
    has one answer. This plan moves the later-phase facts to the server, for
-   both. Recommended.
+   both. **Decided (owner, 2026-11-10): yes.**
 2. **What a Deliberations row shows before its presentation.** Decision 3 of
    the build plan says no next-step line; rule 11 of the redesign plan says
    keep the scheduling cue. This plan reads those together: a timing chip
    ("Not scheduled", "Before presentation", "After presentation") and no
-   line under it until the presentation has ended. Confirm.
+   line under it until the presentation has ended. **Decided (owner,
+   2026-11-10): yes.** The row says nothing about the proposal discussion
+   brief. Owner's context: in D26 the Chairs approved the slate on the
+   shorter Phase I proposal; months later, with the Phase II proposals and
+   the reviews in hand, the Program Directors met as a group (sometimes with
+   a Program Chair), formed an initial opinion and wrote questions to send
+   the applicant before the presentation. J27 is compressed, people have
+   more information earlier, and an applicant can be offramped before a
+   presentation. What is prepared and shared before a J27 presentation will
+   change and is not yet decided, so no pre-presentation step is built into
+   the row.
 3. **Where today's Staff deliberations list goes.** It carries the brief and
    draft cues the stage model does not (build plan, finding 6). Recommended:
    a second section under Deliberations, the way Reviewers sits under Peer
    Review, and Final writeups under Final Assessment as "Writeup review".
+   **Decided (owner, 2026-11-10): yes.** The Final Assessment section is
+   meant to stay. The Deliberations one is temporary: that list assumes the
+   D26 order of work and is revisited when the J27 pre-presentation step is
+   decided (decision 2).
 4. **Cycles after J27.** Twelve places test for the literal J27
    (finding 6), so a D27 request would get the phase cycle page and the
-   older request page. Recommended: a separate small change before D27
-   proposals arrive (June 2027), not part of this plan.
+   older request page. **Decided (owner, 2026-11-10):** a separate small
+   change, done soon, not part of this plan. "We don't want things like
+   that as hard coded." The owner expects the JXX / DXX cadence to continue
+   and no wholesale change to the flow for D27, so each test becomes "2027
+   or later". Each of the twelve is checked first, in case one is
+   deliberately J27-only. The same change renames the seven settings that
+   carry the cycle in their name (`J27_CHAIRS_RECOMMENDATION_ENABLED`,
+   `J27_INITIAL_RATIONALE_SCHEMA_READY`, `J27_MEETING_ROSTER_SCHEMA_READY`,
+   `J27_AUTOMATIC_INTEGRITY` and the three rehearsal and simulation ones)
+   and records which are deleted after go-live. None of the seven is set in
+   any Vercel environment `[VERIFIED via vercel env ls, 2026-11-10: 154
+   setting names, none beginning J27_]`.
 
 ## 2. What reading the code showed
 
