@@ -28,7 +28,9 @@ committed on `claude/j27-cycle-page` at `91fc83581`. **The owner approved
 building this plan on 2026-11-10**, with Codex adversarial review of the
 plan and of each piece, and accepted the one remaining list-and-page
 difference (review-summary freshness, step 3). Step 1 below is the settled
-design, with citations at `91fc83581`; section 2's citations are at
+design, with citations at `91fc83581`. Codex's third pass on it found one
+problem (the schema gate, step 1) and passed the rest; plan review stops
+there and each built piece is reviewed instead. Section 2's citations are at
 `c6292bbf1`, and the three transition files have since moved by a few
 lines. The build
 plan's section 3a requires this plan, a whole-flow review of it, and a Codex
@@ -203,15 +205,20 @@ one read into half from another.
   This replaces both earlier drafts of this step ("never downgrade", then
   "server is the only source with re-fetch"): it needs no new read route and
   loses none of today's synchronization.
-- **Schema not set up is not a failure.** Where the Final Writeup or
-  attendance schema is off for a deployment, the keys read
-  `not-provisioned`, as the memo keys do, so rows are not marked as failed
-  reads.
-- **Request columns.** The draft and Final rules read the request's two
-  current-document pointers `[VERIFIED via transition-model.js:108,189,210-211]`.
-  The feed and the resolver do not select them today, so the select gains
-  them only when the Final Writeup schema check passes; an ungated column
-  would fail the whole list on a target without it.
+- **Schema not set up is not a failure, and does not hide a draft.** The
+  review stage needs the Final Writeup transition schema (wave 22); where
+  that is off, `transition` reads `not-provisioned`. The Board draft does
+  not need it: both request pointers and the draft rows belong to the
+  pre-site draft schema (wave 19), which the Staff deliberations list
+  already reads unconditionally
+  `[VERIFIED via lib/services/pre-site-visit/cycle-list-service.js:81-83]`,
+  so `boardDraft` is worked out regardless. Gating the draft on wave 22, as
+  an earlier draft of this step did, would have left a request with an
+  eligible draft in Deliberations (Codex plan review 3, the one finding of
+  that pass). Attendance reads `not-provisioned` where its field is off.
+- **Request columns.** The feed and the resolver gain the two
+  current-document pointers `[VERIFIED via transition-model.js:108,189,210-211]`,
+  ungated for the reason above.
 - **Slim document read.** Gains the four fields of finding 4.
 - **Failure.** A failed or capped batch read makes that key `unavailable` on
   every row, which the list already reports once (`degradedEverywhere`). A
