@@ -1,0 +1,193 @@
+{
+  "job": {
+    "id": "c4fa16dc-867a-417e-977f-f9cfae962c70",
+    "requestId": "15d8e475-02d3-f111-a05b-70a8a5b11800",
+    "version": 17,
+    "createdAt": "2026-11-11T19:11:55.630Z",
+    "status": "needs_attention",
+    "tasks": [
+      {
+        "taskKey": "proposal.executive-summary",
+        "state": "validated",
+        "resultAvailable": true,
+        "errorCode": null
+      },
+      {
+        "taskKey": "proposal.methodology",
+        "state": "failed_validation",
+        "resultAvailable": false,
+        "errorCode": "profile_output_invalid"
+      }
+    ]
+  },
+  "snapshotHash": "519ef538e0cb8bbf7e2dd0a2bb19391ee91f73845ae6b220d2d0ea6680810b65",
+  "approvedSnapshotHash": "519ef538e0cb8bbf7e2dd0a2bb19391ee91f73845ae6b220d2d0ea6680810b65",
+  "snapshotHashMatches": true,
+  "expiresAt": "2026-11-18T19:11:55.608Z",
+  "results": [
+    {
+      "taskKey": "proposal.executive-summary",
+      "status": "available",
+      "words": 186,
+      "chars": 1520,
+      "sha256": "d58d158ad3c60d8aa910999e5ecb1bdccb770f85bd0d97c48ecdc6b96dfd891f"
+    }
+  ],
+  "attempts": [
+    {
+      "id": "08da99dc-609a-45cf-9bc7-e09fd95cb364",
+      "taskId": "f0747624-7e8d-497c-9dc5-7adb6ffda907",
+      "state": "validated",
+      "auditRunId": "d9347b29-1ef8-4870-882e-9e123907d4ab",
+      "auditState": "delivered",
+      "usage": {
+        "input_tokens": 441,
+        "output_tokens": 304,
+        "cache_read_input_tokens": 0,
+        "cache_creation_input_tokens": 21507
+      },
+      "usageComplete": true
+    },
+    {
+      "id": "d6e628bb-0c98-4103-b09e-4ad47ae3786e",
+      "taskId": "073ef729-c331-482e-a9d5-46e0da97f0ba",
+      "state": "failed_validation",
+      "auditRunId": "8900261e-bbbb-4816-b7ab-a85258309bc3",
+      "auditState": "delivered",
+      "usage": {
+        "input_tokens": 478,
+        "output_tokens": 783,
+        "cache_read_input_tokens": 21507,
+        "cache_creation_input_tokens": 0
+      },
+      "usageComplete": true
+    }
+  ],
+  "providerPosts": 2,
+  "networkWrites": [
+    {
+      "kind": "task_publication",
+      "at": "2026-11-11T19:11:24.105Z",
+      "status": 201
+    },
+    {
+      "kind": "prior_prompt_demotion",
+      "at": "2026-11-11T19:11:24.405Z",
+      "status": 204
+    },
+    {
+      "kind": "task_publication",
+      "at": "2026-11-11T19:11:25.406Z",
+      "status": 201
+    },
+    {
+      "kind": "prior_prompt_demotion",
+      "at": "2026-11-11T19:11:25.746Z",
+      "status": 204
+    },
+    {
+      "kind": "anthropic_message",
+      "at": "2026-11-11T19:13:01.347Z",
+      "status": 200
+    },
+    {
+      "kind": "anthropic_message",
+      "at": "2026-11-11T19:13:55.778Z",
+      "status": 200
+    },
+    {
+      "kind": "contentfree_audit",
+      "at": "2026-11-11T19:16:05.360Z",
+      "status": 201
+    },
+    {
+      "kind": "contentfree_audit",
+      "at": "2026-11-11T19:18:14.600Z",
+      "status": 201
+    }
+  ],
+  "auditReadback": [
+    {
+      "id": "d9347b29-1ef8-4870-882e-9e123907d4ab",
+      "status": 682090000,
+      "runSource": 682090001,
+      "model": "claude-sonnet-4-6",
+      "promptVersion": 2,
+      "promptId": "3264a2ab-03de-f111-84ea-6045bd04539e",
+      "requestId": "15d8e475-02d3-f111-a05b-70a8a5b11800",
+      "createdBy": "29b0de0d-4ff7-ee11-a1fd-000d3a3621c7",
+      "createdOnBehalfBy": "53e97fb3-a006-f111-8406-000d3a352682",
+      "createdOn": "2026-11-11T19:16:05Z",
+      "rawOutputAbsent": true,
+      "promptOverrideAbsent": true,
+      "notes": "profiled=true; outcome=completed; code=none; stopReason=end_turn"
+    },
+    {
+      "id": "8900261e-bbbb-4816-b7ab-a85258309bc3",
+      "status": 682090001,
+      "runSource": 682090001,
+      "model": "claude-sonnet-4-6",
+      "promptVersion": 2,
+      "promptId": "056631ad-03de-f111-84e8-70a8a59c439a",
+      "requestId": "15d8e475-02d3-f111-a05b-70a8a5b11800",
+      "createdBy": "29b0de0d-4ff7-ee11-a1fd-000d3a3621c7",
+      "createdOnBehalfBy": "53e97fb3-a006-f111-8406-000d3a352682",
+      "createdOn": "2026-11-11T19:18:14Z",
+      "rawOutputAbsent": true,
+      "promptOverrideAbsent": true,
+      "notes": "profiled=true; outcome=failed; code=profile_output_invalid; stopReason=end_turn"
+    }
+  ],
+  "verificationScope": "Owner-approved second service-level controlled trial. No live browser/UI proof, Request field writeback, deployment, schema change, or profile change. Exactly two approved generation calls; no retry.",
+  "cohortId": "2fe01641-1860-4233-9233-7864946feb68",
+  "sourceSha256": "d7e31d37ed2163e29ade2bf878720af34582bcf10e7c8252a223c3dd79a20c44",
+  "profileRevision": 1,
+  "profileSha256": "355da5efaa225e162d870bb946b54bcd1a5269320566dbfaa3350b9b66afaf6c",
+  "publicationReadback": {
+    "bothVersion2Current": true,
+    "bothVersion1NotCurrent": true,
+    "profileRevision1Unchanged": true
+  },
+  "qualityReview": {
+    "reviewer": "claude-opus-5-5 via Claude Code OAuth; project/local settings; no advisor model",
+    "scope": "Source narrative and frozen output review. Bibliography tail was not read by reviewer; scientific claims were not independently verified.",
+    "summary": "Ready for staff review, not publication approval. Identity association removed. Attribute applicant novelty claims and distinguish proteome-wide length evidence from topology evidence on a reader-domain panel.",
+    "methodology": "Withheld. Besides the word-limit failure, unsupported chain-length range, incorrect characterization of chemical synthesis as outside the primary workflow, and overstated dependencies/phasing claims require correction.",
+    "nextStep": "Use saved evidence for bounded offline length and grounding work; preserve failed job and 400-word limit. No further generation calls authorized by this trial.",
+    "reviewLimitation": "The prompt explicitly requests methodological gaps/dependencies. The reviewer suggestion that all such content was outside prompt scope was rejected; the actual issue is unsupported inference."
+  },
+  "methodologyDiagnostic": {
+    "words": 419,
+    "chars": 3342,
+    "maxWords": 400,
+    "maxChars": 12000,
+    "stopReason": "end_turn",
+    "outputTokens": 783,
+    "truncated": false,
+    "offlineActualValidatorError": "output: methodology exceeds maxWords",
+    "counterfactual419WordLimitPasses": true,
+    "liveValidationPolicyChanged": false,
+    "rejectedTextPromoted": false
+  },
+  "retention": {
+    "sourceAndResponseDue": "2026-11-12T19:11:55.608Z",
+    "resultsConfigurationAndAuditOutboxDue": "2026-11-18T19:11:55.608Z",
+    "manualScopedCleanupRequired": true,
+    "scheduledCleanupInstalled": false,
+    "physicalExpiryVerified": false,
+    "localReviewSourceAndRejectedDiagnosticCopiesRemoved": true
+  },
+  "estimatedUsdFromReportedUsage": 0.10616535,
+  "costEstimateScope": "Application generation usage only; estimate, not invoice. Per million tokens: input3, output15, cache creation3.75, cache read0.30 USD.",
+  "runnerSha256": "3e5378b22a77c706ca9e4d6d06dbd437a0976023b716eaddbc130505675cfcbd",
+  "checks": [
+    "Bounded OAuth Opus operation review and outcome review",
+    "Publication interlock positive/negative checks",
+    "Admission/stored snapshot hash match",
+    "Final actual-service job/result/audit readback",
+    "Actual offline output validator reproduction",
+    "Syntax and scoped ESLint",
+    "DAL gate and self-test",
+    "Dynamics context-boundary gate and self-test"
+  ]
+}
