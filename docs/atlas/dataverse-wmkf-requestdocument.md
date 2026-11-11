@@ -459,6 +459,19 @@ Production Request Document row was created by this release smoke.
   by filename. The Final writeups dashboard reuses this identity contract
   today; the planned Slice 6 cycle scoping and filters keep it.
 
+- **J27 later-phase facts (built on `claude/j27-cycle-page`, 2026-11-10; not
+  promoted).** `lib/services/workbench/j27-later-facts.js` reads Pre-Site
+  Visit and Final Writeup rows read-only (`findByRequests` with
+  `listFactsOnly`) for the Workbench request list feed and for request
+  resolution, and classifies them with the transition model's own functions
+  (`findCurrentFinal`, `committedFinal`, `resolveSource`,
+  `assertEligibleSource`, `pendingFinalForSource`). The list-facts field set
+  gained `wmkf_sourceversionid`, `wmkf_sourcecontenthash`,
+  `wmkf_sharepointetag` and `wmkf_contenthash`, which the committed-Final and
+  leadership-checkpoint rules require; none carries document text. Final rows
+  are read only where the Final Writeup transition schema is on; draft rows
+  always. `[VERIFIED via source and tests on the branch]`
+
 ## Initial Assessment pilot contract
 
 - Artifact type: `Initial Assessment`.

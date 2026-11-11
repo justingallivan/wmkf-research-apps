@@ -30,6 +30,8 @@ watch_paths:
   - shared/components/workbench/workbench-location.js
   - shared/components/workbench/J27RequestList.js
   - shared/utils/j27CycleRows.js
+  - lib/services/workbench/j27-later-facts.js
+  - shared/utils/j27PageStage.js
 update_triggers:
   - "Workbench shell navigation or view ordering changes"
   - "Staff Deliberations preparation, handoff, or cycle behavior changes"
@@ -89,10 +91,22 @@ under Operating Notes below.
   `shared/config/j27Labels.js`. The request page's stage strip
   (`J27StageStrip.js`) calls the same `rowLine`, but over facts the page
   loads tab by tab, so the two agree only on the facts both have.
-- **Not yet lists.** Deliberations and Final Assessment mount the existing
-  Staff deliberations and Final writeups panels and carry no tab count. Their
-  lists need their own plan (the J27 cycle page build plan of 2026-11-09,
-  section 3a; that document is on `main` and joins this line at the merge).
+- **Deliberations and Final Assessment are lists too** (2026-11-10). The feed
+  loads the later-phase facts (`lib/services/workbench/j27-later-facts.js`:
+  presentation, confirmed attendance, Board draft, review stage) in three
+  batched reads for the rows the stage model describes, so a request reaches
+  these tabs by the same rule for every viewer. Deliberations rows carry a
+  timing chip and no line until the presentation has ended; Final Assessment
+  rows carry Draft Writeup, Group review or Leadership review. Today's Staff
+  deliberations and Final writeups panels are each tab's second section
+  (`STAGE_SECTION` in `workbench-location.js`: `drafts`, `writeup-review`);
+  old links land on them. The Deliberations section is temporary until the
+  J27 pre-presentation step is decided.
+- **The request page uses the same facts.** Request resolution, the Final
+  Writeup status read and the attendance read each report whole keys from
+  that module, and `shared/utils/j27PageStage.js` replaces keys rather than
+  merging. One accepted difference: only the page knows when a saved review
+  summary is out of date.
 - **Hazards.** When every open row has a failed read (`degradedEverywhere`),
   the list says so once above the rows instead of on each one. "Nothing is
   waiting on staff right now." is not shown on a row whose basis is degraded

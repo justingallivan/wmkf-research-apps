@@ -149,6 +149,18 @@ fallback.
   organizer email, forces that address into the exact persisted `To` set, and
   removes it from `Cc` before hashing. It rechecks the ETag before transport.
 
+- **J27 later-phase facts (built on `claude/j27-cycle-page`, 2026-11-10; not
+  promoted).** `lib/services/workbench/j27-later-facts.js` reads presentation
+  records read-only through `findSummariesByRequests` to work out the stage
+  model's `presentation` and `roster` keys. Three callers: the Workbench
+  request list feed (one batched read for the 2027-or-later Research rows of
+  the list), request resolution (one request), and the Final Writeup status
+  read (one request, for every viewer). "A presentation exists" uses the
+  attendance service's three accepted state and status pairs; "its end has
+  passed" uses `classifyPresentationSchedule`, the same function the
+  group-review start guard uses. No write. `[VERIFIED via source and
+  tests/unit/j27-later-facts.test.js on the branch]`
+
 ## Verification and limits
 
 - Metadata/capability probes verified entity, relationship, standard party

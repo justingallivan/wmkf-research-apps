@@ -245,6 +245,17 @@ Sample row had **364 total fields** (vendor + WMKF + standard Dataverse audit fi
   five legacy reviewer lookups for optional Find-card prior-request context;
   excludes the current request and never treats a slot as lifecycle proof
 
+- **J27 later-phase facts (built on `claude/j27-cycle-page`, 2026-11-10; not
+  promoted).** The Workbench request list feed and request resolution select
+  `_wmkf_currentpresitevisit_value` and `_wmkf_currentfinalwriteup_value`
+  (both from the pre-site draft schema, wave 19) for 2027-or-later rows, and
+  read `wmkf_confirmedmeetingroster` where its schema is on, so
+  `lib/services/workbench/j27-later-facts.js` can work out the Board draft,
+  review stage and confirmed attendance. The Final Writeup transition's
+  request read also selects `wmkf_phaseiistatus` and expands the linked Grant
+  Cycle (offramp and presentation-first guards, alignment log D63). Reads
+  only. `[VERIFIED via source on the branch]`
+
 ## Write paths
 
 - `lib/services/phase-i-dynamics/summarize-service.js` — writes ONLY
