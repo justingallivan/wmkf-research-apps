@@ -129,16 +129,21 @@ export default async function handler(req, res) {
     // Parse the JSON response
     let matchResults;
     try {
-      const text = result.content[0].text;
+      const text = result.text;
       // Extract JSON from potential markdown code blocks
       const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
       const jsonStr = jsonMatch ? jsonMatch[1].trim() : text.trim();
       matchResults = JSON.parse(jsonStr);
-    } catch (parseError) {
-      console.error('[ExpertiseFinder] Failed to parse Claude response as JSON:', parseError.message);
+    } catch {
+      console.error('[ExpertiseFinder] Failed to parse Claude response as JSON', {
+        stopReason: result.stopReason,
+        blocks: result.blocks,
+        thinkingTokens: result.thinkingTokens,
+        usage: result.usage,
+      });
       return res.status(500).json({
         error: 'Failed to parse matching results',
-        rawResponse: result.content[0].text,
+        rawResponse: result.text,
       });
     }
 
@@ -239,7 +244,10 @@ async function callClaude(apiKey, model, maxTokens, systemPrompt, userPrompt) {
     temperature: 0.2,
   }));
   return {
-    content: r.content,
+    text: r.text,
+    stopReason: r.stopReason,
+    blocks: r.blocks,
+    thinkingTokens: r.thinkingTokens,
     usage: { input_tokens: r.usage.inputTokens, output_tokens: r.usage.outputTokens },
     model: r.model,
   };

@@ -88,7 +88,12 @@ test('golden: full match pipeline — envelope pinned', async () => {
     .mockResolvedValueOnce({ rows: [{ name: 'Dr. Roster', role_type: 'reviewer' }] }) // roster query
     .mockResolvedValueOnce({ rows: [{ id: 'match-1' }] }); // insert
   const complete = jest.fn().mockResolvedValue({
-    content: [{ text: '```json\n{"proposal_summary":{"title":"A Study"}}\n```' }],
+    text: '```json\n{"proposal_summary":{"title":"A Study"}}\n```',
+    content: [
+      { type: 'thinking', thinking: 'Internal reasoning' },
+      { type: 'text', text: '```json\n{"proposal_summary":' },
+      { type: 'text', text: '{"title":"A Study"}}\n```' },
+    ],
     usage: { inputTokens: 10, outputTokens: 20 },
     model: 'claude-test',
   });
@@ -150,7 +155,7 @@ test.each(['', '{"proposal_summary":{"title":"refused"}}'])('refusal %j never fa
   GraphService.downloadFileByPath.mockResolvedValue({ buffer: Buffer.from('pdf-bytes') });
   pdf.mockResolvedValue({ text: 'A'.repeat(150) });
   sql.mockResolvedValue({ rows: [{ name: 'Dr. Roster', role_type: 'reviewer' }] });
-  const complete = jest.fn().mockResolvedValue({ content: text ? [{ type: 'text', text }] : [], stopReason: 'refusal' });
+  const complete = jest.fn().mockResolvedValue({ text, content: text ? [{ type: 'text', text }] : [], stopReason: 'refusal' });
   LLMClient.mockImplementation(() => ({ complete }));
   const res = mockRes();
   await handler({ method: 'POST', body: { requestId: 'req-1', requestNumber: 'R-1000' } }, res);

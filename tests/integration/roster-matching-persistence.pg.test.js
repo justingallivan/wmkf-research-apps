@@ -60,7 +60,10 @@ run('roster v2 real SQL persistence and history',()=>{
   jest.clearAllMocks();requireAppAccess.mockResolvedValue({profileId:1});
   profiles.list.mockResolvedValue([raw(staff,'Canonical staff','Research Program Staff',{wmkf_leadpdeligible:true,_wmkf_staffuser_value:enabled}),raw(consultant,'Canonical consultant','Consultant'),raw(disabled,'Disabled user staff','Research Program Staff',{wmkf_leadpdeligible:true,_wmkf_staffuser_value:disabledUser}),raw(consultOnly,'Consult only staff','Research Program Staff'),raw(inactive,'Inactive consultant','Consultant',{statecode:1})]);
   users.getById.mockImplementation(async id=>({isdisabled:id===disabledUser}));
-  complete=jest.fn(async()=>({content:[{text:JSON.stringify(output())}],usage:{inputTokens:0,outputTokens:0},model:'controlled-fixture'}));
+  const text=JSON.stringify(output()), split=text.indexOf(',"staff_assignment"');
+  complete=jest.fn(async()=>({text,content:[{type:'thinking',thinking:'Internal reasoning'},
+    {type:'text',text:text.slice(0,split)},{type:'text',text:text.slice(split)}],
+    usage:{inputTokens:0,outputTokens:0},model:'controlled-fixture'}));
   LLMClient.mockImplementation(()=>({complete}));
  });
  test('both entry points refuse model drift before provider and persistence in browser mode',async()=>{
@@ -108,21 +111,21 @@ run('roster v2 real SQL persistence and history',()=>{
  });
  test('invalid returned identities cannot persist in either entry point',async()=>{
   const before=(await client.query('SELECT count(*) FROM expertise_matches')).rows[0].count;
-  complete.mockResolvedValue({content:[{text:JSON.stringify({...output(),staff_assignment:{primary:{profile_guid:consultant}}})}],usage:{inputTokens:0,outputTokens:0}});
+  complete.mockResolvedValue({text:JSON.stringify({...output(),staff_assignment:{primary:{profile_guid:consultant}}}),usage:{inputTokens:0,outputTokens:0}});
   const r=response();await match({method:'POST',body:{file:{url:'https://fixture.invalid/p.pdf'}}},r);expect(r.statusCode).toBe(503);
   await expect(batchMatch({requestId:request,profileId:1})).rejects.toMatchObject({httpStatus:503});
   expect((await client.query('SELECT count(*) FROM expertise_matches')).rows[0].count).toBe(before);
  });
  test.each([['disabled User',disabled],['consultation-only',consultOnly],['inactive profile',inactive]])('%s cannot be selected as lead by either route',async(_label,id)=>{
   const before=(await client.query('SELECT count(*) FROM expertise_matches')).rows[0].count;
-  complete.mockResolvedValue({content:[{text:JSON.stringify({...output(),staff_assignment:{primary:{profile_guid:id},secondary:null}})}],usage:{inputTokens:0,outputTokens:0}});
+  complete.mockResolvedValue({text:JSON.stringify({...output(),staff_assignment:{primary:{profile_guid:id},secondary:null}}),usage:{inputTokens:0,outputTokens:0}});
   const res=response();await match({method:'POST',body:{file:{url:'https://fixture.invalid/p.pdf'}}},res);expect(res.statusCode).toBe(503);
   await expect(batchMatch({requestId:request,profileId:1})).rejects.toMatchObject({httpStatus:503});
   expect((await client.query('SELECT count(*) FROM expertise_matches')).rows[0].count).toBe(before);
  });
  test('no lead persists explicitly while staff remains available for consultation',async()=>{
   users.getById.mockResolvedValue({isdisabled:true});
-  complete.mockResolvedValue({content:[{text:JSON.stringify({staff_assignment:{primary:null,secondary:null},staff_consultation:[{profile_guid:staff}]})}],usage:{inputTokens:0,outputTokens:0}});
+  complete.mockResolvedValue({text:JSON.stringify({staff_assignment:{primary:null,secondary:null},staff_consultation:[{profile_guid:staff}]}),usage:{inputTokens:0,outputTokens:0}});
   const result=await batchMatch({requestId:request,profileId:1});
   const row=(await client.query('SELECT match_results FROM expertise_matches WHERE id=$1',[result.matchId])).rows[0];
   expect(row.match_results.no_lead_recommendation).toBe(true);expect(row.match_results.staff_consultation[0].name).toBe('Canonical staff');

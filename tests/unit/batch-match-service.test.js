@@ -55,7 +55,7 @@ function primeGoldenPath() {
     .mockResolvedValueOnce({ rows: [{ id: 'match-1' }] });
   LLMClient.mockImplementation(() => ({
     complete: jest.fn().mockResolvedValue({
-      content: [{ text: '{"proposal_summary":{"title":"T"}}' }],
+      text: '{"proposal_summary":{"title":"T"}}',
       usage: { inputTokens: 10, outputTokens: 20 },
       model: 'claude-test',
     }),
@@ -112,7 +112,7 @@ describe('batchMatch', () => {
     primeGoldenPath();
     LLMClient.mockImplementation(() => ({
       complete: jest.fn().mockResolvedValue({
-        content: [{ text: '[1, 2, 3]' }], // array root — structurally invalid vs the object schema
+        text: '[1, 2, 3]', // array root — structurally invalid vs the object schema
         usage: { inputTokens: 1, outputTokens: 1 },
         model: 'm',
       }),
@@ -121,6 +121,21 @@ describe('batchMatch', () => {
       httpStatus: 502,
       body: { error: 'Claude returned structurally invalid matching results', requestNumber: 'R-1000' },
     });
+  });
+
+  it('rejects empty normalized text without persisting a match', async () => {
+    primeGoldenPath();
+    LLMClient.mockImplementation(() => ({
+      complete: jest.fn().mockResolvedValue({
+        text: '', content: [{ type: 'thinking', thinking: 'Internal reasoning' }],
+        usage: { inputTokens: 1, outputTokens: 1 }, model: 'm',
+      }),
+    }));
+    await expect(batchMatch(ARGS)).rejects.toMatchObject({
+      httpStatus: 500, body: { error: 'Failed to parse matching results', requestNumber: 'R-1000', rawResponse: '' },
+    });
+    expect(sql).toHaveBeenCalledTimes(1);
+    expect(logUsage).not.toHaveBeenCalledWith(expect.objectContaining({ status: 'success' }));
   });
 
   it('golden path: persists the match, logs success usage, returns the full envelope', async () => {
@@ -151,7 +166,7 @@ describe('batchMatch', () => {
   it('calls the LLM once with the resolved model, max tokens and composed prompts; no fallback', async () => {
     primeGoldenPath();
     const complete = jest.fn().mockResolvedValue({
-      content: [{ text: '{"proposal_summary":{"title":"T"}}' }],
+      text: '{"proposal_summary":{"title":"T"}}',
       usage: { inputTokens: 1, outputTokens: 1 }, model: 'm',
     });
     LLMClient.mockImplementation(() => ({ complete }));

@@ -61,7 +61,16 @@ test('405 on non-POST', async () => {
 });
 
 test('calls the LLM once with the resolved model, max tokens and composed prompts; success envelope', async () => {
-  const complete = jest.fn().mockResolvedValue({ content: [{ text: OK_TEXT }], usage: { inputTokens: 10, outputTokens: 20 }, model: 'm' });
+  const split = OK_TEXT.indexOf(',"staff_assignment"');
+  const complete = jest.fn().mockResolvedValue({
+    text: OK_TEXT,
+    content: [
+      { type: 'thinking', thinking: 'Internal reasoning' },
+      { type: 'text', text: OK_TEXT.slice(0, split) },
+      { type: 'text', text: OK_TEXT.slice(split) },
+    ],
+    usage: { inputTokens: 10, outputTokens: 20 }, model: 'm',
+  });
   prime(complete);
   const res = mockRes();
   await handler(req({ additionalNotes: 'my note' }), res);
@@ -81,6 +90,44 @@ test('calls the LLM once with the resolved model, max tokens and composed prompt
   expect(arg.system[0].text).toContain('UNTRUSTED CONTENT RULES:');
   expect(arg.messages[0].content).toContain('## ADDITIONAL CONTEXT FROM USER\nmy note');
   expect(logUsage).toHaveBeenCalledWith(expect.objectContaining({ appName: 'expertise-finder', model: 'claude-resolved', status: 'success' }));
+});
+
+test('empty normalized text logs only content-free diagnostics and does not persist', async () => {
+  const complete = jest.fn().mockResolvedValue({
+    text: '', content: [{ type: 'thinking', thinking: 'Internal reasoning' }],
+    stopReason: 'max_tokens', blocks: [{ type: 'thinking', chars: 18 }], thinkingTokens: 20,
+    usage: { inputTokens: 10, outputTokens: 20 }, model: 'm',
+  });
+  prime(complete);
+  const res = mockRes();
+  const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    await handler(req(), res);
+    expect(res.statusCode).toBe(500);
+    expect(res.body).toEqual({ error: 'Failed to parse matching results', rawResponse: '' });
+    expect(errorLog).toHaveBeenCalledWith(expect.any(String), {
+      stopReason: 'max_tokens', blocks: [{ type: 'thinking', chars: 18 }], thinkingTokens: 20,
+      usage: { input_tokens: 10, output_tokens: 20 },
+    });
+    expect(JSON.stringify(errorLog.mock.calls)).not.toContain('Internal reasoning');
+    expect(sql).toHaveBeenCalledTimes(1);
+    expect(logUsage).not.toHaveBeenCalledWith(expect.objectContaining({ status: 'success' }));
+  } finally {
+    errorLog.mockRestore();
+  }
+});
+
+test('a refusal cannot persist even when normalized text has valid JSON', async () => {
+  const complete = jest.fn().mockResolvedValue({
+    text: OK_TEXT, content: [{ type: 'text', text: OK_TEXT }], stopReason: 'refusal',
+  });
+  prime(complete);
+  const res = mockRes();
+  await handler(req(), res);
+  expect(res.statusCode).toBeGreaterThanOrEqual(400);
+  expect(res.body).not.toHaveProperty('rawResponse');
+  expect(sql).toHaveBeenCalledTimes(1);
+  expect(logUsage).not.toHaveBeenCalledWith(expect.objectContaining({ status: 'success' }));
 });
 
 test('a provider error is not retried on a fallback model; 500 processing envelope', async () => {
