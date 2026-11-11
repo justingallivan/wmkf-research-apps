@@ -141,3 +141,14 @@ test('a competing Request publication defers baseline capture without dispatch',
   expect(await f.tick()).toEqual({stage:'waiting'});expect(f.executePrompt).not.toHaveBeenCalled();
   expect(f.state.job.target_etag).toBeNull();expect(f.store.releaseClaim).toHaveBeenCalledTimes(1);
 });
+
+test('a lease deadline exhausted by the last freshness check waits without a dispatch or terminal failure', async()=>{
+  const f=fixture(); const now=Date.now(); let checks=0;
+  f.args.checkFreshness.mockImplementation(async()=>{ if(++checks===2) jest.spyOn(Date,'now').mockReturnValue(now+70000); return true; });
+  try {
+    expect(await f.tick()).toEqual({stage:'waiting'});
+    expect(f.store.markDispatching).not.toHaveBeenCalled();
+    expect(f.store.markAttemptFailed).not.toHaveBeenCalled();
+    expect(f.state.tasks[0].state).toBe('queued');
+  } finally { jest.restoreAllMocks(); }
+});
