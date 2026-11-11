@@ -50,6 +50,7 @@ function Editor() {
   const [taskState,setTaskState] = useState('loading');
   const [taskVersion,setTaskVersion] = useState(null);
   const [conflictCurrent,setConflictCurrent] = useState(null);
+  const [reconciliation,setReconciliation] = useState({});
   const [preview,setPreview] = useState(null);
   const [busy,setBusy] = useState('');
   const [error,setError] = useState('');
@@ -57,7 +58,7 @@ function Editor() {
   const [reload,setReload] = useState(0);
   const [taskRetry,setTaskRetry] = useState(0);
   const mounted = useRef(true), loadGeneration = useRef(0), taskGeneration = useRef(0), editGeneration = useRef(0);
-  const profileRequest = useRef({}), taskRequest = useRef({}), taskDrafts = useRef({}), catalogRef = useRef(null), pendingProfileRef = useRef(null);
+  const profileRequest = useRef({}), taskRequest = useRef({}), taskDrafts = useRef({}), catalogRef = useRef(null), pendingProfileRef = useRef(null), reconciliationRef = useRef({});
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => {
     const generation = ++loadGeneration.current;
@@ -75,7 +76,10 @@ function Editor() {
     requestEnvelope(`/api/admin/prompts/${encodeURIComponent(taskName)}`).then(envelope => {
       if (!mounted.current || !active || generation !== taskGeneration.current) return;
       const draft = taskDrafts.current[taskName];
+      if (draft) setTask(draft.task);
+      const pendingReconciliation = reconciliationRef.current[taskName];
       if (envelope.status === 404) {
+        if (pendingReconciliation) { if (draft) setTask(draft.task); setTaskState('blocked'); setError('The new task version is not yet confirmed. Reload the task after reconciliation.'); return; }
         if (draft) setTask(draft.task);
         if (draft && draft.state !== 'new') { setTaskState('blocked'); setError('The published task is no longer available. Your draft is retained.'); }
         else setTaskState('new');
@@ -88,11 +92,17 @@ function Editor() {
       const publication = catalogRef.current?.profiles.find(item => item.profile.key === reference?.key && item.profile.revision === reference?.revision && item.sha256 === reference?.sha256);
       if (!publication || current.systemPrompt !== '') { setTaskState('blocked'); setError('This task references an unavailable profile or incompatible system prompt.'); return; }
       setTask(draft?.task || {body:current.body || '',model:current.model || '',maxTokens:String(current.maxTokens || ''),profileId:id(publication)});
-      if (draft && (draft.state !== 'existing' || draft.baseVersion !== current.version)) {
+      if (pendingReconciliation) {
+        const matchesId = pendingReconciliation.newPromptId && current.id === pendingReconciliation.newPromptId;
+        const matchesVersion = !pendingReconciliation.newPromptId && Number.isSafeInteger(pendingReconciliation.targetVersion) && current.version === pendingReconciliation.targetVersion;
+        setTaskVersion(draft?.baseVersion ?? null); setTaskState('blocked');
+        if (matchesId || matchesVersion) { setConflictCurrent(current); setError('The new version is current. Compare its instructions before using it as the base for your draft.'); }
+        else setError('The new version is not confirmed as current. Reload the task after reconciliation.');
+      } else if (draft && (draft.state !== 'existing' || draft.baseVersion !== current.version)) {
         setTaskVersion(draft.baseVersion); setConflictCurrent(current); setTaskState('blocked');
         setError('The task changed while your draft was open. Compare the current instructions before using the latest version.');
       } else { setTaskVersion(current.version); setTaskState('existing'); }
-    }).catch(() => { if (mounted.current && active && generation === taskGeneration.current) { setTaskState('blocked'); setError('Could not load this task. Try again.'); } });
+    }).catch(() => { if (mounted.current && active && generation === taskGeneration.current) { if (taskDrafts.current[taskName]) setTask(taskDrafts.current[taskName].task); setTaskState('blocked'); setError('Could not load this task. Try again.'); } });
     return () => { active = false; };
   }, [taskName, taskRetry]);
   const invalidate = () => { editGeneration.current++; setPreview(null); setNotice(''); };
@@ -158,7 +168,14 @@ function Editor() {
     try {
       const result = await requestEnvelope(taskState === 'new' ? '/api/admin/prompts' : `/api/admin/prompts/${encodeURIComponent(taskName)}`,{method:taskState === 'new' ? 'POST' : 'PUT',body:{...body,requestId}});
       if (!mounted.current || generation !== editGeneration.current) return;
-      if (!result.ok || !['completed','already_published'].includes(result.data?.status) || !Number.isSafeInteger(result.data?.version ?? result.data?.targetVersion)) { setError(safeMessage(result,'Could not publish the task. Your draft and preview are still here.')); return; }
+      const outcome = result.data;
+      if (outcome?.status === 'partial' || (['failed','concurrency_conflict'].includes(outcome?.status) && outcome.newPromptId)) {
+        taskDrafts.current[taskName] = {task,baseVersion:taskVersion,state:taskState};
+        const next = {...reconciliationRef.current,[taskName]:{newPromptId:outcome.newPromptId || null,targetVersion:outcome.targetVersion ?? outcome.version ?? null}};
+        reconciliationRef.current = next; setReconciliation(next);
+        setBusy(''); beginTaskLoad(); setTaskRetry(value => value+1); return;
+      }
+      if (!result.ok || !['completed','already_published'].includes(outcome?.status) || !Number.isSafeInteger(outcome?.version ?? outcome?.targetVersion)) { setError(safeMessage(result,'Could not publish the task. Your draft and preview are still here.')); return; }
       const version = result.data.version ?? result.data.targetVersion;
       delete taskDrafts.current[taskName]; setTaskVersion(version); setTaskState('existing'); setPreview(null); setNotice(`Published ${LABELS[taskName]}, version ${version}.`);
     } catch { if (mounted.current && generation === editGeneration.current) setError('Could not publish the task. Retry the same previewed draft.'); }
@@ -167,6 +184,7 @@ function Editor() {
   const setLimit = key => event => updateProfile('limits',{...profileDraft.limits,[key]:event.target.value === '' ? null : Number(event.target.value)});
   return <div className="space-y-6">
     {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error} {!catalog ? <Button type="button" variant="link" onClick={() => { setError(''); setCatalogLoading(true); setReload(value => value+1); }}>Retry</Button> : <Button type="button" variant="link" disabled={Boolean(busy) || catalogLoading} onClick={() => { invalidate(); setError(''); setCatalogLoading(true); setReload(value => value+1); }}>Refresh profiles</Button>}</p>}
+    {reconciliation[taskName] && <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">The new version may exist and needs reconciliation. Reload the task.</p>}
     {notice && <p role="status" className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">{notice}</p>}
     {!catalog ? !error && <p className="text-sm text-gray-600">Loading shared profiles…</p> : <>
       <fieldset disabled={Boolean(busy) || catalogLoading} className="space-y-3"><legend className="text-base font-semibold text-gray-900">Shared profile</legend>
@@ -184,9 +202,9 @@ function Editor() {
         <p className="text-sm text-gray-600">Choose a published profile and preview with fabricated sample data before publishing. No model is called.</p>
         <div className="grid gap-3 sm:grid-cols-2"><label className="block text-sm font-medium text-gray-700">Task<select className={INPUT} value={taskName} onChange={event => { beginTaskLoad(); setTaskName(event.target.value); }}>{catalog.tasks.filter(item => Object.hasOwn(LABELS,item.name)).map(item => <option key={item.name} value={item.name}>{LABELS[item.name]}</option>)}</select></label><label className="block text-sm font-medium text-gray-700">Published profile<select className={INPUT} value={task.profileId} onChange={event => updateTask('profileId',event.target.value)}><option value="">Choose a revision</option>{profiles.map(item => <option key={id(item)} value={id(item)}>{item.profile.key} — revision {item.profile.revision}</option>)}</select></label></div>
         {taskState==='loading' && <p className="text-sm text-gray-600">Loading task…</p>}
-        {taskState==='blocked' && !conflictCurrent && <Button type="button" variant="link" onClick={() => { beginTaskLoad(); setTaskRetry(value => value+1); }}>Retry task load</Button>}
+        {taskState==='blocked' && !conflictCurrent && <Button type="button" variant="link" onClick={() => { beginTaskLoad(); setTaskRetry(value => value+1); }}>{reconciliation[taskName] ? 'Reload task' : 'Retry task load'}</Button>}
         {taskState==='existing' && error && <Button type="button" variant="link" onClick={() => { beginTaskLoad(); setTaskRetry(value => value+1); }}>Reload task version</Button>}
-        {conflictCurrent && <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3"><details><summary className="cursor-pointer text-sm font-medium text-amber-900">Current version {conflictCurrent.version} instructions</summary><pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words text-xs text-gray-800">{conflictCurrent.body}</pre></details><Button type="button" variant="outline" size="sm" onClick={() => { invalidate(); setTaskVersion(conflictCurrent.version); taskDrafts.current[taskName] = {task,baseVersion:conflictCurrent.version,state:'existing'}; setConflictCurrent(null); setTaskState('existing'); setError(''); }}>Use latest version with my draft</Button></div>}
+        {conflictCurrent && <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3"><details><summary className="cursor-pointer text-sm font-medium text-amber-900">Current version {conflictCurrent.version} instructions</summary><pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words text-xs text-gray-800">{conflictCurrent.body}</pre></details><Button type="button" variant="outline" size="sm" onClick={() => { invalidate(); setTaskVersion(conflictCurrent.version); taskDrafts.current[taskName] = {task,baseVersion:conflictCurrent.version,state:'existing'}; setConflictCurrent(null); setTaskState('existing'); setError(''); taskRequest.current = {}; const next = {...reconciliationRef.current}; delete next[taskName]; reconciliationRef.current = next; setReconciliation(next); }}>Use latest version with my draft</Button></div>}
         <p className="text-xs text-gray-600">{taskState==='new' ? 'New task; publishing creates version 1.' : taskState==='existing' ? `Editing version ${taskVersion}; publishing creates a new version.` : taskState==='blocked' ? 'Task editing is unavailable until its current version is resolved.' : ''}</p>
         <label className="block text-sm font-medium text-gray-700">Task instructions<textarea aria-label="Task instructions" className={INPUT} rows={6} value={task.body} onChange={event => updateTask('body',event.target.value)} /><span className="mt-1 block text-xs font-normal text-gray-600">Use {'{{record_name}}'} for a record declared by the selected profile. Missing values remain explicit.</span></label>
         {!placeholdersValid && <p className="text-sm text-red-700">Use only complete placeholders for record names in the selected profile.</p>}
