@@ -53,6 +53,10 @@ test('list facts preserve provenance and schema gates while dropping document bo
   await findByRequests([DOCUMENT_ID], { listFactsOnly: true });
   fields = DynamicsService.queryAllRecords.mock.calls.at(-1)[1].select.split(',');
   expect(fields).toContain('wmkf_groupreviewstartedat');
+  // The committed-Final and leadership-checkpoint rules need these four on a list-facts row.
+  expect(fields).toEqual(expect.arrayContaining([
+    'wmkf_sourceversionid', 'wmkf_sourcecontenthash', 'wmkf_sharepointetag', 'wmkf_contenthash',
+  ]));
   await findByRequests([DOCUMENT_ID]);
   expect(DynamicsService.queryAllRecords.mock.calls.at(-1)[1].select).toContain('wmkf_presiteproposalcorejson');
 });
