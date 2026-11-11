@@ -14,8 +14,11 @@ related:
 
 # J27 Deliberations and Final Assessment lists plan
 
-Author: Claude for Justin Gallivan, 2026-11-10 (Session 673). **Draft. Not
-reviewed by the owner or by Codex, and nothing here is built.** The build
+Author: Claude for Justin Gallivan, 2026-11-10 (Session 673). **Draft;
+nothing here is built.** The owner answered its four decisions on
+2026-11-10. Codex reviewed it the same day and returned "needs attention"
+with three findings, all confirmed against the source and worked into
+findings 4, step 1 and section 5; it has not re-reviewed the amended text. The build
 plan's section 3a requires this plan, a whole-flow review of it, and a Codex
 review before any code.
 
@@ -110,8 +113,13 @@ The Staff deliberations list uses both for a whole cycle
 needs.** `committedFinal` requires the Final row's source version and source
 content hash `[VERIFIED via lib/services/final-writeup/transition-model.js:194-213]`;
 the slim field list has neither
-`[VERIFIED via request-document.js:184-209]`. Both are short identifiers,
-not document text. This confirms Codex's second point.
+`[VERIFIED via request-document.js:184-209]`. A Final row in leadership
+review must also pass the leadership checkpoint, which requires the row's
+SharePoint eTag and content hash
+`[VERIFIED via lib/services/final-writeup/leadership-checkpoint.js:30-41,49-51]`;
+the slim list lacks those two as well (Codex review, 2026-11-10). So four
+fields are missing, not two. All four are short identifiers, not document
+text. This confirms Codex's second point.
 
 **5. Two services decide "there is a presentation" differently.**
 - The attendance service accepts three fixed state and status pairs and
@@ -158,6 +166,7 @@ the four keys the stage model already expects: `presentation`, `roster`,
 | `transition.phase` | The current Final row passes the committed check; its stage is group review or leadership review. No Final pointer is `null`; a pointer to a missing or wrong-type row, or a Final row that fails the check, is `unavailable`. | `findCurrentFinal`, `committedFinal`, `stageOf` |
 | `presentation.exists` | At least one presentation record in an accepted state. | To be settled in review: which of the two classifiers (finding 5) |
 | `presentation.ended` | Exactly one eligible record whose scheduled end has passed. More than one, or an unclassified record, is `null` (unknown). | The schedule check's classification, without its per-record re-read |
+| `presentation.legacyException` | The schedule check's exception, worked out for every viewer: a draft with a complete review milestone and either no presentation record or no configured schedule map. Kept separate from `ended`. The stage model already offers "start group review" on it `[VERIFIED via j27-read-model.js:280-282]`. | The classification part of `assertScheduledEnd`, moved into a function both the start action and this rule call |
 | `roster` | The stored attendance for that presentation: present, stale when its binding no longer matches, absent. | `storedRosters` and the binding from the attendance service |
 
 - **Both callers use it.** The request list feed calls it once for the rows
@@ -168,9 +177,15 @@ the four keys the stage model already expects: `presentation`, `roster`,
   Final Writeup read does the same when its schedule check did not run
   `[VERIFIED via shared/utils/j27PageStage.js:40-43,67,70-71]`; both are
   spread over the server input `[VERIFIED via j27PageStage.js:80,87]`. With
-  server facts that would bring the viewer difference straight back. New
-  merge rule: a tab's read replaces a server value only with a known value,
-  never with unknown or "not checked".
+  server facts that would bring the viewer difference straight back. A
+  "never replace known with unknown" rule is not enough either: it has no
+  check that the tab's read and the server's fact describe the same
+  presentation, so a rescheduled or replaced presentation could keep the
+  old one's "ended" (Codex review, 2026-11-10). **Rule adopted instead:
+  the server is the only source of these four keys.** Tabs stop reporting
+  them. After an action that can change one (saving attendance, starting
+  or advancing group review, saving the Board draft), the page asks the
+  server for the request's facts again and replaces all four together.
 - **Schema not set up is not a failure.** Where the Final Writeup or
   attendance schema is off for a deployment, the keys read
   `not-provisioned`, as the memo keys do since Session 672, so the rows are
@@ -223,6 +238,13 @@ are, with a tab count from the same row rules.
   present in the setup.
 - Gates for the surfaces touched: route matrix, Atlas (request document and
   site visit pages), status-and-label parity, the J27 register.
+- From the Codex review: a valid leadership-review row passes through the
+  real slim projection and the committed check, with a negative case for
+  each missing checkpoint field; a replaced presentation, a rescheduled
+  one and a newly ambiguous schedule each change the page's facts after a
+  refresh; a J27 draft with a complete review milestone and no presentation
+  record gives the same answer to a lead Program Director and to another
+  viewer.
 
 ## 4. Not in this plan
 
@@ -236,9 +258,14 @@ support stays later.
 
 - Which classifier decides "a presentation exists" (finding 5). The two can
   disagree about one request.
-- Whether the earlier-cycle exception in the schedule check can apply to a
-  J27 request `[ASSUMED not, because J27 drafts are created under the
-  configured schedule map]`.
+- **Owner question.** The schedule check's exception is not limited to
+  earlier cycles: nothing in it tests the cycle, and a draft with a complete
+  review milestone and no presentation record qualifies even with the
+  schedule map configured `[VERIFIED via transition-schedule.js:24-38]`
+  (Codex review, 2026-11-10; this draft had assumed otherwise). So a J27
+  request can start group review with no presentation on record. Whether
+  that should be allowed for J27 is a business rule; the plan carries the
+  exception as it is until decided.
 - How the Staff deliberations list classifies timing (finding 5, last
   point).
 - Codex's second and fourth points are confirmed only in part: the Final
