@@ -42,10 +42,12 @@ matching schema OID 50026. Public SQL fingerprint and all 46 profile values/ETag
 matched their before snapshots. The server stopped and all three owned temporary
 public HTML/JS files were removed.
 
-No Production promotion, push or deployment occurred. A successful live single
-rerun needs new metered authorization and a new temporary venue/storage setup after
-the two-call limit and completed cleanup. Controlled single tests and successful
-batch proof do not establish full matching completion.
+No Production promotion, push or deployment occurred. The original two-call limit
+ended with no successful live single rerun. The owner later separately authorized
+one additional submission and temporary storage; the normal upload/Find Matches
+UI then passed persistence, History and cleanup without runtime changes. See
+[the separate rerun evidence](SINGLE_MATCH_RERUN_2026-11-11.md). This closes bounded
+single proof, not batch picker, full-application or Production readiness.
 
 ## Source verification
 

@@ -13,7 +13,8 @@ model-warming and prompt-injection gates/self-tests. These checks do not establi
 a successful live match. The first authorized live single submission received a
 provider response but failed parsing before any result insert; its two original
 synthetic history rows remained unchanged. The remaining approved batch submission subsequently passed with persistence and
-History rendering; final cleanup passed. The single path was not live rerun. See
+History rendering; final cleanup passed. The single path later passed a separately authorized normal-UI rerun and cleanup
+([evidence](SINGLE_MATCH_RERUN_2026-11-11.md)). See
 [final results](LIVE_ATTACHMENT_MATCHING_RESULTS_2026-11-11.md); no full matching-pass claim.
 
 Source transcript: `outputs/roster-normalized-text-opus.md`, preserved verbatim below.

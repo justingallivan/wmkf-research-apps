@@ -4,13 +4,13 @@
 Authorized live attachments passed save/reload, hash-exact download, consumed replay,
 wrong-request refusal and delete. The second approved model submission succeeded as
 batch route/service proof, persisted actor-owned results and rendered History; D99
-was not tested through the picker. The first paid single call failed before result
-persistence; its normalized-text repair is controlled-test verified but not live
-rerun. Exact Graph/Blob cleanup, owned schema drop, unchanged public SQL/all 46 roster
+was not tested through the picker. The first paid single call failed before result persistence; after its reviewed
+normalized-text repair, the separately approved normal-UI rerun passed. Exact Graph/Blob cleanup, owned schema drop, unchanged public SQL/all 46 roster
 profiles and temporary-file/server removal passed. The Superseded registry audit
 row remains. See [final results](LIVE_ATTACHMENT_MATCHING_RESULTS_2026-11-11.md).
-A successful live single rerun requires new metered authorization and a new temporary
-venue/storage setup. No full matching completion or Production promotion is claimed.
+A separately authorized additional normal-UI single run subsequently passed with
+actor-owned persistence, History and cleanup; see [rerun evidence](SINGLE_MATCH_RERUN_2026-11-11.md).
+Batch picker, full-application and Production readiness are not claimed.
 
 ## Historical preflight checkpoint
 

@@ -101,8 +101,9 @@ the subsequently authorized run is recorded below. See
 limitations and final 194-test/12-suite evidence.
 
 Authorized live attachments and batch route/service matching subsequently passed.
-The first paid single attempt failed before persistence; a successful live single
-rerun remains unproved. Final cleanup verified exact external objects absent,
+The first paid single attempt failed before persistence. A separately authorized
+normal-UI single rerun later passed persistence/History and cleanup with 46 profiles
+and public SQL unchanged; see `docs/plans/data/expertise-roster/SINGLE_MATCH_RERUN_2026-11-11.md`. Final cleanup verified exact external objects absent,
 Superseded registry audit retained, owned SQL schema removed and all 46 roster
 values/ETags plus public SQL unchanged. No Production promotion occurred. See
 `docs/plans/data/expertise-roster/LIVE_ATTACHMENT_MATCHING_RESULTS_2026-11-11.md`.

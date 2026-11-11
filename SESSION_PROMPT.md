@@ -180,9 +180,15 @@ checkpoint; these overlapping runs are not summed. Exact Graph/Blob cleanup, own
 schema drop, server/temporary-file removal and unchanged public SQL/all 46 profiles
 passed. The Superseded registry audit row remains. See
 `docs/plans/data/expertise-roster/LIVE_ATTACHMENT_MATCHING_RESULTS_2026-11-11.md`.
-Next: a successful live single rerun requires new metered approval and a new temporary
-venue/storage setup. Batch picker proof and deliberate public cutover/deployment
-admission remain separate; no full matching completion or Production promotion.
+The owner later separately approved one additional paid single run and temporary
+storage. Normal upload/Find Matches succeeded with the same 2,339-byte PDF, one
+Sonnet 5.5 submission, 40 active profiles and actor-owned exact persistence/History.
+Exact Blob cleanup, unchanged all 46 profiles/public SQL, fixture removal and server stop
+passed with the prior reviewed build; no Graph/attachment writes or runtime changes.
+See `docs/plans/data/expertise-roster/SINGLE_MATCH_RERUN_2026-11-11.md`.
+Remaining boundaries: batch picker proof and deliberate public cutover/deployment
+admission; bounded single/batch/attachment proof does not establish full-app or
+Production readiness.
 The local import fixture is not a full application schema; do not claim full app UAT.
 Justin approved the minimal matching contract: active explicitly lead-eligible staff
 with enabled User links only for lead; other active staff may be consulted; validated
