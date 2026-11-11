@@ -1,4 +1,6 @@
-/** Offline candidate check only. All live stages deliberately fail closed pending review. */
+/** Scoped operator runner for one reviewed Sandbox trial. No Request writes.
+ * Run expiry after 24 hours to purge due source/response content, and again
+ * after seven days to purge due configuration/result/audit content. */
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
@@ -9,6 +11,31 @@ const candidatePath = path.join(root, 'docs/plans/EXPERTISE_SANDBOX_1000339_CAND
 const candidateDigest = '5060ea160f58ec90ab54736e40180cbddb61d8073089faa930e1cb8eb3d44679';
 const sha256 = value => crypto.createHash('sha256').update(value).digest('hex');
 const req = createRequire(path.join(root, 'package.json'));
+const LEDGER_HOST = 'ep-frosty-credit-afovxswa-pooler.c-2.us-west-2.aws.neon.tech';
+const LEDGER_DATABASE = 'neondb';
+function fetchUrl(input) {
+  if (typeof input !== 'string') throw new Error('Only string fetch URLs are allowed');
+  return new URL(input);
+}
+function checkLedgerBinding(ledger) {
+  if (!/^[a-f0-9]{64}$/.test(ledger?.databaseIdentity || '') || ledger.hostname !== LEDGER_HOST
+    || ledger.database !== LEDGER_DATABASE) throw new Error('Ledger binding invalid');
+}
+function checkDatabaseUrl(value, ledger) {
+  checkLedgerBinding(ledger);
+  const url = new URL(value);
+  const keys = [...url.searchParams.keys()];
+  if (!['postgres:', 'postgresql:'].includes(url.protocol) || url.hostname !== ledger.hostname
+    || url.pathname !== `/${ledger.database}` || (url.port && url.port !== '5432') || url.hash
+    || keys.some(key => !['sslmode', 'channel_binding'].includes(key))
+    || new Set(keys).size !== keys.length) throw new Error('Database target mismatch');
+}
+function reserveAuditIntent(state, runId) {
+  if (state.auditRunId || typeof runId !== 'string' || !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(runId)) {
+    throw new Error('Audit outcome needs reconciliation');
+  }
+  state.auditRunId = runId;
+}
 function allowedRead(url, method) {
   return ['GET', 'HEAD'].includes(method) && ['https://graph.microsoft.com',
     'https://orgd9e66399.crm.dynamics.com', 'https://appriver3651007194.sharepoint.com'].includes(url.origin);
@@ -19,6 +46,19 @@ function providerIntent(url, method, mode, body, posts) {
     && body?.max_tokens === 4096 && posts === 0;
 }
 function checkGuards() {
+  const testLedger = { databaseIdentity: 'a'.repeat(64), hostname: LEDGER_HOST, database: LEDGER_DATABASE };
+  const validUrl = `postgresql://fixture:fixture@${LEDGER_HOST}/${LEDGER_DATABASE}?sslmode=require`;
+  checkDatabaseUrl(validUrl, testLedger);
+  for (const bad of [`${validUrl}&host=other`, `${validUrl}&port=9999`, `${validUrl}&dbname=other`, validUrl.replace(LEDGER_HOST, 'other.example')]) {
+    let denied = false; try { checkDatabaseUrl(bad, testLedger); } catch { denied = true; }
+    if (!denied) throw new Error('Database guard self-test failed');
+  }
+  let requestDenied = false; try { fetchUrl(new Request('https://graph.microsoft.com/v1.0/me', { method: 'POST' })); } catch { requestDenied = true; }
+  if (!requestDenied) throw new Error('Request object guard self-test failed');
+  const auditState = {}; const runId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  reserveAuditIntent(auditState, runId);
+  let retryDenied = false; try { reserveAuditIntent(auditState, runId); } catch { retryDenied = true; }
+  if (!retryDenied || auditState.auditRunId !== runId) throw new Error('Audit retry guard self-test failed');
   const provider = new URL('https://api.anthropic.com/v1/messages');
   const good = { model: 'claude-sonnet-4-6', max_tokens: 4096 };
   if (!providerIntent(provider, 'POST', 'tick', good, 0)
@@ -95,16 +135,16 @@ function initialize(directory) {
     || fs.realpathSync(directory) !== directory) throw new Error('Private state directory is invalid');
   const binding = readPrivateJson('/private/tmp/wmkf-expertise-sandbox-staff-binding-20261111.json');
   const ledger = readPrivateJson('/private/tmp/wmkf-expertise-sandbox-ledger-binding-20261111.json');
+  checkLedgerBinding(ledger);
   const guid = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/;
-  if (binding.profileId !== 2 || !['systemUserId','azureId','applicationId'].every(key => guid.test(binding[key]))
-    || !/^[a-f0-9]{64}$/.test(ledger.databaseIdentity)) throw new Error('Private bindings are invalid');
+  if (binding.profileId !== 2 || !['systemUserId','azureId','applicationId'].every(key => guid.test(binding[key]))) throw new Error('Private bindings are invalid');
   const receiptPath = '/private/tmp/wmkf-proposal-copy.5w03zboq/copy-receipt.jsonl';
   if (sha256(fs.readFileSync(receiptPath)) !== 'e0930521c06f282a08cb9da3096e97b682e9284d41bc92496582cd568382462c') {
     throw new Error('Copied source receipt changed');
   }
   const state = { version: 1, candidateDigest, requestId: '63dab4af-178f-4bbc-b24d-3ccbaf74cbfc',
     profileId: binding.profileId, systemUserId: binding.systemUserId, azureId: binding.azureId,
-    applicationId: binding.applicationId, databaseIdentity: ledger.databaseIdentity,
+    applicationId: binding.applicationId, databaseIdentity: ledger.databaseIdentity, ledgerHostname: ledger.hostname, ledgerDatabase: ledger.database,
     scopeId: crypto.randomUUID(), idempotencyKey: crypto.randomUUID(), promptId: crypto.randomUUID(),
     profilePublicationId: crypto.randomUUID(), nonceSecret: crypto.randomBytes(32).toString('hex'),
     sourceProof: null, providerPosts: 0 };
@@ -112,7 +152,7 @@ function initialize(directory) {
   try { fs.writeFileSync(fd, JSON.stringify(state)); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
   const dirFd = fs.openSync(directory, 'r');
   try { fs.fsyncSync(dirFd); } finally { fs.closeSync(dirFd); }
-  return { initialized: true, sourceProof: 'pending', liveStages: 'disabled' };
+  return { initialized: true, sourceProof: 'pending' };
 }
 
 // The only network-capable preparatory operation is read-only. It observes the
@@ -157,7 +197,7 @@ async function prepareSource(directory) {
     process.env.DYNAMICS_IMPERSONATION_ENABLED = 'false'; process.env.NODE_ENV = 'development';
     const originalFetch = globalThis.fetch;
     globalThis.fetch = async (input, options = {}) => {
-      const url = new URL(typeof input === 'string' ? input : input.url);
+      const url = fetchUrl(input);
       const method = (options.method || 'GET').toUpperCase();
       const token = method === 'POST' && url.origin === 'https://login.microsoftonline.com'
         && url.pathname === `/${process.env.DYNAMICS_TENANT_ID}/oauth2/v2.0/token`;
@@ -221,8 +261,9 @@ async function liveStage(mode, directory) {
     const state = readPrivateJson(statePath);
     const staff = readPrivateJson('/private/tmp/wmkf-expertise-sandbox-staff-binding-20261111.json');
     const ledger = readPrivateJson('/private/tmp/wmkf-expertise-sandbox-ledger-binding-20261111.json');
+    checkLedgerBinding(ledger);
     if (state.version !== 1 || state.candidateDigest !== candidateDigest || state.requestId !== '63dab4af-178f-4bbc-b24d-3ccbaf74cbfc'
-      || state.profileId !== 2 || ['systemUserId','azureId','applicationId'].some(k => state[k] !== staff[k])
+      || state.ledgerHostname !== ledger.hostname || state.ledgerDatabase !== ledger.database || state.profileId !== 2 || ['systemUserId','azureId','applicationId'].some(k => state[k] !== staff[k])
       || state.databaseIdentity !== ledger.databaseIdentity || !state.sourceProof || !Number.isInteger(state.providerPosts)
       || state.providerPosts < 0 || state.providerPosts > 1) throw new Error('Trial state mismatch');
     checkCandidate();
@@ -249,6 +290,7 @@ async function liveStage(mode, directory) {
     }
     process.env.SHAREPOINT_SITE_URL = sandbox.SHAREPOINT_SITE_URL || 'https://appriver3651007194.sharepoint.com/sites/akoyaGO';
     if (!app.POSTGRES_URL || !app.CLAUDE_API_KEY) throw new Error('Application configuration missing');
+    checkDatabaseUrl(app.POSTGRES_URL, ledger);
     process.env.POSTGRES_URL = app.POSTGRES_URL; process.env.CLAUDE_API_KEY = app.CLAUDE_API_KEY;
     if (process.env.DYNAMICS_URL !== 'https://orgd9e66399.crm.dynamics.com' || process.env.DYNAMICS_CLIENT_ID !== state.applicationId
       || process.env.SHAREPOINT_SITE_URL !== 'https://appriver3651007194.sharepoint.com/sites/akoyaGO') throw new Error('Sandbox target mismatch');
@@ -262,7 +304,7 @@ async function liveStage(mode, directory) {
     const originalFetch = globalThis.fetch;
     let allowedAuditRunId = null;
     globalThis.fetch = async (input, options = {}) => {
-      const url = new URL(typeof input === 'string' ? input : input.url);
+      const url = fetchUrl(input);
       const method = (options.method || 'GET').toUpperCase();
       if (method === 'POST' && url.origin === 'https://login.microsoftonline.com'
         && url.pathname === `/${process.env.DYNAMICS_TENANT_ID}/oauth2/v2.0/token`) {
@@ -304,6 +346,7 @@ async function liveStage(mode, directory) {
           || !allowedAuditRunId || body.wmkf_ai_runid !== allowedAuditRunId || body['wmkf_ai_Request@odata.bind'] !== `/akoya_requests(${state.requestId})`
           || body['wmkf_ai_Prompt@odata.bind'] !== `/wmkf_ai_prompts(${state.promptId})` || body.wmkf_ai_rawoutput != null
           || body.wmkf_ai_promptoverride != null) throw new Error('Audit scope rejected');
+        reserveAuditIntent(state, allowedAuditRunId);
         allowedAuditRunId = null; intent = 'audit';
       } else throw new Error('Network write rejected');
       state.lastWriteIntent = intent; save();
@@ -319,7 +362,7 @@ async function liveStage(mode, directory) {
     const owner = { environment: policy.environment, principalKey: policy.principalKey, authorizationScope: policy.authorizationScope, requestId: policy.requestId };
     const actor = { profileId: state.profileId, systemUserId: state.systemUserId, azureId: state.azureId };
     const { verifyRecommendationsStaffActor } = req('./lib/services/prompt-jobs/staff-recommendations-service.js');
-    if (mode !== 'expire' && !await withDalContext('sandbox-trial-readiness', () => verifyRecommendationsStaffActor(actor, () => true))) throw new Error('Staff authorization failed');
+    if (['publish','preflight','admit','inspect'].includes(mode) && !await withDalContext('sandbox-trial-readiness', () => verifyRecommendationsStaffActor(actor, () => true))) throw new Error('Staff authorization failed');
     return await withDalContext('sandbox-trial-operator', async () => {
       const trial = req('./lib/services/prompt-jobs/sandbox-recommendations-trial.js');
       if (mode === 'publish') {
@@ -338,6 +381,10 @@ async function liveStage(mode, directory) {
           await profiles.publishPromptProfile({ profile: candidate.profile, expectedVersion: 0, requestId: state.profilePublicationId });
         } else if (found.length !== 1 || found[0].sha256 !== candidate.profileHash || found[0].requestId !== state.profilePublicationId
           || canonical(found[0].profile) !== canonical(candidate.profile)) throw new Error('Profile conflict');
+        const verifiedProfiles = (await profiles.getPromptProfiles()).profiles.filter(x => x.profile.key === candidate.profile.key);
+        if (verifiedProfiles.length !== 1 || verifiedProfiles[0].sha256 !== candidate.profileHash
+          || verifiedProfiles[0].requestId !== state.profilePublicationId
+          || canonical(verifiedProfiles[0].profile) !== canonical(candidate.profile)) throw new Error('Profile readback mismatch');
         const versions = (await aiPrompt.listVersions(task.name)).records || [];
         if (!versions.length) {
           if (state.promptWriteIntent) throw new Error('Prompt publication needs reconciliation');
@@ -364,7 +411,10 @@ async function liveStage(mode, directory) {
             filter: `applicationid eq ${state.applicationId}`, top: 2 });
           const appUsers = users.records || [];
           if (appUsers.length !== 1 || appUsers[0].applicationid !== state.applicationId || appUsers[0].isdisabled !== false) throw new Error('Backend actor unavailable');
-          if (job.id !== state.jobId || !views[0].attempts.some(a => a.audit_run_id === runId)) throw new Error('Audit attempt mismatch');
+          const fresh = await store.listJobs({ ...owner, limit: 2 });
+          if (job.id !== state.jobId || fresh.length !== 1 || fresh[0].job.id !== state.jobId
+            || fresh[0].job.idempotency_key !== state.idempotencyKey
+            || fresh[0].attempts.filter(a => a.audit_run_id === runId && a.audit_state === 'dispatching').length !== 1) throw new Error('Audit attempt mismatch');
           allowedAuditRunId = runId;
           const auditAdapter = req('./lib/dataverse/adapters/ai-run.js');
           await auditAdapter.create({ ...payload, wmkf_ai_runid: runId });
