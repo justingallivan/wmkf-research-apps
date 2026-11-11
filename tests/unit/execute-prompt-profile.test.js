@@ -1,5 +1,9 @@
 /** @jest-environment node */
 const mockComplete = jest.fn();
+jest.mock('../../lib/dataverse/core/context.js', () => ({ withDalContext: (_tag, fn) => fn() }));
+jest.mock('../../lib/services/prompt-model-resolution.js', () => ({
+  resolvePromptModel: async row => jest.requireActual('../../lib/services/model-resolver.js').resolveModelWithCapabilities(row.wmkf_ai_model),
+}));
 jest.mock('../../lib/services/llm-client.js', () => ({
   DEFAULT_TIMEOUT_MS: 120000, LLMClient: jest.fn().mockImplementation(() => ({ complete: mockComplete })),
 }));
@@ -127,4 +131,11 @@ test('default preamble keeps system-only semantics while opt-in trusts suffix',(
   expect(buildUntrustedContentPreamble()).toBe(buildUntrustedContentPreamble([],{trustedTaskSuffix:false}));
   expect(buildUntrustedContentPreamble()).toContain('ONLY from this system prompt');
   expect(buildUntrustedContentPreamble([],{trustedTaskSuffix:true})).not.toContain('ONLY from this system prompt');
+});
+
+test.each(['  ', '[]'])('legacy variables %s retain pre-profile behavior',async variables=>{
+  const row={...prompt(),wmkf_ai_promptname:'legacy.empty',wmkf_ai_promptbody:'Summarize the fixed text.',wmkf_ai_promptvariables:variables};
+  runAdapter.create.mockResolvedValueOnce({wmkf_ai_runid:'cccccccc-cccc-cccc-cccc-cccccccccccc'});
+  const result=await executePrompt({promptName:row.wmkf_ai_promptname,promptSnapshot:row,runSource:'Vercel Test',requireNoPersistence:true});
+  expect(result.parsed.summary).toContain('RESULT_CANARY');expect(mockComplete).toHaveBeenCalledTimes(1);expect(runAdapter.create).toHaveBeenCalledTimes(1);
 });

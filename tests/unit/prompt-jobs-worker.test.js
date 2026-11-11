@@ -42,13 +42,13 @@ test('post-dispatch ambiguity blocks queued siblings and publication', async()=>
 });
 test('checkpoint is reused without provider call after validation stage crash', async()=>{
   const f=fixture();f.executePrompt.mockImplementationOnce(async o=>{await o.onDispatch();await o.onResponse({version:1,binding:'hash',response:{text:'saved'}});throw new Error('crashed after checkpoint');});
-  expect(await f.tick()).toEqual({stage:'response_saved'});
+  expect(await f.tick()).toEqual({stage:'needs_attention'});
   f.executePrompt.mockImplementationOnce(async o=>{expect(o.responseCheckpoint.response.text).toBe('saved');expect(o.onDispatch).toBeUndefined();return {parsed:{summary:'recovered'},deferredAudit:auditPayload()};});
   expect(await f.tick()).toEqual({stage:'validated'});expect(f.store.markDispatching).toHaveBeenCalledTimes(1);
 });
 test('audit failure never regenerates and publication 412 preserves result and baseline', async()=>{
   const f=fixture();f.args.audit.mockRejectedValueOnce(new Error('lost audit response'));f.args.writer.mockRejectedValueOnce(Object.assign(new Error('conflict'),{status:412}));
-  expect(await f.tick()).toEqual({stage:'validated'});expect(await f.tick()).toEqual({stage:'audit_failed'});expect(await f.tick()).toEqual({stage:'needs_attention'});
+  expect(await f.tick()).toEqual({stage:'validated'});expect(await f.tick()).toEqual({stage:'audit_unknown'});expect(await f.tick()).toEqual({stage:'needs_attention'});
   expect(f.executePrompt).toHaveBeenCalledTimes(1);expect(f.state.tasks[0].result).toBe('validated result');expect(f.args.writer).not.toHaveBeenCalled();
   const g=fixture();await g.tick();await g.tick();g.args.writer.mockRejectedValueOnce(Object.assign(new Error('conflict'),{status:412}));expect(await g.tick()).toEqual({stage:'conflict'});expect(await g.tick()).toEqual({stage:'needs_attention'});expect(g.state.publication.expected_etag).toBe('etag-original');expect(g.args.writer).toHaveBeenCalledTimes(1);
 });
@@ -61,7 +61,7 @@ test('content-free audit whitelist rejects response text and validation failures
   const f=fixture();f.executePrompt.mockImplementationOnce(async o=>{await o.onDispatch();await o.onResponse({version:1,response:{text:'actual'}});const e=Object.assign(new Error('bad output'),{code:'claude_output_invalid_json',deferredAudit:auditPayload('failed','claude_output_invalid_json')});throw e;});
   expect(await f.tick()).toEqual({stage:'failed_validation'});expect(await f.tick()).toEqual({stage:'audit_delivered'});expect(f.executePrompt).toHaveBeenCalledTimes(1);
   const g=fixture();g.executePrompt.mockImplementationOnce(async o=>{await o.onDispatch();await o.onResponse({version:1,response:{text:'actual'}});return {parsed:{summary:'result'},deferredAudit:{...auditPayload(),wmkf_ai_rawoutput:'secret'}};});
-  await expect(g.tick()).rejects.toThrow('invalid audit payload');expect(g.state.tasks[0].state).toBe('response_saved');expect(g.store.saveValidated).not.toHaveBeenCalled();
+  expect(await g.tick()).toEqual({stage:'needs_attention'});expect(g.state.tasks[0].state).toBe('response_saved');expect(g.store.saveValidated).not.toHaveBeenCalled();
 });
 test('publication rechecks source and authorization after generation', async()=>{
   const f=fixture();await f.tick();await f.tick();f.args.checkFreshness.mockResolvedValueOnce(false);await expect(f.tick()).rejects.toThrow();expect(f.store.freezePublication).not.toHaveBeenCalled();expect(f.args.writer).not.toHaveBeenCalled();
@@ -106,4 +106,18 @@ test('saved response recovery still proceeds when another task is unknown', asyn
   f.state.attempts.push({id:attemptId,task_id:'t2',state:'response_saved',response_content_id:'saved',audit_run_id:runId,audit_state:'none'});f.state.contents.saved={version:1,response:{text:'saved'}};
   f.executePrompt.mockImplementationOnce(async o=>({parsed:{methodology:o.responseCheckpoint.response.text},deferredAudit:auditPayload()}));
   expect(await f.tick()).toEqual({stage:'validated'});expect(f.store.markDispatching).not.toHaveBeenCalled();
+});
+
+test('definitive audit rejection stays failed and is never retried', async()=>{
+  const f=fixture();await f.tick();f.args.audit.mockRejectedValueOnce(Object.assign(new Error('rejected'),{definitive:true}));
+  expect(await f.tick()).toEqual({stage:'audit_failed'});expect(f.state.attempts[0].audit_state).toBe('failed');
+  expect(await f.tick()).toEqual({stage:'needs_attention'});expect(f.args.audit).toHaveBeenCalledTimes(1);
+});
+
+test('a competing Request publication defers baseline capture without dispatch', async()=>{
+  const f=fixture();f.state.job.target_etag=null;
+  f.args.readTarget=async()=>({etag:'W/"1"',fields:{field1:{blank:true,sha256:'a'.repeat(64)}}});
+  f.store.captureTarget=jest.fn(async()=>{throw Object.assign(new Error('pending'),{code:'prompt_job_request_publication_pending'});});
+  expect(await f.tick()).toEqual({stage:'waiting'});expect(f.executePrompt).not.toHaveBeenCalled();
+  expect(f.state.job.target_etag).toBeNull();expect(f.store.releaseClaim).toHaveBeenCalledTimes(1);
 });

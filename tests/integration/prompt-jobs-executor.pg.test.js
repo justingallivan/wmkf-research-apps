@@ -100,7 +100,7 @@ suite('shared prompt job synthetic vertical trial',()=>{
   });
   test('worker loss after response checkpoint resumes canonical parser without another provider call',async()=>{
     const t=await trial();await t.tick();await t.tick();
-    await expect(t.tick({store:{...store,saveValidated:async()=>{throw new Error('simulated worker loss');}}})).rejects.toThrow('worker loss');
+    expect((await t.tick({store:{...store,saveValidated:async()=>{throw new Error('simulated worker loss');}}})).stage).toBe('needs_attention');
     expect((await t.read()).tasks.filter(x=>x.state==='response_saved')).toHaveLength(1);expect(mockComplete).toHaveBeenCalledTimes(1);
     expect((await t.tick()).stage).toBe('validated');expect(mockComplete).toHaveBeenCalledTimes(1);
     await until(t,'published');expect(mockComplete).toHaveBeenCalledTimes(2);
@@ -118,6 +118,12 @@ suite('shared prompt job synthetic vertical trial',()=>{
     expect(t.writer).toHaveBeenCalledTimes(1);expect(Object.keys(t.writer.mock.calls[0][0].fields)).toEqual(['fixture_methodology']);
     expect(t.fields.fixture_summary).toBe('');expect(mockComplete).toHaveBeenCalledTimes(2);
   });
+  test('mismatched provider model terminates validation and allows the successful sibling',async()=>{
+    const t=await trial();await t.tick();await t.tick();mockComplete.mockResolvedValueOnce({...providerResponse(),model:'claude-sonnet-4-6-x'});
+    expect((await t.tick()).stage).toBe('failed_validation');await until(t,'published');
+    expect(mockComplete).toHaveBeenCalledTimes(2);expect(Object.keys(t.writer.mock.calls[0][0].fields)).toEqual(['fixture_methodology']);
+    expect((await t.read()).tasks.find(x=>x.task_key==='synthetic.executive-summary').error_code).toBe('profile_response_model_mismatch');
+  });
   test.each(['conflict','unknown'])('conditional write %s retains original operation and never repeats',async(outcome)=>{
     const t=await trial();t.args.writer=jest.fn(async()=>outcome);
     await until(t,outcome);const first=await t.read();t.setEtag('W/"100"');
@@ -127,7 +133,8 @@ suite('shared prompt job synthetic vertical trial',()=>{
   });
   test('audit failure remains visible and never regenerates or publishes',async()=>{
     const t=await trial();t.args.audit=jest.fn(async()=>{throw new Error('audit transport uncertain');});
-    await until(t,'audit_failed');await until(t,'needs_attention');
+    await until(t,'audit_unknown');await until(t,'needs_attention');
+    expect((await t.read()).attempts.every(a=>a.audit_state==='unknown')).toBe(true);
     const ids=t.args.audit.mock.calls.map(([arg])=>arg.runId);
     expect(ids).toHaveLength(2);expect(new Set(ids).size).toBe(2);
     expect((await t.tick()).stage).toBe('needs_attention');
