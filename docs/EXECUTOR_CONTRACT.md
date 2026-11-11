@@ -3,7 +3,7 @@ title: Executor Contract
 domain: prompt-executor
 kind: source-of-truth
 status: canonical
-summary: "The Executor is the function invoker. The prompt row is the function definition. Chains and triggers are the Flow's job, not the Executor's."
+summary: "Single-prompt execution contract for the shipped Dataverse path and the internal synthetic job mode."
 canonical: true
 cataloged: 2026-07-02
 last_verified: 2026-09-12
@@ -17,16 +17,22 @@ related:
 
 # Executor Contract
 
-**Status:** [VERIFIED via `lib/services/execute-prompt.js` and its callers] This
-contract describes the shipped single-prompt Executor. Its callers include the
-Phase I summary route and grantee, field-primer, and review services.
-**Power Automate direction (owner, 2026-11-10):** [PLANNED] Power Automate will
-submit work to the same backend through authenticated job submit and status
-endpoints. The [shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md)
-specifies the proposed profiles and job service. This decision supersedes the
-earlier Power Automate child-flow implementation proposal.
+**Shipped [VERIFIED via `lib/services/execute-prompt.js` and its callers]:**
+The legacy single-prompt path serves the Phase I summary route and grantee,
+field-primer, and review services.
+
+**Branch-built [VERIFIED via Executor, job worker, and ledger source]:** The
+[internal synthetic job mode](#internal-synthetic-job-mode) uses the same
+Executor transport and parser with frozen inputs, awaited checkpoints, and
+deferred audit. Its scope is local synthetic testing.
+
+**Planned (owner decision, 2026-11-10):** Power Automate will submit and poll
+jobs through authenticated endpoints. Staff job routes, Entra authorization,
+profile publication in Admin, and live source and destination adapters are
+planned in the [shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md).
+
 **Created:** 2026-04-24 (Session 109, reconciliation pass)
-**Last status update:** 2026-11-10 (planned Power Automate integration)
+**Last status update:** 2026-11-10 (internal synthetic job mode and planned Power Automate integration)
 **Owners:** Justin (backend Executor); Connor (Power Automate trigger and follow-up flows)
 **Related docs:** `docs/PROMPT_STORAGE_DESIGN.md`, `docs/BACKEND_AUTOMATION_PLAN.md`, `docs/WORKFLOW_CHAINING_DESIGN.md`, `docs/GRANT_CYCLE_LIFECYCLE.md`
 
@@ -34,16 +40,15 @@ earlier Power Automate child-flow implementation proposal.
 
 ## Purpose
 
-The Executor invokes one published prompt per call. It resolves the Dataverse
-prompt row or accepts a server-owned prompt snapshot, composes the input, calls
-the provider, validates the response, and attempts an invocation audit.
-Callers define sequencing and business follow-up. The planned job service will
-coordinate task admission and durable execution for application and Power
-Automate callers using that same invocation boundary.
+The Executor invokes one prompt per call. The shipped path resolves a Dataverse
+prompt row or accepts a server-owned snapshot, composes the input, calls the
+provider, validates the response, and attempts an invocation audit. The internal
+synthetic mode accepts a frozen prompt and context and returns audit data to the
+worker. Callers own sequencing and business follow-up.
 
 ## Scope of generality
 
-The contract covers **Pattern A + dual-caller prompts and Pattern B/C Vercel-only prompts** — one Executor, no branching. Specifically:
+The shipped path covers **Pattern A, dual-caller prompts, and Pattern B/C Vercel-only prompts** as defined in the [prompt storage design](PROMPT_STORAGE_DESIGN.md).
 
 **In scope:**
 - Single-shot Anthropic prompts and explicitly allowed OpenAI prompt snapshots (system + user, no multi-turn)
@@ -62,6 +67,8 @@ The contract covers **Pattern A + dual-caller prompts and Pattern B/C Vercel-onl
 ---
 
 ## Signature
+
+This signature describes the shipped legacy invocation. See [internal synthetic job mode](#internal-synthetic-job-mode) for the additional worker-only inputs.
 
 ### Inputs
 
@@ -244,7 +251,7 @@ it is supported, and preserves `providerFinishReason`. It maps `stop` to
 non-empty `message.refusal` is also a refusal regardless of finish reason.
 Unmapped reasons reach the existing fail-closed termination check.
 
-**Audit attempt invariant:** the Executor attempts a `wmkf_ai_run` row for
+**Legacy audit attempt invariant:** the Executor attempts a `wmkf_ai_run` row for
 blocked, completed/needs-review, and thrown-failure outcomes. Audit persistence
 can itself fail; that secondary failure is logged server-side and a thrown error
 then carries `runId = null`. Do not describe the audit trail as mathematically
@@ -254,7 +261,7 @@ complete when Dataverse logging is unavailable.
 
 ## The 10 steps
 
-| # | Step | Current implementation |
+| # | Step | Shipped legacy implementation |
 |---|---|---|
 | 1 | Resolve prompt | Use the sole current Dataverse prompt row by name, or validate a server-owned prompt snapshot. |
 | 2 | Parse declarations | Parse the row's variable declarations and output schema. |
@@ -270,6 +277,8 @@ complete when Dataverse logging is unavailable.
 ---
 
 ## Metadata shapes
+
+These are the shipped legacy declaration shapes. The [internal synthetic mode](#internal-synthetic-job-mode) has its own opt-in declarations.
 
 ### `wmkf_ai_promptvariables` (Memo, JSON)
 
@@ -318,15 +327,15 @@ complete when Dataverse logging is unavailable.
 
 **Preprocess hints (Phase 0):** `pdf_to_text` only — the live `execute-prompt.js` throws on any other hint. `docx_to_text`, `truncate_tokens:N`, `strip_images` are deferred until needed.
 
-**Placement attribute (Phase 0 — present but single-valued):** v0 only supports `placement: "user"`. Earlier designs considered `placement: "system"` for context blocks. The proposed execution profile defines composition for the new shared-prefix mode.
+**Placement attribute (Phase 0 — present but single-valued):** v0 only supports `placement: "user"`. Earlier designs considered `placement: "system"` for context blocks. The synthetic profile composer defines its own placement rules.
 
 **`cacheable` flag:** Phase 0 stores this declaration but does not use it to place variables
 relative to the cache boundary. `composeMessages()` interpolates variables wherever their
 placeholders occur in the stored system/body templates, and the Anthropic transport marks the completed
 system block. An identical rerun can be cache-eligible when its composed prefix is unchanged
 (including stable nonces for opted-in untrusted variables), but a cache hit must be verified
-from response usage. Cross-prompt document-prefix reuse is proposed in the
-[shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md).
+from response usage. The branch-built synthetic profile composer exercises
+cross-prompt prefix equality using an explicitly frozen document block.
 
 **Data classification + payload boundary (added 2026-05-04):** A variable can declare two additional optional fields to opt into the shared AI payload-boundary helper:
 
@@ -443,7 +452,7 @@ Each output may declare a `guard` policy that the Executor applies in step 4 (pr
 
 ## Caching contract
 
-The current Phase-0 Executor:
+The shipped legacy Executor:
 
 1. Sends `system` and `user` as separate blocks (requires the `wmkf_ai_systemprompt` + `wmkf_ai_promptbody` split — added by Connor in Phase 0, confirmed live 2026-04-24).
 2. Interpolates each variable wherever its placeholder occurs in the stored system/body templates; it does not branch on `cacheable` or `placement` to move that value across the boundary.
@@ -457,19 +466,22 @@ the active model's requirements; response usage is the proof of a realized hit.
 the same PDF content may be cache-eligible when its composed prefix is unchanged; confirm a
 realized hit through `usage.cache_read_input_tokens`.
 
-**Cross-prompt caching [PLANNED]:** an opt-in execution profile would compose
-a common protected document prefix for compatible tasks in the shared backend.
-See the [shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md)
-for proposed cache grouping and verification.
+**Synthetic cross-prompt prefix [BRANCH-BUILT]:** the profile composer places
+the cache marker at the end of the first user text block, which holds the
+protected document context. Frozen records and task-specific instructions
+follow it. Compare composed prefixes with `prefixHash`. Measure realized
+cache reuse through provider usage. See the [shared Executor job
+design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md) for the planned
+rollout.
 
 ---
 
 ## Logging contract
 
-Every execution path attempts one `wmkf_ai_run` row with, at minimum, the
-following fields. A Dataverse failure can prevent that row from being created;
-callers and operators must treat `runId=null` as an audit failure, not as proof
-that no execution occurred.
+The legacy path attempts one `wmkf_ai_run` row with the fields below. A
+Dataverse failure can prevent creation. A legacy failure with `runId=null`
+can follow a provider response. In synthetic mode, `runId:null` is expected
+because the worker owns deferred audit delivery.
 
 | Field | Value |
 |---|---|
@@ -490,7 +502,7 @@ that no execution occurred.
 
 ## Notes for server-side caller authors
 
-The Executor is intentionally minimal. Two decisions belong to the caller, not the prompt row:
+The following overwrite rules apply to shipped legacy calls.
 
 ### 1. `forceOverwrite` — set per *call site*, not per prompt
 
@@ -522,8 +534,8 @@ A prompt row with `guard: "always-overwrite"` on every output ignores `forceOver
 - **Does not branch on output.** Business-logic conditions ("if compliance failed, notify staff") live in the caller's Flow.
 - **Does not semantically retry.** Caller decides retry policy. Executor returns a
   typed failure; the review-synthesis service is the current example that
-  re-invokes once only for `claude_output_truncated`. Transport-level 429/529
-  retries remain inside `LLMClient` and are not semantic prompt attempts.
+  re-invokes once only for `claude_output_truncated`. Legacy transport-level
+  429/529 retries remain inside `LLMClient`.
 - **Does not handle arbitrary code.** Preprocessing, source kinds, and target kinds are closed enums.
   A new case requires a reviewed enum value and implementation in the shared Executor.
 - **Does not write to SharePoint.** Phase 0 is Dynamics-only for persistence.
@@ -532,14 +544,85 @@ A prompt row with `guard: "always-overwrite"` on every output ignores `forceOver
 
 ---
 
+## Internal synthetic job mode
+
+**[BRANCH-BUILT, synthetic only]** `executePrompt()` accepts the
+`shared-document-task` execution mode from an internal worker. The prompt's
+variables JSON carries `contractVersion:1` and a profile reference pinned by
+key, revision, and SHA-256. The row has an empty system template and a task
+body. It declares one required `prepared_context` and can declare
+`frozen_record` slots. The profile composer verifies the snapshot's scope
+and integrity, wraps documents and records as untrusted data, and enforces
+bounded sizes and required fields. Record values are authoritative for
+declared fields and missing values stay explicit. The reviewed model must
+be a concrete Anthropic model. The worker supplies the frozen inputs,
+including the model, token budget, and temperature. The Executor reads
+these inputs directly and resolves capabilities from the reviewed local
+registry. Live model-list, prompt, Request, and SharePoint reads are absent
+from this path.
+
+| Test task key | Parsed output key | Maximum | Fixture destination |
+|---|---|---|---|
+| `synthetic.executive-summary` | `summary` | 200 words | `fixture_summary` |
+| `synthetic.methodology` | `methodology` | 12,000 characters | `fixture_methodology` |
+
+The task registry accepts only these keys under `environment:'test'`.
+Each Executor output must declare `target.kind:'none'`. The destination
+keys identify fixture writer slots for initialization. The internal worker
+uses injected adapters for authorization, freshness, target reads, audit,
+and conditional writes.
+
+### Worker-only inputs and ordering
+
+Every invocation requires `promptSnapshot`, a matching `requestId`, and
+`profiledContext: { profile, snapshot, scope, nonceSecret }` together with
+`requireNoPersistence:true`, `auditMode:'deferred'`, and
+`auditRetention:'content-free'`. The legacy override and overwrite controls
+are disabled in this mode. The normal path refuses profiled rows without the
+worker context. These arguments are internal server data.
+
+1. For a new attempt, supply both `onDispatch()` and `onResponse(checkpoint)`.
+   The Executor awaits the dispatch callback before calling the provider.
+   The worker records a lease-fenced dispatch intent in the ledger. The
+   Anthropic client makes at most one request per attempt. It sets
+   `maxRetries:0` and `allowParameterRepair:false` and omits a fallback model.
+2. The Executor awaits the response callback before parsing or generating
+   audit data. The store commits the bounded response content and
+   `response_saved` state in one PostgreSQL transaction. The retained
+   checkpoint may contain model text and stays in bounded internal storage.
+   On recovery, pass
+   the saved `responseCheckpoint`; the Executor checks its binding to the
+   frozen prompt, snapshot integrity, Request, and effective token budget and
+   resumes validation without another provider call.
+3. The shared parser checks termination and output shape. The synthetic mode
+   also enforces the registered text and length contract. It returns
+   `runId:null`, skipped write results, and a content-free `deferredAudit`
+   on success. A classified validation failure carries deferred audit
+   metadata too. The Executor performs no inline audit or target write.
+4. The worker journals the validated result and deferred audit, and fences
+   audit delivery and any conditional fixture publication separately.
+   An ambiguous provider outcome becomes `unknown`; a saved response can
+   be validated after restart, while an unknown attempt cannot be resent
+   automatically. An uncertain audit or destination write also stops automatic
+   replay of that operation.
+
+See [Service & Utility Catalog](SERVICE_AND_UTILITY_CATALOG.md) for the profile,
+context, task capabilities, worker, and store entries.
+
 ## Test oracle
 
 `scripts/test-echo-parity.js` is a Vercel smoke script for the
 `executor.echo-parity` prompt. It invokes the provider twice and checks echoed
-content, persisted raw output, and cache usage. The proposed job API uses
-synthetic inputs and a provider double to verify both caller paths, including
-admission, repeat delivery, and polling. Provider usage measures realized cache
-hits in a separate authorized test.
+content, persisted raw output, and cache usage. The focused local synthetic
+tests passed with fixture inputs and doubles for the provider and external
+adapters. They exercise actual request composition and Executor/worker
+ordering. HTTP admission and polling checks belong to the planned caller
+integration.
+
+```sh
+npx jest tests/unit/execute-prompt-profile.test.js tests/unit/prompt-jobs-profile.test.js tests/unit/prompt-jobs-context.test.js tests/unit/execute-prompt-payload-boundary.test.js tests/unit/execute-prompt-audit-retention.test.js tests/unit/execute-prompt-multi-output.test.js --runInBand --silent
+npx jest tests/unit/prompt-jobs-worker.test.js --runInBand
+```
 
 ---
 
@@ -556,7 +639,7 @@ hits in a separate authorized test.
 - First prompt row: `phase-i.summary` (system/body split, single raw-text output to `wmkf_ai_summary`, `guard: "skip-if-populated"`)
 
 **Still deferred (post-May 1 status — re-verify before consuming):**
-- Authenticated Power Automate submit/status endpoints and the execution profile/job layer. See the [shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md).
+- Authenticated Power Automate submit/status and staff job routes, Admin profile publication, Entra machine authorization, and live source/destination adapters. See the [shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md).
 - `prior_output` source kind
 - `overridePromptBody` input
 - Streaming Executor variant

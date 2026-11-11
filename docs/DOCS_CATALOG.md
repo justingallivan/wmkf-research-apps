@@ -264,7 +264,7 @@ related:
 | [AI_DATA_FLOW_MATRIX.md](AI_DATA_FLOW_MATRIX.md) | audit | active |  | It complements docs/API_ROUTE_SECURITY_MATRIX.md: that document answers \"who can call this route,\" while this one answers \"what the code sends or... | 2026-07-02 |
 | [AI_PROMPTS_DETAILED.md](AI_PROMPTS_DETAILED.md) | spec | historical |  | Historical prompt-text snapshot; incomplete for the current app registry and not a source of live prompt truth. | 2026-07-02 |
 | [AI_PROMPTS_OVERVIEW.md](AI_PROMPTS_OVERVIEW.md) | spec | historical |  | Historical plain-language prompt overview; incomplete for the current app registry and not a source of prompt truth. | 2026-07-02 |
-| [EXECUTOR_CONTRACT.md](EXECUTOR_CONTRACT.md) | source-of-truth | canonical | yes | The Executor is the function invoker. The prompt row is the function definition. Chains and triggers are the Flow's job, not the Executor's. | 2026-07-02 |
+| [EXECUTOR_CONTRACT.md](EXECUTOR_CONTRACT.md) | source-of-truth | canonical | yes | Single-prompt execution contract for the shipped Dataverse path and the internal synthetic job mode. | 2026-07-02 |
 | [EXECUTOR_EXTENSIONS_PLAN.md](EXECUTOR_EXTENSIONS_PLAN.md) | plan | active |  | Status: Design sketch (Session 110, 2026-04-25). Not yet implemented. | 2026-07-02 |
 | [MODEL_CHANGE_STRATEGY.md](MODEL_CHANGE_STRATEGY.md) | plan | active |  | Active policy: model registry, validation, request shaping, retry, canary, and replay shipped; future model changes still use this runbook. | 2026-07-02 |
 | [MODEL_PREFLIP_REPLAY_RUNBOOK.md](MODEL_PREFLIP_REPLAY_RUNBOOK.md) | runbook | active |  | Use this before changing reviewer-affecting Claude model routing, including advancing the reviewer-finder tier fallback or removing a concrete pin. | 2026-07-02 |
