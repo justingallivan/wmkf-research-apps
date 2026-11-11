@@ -1,6 +1,6 @@
 # Atlas: Expertise Profile (sandbox preparation)
 
-**Last verified:** 2026-11-09.
+**Last verified:** 2026-11-10 (sandbox importer canary and readback).
 
 `wmkf_expertiseprofile` / `wmkf_expertiseprofiles` is provisioned in sandbox
 `orgd9e66399.crm.dynamics.com` for the roster migration. It is not a Production
@@ -14,10 +14,13 @@ Three Active alternate keys cover `wmkf_creationkey`, nullable `wmkf_contactguid
 is enabled. Table-level auditing was enabled with a table-scoped metadata update.
 Complete actor attribution/audit-event/permissions validation remains a release gate.
 
-The only profile writer executed in the recorded live evidence is the explicitly
-authorized sandbox synthetic rehearsal script. The separate sandbox-only
-`scripts/execute-expertise-roster-import.cjs` is now implemented and synthetically
-tested on the import branch, but has not been run against Dataverse or Postgres. Real roster data has not been imported. The related
+The authorized sandbox importer canary at `04c44b9a8` ran November 10 and failed:
+Dataverse rejected inactive creation with HTTP 400 / `0x80048408` (status 2 invalid
+for Active). Local SQL locks/rollback executed; binding/COMMIT and empty-string
+round trips were not reached. Final readback found no canary profile, three existing
+sandbox profiles, zero local bridge identities/bindings and unchanged sequence 4.
+Real roster data has not been imported. See the live canary record in
+`docs/plans/data/expertise-roster/README.md` for receipts and the next blocker. The related
 `expertise_roster_identity` and `expertise_roster_binding` tables exist only in the
 local synthetic rehearsal database; no shared-Postgres bridge migration was applied.
 

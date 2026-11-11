@@ -103,7 +103,7 @@ complete target census → metadata/link preflight → create-only Dataverse wri
 one locked bridge transaction → private receipt. There is no app/UI entry point,
 no matching prompt change and no consumer cutover in this slice.
 
-## Sandbox execution contract (not run live)
+## Sandbox execution contract (canary blocked)
 
 `execute-expertise-roster-import.cjs` requires all six arguments:
 `--source FILE --mapping FILE --reviewed-plan FILE --env PRIVATE_FILE
@@ -168,19 +168,21 @@ Before a full import, separately authorize a one-row synthetic canary through th
 same executor: use a distinct synthetic lineage, an inactive staged new profile, and
 an empty-string text field. Verify exact read-back and retain the receipt. Count empty
 strings in the approved private source offline before deciding whether normalization
-needs a separately reviewed mapping policy. Neither this canary nor the private-source
-count has been performed here; the private source evidence is unavailable.
+needs a separately reviewed mapping policy. The November 10 authorized canary failed at inactive creation, before empty-string
+read-back could be tested; see the live record below. The private-source count remains
+unperformed because the private source evidence is unavailable.
 
 Dataverse requests have 30-second timeouts so transport failure can release database
 locks. This is a per-request bound, not a bound on total transaction duration. The
 exclusive mode-0600 receipt contains identities/status, not expertise text; retain it
 privately with the inputs.
 
-No real import or local SQL execution was performed during this implementation.
-Synthetic tests use in-memory durable stores for failure recovery and mocked concrete
-transport/SQL boundaries. Actual PostgreSQL transaction behavior, Dataverse null/empty
-round trips, permissions, audit events and all linked-person lifecycle cases still
-need the separately authorized rehearsal. Exact comparison deliberately refuses a
+No real roster data was imported. The authorized synthetic canary exercised the
+local SQL transaction through locks and rollback, but did not reach binding allocation,
+sequence advancement or COMMIT. Unit tests use in-memory durable stores and mocked
+transport/SQL boundaries. Successful PostgreSQL commit/replay, Dataverse null/empty
+round trips, permissions, audit events and linked-person lifecycle cases still
+need rehearsal. Exact comparison deliberately refuses a
 server normalization mismatch instead of silently losing source distinctions.
 
 Final Fable plan review: `docs/plans/EXPERTISE_ROSTER_FABLE_REVIEW_4_2026-11-09.md`.
@@ -188,14 +190,14 @@ This review does not certify the implementation or live readiness.
 
 ## Next stage and remaining gates
 
-Real inventory and a dedicated local PostgreSQL 17 synthetic fixture were prepared on November 9; the private temporary directories are unavailable in the current session. Recover them or obtain an authorized fresh export with the same source lineage before a real import;
+Real inventory and a dedicated local PostgreSQL 17 synthetic fixture were prepared on November 9. The fixture was recovered on November 10, but the prior private inventory directories remain unavailable. Recover the source or obtain an authorized fresh export with the same source lineage before a real import;
 see `INVENTORY_AND_REHEARSAL_2026-11-09.md` for verified counts and limitations.
 Staff eligibility, new PD staging and placeholder exclusion are recorded in
 `OWNER_MAPPING_DECISIONS_2026-11-09.md`. Slot storage is parent-session inheritance.
 Complete the remaining
 schema/audit/keys/permissions verification, integrate consumers, and rehearse
-actual import plus rollback. The executor is built on the import branch; its presence
-is not live-import evidence. The owner-reviewed minimal matching
+actual import plus rollback. First resolve the inactive-create rejection recorded below;
+the executor cannot currently import inactive profiles. The owner-reviewed minimal matching
 prompt contract and verified old-deployment admission/drain remain cutover prerequisites.
 
 ## Historical verification record — November 9, 2026
@@ -208,7 +210,7 @@ passed; each available corresponding self-test ran sequentially and passed.
 not actual Dataverse schema or SQL execution. Node emitted its existing mixed-module
 package warning when importing the target registry; the command completed successfully.
 
-## November 10 implementation verification and bounded reconciliation
+## Historical pre-canary implementation verification — November 10
 
 [VERIFIED via source, Jest and repository gates] The create-only executor, explicit
 sandbox CLI, and guarded transport/bridge store are implemented on
@@ -234,7 +236,51 @@ November 9 inventory and rehearsal records remain historical evidence. The same
 search for “not yet apply,” “later writer,” and “planning-only” in these roster
 surfaces found no remaining stale statement. Remote state was not re-probed.
 
-Unknowns remain explicit: actual SQL transaction/locking execution, Dataverse
-normalization/permission behavior, full import parity, restored private source evidence,
-consumer integration and Production release. A green mocked test is not evidence
-that any of those live steps occurred.
+At that pre-canary checkpoint, SQL execution and platform behavior were untested.
+The live record below supersedes that operational status; full import parity, restored
+private source evidence, consumer integration and Production release remain pending.
+
+
+## Live synthetic canary — November 10, 2026
+
+[VERIFIED via executor receipts and final read-only Dataverse/Postgres probes]
+Justin authorized one synthetic inactive new profile against the registered sandbox
+and dedicated local fixture. Code tested: `04c44b9a8`. Private evidence directory:
+`/private/tmp/wmkf-roster-canary-20261110-pnN7He` (0700, files 0600; contains
+credentials, so do not commit/copy wholesale). Inputs, reviewed plan, initial receipt,
+diagnostic-retry receipt, server error and final verification are retained there.
+
+The importer CLI was invoked with all six required arguments, `--execute sandbox`,
+source/mapping/reviewed-plan files and `canary.env` from that directory, and a new
+receipt path for each attempt. One identical-input diagnostic retry followed a
+read-only check that no row or binding persisted. Both attempts exited 2. Target:
+`orgd9e66399.crm.dynamics.com`; SQL: `127.0.0.1:55439/roster_rehearsal`, user
+`roster_rehearsal`, PostgreSQL 17.11. Production was not contacted.
+
+The one planned row was `Synthetic Import Canary 202f55cd`, creation key
+`app_202f55cd-2b14-44f7-b788-70b871a7d4e6`, inactive Research Program Staff,
+no User/Contact links, lead eligibility false, empty `role`, other optional text null.
+Metadata/audit/concurrency/key preflight and category label/value verification passed.
+Dataverse rejected POST with HTTP 400 / `0x80048408`: status code 2 is invalid for
+`wmkf_ExpertiseProfileState.Active`. The submitted payload included `statecode: 1`
+and `statuscode: 2`; the server response therefore blocks the current inactive-create
+contract. Its underlying platform cause has not yet been established. Empty-string
+normalization was not reached.
+
+Both receipts report `success:false`, `bridgeCommitted:false`, failed row phase,
+`createAttempted:true`, `profileOutcome:unknown`, and `rollbackSucceeded:true`.
+The final independent readback establishes the narrower durable result: no keyed
+canary profile, unchanged sandbox census of three profiles, three local fixture roster
+rows, zero identities/bindings, and unchanged sequence last_value 4 / is_called true.
+No cleanup, PATCH, schema change or real-data import was attempted. Colima and the
+existing dedicated rehearsal container were started and left running.
+
+Next: investigate and review an inactive-creation lifecycle compatible with the
+create-only import safety contract, then rerun the canary. Do not silently import
+inactive people as active or bypass exact-value checks. Successful commit/replay and
+empty-string behavior remain unverified; recover the private source before its census.
+
+Narrow sweep mode A: current README, Atlas and roster session handoff now describe
+this failed canary. Dated pre-canary test/review records remain historical. Owner
+mapping decisions are unchanged. Evidence traces CLI → executor → Dataverse rejection
+→ SQL rollback → receipt → independent readback; no UI consumer is involved.

@@ -73,8 +73,13 @@ Roster continuation is on `codex/expertise-roster-import-2026-11-10` in
 `e90babb2a`. The temporary worktree disappeared; the pushed checkpoint was preserved.
 The branch now includes the file-only planner and a separate sandbox-only import
 executor with explicit overrides/exclusions/new-person staging and replay recovery.
-No real import has been performed. Private prior inventory/rehearsal directories
-are unavailable here; do not invent replacements for their source lineage or GUIDs. Synthetic verification and runbook:
+The authorized November 10 synthetic canary at `04c44b9a8` failed: Dataverse rejects
+inactive creation (HTTP 400 / `0x80048408`, status 2 invalid for Active). Final probes
+found no canary profile or bridge binding; SQL rollback succeeded, sequence unchanged.
+Resolve the inactive-create lifecycle before another canary; empty-string round trips
+and successful commit remain unverified. No real import has been performed. The local
+fixture was recovered, but prior private inventory files remain unavailable; do not
+invent replacements for their source lineage or GUIDs. Evidence and runbook:
 `docs/plans/data/expertise-roster/README.md`. Real inventory and a synthetic-only
 local PostgreSQL 17.11 rehearsal database are prepared; see
 `docs/plans/data/expertise-roster/INVENTORY_AND_REHEARSAL_2026-11-09.md`.
