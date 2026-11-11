@@ -131,17 +131,23 @@ assertion, not pagination proof. Its 4 MiB cap bounds the roster extension only;
 the shared full sealed-snapshot/prompt budget still requires integration checks.
 No live calls or assignment writes were added. Source choice remains OPEN.
 
-The agreed shared interface checkpoint is `a756735fa`, documented in the shared
-owner's `docs/plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md`; the historical
-runtime baseline remains `0c4b8d39c`. Shared machine audit attribution without an
-invented human and cleanup that still works after principal revocation are explicit
-release gates, alongside typed-result integration, PA admission, source/cache and
-worker operations. The pure contract is not shared integration or PA readiness.
+The shared offline typed fixture is built at runtime `7d0cf0392`, checkpoint
+`eb0010163` (coordinating-session source verification; reported 380 tests/25 suites,
+Opus READY). The agreed earlier interface is `a756735fa`; `0c4b8d39c` remains its
+historical runtime baseline. The staff access/currentness facade is in progress
+with injected fabricated readers, not an HTTP/live-DAL integration or PA release.
+The roster-only freshness comparator is source-built with 21 new passing tests
+(final combined 120 tests across seven suites); Opus source review returned READY with no concrete defects. It compares a
+retained hash to a trusted complete fresh projection, returning only current/stale/
+unknown. Auth, contract version, expiry and document/source proof remain caller
+obligations. See `docs/plans/data/expertise-roster/ROSTER_FRESHNESS_CONTRACT_BUILD_2026-11-11.md`.
+Machine audit attribution, revocation-safe cleanup, PA operations and roster cutover
+remain release gates; source choice stays OPEN.
 
 The shared infrastructure owner confirmed clean runtime baseline `0c4b8d39c` and retains
 common source/cache contracts, PA authentication, typed storage/results, worker,
 recovery and operations. The roster stream owns expertise semantics/validation and
 recommendation presentation. Shared interface/typed-result admission, source/cache
 selection, PA authorization/operations and deliberate roster cutover remain
-integration dependencies, not built capability. See
+integration/release dependencies; the shared offline typed fixture is separately built. See
 `docs/plans/data/expertise-roster/POWER_AUTOMATE_RECOMMENDATIONS_PLAN_2026-11-11.md`.

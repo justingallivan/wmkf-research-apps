@@ -1,6 +1,6 @@
 # Expertise recommendations through the shared Executor
 
-Status: REVIEWED PLAN; pure domain contract source-built, shared runtime integration PLANNED; recommendations-only direction approved by Justin on November 11,
+Status: REVIEWED PLAN; pure domain contract source-built, shared offline typed fixture built; staff/live integration PLANNED; recommendations-only direction approved by Justin on November 11,
 2026. This document does not activate a flow, authorize provider spending, select a
 proposal source, or approve Production cutover. Opus review disposition is recorded
 in the companion review document. Owner: roster stream; shared infrastructure remains owned by
@@ -43,7 +43,8 @@ projected as text, and the 1,536-token cap appears in both capabilities and Exec
 The staff service is trial-specific, not general machine authorization. The drain
 exists but is unscheduled. PA app-only admission/status and general operations
 remain planned in that branch's `docs/plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md`.
-These files are not yet integrated into the roster branch. Live trial outcomes in
+At that historical baseline these files were not integrated into the roster branch;
+subsequent shared offline typed-fixture progress is recorded below. Live trial outcomes in
 that other session are not evidence of deployed PA connectivity.
 
 Ownership: infrastructure owner retains shared auth, ledger/worker, scheduler,
@@ -80,6 +81,19 @@ runtime baseline remains `0c4b8d39c`. Shared machine audit attribution without a
 invented human and cleanup that still works after principal revocation are explicit
 release gates, alongside typed-result integration, PA admission, source/cache and
 worker operations. The pure contract is not shared integration or PA readiness.
+
+## Freshness and shared checkpoint
+
+The shared offline typed fixture is built at runtime `7d0cf0392`, checkpoint
+`eb0010163` (coordinating-session source verification; reported 380 tests/25 suites,
+Opus READY). The agreed earlier interface is `a756735fa`; `0c4b8d39c` remains its
+historical runtime baseline. The staff access/currentness facade is in progress
+with injected fabricated readers, not an HTTP/live-DAL integration or PA release.
+The roster-only freshness comparator is source-built with 21 new passing tests
+(final combined 120 tests across seven suites); Opus source review returned READY with no concrete defects. It compares a
+retained hash to a trusted complete fresh projection, returning only current/stale/
+unknown. Auth, contract version, expiry and document/source proof remain caller
+obligations. See [freshness receipt](ROSTER_FRESHNESS_CONTRACT_BUILD_2026-11-11.md).
 
 ## Planned caller → result contract
 

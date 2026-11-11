@@ -1,5 +1,9 @@
 # Pure expertise recommendations contract — build receipt
 
+This receipt preserves the original pure-contract checkpoint. Later shared offline
+typed integration and roster freshness progress are recorded in
+[the freshness receipt](ROSTER_FRESHNESS_CONTRACT_BUILD_2026-11-11.md).
+
 [VERIFIED via source and coordinating-session test results] The pure domain module
 `lib/services/expertise-finder/recommendations-contract.js` is source-built. Its
 focused suite passed 60/60; four existing matching/consumer suites separately passed
@@ -86,5 +90,6 @@ execution and byte-identical extraction verification are coordinating-session ev
 Scoped Mode A reconciliation updated plan, Session, roster Atlas and catalog.
 Doc-currency, doc-symbol-reference and Atlas gates and their sequential self-tests
 passed, as did diff checks. No remaining pending-review claim remains in those
-current surfaces. Source choice, shared sealing/compiler/ledger integration,
-PA authorization, machine audit/revocation-safe cleanup and release gates remain open.
+current surfaces. At this checkpoint shared integration remained open. The later offline typed fixture
+is built; source choice, live PA authorization, machine audit/revocation-safe cleanup
+and release remain open.
