@@ -21,6 +21,8 @@ const describePg = url ? describe : describe.skip;
 
 const SUMMARY = 'synthetic.executive-summary';
 const METHODOLOGY = 'synthetic.methodology';
+const PROPOSAL_SUMMARY = 'proposal.executive-summary';
+const PROPOSAL_METHODOLOGY = 'proposal.methodology';
 const profile = {
   key: 'proposal-analysis', revision: 1, wrapperVersion: 1, sharedInstructions: 'Analyze the fixture.',
   documentRoles: ['proposal'], recordNames: [],
@@ -37,7 +39,8 @@ const response = {
 const audit = { status: 'completed' };
 
 function fixtureTask(taskKey, scope) {
-  const output = taskKey === SUMMARY ? { name: 'summary', maxWords: 200 } : { name: 'methodology', maxChars: 12_000 };
+  const output = taskKey.endsWith('.executive-summary') ? { name: 'summary', maxWords: 200 }
+    : { name: 'methodology', maxChars: 12_000 };
   const promptRow = {
     wmkf_ai_promptid: randomUUID(),
     wmkf_ai_promptname: taskKey,
@@ -69,6 +72,11 @@ function input(overrides = {}, keys = [SUMMARY, METHODOLOGY]) {
     environment: command.environment, authorizationScope: command.authorizationScope, requestId: command.requestId,
   }));
   return command;
+}
+
+function proposalInput(overrides = {}, keys = [PROPOSAL_SUMMARY, PROPOSAL_METHODOLOGY]) {
+  return input({ environment: 'local-sandbox', authorizationScope: `proposal-trial:${randomUUID()}`,
+    operation: 'generate-draft', sourceEventId: null, ...overrides }, keys);
 }
 
 describePg('durable shared Executor ledger on PostgreSQL', () => {
@@ -128,6 +136,121 @@ describePg('durable shared Executor ledger on PostgreSQL', () => {
     expect(await store.markAuditDispatching(attempt)).toMatchObject({ audit_state: 'dispatching' });
     expect(await store.markAudit({ ...attempt, outcome: 'delivered' })).toMatchObject({ audit_state: 'delivered' });
   }
+
+  it('atomically caps a proposal cohort across concurrent distinct keys, Requests, actors and environments', async () => {
+    const first = proposalInput();
+    const second = proposalInput({ requestId: first.requestId, authorizationScope: first.authorizationScope });
+    const third = proposalInput({ environment: 'preview-sandbox', principalKey: 'human:other', authorizationScope: first.authorizationScope });
+    const outcome = await Promise.allSettled([first, second, third].map(command => store.admit(command)));
+    expect(outcome.filter(x => x.status === 'fulfilled')).toHaveLength(1);
+    expect(outcome.filter(x => x.status === 'rejected').map(x => x.reason.code)).toEqual(['prompt_job_trial_limit', 'prompt_job_trial_limit']);
+    const { job, tasks } = outcome.find(x => x.status === 'fulfilled').value;
+    expect(tasks.map(task => [task.task_key, task.destination_field, task.writeback_state])).toEqual([
+      [PROPOSAL_SUMMARY, null, 'not_requested'], [PROPOSAL_METHODOLOGY, null, 'not_requested'],
+    ]);
+    expect((await pool.query('SELECT count(*)::int AS count FROM prompt_jobs WHERE authorization_scope = $1', [first.authorizationScope])).rows[0].count).toBe(1);
+    expect((await pool.query('SELECT count(*)::int AS count FROM prompt_job_initializations WHERE job_id = $1', [job.id])).rows[0].count).toBe(0);
+    await pool.query("UPDATE prompt_job_content SET expires_at = clock_timestamp() - interval '1 second' WHERE job_id = $1", [job.id]);
+    await store.expireContent();
+    await expect(store.admit(proposalInput({ authorizationScope: first.authorizationScope }))).rejects.toMatchObject({ code: 'prompt_job_trial_limit' });
+  });
+
+  it('re-finds an identical concurrent proposal receipt before quota and skips re-resolved configuration on replay', async () => {
+    const command = proposalInput({ environment: 'local-production' });
+    const [a, b] = await Promise.all([store.admit(command), store.admit({ ...command, tasks: [...command.tasks].reverse() })]);
+    expect(a.job.id).toBe(b.job.id);
+    expect([a.replayed, b.replayed].sort()).toEqual([false, true]);
+    const tasks = command.tasks.map(({taskKey}) => ({taskKey}));
+    const replay = await store.admit({ ...command, tasks, sourceExpiresAt: undefined, resultExpiresAt: undefined });
+    expect(replay).toMatchObject({ job: { id: a.job.id }, tasks: a.tasks, replayed: true });
+    await expect(store.admit({ ...command, requestId: randomUUID() })).rejects.toMatchObject({ code: 'prompt_job_idempotency_key_reused' });
+  });
+
+  it('refuses proposal admission outside the bounded draft capability or with a destination override', async () => {
+    const command = proposalInput();
+    const invalidCommands = [
+      proposalInput({ environment: 'production' }),
+      proposalInput({ environment: 'test' }),
+      proposalInput({ operation: 'initialize', sourceEventId: 'forbidden-event' }),
+      proposalInput({}, [PROPOSAL_SUMMARY]),
+      proposalInput({}, [PROPOSAL_SUMMARY, PROPOSAL_SUMMARY]),
+      proposalInput({}, [PROPOSAL_SUMMARY, METHODOLOGY]),
+      proposalInput({ authorizationScope: 'proposal-trial:AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA' }),
+      proposalInput({ authorizationScope: 'proposal:unbounded' }),
+    ];
+    for (const invalid of invalidCommands) {
+      await expect(store.admit(invalid)).rejects.toMatchObject({ code: 'invalid_prompt_job_admission' });
+    }
+    const [summary, methodology] = command.tasks;
+    await expect(store.admit({ ...command, tasks: [{ ...summary, destinationField: 'fixture_summary' }, methodology] }))
+      .rejects.toMatchObject({ code: 'invalid_prompt_job_configuration' });
+    expect(await store.admit(command)).toMatchObject({ replayed: false });
+  });
+
+  it('finds the oldest exact-scope actionable draft while skipping terminal and uncertain work', async () => {
+    const command = input({ operation: 'generate-draft' }, [SUMMARY]);
+    const readScope = { ...scope(command), principalKey: command.principalKey };
+    const next = () => input({ ...readScope, operation: 'generate-draft' }, [SUMMARY]);
+    const completed = await open(next());
+    await deliverAudit(await validate(completed.fence, completed.tasks[0].id));
+    await store.releaseClaim(completed.fence);
+    const failed = await open(next());
+    await store.markAttemptFailed({ ...failed.fence, taskId: failed.tasks[0].id, outcome: 'failed_pre_dispatch', errorCode: 'fixture_failure' });
+    await store.releaseClaim(failed.fence);
+    for (const outcome of ['failed', 'unknown']) {
+      const auditJob = await open(next());
+      const attempt = await validate(auditJob.fence, auditJob.tasks[0].id);
+      await store.markAuditDispatching(attempt);
+      await store.markAudit({ ...attempt, outcome });
+      await store.releaseClaim(auditJob.fence);
+    }
+    const uncertain = await open(next());
+    const attempt = await store.markDispatching({ ...uncertain.fence, taskId: uncertain.tasks[0].id });
+    await store.markAttemptFailed({ ...uncertain.fence, taskId: uncertain.tasks[0].id, attemptId: attempt.id, outcome: 'unknown', errorCode: 'fixture_uncertainty' });
+    await store.releaseClaim(uncertain.fence);
+    expect(await store.findRunnableJob(readScope)).toBeNull();
+
+    const first = await store.admit(next());
+    const second = await store.admit(next());
+    await pool.query("UPDATE prompt_jobs SET created_at = '2026-01-02T00:00:00Z' WHERE id = ANY($1::uuid[])", [[first.job.id, second.job.id]]);
+    expect(await store.findRunnableJob(readScope)).toEqual({ id: [first.job.id, second.job.id].sort()[0] });
+    expect(await store.findRunnableJob({ ...readScope, principalKey: 'human:other' })).toBeNull();
+    expect(await store.findRunnableJob({ ...readScope, authorizationScope: 'proposal:other' })).toBeNull();
+    expect(await store.findRunnableJob({ ...readScope, requestId: randomUUID() })).toBeNull();
+    expect(await store.findRunnableJob({ ...readScope, environment: 'preview-sandbox' })).toBeNull();
+  });
+
+  it('selects recoverable expired dispatches and saved response or pending audit, while excluding live leases', async () => {
+    const command = input({ operation: 'generate-draft' }, [SUMMARY]);
+    const readScope = { ...scope(command), principalKey: command.principalKey };
+    const dispatching = await open(command);
+    await store.markDispatching({ ...dispatching.fence, taskId: dispatching.tasks[0].id });
+    expect(await store.findRunnableJob(readScope)).toBeNull();
+    await expireLease(dispatching.job.id);
+    expect(await store.findRunnableJob(readScope)).toEqual({ id: dispatching.job.id });
+    const recovered = await store.claim({ jobId: dispatching.job.id });
+    expect(recovered.tasks[0].state).toBe('unknown');
+    await store.releaseClaim({ jobId: dispatching.job.id, leaseToken: recovered.leaseToken });
+    expect(await store.findRunnableJob(readScope)).toBeNull();
+
+    const later = input({ operation: 'generate-draft' }, [SUMMARY]);
+    const laterScope = { ...scope(later), principalKey: later.principalKey };
+    const saved = await open(later);
+    const attempt = await checkpoint(saved.fence, saved.tasks[0].id);
+    await store.releaseClaim(saved.fence);
+    expect(await store.findRunnableJob(laterScope)).toEqual({ id: saved.job.id });
+    const validating = await store.claim({ jobId: saved.job.id });
+    const fence = { jobId: saved.job.id, leaseToken: validating.leaseToken };
+    await store.saveValidated({ ...fence, taskId: saved.tasks[0].id, attemptId: attempt.id, result: 'Approved draft.', deferredAudit: audit });
+    await store.releaseClaim(fence);
+    expect(await store.findRunnableJob(laterScope)).toEqual({ id: saved.job.id });
+    const auditing = await store.claim({ jobId: saved.job.id });
+    await store.markAuditDispatching({ jobId: saved.job.id, leaseToken: auditing.leaseToken, taskId: saved.tasks[0].id, attemptId: attempt.id });
+    await expireLease(saved.job.id);
+    expect(await store.findRunnableJob(laterScope)).toEqual({ id: saved.job.id });
+    const auditRecovered = await store.claim({ jobId: saved.job.id });
+    expect(auditRecovered.attempts[0].audit_state).toBe('unknown');
+  });
 
   it('lists only jobs in the full Request scope, with a bounded stable newest-first order', async () => {
     const command = input({ operation: 'generate-draft' }, [SUMMARY]);
