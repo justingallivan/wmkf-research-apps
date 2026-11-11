@@ -52,10 +52,30 @@ test('audit failure never regenerates and publication 412 preserves result and b
   expect(f.executePrompt).toHaveBeenCalledTimes(1);expect(f.state.tasks[0].result).toBe('validated result');expect(f.args.writer).not.toHaveBeenCalled();
   const g=fixture();await g.tick();await g.tick();g.args.writer.mockRejectedValueOnce(Object.assign(new Error('conflict'),{status:412}));expect(await g.tick()).toEqual({stage:'conflict'});expect(await g.tick()).toEqual({stage:'needs_attention'});expect(g.state.publication.expected_etag).toBe('etag-original');expect(g.args.writer).toHaveBeenCalledTimes(1);
 });
-test('unknown write is never repeated, and freshness or authorization denial stops dispatch', async()=>{
-  const f=fixture();f.args.checkFreshness.mockResolvedValueOnce(false);await expect(f.tick()).rejects.toThrow();expect(f.executePrompt).not.toHaveBeenCalled();
-  f.args.authorize.mockResolvedValueOnce(false);await expect(f.tick()).rejects.toThrow();expect(f.executePrompt).not.toHaveBeenCalled();
+test('unknown write is never repeated, and job read authorization denial stops dispatch', async()=>{
+  const f=fixture();f.args.authorize.mockResolvedValueOnce(false);await expect(f.tick()).rejects.toThrow();expect(f.executePrompt).not.toHaveBeenCalled();
   await f.tick();await f.tick();f.args.writer.mockRejectedValueOnce(new Error('timeout'));expect(await f.tick()).toEqual({stage:'unknown'});expect(await f.tick()).toEqual({stage:'needs_attention'});expect(f.args.writer).toHaveBeenCalledTimes(1);
+});
+
+test.each([['authorize',1], ['authorize',2], ['checkFreshness',1], ['checkFreshness',2]])('explicit %s denial at dispatch check %s terminates before provider', async (name, denyAt) => {
+  const f=fixture();let calls=0;
+  f.args[name].mockImplementation(async ({stage}) => stage !== 'dispatch' || ++calls !== denyAt);
+  expect(await f.tick()).toEqual({stage:'failed_pre_dispatch'});
+  expect(f.store.markAttemptFailed).toHaveBeenCalledWith(expect.objectContaining({attemptId:null,outcome:'failed_pre_dispatch',errorCode:'dispatch_denied'}));
+  expect(f.store.markDispatching).not.toHaveBeenCalled();
+  expect(f.state.events).not.toContain('provider');
+});
+
+test.each([1,2])('authorization adapter outage at check %s leaves work waiting before provider', async denyAt => {
+  const f=fixture();let calls=0;
+  f.args.authorize.mockImplementation(async ({stage}) => {
+    if (stage === 'dispatch' && ++calls === denyAt) throw new Error('adapter unavailable');
+    return true;
+  });
+  expect(await f.tick()).toEqual({stage:'waiting'});
+  expect(f.store.markAttemptFailed).not.toHaveBeenCalled();
+  expect(f.store.markDispatching).not.toHaveBeenCalled();
+  expect(f.state.events).not.toContain('provider');
 });
 test('content-free audit whitelist rejects response text and validation failures preserve audit', async()=>{
   const f=fixture();f.executePrompt.mockImplementationOnce(async o=>{await o.onDispatch();await o.onResponse({version:1,response:{text:'actual'}});const e=Object.assign(new Error('bad output'),{code:'claude_output_invalid_json',deferredAudit:auditPayload('failed','claude_output_invalid_json')});throw e;});

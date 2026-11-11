@@ -141,9 +141,47 @@ suite('shared prompt job synthetic vertical trial',()=>{
     expect(t.args.audit).toHaveBeenCalledTimes(2);expect(t.writer).not.toHaveBeenCalled();expect(mockComplete).toHaveBeenCalledTimes(2);
   });
   test('source drift stops before provider and existing staff text is protected',async()=>{
+    const denied=await trial();await denied.tick();await denied.tick();
+    expect((await denied.tick({checkFreshness:async()=>false})).stage).toBe('failed_pre_dispatch');
+    expect((await denied.read()).attempts).toHaveLength(0);expect(mockComplete).not.toHaveBeenCalled();
     const t=await trial();t.fields.fixture_summary='Staff-written text';await t.tick();await t.tick();
-    await expect(t.tick({checkFreshness:async()=>false})).rejects.toThrow('freshness denied');expect(mockComplete).not.toHaveBeenCalled();
     await until(t,'published');expect(t.fields.fixture_summary).toBe('Staff-written text');expect(mockComplete).toHaveBeenCalledTimes(1);
     expect(Object.keys(t.writer.mock.calls[0][0].fields)).toEqual(['fixture_methodology']);
+  });
+  test('a received provider rejection revokes its attempt and releases only its slot', async()=>{
+    const t=await trial();await t.tick();await t.tick();
+    mockComplete.mockRejectedValueOnce(Object.assign(new Error('Claude API error 429 after 1 attempts: synthetic rejection'),{status:429}));
+    expect((await t.tick()).stage).toBe('failed_pre_dispatch');
+    const rejected=await t.read();
+    expect(rejected.attempts[0]).toMatchObject({state:'failed_pre_dispatch',error_code:'provider_rejected',response_content_id:null});
+    expect(rejected.tasks[0].writeback_state).toBe('blocked');
+    const command={...t.input,tasks:[t.input.tasks[0]],idempotencyKey:randomUUID(),sourceEventId:'new-fixture-event'};
+    expect(await store.admit(command)).toMatchObject({replayed:false});
+    await until(t,'published');
+    expect(mockComplete).toHaveBeenCalledTimes(2);
+    expect(Object.keys(t.writer.mock.calls[0][0].fields)).toEqual(['fixture_methodology']);
+  });
+  test('oversized encoded source terminates preparation and releases eligible slots before transport', async()=>{
+    const t=await trial();
+    const prepareSnapshot=jest.fn(async()=>({escaped:'\u0001'.repeat(700_000)}));
+    expect((await t.tick({prepareSnapshot})).stage).toBe('failed_pre_dispatch');
+    expect((await t.tick({prepareSnapshot})).stage).toBe('needs_attention');
+    expect(prepareSnapshot).toHaveBeenCalledTimes(1);
+    const terminal=await t.read();
+    expect(terminal.job.snapshot_content_id).toBeNull();
+    expect(terminal.tasks.map(task=>task.error_code)).toEqual(['snapshot_too_large','snapshot_too_large']);
+    expect(terminal.attempts).toHaveLength(0);expect(mockComplete).not.toHaveBeenCalled();
+    expect(await store.admit({...t.input,idempotencyKey:randomUUID(),sourceEventId:'new-fixture-event'})).toMatchObject({replayed:false});
+  });
+  test('oversized received response checkpoints known usage and reaches terminal validation', async()=>{
+    const t=await trial();await t.tick();await t.tick();
+    mockComplete.mockResolvedValueOnce(providerResponse('RESULT_CANARY ' + '\u0001'.repeat(50_000)));
+    expect((await t.tick()).stage).toBe('failed_validation');
+    const failed=await t.read();
+    expect(failed.attempts[0]).toMatchObject({state:'failed_validation',error_code:'profile_response_too_large',usage_complete:true,usage:{output_tokens:20}});
+    expect(failed.attempts[0].response_content_id).toBeTruthy();
+    await until(t,'published');
+    expect(Object.keys(t.writer.mock.calls[0][0].fields)).toEqual(['fixture_methodology']);
+    expect(mockComplete).toHaveBeenCalledTimes(2);
   });
 });

@@ -45,6 +45,8 @@ function fixtureTask(taskKey, scope) {
     wmkf_ai_systemprompt: '',
     wmkf_ai_promptbody: 'Analyze the synthetic proposal.',
     wmkf_ai_model: 'claude-sonnet-4-6',
+    wmkf_ai_maxtokens: 1000,
+    wmkf_ai_temperature: 0,
     wmkf_ai_promptvariables: JSON.stringify({
       execution: { contractVersion: 1, mode: 'shared-document-task', profile: { key: profile.key, revision: 1, sha256: profileHash } },
       variables: [{ name: 'proposal_context', source: { kind: 'prepared_context' }, required: true }],
@@ -150,6 +152,8 @@ describePg('durable shared Executor ledger on PostgreSQL', () => {
       [{ ...summary, profileHash: 'a'.repeat(64) }, methodology],
       [{ ...summary, model: 'other' }, methodology],
       [{ ...summary, destinationField: 'real_field' }, methodology],
+      [{ ...summary, configuration: { ...summary.configuration, promptRow: { ...summary.configuration.promptRow, wmkf_ai_maxtokens: 1537 } } }, methodology],
+      [{ ...summary, configuration: { ...summary.configuration, promptRow: { ...summary.configuration.promptRow, wmkf_ai_temperature: 2 } } }, methodology],
       [{ ...summary, configuration: { ...summary.configuration, scope: { ...summary.configuration.scope, requestId: randomUUID() } } }, methodology],
     ]) {
       await expect(store.admit({ ...command, tasks })).rejects.toMatchObject({ code: 'invalid_prompt_job_configuration' });

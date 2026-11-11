@@ -16,7 +16,8 @@ jest.mock('../../lib/services/prompt-store.js', () => ({
 }));
 import { executePrompt } from '../../lib/services/execute-prompt.js';
 import { LLMClient } from '../../lib/services/llm-client.js';
-import { hashProfile } from '../../lib/services/prompt-jobs/profile.js';
+import { canonical, hashProfile, MAX_PROFILE_RESPONSE_BYTES } from '../../lib/services/prompt-jobs/profile.js';
+import { SYNTHETIC_MAX_OUTPUT_TOKENS } from '../../lib/services/prompt-jobs/capabilities.js';
 import { prepareContextSnapshot } from '../../lib/services/prompt-jobs/context.js';
 import { buildUntrustedContentPreamble } from '../../lib/utils/ai-payload-boundary.js';
 import * as requestAdapter from '../../lib/dataverse/adapters/grant-request.js';
@@ -78,6 +79,8 @@ test('awaits intent and response save; retained checkpoint replays without provi
   expect(events).toEqual(['intent','provider','saved','parsed']);
   const replay=await executePrompt({...args,onDispatch:null,onResponse:null,responseCheckpoint:checkpoint});
   expect(replay.parsed).toEqual(result.parsed);expect(mockComplete).toHaveBeenCalledTimes(1);
+  const older = {...checkpoint,response:{...checkpoint.response,content:[{type:'text',text:checkpoint.response.text}],stopDetails:null}};
+  await expect(executePrompt({...args,onDispatch:null,onResponse:null,responseCheckpoint:older})).resolves.toMatchObject({parsed:result.parsed});
   expect(runAdapter.create).not.toHaveBeenCalled();
   await expect(executePrompt({...args,responseCheckpoint:{...checkpoint,binding:'forged'}})).rejects.toThrow('checkpoint mismatch');
   expect(mockComplete).toHaveBeenCalledTimes(1);
@@ -103,6 +106,55 @@ test('network ambiguity is unknown and prose length violations reject after chec
   await expect(executePrompt(options())).rejects.toMatchObject({paidCall:null});
   mockComplete.mockResolvedValueOnce(response('word '.repeat(201)));
   await expect(executePrompt(options())).rejects.toMatchObject({code:'profile_output_invalid',paidCall:true});
+});
+
+test.each([400, 401, 429, 529])('received HTTP %s rejection is definitive without retry', async status => {
+  mockComplete.mockRejectedValueOnce(Object.assign(new Error(`Claude API error ${status}: synthetic detail`), {status}));
+  const args = options();
+  await expect(executePrompt(args)).rejects.toMatchObject({code:'profile_provider_rejected', providerRejected:true, status, paidCall:true});
+  expect(args.onDispatch).toHaveBeenCalledTimes(1);
+  expect(args.onResponse).not.toHaveBeenCalled();
+  expect(mockComplete).toHaveBeenCalledTimes(1);
+});
+
+test.each([[503, 'Claude API error 503: ambiguous'], [429, 'unrelated status']])('HTTP status %s with an unproved rejection remains ambiguous', async (status, message) => {
+  mockComplete.mockRejectedValueOnce(Object.assign(new Error(message), {status}));
+  await expect(executePrompt(options())).rejects.toMatchObject({providerRejected:false, paidCall:null});
+  expect(mockComplete).toHaveBeenCalledTimes(1);
+});
+
+test('frozen and effective token budgets must fit before dispatch', async () => {
+  const high = SYNTHETIC_MAX_OUTPUT_TOKENS + 1;
+  for (const args of [options({promptSnapshot:{...prompt(),wmkf_ai_maxtokens:high}}), options({maxTokensOverride:high})]) {
+    await expect(executePrompt(args)).rejects.toThrow(/output token budget/);
+    expect(args.onDispatch).not.toHaveBeenCalled();
+  }
+  expect(mockComplete).not.toHaveBeenCalled();
+});
+
+test('encoded response overflow saves bounded known usage and replay fails without regenerating', async () => {
+  const args = options();
+  const text = 'RESULT_CANARY ' + '\u0001'.repeat(50_000);
+  expect(Buffer.byteLength(text)).toBeLessThan(MAX_PROFILE_RESPONSE_BYTES);
+  mockComplete.mockResolvedValueOnce(response(text));
+  await expect(executePrompt(args)).rejects.toMatchObject({code:'profile_response_too_large',paidCall:true,usageComplete:true});
+  const [checkpoint] = args.onResponse.mock.calls[0];
+  expect(checkpoint.response).toMatchObject({storageLimitExceeded:true,usage:{output_tokens:20}});
+  expect(checkpoint.response).not.toHaveProperty('text');
+  expect(Buffer.byteLength(canonical(checkpoint))).toBeLessThan(MAX_PROFILE_RESPONSE_BYTES);
+  await expect(executePrompt({...args,responseCheckpoint:checkpoint,onDispatch:null,onResponse:null}))
+    .rejects.toMatchObject({code:'profile_response_too_large',paidCall:true});
+  expect(mockComplete).toHaveBeenCalledTimes(1);
+});
+
+test('a fitting checkpoint stores text once and checks the separately encoded result size', async () => {
+  const args = options();
+  const text = 'x'.repeat(150_000);
+  mockComplete.mockResolvedValueOnce(response(text));
+  await expect(executePrompt(args)).rejects.toMatchObject({code:'profile_output_invalid',paidCall:true});
+  const [checkpoint] = args.onResponse.mock.calls[0];
+  expect(checkpoint.response.text).toBe(text);
+  expect(checkpoint.response).not.toHaveProperty('content');
 });
 
 test.each([
