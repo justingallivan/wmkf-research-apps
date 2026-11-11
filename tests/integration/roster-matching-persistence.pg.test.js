@@ -3,7 +3,7 @@
 // Real SQL in transaction-local TEMP tables; every external/app-auth dependency
 // is controlled. No inference, Graph, Dataverse writes or persistent DDL.
 jest.mock('../../lib/services/expertise-finder/roster-sql.cjs',()=>({sql:jest.fn()}));
-jest.mock('../../lib/services/expertise-finder/roster-rehearsal-target.cjs',()=>({enabled:()=>true,assertTarget:jest.fn()}));
+jest.mock('../../lib/services/expertise-finder/roster-rehearsal-target.cjs',()=>({enabled:()=>true,browserRequested:jest.fn(()=>false),assertBrowserTarget:jest.fn(),assertTarget:jest.fn()}));
 jest.mock('../../lib/utils/auth',()=>({requireAppAccess:jest.fn()}));
 jest.mock('pdf-parse',()=>jest.fn(async()=>({text:'Synthetic proposal text. '.repeat(20)})));
 jest.mock('../../lib/utils/public-blob-fetch',()=>({fetchPublicBlob:jest.fn(async()=>({ok:true,arrayBuffer:async()=>new ArrayBuffer(4)}))}));
@@ -62,6 +62,16 @@ run('roster v2 real SQL persistence and history',()=>{
   users.getById.mockImplementation(async id=>({isdisabled:id===disabledUser}));
   complete=jest.fn(async()=>({content:[{text:JSON.stringify(output())}],usage:{inputTokens:0,outputTokens:0},model:'controlled-fixture'}));
   LLMClient.mockImplementation(()=>({complete}));
+ });
+ test('both entry points refuse model drift before provider and persistence in browser mode',async()=>{
+  const target=require('../../lib/services/expertise-finder/roster-rehearsal-target.cjs');
+  target.browserRequested.mockReturnValue(true);
+  try{
+   const res=response();await match({method:'POST',body:{file:{url:'https://fixture.invalid/proposal.pdf'}}},res);
+   expect(res.statusCode).toBe(503);
+   await expect(batchMatch({requestId:request,profileId:1})).rejects.toMatchObject({httpStatus:503});
+   expect(LLMClient).not.toHaveBeenCalled();expect(complete).not.toHaveBeenCalled();expect(sql).not.toHaveBeenCalled();
+  }finally{target.browserRequested.mockReturnValue(false);}
  });
  test('actual roster snapshot honors enabled, disabled, consultation-only and inactive profiles',async()=>{
   const snapshot=await matchRosterSnapshot();

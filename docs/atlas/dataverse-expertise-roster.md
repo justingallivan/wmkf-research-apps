@@ -92,3 +92,10 @@ restriction, canary activation/deactivation and unlink/restore. The Contact itse
 was never written: exact fields/ETag were unchanged, with zero links remaining.
 All 45 other roster profiles and public SQL were unchanged; the owned fixture was
 removed. See `docs/plans/data/expertise-roster/LINKED_CONTACT_REHEARSAL_2026-11-11.md`.
+
+The minimal attachment/matching venue subsequently passed source review and build
+checks plus a real OAuth zero-write Reviews/form preflight. All 46 profiles and
+public SQL remained unchanged and the fixture was removed. No live attachment or
+model proof follows from this; exact storage/model approvals remain pending. See
+`docs/plans/data/expertise-roster/LIVE_VENUE_PREFLIGHT_2026-11-11.md` for known shell
+limitations and final 194-test/12-suite evidence.

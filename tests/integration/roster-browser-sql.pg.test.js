@@ -16,8 +16,12 @@ live('browser SQL verifies owned local relations before every query and never fa
   jest.resetModules();const {sql,browserSql,db}=require('../../lib/services/expertise-finder/roster-sql.cjs');
   expect((await browserSql`SELECT current_schema() AS name`).rows[0].name).toBe(fixture.schema);
   expect((await sql`SELECT current_schema() AS name`).rows[0].name).toBe(fixture.schema);
-  expect(()=>db.connect()).toThrow();
+  const transaction=await db.connect();
+  try{await transaction.query('BEGIN');await transaction.query("INSERT INTO expertise_matches(user_profile_id,proposal_title) VALUES(900001,'Rollback transaction')");await transaction.query('ROLLBACK');}
+  finally{transaction.release();}
+  expect((await fixture.primary.query("SELECT count(*)::int AS n FROM expertise_matches WHERE proposal_title='Rollback transaction'")).rows[0].n).toBe(0);
   await fixture.primary.query('DROP TABLE dynamics_user_roles');
   await expect(browserSql`SELECT 1`).rejects.toMatchObject({status:503});
+  await expect(db.connect()).rejects.toMatchObject({status:503});
  }finally{process.env=original;await fixture.cleanup();}
 });

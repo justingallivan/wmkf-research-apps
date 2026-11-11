@@ -136,10 +136,10 @@ async function createRosterPgFixture(envFile) {
     }
   }
 
-  async function cleanupOnce() {
+  async function cleanupOnce({ retainSchema = false } = {}) {
     const closed = await Promise.allSettled([admin, ...clients].map(client => client.end()));
     clients.clear();
-    let after;
+    let after, removed = false;
     if (before) {
       const cleanupClient = newClient();
       try {
@@ -150,7 +150,10 @@ async function createRosterPgFixture(envFile) {
           if (current) {
             assert(current.owned && fixtureSchema.test(schema), 'Refusing to drop an unowned fixture schema');
             assert.equal(current.oid, namespace.oid, 'Fixture schema was replaced');
-            await cleanupClient.query(`DROP SCHEMA ${quotedSchema} CASCADE`);
+            if (!retainSchema) {
+              await cleanupClient.query(`DROP SCHEMA ${quotedSchema} CASCADE`);
+              removed = true;
+            }
           }
         }
         after = await fingerprintPublic(cleanupClient);
@@ -161,11 +164,11 @@ async function createRosterPgFixture(envFile) {
     }
     const failure = closed.find(result => result.status === 'rejected');
     if (failure) throw failure.reason;
-    return { before, after };
+    return { before, after, removed };
   }
 
-  function cleanup() {
-    cleanupPromise ??= cleanupOnce();
+  function cleanup(options) {
+    cleanupPromise ??= cleanupOnce(options);
     return cleanupPromise;
   }
 

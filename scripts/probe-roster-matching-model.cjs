@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-/** Read-only sandbox prompt/roster probe; never supplies model-provider credentials. */
+/** Read-only sandbox prompt/roster probe. Optional app credentials permit only
+ * the model-list GET; provider inference and all sandbox writes are refused. */
 const fs=require('node:fs');
 const path=require('node:path');
 const Module=require('node:module');

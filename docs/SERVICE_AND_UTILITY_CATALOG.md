@@ -446,6 +446,8 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`auth-policy.js`** — proxy-bundle-safe `isAuthRequired()` shared between `proxy.js` (Node.js runtime in Next 16) and `lib/utils/auth.js`. Reads only `process.env`, no Node-only / `@vercel/postgres` / `next-auth` imports. **`NODE_ENV=production` fails closed** unless `EMERGENCY_AUTH_BYPASS=true`; the predicate is not a Vercel environment-name check and applies to production-mode Preview and Production runtimes. Misconfig warnings memoized once per process.
 - **`cron-auth.js`** — Vercel cron `CRON_SECRET` verification (Bearer header). Dev-mode bypass.
 
+- **`usage-logger.js`** — Best-effort usage persistence. Initial SQL synchronous throws and fallback synchronous/asynchronous failures are contained and warned; logging failures do not fail an otherwise completed caller operation.
+
 ### Versioning
 
 - **`etag.js`** — `isConcreteEtag(value)`: true only for a strong or weak entity tag with a nonempty opaque body and no surrounding whitespace (`"…"`, `W/"…"`); rejects `*`, `W/""`, unquoted and control-character values. Stage 5 (2026-09-05) made it the `ifMatch` requirement behind `reviewer-suggestion.js` `attachReviewDocumentPointer` / `claimThankYou`, which fail with 400 `missing_version` otherwise. The four older inline copies of the same regex (`reviewer-suggestion.js`'s invitation-response guard, `reviewer-engagement/correct-response.js`, `reviewer-engagement/expire-invitation.js`, `reviewer-engagement/record-email-outcome.js`) were consolidated onto it 2026-09-06 (S490); `grep -rn 'W\\/)?"\[' lib/` now hits only this file.

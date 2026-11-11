@@ -52,3 +52,24 @@ test('falls back to the legacy usage insert before migration 033 exists', async 
   expect(sql.mock.calls[0][0].join('?')).toContain('request_id');
   expect(sql.mock.calls[1][0].join('?')).not.toContain('request_id');
 });
+
+test('synchronous database setup failure cannot fail the completed application request',()=>{
+ const warning=jest.spyOn(console,'warn').mockImplementation(()=>{});
+ try{
+  sql.mockImplementationOnce(()=>{throw Error('invalid pooled URL');});
+  expect(()=>logUsage({appName:'expertise-finder',model:'claude-sonnet-5-5',status:'success'})).not.toThrow();
+  expect(warning).toHaveBeenCalledWith('Usage log failed:','invalid pooled URL');
+ }finally{warning.mockRestore();}
+});
+test.each(['sync','async'])('legacy fallback %s failure remains handled',async kind=>{
+ const warning=jest.spyOn(console,'warn').mockImplementation(()=>{});
+ try{
+  sql.mockRejectedValueOnce(Object.assign(Error('missing column'),{code:'42703'}));
+  if(kind==='sync')sql.mockImplementationOnce(()=>{throw Error('fallback unavailable');});
+  else sql.mockRejectedValueOnce(Error('fallback unavailable'));
+  logUsage({appName:'expertise-finder',model:'claude-sonnet-5-5'});
+  await new Promise(resolve=>setTimeout(resolve,0));
+  expect(sql).toHaveBeenCalledTimes(2);
+  expect(warning).toHaveBeenCalledWith('Usage log failed:','fallback unavailable');
+ }finally{warning.mockRestore();}
+});

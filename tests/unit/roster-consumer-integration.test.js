@@ -2,7 +2,7 @@
 jest.mock('../../lib/services/expertise-finder/roster-sql.cjs',()=>({sql:{query:jest.fn()}}));
 jest.mock('../../lib/dataverse/adapters/expertise-profile.js',()=>({list:jest.fn()}));
 jest.mock('../../lib/dataverse/adapters/system-user.js',()=>({getById:jest.fn()}));
-jest.mock('../../lib/services/expertise-finder/roster-rehearsal-target.cjs',()=>({assertTarget:jest.fn(()=>({host:'sandbox.invalid'}))}));
+jest.mock('../../lib/services/expertise-finder/roster-rehearsal-target.cjs',()=>({assertTarget:jest.fn(()=>({host:'sandbox.invalid'})),browserRequested:jest.fn(()=>false),assertBrowserTarget:jest.fn()}));
 import {sql} from '../../lib/services/expertise-finder/roster-sql.cjs';
 import * as profiles from '../../lib/dataverse/adapters/expertise-profile';
 import * as users from '../../lib/dataverse/adapters/system-user';
@@ -22,3 +22,15 @@ test('unknown or wrong-category model identity is rejected',()=>{const s={rows:[
 test('live and bundled contracts must exactly match approved v2 bytes',()=>{expect(()=>assertRosterPrompt(EXPERTISE_FINDER_ROSTER_V2_ROW)).not.toThrow();expect(()=>assertRosterPrompt({...EXPERTISE_FINDER_ROSTER_V2_ROW,systemPrompt:'old or changed'})).toThrow();});
 test.each([{}, {staff_assignment:null}])('missing assignment is explicit contract refusal',value=>{expect(()=>validateRosterMatch(value,{rows:[],leadGuids:[],warnings:[]})).toThrow('invalid roster result');});
 test('raw malformed lead flags are excluded rather than coerced',async()=>{profiles.list.mockResolvedValue([raw({wmkf_leadpdeligible:null})]);expect((await readConsumerRoster()).rows).toEqual([]);expect((await matchRosterSnapshot()).warnings).toHaveLength(1);});
+
+const target=require('../../lib/services/expertise-finder/roster-rehearsal-target.cjs');
+test('browser matching refuses fallback models and changed output limits before inference',()=>{
+ target.browserRequested.mockReturnValue(true);
+ const approved={...EXPERTISE_FINDER_ROSTER_V2_ROW,model:'claude-sonnet-5-5',maxTokens:4096};
+ try{
+  expect(()=>assertRosterPrompt(approved)).not.toThrow();
+  for(const changed of [{model:'claude-sonnet-5'},{model:undefined},{maxTokens:8192},{maxTokens:'4096'}])expect(()=>assertRosterPrompt({...approved,...changed})).toThrow('approved matching model');
+  target.assertBrowserTarget.mockImplementationOnce(()=>{throw Error('invalid browser target');});
+  expect(()=>assertRosterPrompt(approved)).toThrow('invalid browser target');
+ }finally{target.browserRequested.mockReturnValue(false);}
+});

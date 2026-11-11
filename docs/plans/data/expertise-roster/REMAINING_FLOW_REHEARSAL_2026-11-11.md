@@ -10,12 +10,26 @@ bounded source/browser verification; see [evidence](LINKED_CONTACT_REHEARSAL_202
 require the venue changes and shared-resource approvals below. This plan proposes
 no new storage infrastructure.
 
+## Current live-venue implementation and approval status
+
+[VERIFIED via source, final checks and Opus build review] The coordinating session accepted the minimal real-code-path design and
+[Opus named changes](LIVE_VENUE_PLAN_OPUS_5_5_REVIEW_2026-11-11.md). The minimal transport, staging, runner, model-pin and usage-logger changes are
+source-built, with Opus READY and 194 tests/12 suites passing. This establishes
+no live paid/storage proof; see [evidence](LIVE_VENUE_PREFLIGHT_2026-11-11.md).
+Approval has been requested and remains pending for two synthetic SharePoint copies
+plus the `Consultant Feedback` child folder, private and public Blob usage and two
+Anthropic `claude-sonnet-5-5` submissions. Exact targets and harmless PDF metadata
+are in the private `attachment-approval-candidate` manifest and `live-checks-proposal`
+metadata. No new storage infrastructure, Graph upload branch, credential alias or
+unique staging index is part of this work.
+
 ## Verified boundaries
 
 - [VERIFIED via `scripts/run-roster-browser-venue.cjs` and
   `lib/services/expertise-finder/roster-sql.cjs`] The signed-in browser venue
   can run the real roster editor in GUID-only preparation mode and uses a
-  disposable SQL schema. Browser pooled transactions currently refuse and
+  disposable SQL schema. At the preimplementation checkpoint, browser pooled
+  transactions refuse and
   attachment staging still uses direct `@vercel/postgres`
   (`lib/services/portal-upload-staging.js`). Both are relevant for attachments.
 - [VERIFIED via `lib/services/sharepoint-target-registry.js`] GraphService's
@@ -121,8 +135,8 @@ synthetic child folder on registered shared `akoyago-shared`. Use
 `wmkf-uploads-private` only with explicit owner approval for one exact
 `portal-staging/consultant_feedback/<synthetic request GUID>/` prefix and the
 named Vercel Blob usage, which may consume credits or money. Obtain explicit
-authorization for the exact SharePoint synthetic folder, one new item and exact
-cleanup on the shared site. No Graph or Blob mutation is authorized by this plan
+authorization for the exact SharePoint Request folder, two PDF copies and the
+`Consultant Feedback` child folder, plus exact cleanup on the shared site. No Graph or Blob mutation is authorized by this plan
 before those approvals. Do not widen the store/site registry or use a real
 Request. If existing authorized resources do not match, report the missing
 fixture/approval and keep this proof pending.
@@ -145,20 +159,27 @@ deletions, so even readback requires an isolated fixture.
 1. [PLANNED] After approval, pin the exact Request GUID/number and its active
    sandbox location with complete read-only queries. Require exactly one
    Request location across all states. Verify its resolved parent library and
-   actual Graph site/drive/folder IDs. Verify the computed child folder equals
-   the approved path before any Graph write, and no pre-existing run item. Verify reviewer app grant,
+   actual Graph site/drive/folder IDs. Prove the resolved bucket library drive equals
+   the default `akoyago-shared` `akoya_request` drive used by the normal upload path. Verify the computed child folder equals
+   the approved path before any Graph write, and no pre-existing run item. Verify both `expertise-finder` and `reviewers` app grants,
    sandbox registry create/read/update permissions and Graph exact write/read/
    cleanup permission. Verify the Blob token selects the approved private store,
    and the route uses only the approved prefix. A malformed or mismatched
    destination blocks before mint/finalize. No app grant or storage permission
    expansion is implied by an authorized write.
-2. [PLANNED] Use the disposable SQL venue and migrations 031 and 049 for the
+2. [IMPLEMENTED CONTRACT] Use the disposable SQL venue and migrations 031 and 049 for the
    staging ledger and Consultant Feedback scope, plus the existing 048 feedback
    table. Add only a scoped browser-mode staging SQL selector and verified
    `db.connect()` for the feedback transaction path, conditional on the approved
    rehearsal venue. Preserve normal-mode Vercel behavior and the existing browser
    defaults. Prove staging and feedback SQL use the same owned schema, and allow
-   only the approved synthetic Request for the browser attachment run.
+   only the approved synthetic Request by operator procedure for this run.
+   Use `browserSql` in staging; verify namespace before returning a pooled transaction
+   client and discard it on verification failure. Apply migrations 031/049 only in
+   the owned browser fixture; keep the background-schema-ready flag unset. Preserve
+   non-browser Vercel delegation. Graph credentials already exist in the venue;
+   selectively pass the approved private uploads token and application provider key
+   only for an authorized run, without repurposing them for agent authentication.
 3. [VERIFIED via `lib/utils/sharepoint-buckets.js`, the attachment service and
    focused tests] Attachment finalize now passes
    `{requireResolvedParents:true, requireCompleteResults:true}` at the governed
@@ -176,7 +197,8 @@ deletions, so even readback requires an isolated fixture.
    Reload and download through the authenticated staff attachment endpoint,
    compare SHA-256 and content type, and confirm wrong-request refusal. Replay
    the same successful staging ID once to verify unchanged feedback/registry
-   IDs and exactly one Graph object. No replacement or additional file is
+   IDs and exactly one Graph object. This is consumed-staging replay evidence,
+   not proof of intermediate recovery paths. No replacement or additional file is
    necessary for this bounded proof. Shared briefing is outside this run.
 5. [PLANNED] Delete through the UI and confirm absent feedback row, Superseded
    registry record, and refused staff attachment read. Remove only the
@@ -185,13 +207,26 @@ deletions, so even readback requires an isolated fixture.
    agreed evidence. On incomplete cleanup keep the disposable schema and exact
    stage/item receipts for recovery. No recursive folder deletion, broad
    maintenance sweep or guess at an untracked item. After verified cleanup,
-   fingerprint public SQL and end the disposable venue.
+   fingerprint public SQL and end the disposable venue. Confirm automatic staged
+   Blob deletion with an exact persisted-path HEAD 404. Remove the approved child
+   folder by exact ID only after verifying it empty, or retain it explicitly in the
+   receipt. Dump staging and feedback rows privately before cleanup; refuse schema
+   removal while any staging row exists, feedback differs from its seeded baseline,
+   or the retention query fails. Keep that SQL evidence for partial-success recovery.
 
 [PLANNED] Use synthetic bytes with the optional Cloudmersive scan off in this
 venue, unless that named metered product is separately authorized. This proves
 the attachment pipeline under that configuration. Existing controlled tests
 cover scanner and intermediate transport failures. Real storage proof requires
 the named approvals above and does not follow from green tests alone.
+
+## Live venue preflight
+
+[PLANNED] Before any approved write or paid call, load the synthetic Request workbench
+with zero writes and inspect its actual dependencies. A 500 blocks continuation.
+The route import scan alone does not establish all Reviews-tab service compatibility.
+Keep scanning off; no Cloudmersive usage is authorized. Use the existing Graph path,
+not a special rehearsal upload implementation.
 
 ## Matching handoff
 
@@ -206,6 +241,25 @@ estimate only as a sizing heuristic. The probe made no inference call.
 [PLANNED] Continue controlled transport and persistence checks without paid
 calls. A live single/batch run requires explicit named Anthropic
 `claude-sonnet-5-5` authorization after disclosure that it may cost money.
-Only if approved, pin that exact model and refuse if actual runtime resolution
-differs. Detailed fixture, cost and live proof remain pending. Keep those
-receipts separate from attachment and linked-person evidence.
+The implemented pre-inference guard pins `claude-sonnet-5-5` and maxTokens 4096 in browser mode inside
+`assertRosterPrompt`, covering single and batch before inference; refuse any mismatch.
+The implemented usage logger contains synchronous initial and synchronous/asynchronous
+fallback SQL failures, with tests, so logging cannot turn a saved result into false
+failure. A missing usage row must still be recorded honestly.
+
+The second approved PDF copy must sit directly in the synthetic Request folder with
+the Phase I staff-version filename pattern, because batch listing is non-recursive.
+Upload with conflict behavior `fail` and clean up by exact item ID and ETag. The
+batch picker covers 2020 through next year and excludes this D99 fixture: label any
+same-origin batch POST as route/service proof, not picker proof. Private/public Blob
+use is limited to the approved synthetic scope. Each model submission can make up
+to four attempts on 429/529 plus one corrective deprecated-parameter retry. Timeouts
+are not retried but may still be billed; no fallback model is configured. Keep
+matching receipts separate from attachment and linked-person evidence.
+
+[PLANNED] After exact approval, temporarily serve the private inert
+`roster-batch-rehearsal.html` locally. Its ordinary HTML form POSTs once to the
+same-origin `/api/expertise-finder/batch-match` with the exact Request 1000339.
+Use the real signed-in browser and normal URL-encoded route parsing; no injected
+cookies, developer-console fetch, test auth, new API or picker change. The file
+has not been published or submitted. This is route/service proof, not picker proof.

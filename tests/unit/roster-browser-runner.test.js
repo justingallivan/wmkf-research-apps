@@ -37,3 +37,23 @@ test('repeated stop during cleanup is handled without killing an exited child',a
  watch.dispose();expect(signals.listenerCount('SIGINT')).toBe(0);expect(signals.listenerCount('SIGTERM')).toBe(0);
 });
 test('child process error rejects',async()=>{const {child,watch}=serverWatch();const error=Error('spawn failed');child.emit('error',error);await expect(watch.done).rejects.toBe(error);watch.dispose();});
+
+const {validateLiveManifest,attachmentCleanupPending}=require('../../scripts/run-roster-browser-venue.cjs');
+const source=require('../../docs/plans/evidence/test-request-factory/app-owned-location-rehearsal-2026-09-23.json');
+const graphFolder=require('../../docs/plans/evidence/test-request-factory/app-owned-location-receipt-2026-09-23.json').locationProvision.graphFolder;
+function liveManifest(){const loc=source.appOwnedSharePointProvision;return {authorization:{attachments:true,matching:false,publicBlob:false},sandboxHost:new URL(source.target).hostname,requestId:source.requestId,requestNumber:source.requestNumber,factoryRunId:source.runId,locationId:loc.locationId,parentLocationId:loc.parentLocationId,library:loc.parentLibrary,graphParentFolderId:loc.graphFolderId,graphFolderPath:`${loc.folder}/Consultant Feedback`,site:{key:'akoyago-shared',scope:'shared',siteUrl:'https://appriver3651007194.sharepoint.com/sites/akoyaGO'},siteId:graphFolder.siteId,driveId:graphFolder.driveId,blobStore:'wmkf-uploads-private',blobPrefix:`portal-staging/consultant_feedback/${source.requestId}/`};}
+test('live credentials require explicit approved mode and exact fixture',()=>{
+ const staffWithKeys={...staff,UPLOADS_BLOB_RW_TOKEN:'blob-synthetic',CLAUDE_API_KEY:'model-synthetic',BLOB_READ_WRITE_TOKEN:'public-synthetic'};
+ const a=environment(rehearsal,staffWithKeys,schema,liveManifest());expect(a.UPLOADS_BLOB_RW_TOKEN).toBe('blob-synthetic');expect(a).not.toHaveProperty('CLAUDE_API_KEY');expect(a).not.toHaveProperty('BLOB_READ_WRITE_TOKEN');
+ const matching=liveManifest();matching.authorization={attachments:false,matching:true,publicBlob:true};matching.approvedModel='claude-sonnet-5-5';const b=environment(rehearsal,staffWithKeys,schema,matching);
+ expect(b.CLAUDE_API_KEY).toBe('model-synthetic');expect(b.BLOB_READ_WRITE_TOKEN).toBe('public-synthetic');expect(b).not.toHaveProperty('UPLOADS_BLOB_RW_TOKEN');
+ for(const mutate of [x=>{delete x.authorization.attachments;},x=>{x.requestId='wrong';},x=>{x.authorization={attachments:false,matching:true,publicBlob:false};x.approvedModel='claude-sonnet-5';},x=>{x.authorization={attachments:true,matching:false,publicBlob:true};}]){const value=liveManifest();mutate(value);expect(()=>validateLiveManifest(value)).toThrow();}
+});
+test('attachment cleanup retains state until every row and external cleanup is confirmed',()=>{
+ const baseline=[{id:1,status:'active'}],terminal={status:'consumed',candidate_result:{itemId:'synthetic'},result_payload:{requestDocumentId:'synthetic'}};
+ expect(attachmentCleanupPending({staging:[],feedback:baseline,baselineFeedback:baseline})).toBe(false);
+ expect(attachmentCleanupPending({staging:[terminal],feedback:baseline,baselineFeedback:baseline,externalClean:true})).toBe(true);
+ for(const row of [{...terminal,status:'pending'},{...terminal,status:'rejected'},{...terminal,candidate_result:null},{...terminal,result_payload:null}])expect(attachmentCleanupPending({staging:[row],feedback:baseline,baselineFeedback:baseline,externalClean:true})).toBe(true);
+ expect(attachmentCleanupPending({staging:[terminal],feedback:baseline,baselineFeedback:baseline})).toBe(true);
+ expect(attachmentCleanupPending({staging:[],feedback:[],baselineFeedback:baseline,externalClean:true})).toBe(true);
+});

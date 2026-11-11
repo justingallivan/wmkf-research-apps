@@ -210,6 +210,18 @@ and unlink/restore. All 46 profiles were retained, all 45 non-canaries and exact
 Contact fields/ETag were unchanged, zero Contact links remained, and cleanup
 preserved public SQL. See [linked-Contact evidence](LINKED_CONTACT_REHEARSAL_2026-11-11.md).
 
+## Minimal attachment and matching venue
+
+[VERIFIED via final source/build checks and real OAuth zero-write preflight] Opus
+returned READY; the final single run passed 194 tests across 12 suites, with build,
+scoped lint, types and model-warming/DAL gates+self-tests passing. Reviews, Add
+Feedback and a one-off form loaded and were canceled without save/upload. All 46
+profiles and public SQL were unchanged; the disposable fixture was removed. Known
+shell/synthesis direct-Vercel errors limit this proof. Actual shared storage/model
+execution remains pending named approval; no Production write, push or deployment.
+See [bounded evidence](LIVE_VENUE_PREFLIGHT_2026-11-11.md). The proposed D99 batch
+HTML-form submission is planned authenticated route proof, not picker proof.
+
 ## Historical Fable empty-text source review transcript
 
 **READY FOR BOUNDED SANDBOX CANARY** — no named blockers, with caveats below.

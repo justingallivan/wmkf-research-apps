@@ -17,3 +17,11 @@ test('browser auth selector delegates normally even when roster-only rehearsal i
  delete process.env.EXPERTISE_ROSTER_BROWSER_REHEARSAL;delete process.env.EXPERTISE_ROSTER_BROWSER_SCHEMA;
  const vercel=require('@vercel/postgres');const {browserSql}=require('../../lib/services/expertise-finder/roster-sql.cjs');await browserSql`SELECT ${1}`;expect(vercel.sql).toHaveBeenCalledTimes(1);expect(require('pg').Pool).not.toHaveBeenCalled();
 });
+
+test('browser transaction checkout verifies namespace before handoff and destroys failures',async()=>{
+ const {Pool}=require('pg'),{verifyNamespace}=require('../../lib/services/expertise-finder/roster-lifecycle.cjs'),vercel=require('@vercel/postgres');
+ const client={query:jest.fn(),release:jest.fn()},pool={connect:jest.fn().mockResolvedValue(client)};Pool.mockImplementation(()=>pool);
+ const {db}=require('../../lib/services/expertise-finder/roster-sql.cjs');verifyNamespace.mockRejectedValueOnce(new Error('unowned namespace'));
+ await expect(db.connect()).rejects.toThrow('unowned namespace');expect(client.release).toHaveBeenCalledWith(true);expect(client.query).not.toHaveBeenCalled();expect(vercel.db.connect).not.toHaveBeenCalled();
+ verifyNamespace.mockResolvedValueOnce('1');expect(await db.connect()).toBe(client);expect(verifyNamespace).toHaveBeenLastCalledWith(client,schema,{browser:true});
+});

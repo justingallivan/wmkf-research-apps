@@ -2,7 +2,7 @@
 /** Local, real-OAuth walkthrough venue. Owns one disposable PG schema and no
  * Dataverse writes. Ctrl-C stops Next, verifies sandbox preservation, and drops
  * only the owned schema. All evidence/logs are private; no credentials printed.
- * Usage: node scripts/run-roster-browser-venue.cjs PRIVATE_FULL_ENV STAFF_ENV NEW_PRIVATE_DIR
+ * Usage: node scripts/run-roster-browser-venue.cjs PRIVATE_FULL_ENV STAFF_ENV NEW_PRIVATE_DIR [PRIVATE_AUTHORIZED_MANIFEST]
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -33,7 +33,29 @@ async function freePort(host) {
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen({ host, port: 3000, exclusive: true }, resolve); });
   await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
 }
-function environment(rehearsal, staff, schema) {
+function validateLiveManifest(live) {
+  const source = require('../docs/plans/evidence/test-request-factory/app-owned-location-rehearsal-2026-09-23.json');
+  const location = source.appOwnedSharePointProvision;
+  const receipt = require('../docs/plans/evidence/test-request-factory/app-owned-location-receipt-2026-09-23.json');
+  const graphFolder = receipt.locationProvision.graphFolder;
+  const approval = live?.authorization;
+  assert(approval && ['attachments', 'matching', 'publicBlob'].every(key => typeof approval[key] === 'boolean') &&
+    (approval.attachments || approval.matching) && (!approval.publicBlob || approval.matching),
+  'Explicit live authorization fields required');
+  assert(!approval.matching || live.approvedModel === 'claude-sonnet-5-5', 'Exact named matching model required');
+  assert(live.sandboxHost === new URL(source.target).hostname && live.requestId === source.requestId &&
+    live.requestNumber === source.requestNumber && live.factoryRunId === source.runId &&
+    live.locationId === location.locationId && live.parentLocationId === location.parentLocationId &&
+    live.library === location.parentLibrary && live.graphParentFolderId === location.graphFolderId &&
+    live.graphFolderPath === `${location.folder}/Consultant Feedback` &&
+    live.site?.key === 'akoyago-shared' && live.site.scope === 'shared' &&
+    live.site.siteUrl === 'https://appriver3651007194.sharepoint.com/sites/akoyaGO' &&
+    live.siteId === graphFolder.siteId && live.driveId === graphFolder.driveId &&
+    live.blobStore === 'wmkf-uploads-private' && live.blobPrefix === `portal-staging/consultant_feedback/${source.requestId}/`,
+  'Live Request or storage candidate differs from reviewed fixture');
+  return live;
+}
+function environment(rehearsal, staff, schema, live = null) {
   const env = { PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: process.env.TMPDIR,
     NODE_ENV: 'production', NEXT_TELEMETRY_DISABLED: '1', AUTH_REQUIRED: 'true',
     NEXTAUTH_URL: 'http://localhost:3000', NEXTAUTH_SECRET: randomBytes(48).toString('base64url'),
@@ -46,6 +68,20 @@ function environment(rehearsal, staff, schema) {
   }
   for (const key of ['AZURE_AD_CLIENT_ID', 'AZURE_AD_CLIENT_SECRET', 'AZURE_AD_TENANT_ID']) {
     assert(staff[key], `Missing staff setting ${key}`); env[key] = staff[key];
+  }
+  if (live) {
+    const { authorization } = validateLiveManifest(live);
+    env.SHAREPOINT_SITE_URL = live.site.siteUrl;
+    for (const [approved, key] of [
+      [authorization.attachments, 'UPLOADS_BLOB_RW_TOKEN'],
+      [authorization.matching, 'CLAUDE_API_KEY'],
+      [authorization.publicBlob, 'BLOB_READ_WRITE_TOKEN'],
+    ]) {
+      if (approved) {
+        assert(staff[key], `Missing approved live setting ${key}`);
+        env[key] = staff[key];
+      }
+    }
   }
   assertBrowserTarget(env);
   return env;
@@ -111,14 +147,27 @@ function watchServer(child, signals = process) {
   });
   return { done, dispose() { signals.removeListener('SIGINT', stop); signals.removeListener('SIGTERM', stop); } };
 }
+async function feedbackRows(fixture) {
+  return (await fixture.primary.query('SELECT to_jsonb(f) AS row FROM consultant_feedback f ORDER BY id')).rows.map(entry => entry.row);
+}
+function attachmentCleanupPending({ staging, feedback, baselineFeedback }) {
+  // A consumed row still owns the exact Graph and Blob cleanup evidence.
+  return staging.length > 0 || fingerprint(feedback) !== fingerprint(baselineFeedback);
+}
+
 async function main(args) {
-  assert.equal(args.length, 3, 'Three paths required');
-  const [fullFile, staffFile, evidenceDir] = args;
+  assert([3, 4].includes(args.length), 'Three paths and an optional authorized manifest required');
+  const [fullFile, staffFile, evidenceDir, manifestFile] = args;
   const rehearsal = parse(privateInput(fullFile)), staff = parse(privateInput(staffFile));
   assert(path.isAbsolute(evidenceDir));
   const parent = fs.realpathSync(path.dirname(evidenceDir));
   assert(parent !== root && !parent.startsWith(root + path.sep), 'Evidence must be outside worktree');
   assert(!(fs.statSync(parent).mode & 0o077), 'Private evidence parent required');
+  if (manifestFile) {
+    const manifestParent = fs.realpathSync(path.dirname(manifestFile));
+    assert(manifestParent !== root && !manifestParent.startsWith(root + path.sep), 'Live manifest must be outside the worktree');
+  }
+  const live = manifestFile ? validateLiveManifest(JSON.parse(privateInput(manifestFile))) : null;
   const { host } = assertTarget(rehearsal);
   assert(!rehearsal.VERCEL_ENV && rehearsal.NODE_ENV !== 'production');
   assert(!fs.readdirSync(root).some(name => /^\.env(?:\.|$)/.test(name) && name !== '.env.example'), 'Worktree environment fallback refused');
@@ -144,6 +193,9 @@ async function main(args) {
   assert(sameEmail.value[0].systemuserid === user.systemuserid && sameEmail.value[0].azureactivedirectoryobjectid === user.azureactivedirectoryobjectid && sameEmail.value[0].isdisabled === false);
   const grants = await get(`/wmkf_appuserappaccesses?$filter=${encodeURIComponent(`_wmkf_user_value eq ${user.systemuserid}`)}&$select=wmkf_appkey`);
   assert(!grants['@odata.nextLink'] && grants.value.some(g => g.wmkf_appkey === 'expertise-finder'));
+  if (live?.authorization.attachments) {
+    assert(grants.value.some(g => g.wmkf_appkey === 'reviewers'), 'Existing reviewers grant required');
+  }
   const store = require('./lib/expertise-roster-import-store.cjs').createStore({ env: rehearsal, client: readOnly, pg: null });
   const before = await store.readTarget({ includeAuditTimestamps: true });
   const canary = before.profiles.find(p => p.profileGuid === CANARY);
@@ -152,12 +204,18 @@ async function main(args) {
   const importBaseline = JSON.parse(privateInput(path.join(path.dirname(fullFile), 'target-before.json')));
   assert(!importReceipt.rows.some(row => row.profileGuid === CANARY) && !importBaseline.profiles.some(row => row.profileGuid === CANARY), 'Canary belongs to original import evidence');
   writePrivate(evidenceDir, 'sandbox-before.json', before);
-  let fixture, child, serverWatch, logFd, failure;
+  let fixture, child, serverWatch, logFd, failure, baselineFeedback;
   try {
     fixture = await createRosterPgFixture(fullFile);
     assert.equal((await fixture.primary.query('SELECT 1 FROM public.expertise_roster_binding WHERE dataverse_profile_guid=$1', [CANARY])).rowCount, 0, 'Canary has a real import binding');
     await seed(fixture, user);
-    const env = environment(rehearsal, staff, fixture.schema);
+    if (live?.authorization.attachments) {
+      for (const migration of ['031_portal_upload_staging.sql', '049_consultant_feedback_attachments.sql']) {
+        await fixture.primary.query(fs.readFileSync(path.join(root, 'lib/db/migrations', migration), 'utf8'));
+      }
+      baselineFeedback = await feedbackRows(fixture);
+    }
+    const env = environment(rehearsal, staff, fixture.schema, live);
     writePrivate(evidenceDir, 'venue.json', { schema: fixture.schema, profileId: OWNER, canary: CANARY, publicBefore: fixture.before, origin: env.NEXTAUTH_URL });
     logFd = fs.openSync(path.join(evidenceDir, 'server.log'), 'wx', 0o600);
     child = spawn(process.execPath, [path.join(root, 'node_modules/next/dist/bin/next'), 'start', '--hostname', 'localhost', '--port', '3000'], { cwd: root, env, stdio: ['ignore', logFd, logFd] });
@@ -180,12 +238,25 @@ async function main(args) {
         census.canaryAttributedToSignedInOperator = true;
       }
     } catch (error) { failure ||= error; }
-    try { if (fixture) cleanup = await fixture.cleanup(); } catch (error) { failure ||= error; }
+    let retainSchema = false;
+    if (baselineFeedback) {
+      retainSchema = true;
+      try {
+        const { rows: staging } = await fixture.primary.query('SELECT * FROM portal_upload_staging ORDER BY id');
+        const feedback = await feedbackRows(fixture);
+        writePrivate(evidenceDir, 'attachment-sql-cleanup.json', { staging, feedback, baselineFeedback });
+        retainSchema = attachmentCleanupPending({ staging, feedback, baselineFeedback });
+        assert(!retainSchema, 'Attachment activity retained for exact cleanup verification');
+      } catch (error) { failure ||= error; }
+    }
+    try { if (fixture) cleanup = await fixture.cleanup({ retainSchema }); } catch (error) { failure ||= error; }
     serverWatch?.dispose();
-    writePrivate(evidenceDir, 'result.json', { success: !failure, census, publicUnchanged: !!cleanup && cleanup.before === cleanup.after, fixtureRemoved: !!cleanup });
-    console.log(JSON.stringify({ success: !failure, census, publicUnchanged: !!cleanup && cleanup.before === cleanup.after, fixtureRemoved: !!cleanup }));
+    const result = { success: !failure, census, publicUnchanged: !!cleanup && cleanup.before === cleanup.after,
+      fixtureRemoved: cleanup?.removed === true, ...(retainSchema ? { retainedSchema: fixture.schema } : {}) };
+    writePrivate(evidenceDir, 'result.json', result);
+    console.log(JSON.stringify(result));
   }
   if (failure) throw failure;
 }
 if (require.main === module) main(process.argv.slice(2)).catch(() => { console.error('Venue failed; inspect private evidence without exposing credentials.'); process.exitCode = 1; });
-module.exports = { environment, seed, verifyCensus, watchServer };
+module.exports = { environment, seed, verifyCensus, watchServer, validateLiveManifest, attachmentCleanupPending };

@@ -165,6 +165,12 @@ passed. Exact Contact fields/ETag and all 45 other profiles remained unchanged;
 46 profiles retained, signed-in canary attribution verified and public SQL preserved.
 Strict attachment destination resolution is source-built, Opus READY and build/gate
 verified. See `docs/plans/data/expertise-roster/LINKED_CONTACT_REHEARSAL_2026-11-11.md`.
+The subsequent minimal attachment/matching venue is source-built and Opus READY;
+194 tests/12 suites, build, scoped lint, types and relevant gates/self-tests passed.
+A zero-write real OAuth Workbench Reviews/Add Feedback preflight loaded and canceled
+without upload/save; all 46 profiles/public SQL were unchanged and fixture removed.
+Known direct-Vercel shell/synthesis limitations remain bounded in
+`docs/plans/data/expertise-roster/LIVE_VENUE_PREFLIGHT_2026-11-11.md`.
 Next: actual shared-storage attachment proof and live model matching, each pending
 its named authorization, and deliberate public cutover
 and deployment admission. Bounded SQL rollback is verified; this browser pass is
