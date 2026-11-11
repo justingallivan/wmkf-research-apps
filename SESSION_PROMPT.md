@@ -93,14 +93,25 @@ New fixture/probe commits: `04ec9148f`, `5f33594ac`. The old canary container/vo
 is backed up, stopped and preserved. Separate container/volume
 `wmkf-roster-full-import17-20261110` owns loopback port 55439. Never run the canary
 against the full fixture or copy its sandbox allocations into shared Postgres.
-Next: dependent-consumer, permissions/audit and linked-person lifecycle verification,
-then operational cutover/rollback rehearsal and the owner-reviewed matching contract.
+The approved sandbox editor role is now assigned to John, Beth and Jean, with
+exactly five roster privileges verified after removing nine platform-added defaults.
+Existing roles and Production were unchanged. Evidence and limits:
+`docs/plans/data/expertise-roster/SANDBOX_PERMISSIONS_2026-11-10.md`.
+Consumer/matching integration remains uncommitted WIP in this worktree; preserve it.
+Focused unit tests pass, but live consumer proof is blocked because the Vercel SQL
+client cannot connect to the pinned local TCP fixture. A minimal rehearsal-only
+transport proposal awaits the owner; no full application rehearsal is claimed.
+Next: resolve that transport boundary, verify dependent consumers, signed-in staff
+writes/audit and linked-person lifecycle, then operational cutover/rollback.
+Justin approved the minimal matching contract: active explicitly lead-eligible staff
+with enabled User links only for lead; other active staff may be consulted; validated
+profile GUIDs; no lead when none qualify; expertise wording/scoring unchanged.
 The historical November 9 inventory reported
 39 roster rows, 10 healthy Contact links, 7 feedback references. Slot attendee maps are inherited from parent sessions; the reported missing-field
 issue was an inventory interpretation error, now resolved. TBD profile is excluded from migration while its numeric identity is retained for
 one verified historical feedback reference. Sandbox schema/keys and synthetic SQL
 cutover/rollback tests passed; see
-`docs/plans/data/expertise-roster/SANDBOX_REHEARSAL_2026-11-09.md`. No Production writes. Owner prompt approval and platform rehearsal
+`docs/plans/data/expertise-roster/SANDBOX_REHEARSAL_2026-11-09.md`. No Production writes. The minimal matching contract is owner-approved; platform rehearsal
 gates remain prerequisites; no Production schema or runtime has been deployed. The existing J27 stream below is
 preserved and has not been resumed by this planning task.
 

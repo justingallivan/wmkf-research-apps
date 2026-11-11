@@ -1,0 +1,8 @@
+{
+  "name": "WMKF Expertise Roster Editor - Sandbox",
+  "description": "Owner-approved sandbox rehearsal role. Edit Expertise Profiles without Delete, Assign or Share. Existing application access and roles remain authoritative.",
+  "businessUnit": "root",
+  "privileges": [
+    { "table": "wmkf_expertiseprofile", "depth": "Global", "ops": ["Create", "Read", "Write", "Append", "AppendTo"] }
+  ]
+}

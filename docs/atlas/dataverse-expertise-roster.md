@@ -1,6 +1,6 @@
 # Atlas: Expertise Profile (sandbox preparation)
 
-**Last verified:** 2026-11-10 (full sandbox import and stable replay readback).
+**Last verified:** 2026-11-10 (full sandbox import, stable replay, sandbox role readback).
 
 `wmkf_expertiseprofile` / `wmkf_expertiseprofiles` is provisioned in sandbox
 `orgd9e66399.crm.dynamics.com` for the roster migration. It is not a Production
@@ -12,7 +12,13 @@ Owner mapping decisions: `docs/plans/data/expertise-roster/OWNER_MAPPING_DECISIO
 Three Active alternate keys cover `wmkf_creationkey`, nullable `wmkf_contactguid`
 (text) and nullable `wmkf_staffuser` (User lookup). Native optimistic concurrency
 is enabled. Table-level auditing was enabled with a table-scoped metadata update.
-Complete actor attribution/audit-event/permissions validation remains a release gate.
+The owner-approved sandbox role is assigned to John, Beth and Jean with exactly
+Create, Read, Write, Append and Append To on this table. Nine platform-added default
+privileges were removed from this new role; exact role privileges and assignments
+were read back. No Delete, Assign or Share grant was added. Existing roles and
+Production were unchanged. Signed-in staff writes and native actor attribution
+remain release gates; effective grants alone do not prove those flows. See
+`docs/plans/data/expertise-roster/SANDBOX_PERMISSIONS_2026-11-10.md`.
 
 The November 10 canary first exposed inactive-create and empty/null issues.
 Fable-reviewed repair `83cf6c93c` created an inactive synthetic profile atomically.
