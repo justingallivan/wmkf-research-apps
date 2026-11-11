@@ -43,3 +43,11 @@ it('does not accept an audit token belonging to another prompt name', async () =
   await expect(publishPrompt(args())).rejects.toMatchObject({ body: { status: 'idempotency_key_reuse' } });
   expect(adapter.create).not.toHaveBeenCalled();
 });
+
+it('preview and publication both accept hyphenated frozen record names', async () => {
+  const p = { ...profile, recordNames: ['pi-name'] };
+  listSettingsWithMetaStrict.mockResolvedValue({ 'executor.profiles.proposal.v000001': { value: JSON.stringify({ schemaVersion: 1, profile: p, sha256: hashProfile(p), requestId: id, publishedAt: '2026-11-11T00:00:00Z' }) } });
+  const metadata = JSON.parse(variables); metadata.execution.profile.sha256 = hashProfile(p); metadata.variables[1].name = 'pi-name';
+  await expect(createPrompt({ ...args(), body: 'Summarize for {{pi-name}}.', variables: JSON.stringify(metadata) })).resolves.toMatchObject({ status: 'completed' });
+  expect(adapter.create.mock.calls[0][0].wmkf_ai_promptvariables).toContain('pi-name');
+});
