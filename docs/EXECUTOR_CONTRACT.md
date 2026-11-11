@@ -669,10 +669,14 @@ before rechecking the actor and preserves receipts. See the
 `ProposalNarrative_1003384.pdf` is the unique accepted alias in Request 1003384's
 active AI Materials folder. Preparation passed the candidate profile's limits
 and the source remained current. The PI name comes from the populated
-Dataverse Project Leader record. Scoped configuration, actor and storage
-preflight and explicit publication and application API-spend approval precede
-activation. The probe made no provider calls or writes. See the
-[staff trial source receipt](plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md#verified-owner-uploaded-trial-source).
+Dataverse Project Leader record. The owner separately approved the live
+service-level trial. Preflight verified the actor, and the canonical
+migration runner applied only 097. The Admin services published one profile
+revision and both v1 task rows. The local trial used process-scoped
+configuration. Its second invocation reused the cached document prefix.
+The summary passed format validation and needs attribution review. The
+Methodology reached the output cap and was rejected. Both AI-run audits
+were delivered. The Workbench, Admin and cron HTTP endpoints remain undeployed. See the [staff trial receipt](plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md#authorized-live-trial).
 
 ### Admin authoring and sample preview
 

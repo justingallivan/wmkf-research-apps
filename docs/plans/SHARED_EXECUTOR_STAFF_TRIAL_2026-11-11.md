@@ -1,12 +1,12 @@
 # Staff drafts and controlled proposal trial
 
-The staff workflow passed local verification on the isolated branch. The Opus 5.5 follow-up verdict was READY. The owner-uploaded narrative for Request 1003384 passed a read-only run of the source adapter. Live generation awaits scoped configuration, actor and storage preflight, then explicit publication and application API-spend approval. No deployment or Request field writes are part of this slice.
+The staff workflow passed local verification on the isolated branch. The Opus 5.5 follow-up verdict was READY. The owner-approved live trial for Request 1003384 retained an Executive Summary that passed format validation and needs staff review for PI attribution. The Methodology hit the output-token limit and failed validation. The second call reused the cached proposal prefix. The trial made no Request-field writes or deployment.
 
 ## Surface and review
 
 [BRANCH-BUILT] Staff Proposal tab → authenticated Workbench job routes → server-owned trial policy/source adapter → existing PostgreSQL Executor ledger → bounded worker → separately authorized validated-result reads. Persistence uses migration 097's existing six tables; Dataverse supplies pinned prompt/profile definitions and receives content-free AI-run audit records only after explicit trial approval. Existing legacy summary paths remain consumers of their existing fields.
 
-Prior findings: Opus 5.5 plan review (`/private/tmp/wmkf-staff-workflow-plan-review.json`) returned READY WITH NAMED CHANGES. Its required changes are captured below. Review model usage was exclusively `claude-opus-5-5` through Claude subscription OAuth. No application inference has run.
+Prior findings: Opus 5.5 plan review (`/private/tmp/wmkf-staff-workflow-plan-review.json`) returned READY WITH NAMED CHANGES. Its required changes are captured below. Review model usage was exclusively `claude-opus-5-5` through Claude subscription OAuth. This design review preceded application inference.
 
 ## Implementation invariants
 
@@ -31,7 +31,7 @@ Prior findings: Opus 5.5 plan review (`/private/tmp/wmkf-staff-workflow-plan-rev
 
 [BRANCH-BUILT] Trial activation defaults off. Configuration binds one trial UUID, one Request GUID and one authenticated staff profile/system-user identity. Environment derives from deployment and actual Dataverse target classification. Only local-production, local-sandbox and preview-sandbox are permitted; deployed production and unknown targets fail closed. A separate stable server nonce secret seals prepared snapshots. Trial activation and cron scheduling are not committed as live configuration.
 
-[BRANCH-BUILT] Source adapter uses strict complete SharePoint resolution, a unique active AI Materials location, bounded download with identity/version checks before and after, and exact source/PI comparison before each dispatch. Manifest stores identity and hashes; snapshot stores source text. The owner authorized scoped Request 1003384 and related document inspection; those reads are recorded below. Prompt/profile publication, two Anthropic application calls, and content-free audit writes still require a concrete trial approval. Ordinary Opus OAuth development reviews are already authorized and do not substitute for application model-cost consent.
+[BRANCH-BUILT] Source adapter uses strict complete SharePoint resolution, a unique active AI Materials location, bounded download with identity/version checks before and after, and exact source/PI comparison before each dispatch. Manifest stores identity and hashes; snapshot stores source text. The owner authorized scoped Request 1003384 and related document inspection; those reads are recorded below. The owner separately approved the scoped trial publication, application calls and content-free audit writes. The design reviews used Claude subscription OAuth.
 
 ## Initial read-only Request 1003384 inspection
 
@@ -67,32 +67,142 @@ name did not appear in the extracted text, so PI identity remains sourced
 from Dataverse. This narrative supplies the material needed for both tasks.
 
 The probe persisted no snapshot or job, made no provider call, and wrote no
-configuration, audit or Request data. Live execution still requires the
-scoped preflight and explicit approval.
+configuration, audit or Request data. That read-only probe preceded the separately authorized live trial.
 
-## Proposed live trial
+## Authorized live trial
 
-After scoped configuration, actor and storage preflight, the proposed run
-would publish one profile revision and two task versions, activate one
-cohort for Request 1003384, and use the uploaded file version verified above.
-It would make at most two Sonnet 4.6 application calls at 1,536 output
-tokens each, retain validated Executive Summary and Methodology drafts, and
-write content-free AI-run audit records. The run has no Request-field
-writeback or deployment step. Publication, activation, application API spend
-and audit writes still require explicit approval. The Opus 5.5 development
-reviews used separate Claude subscription OAuth.
+The owner approved one `local-production` trial for Request 1003384, including
+the ledger migration, profile/task publication, up to two Sonnet 4.6
+application calls at 1,536 output tokens each, retained validated drafts
+and content-free AI-run audit writes. The proposal SHA-256 above bound the
+approved source. The deployment and Request fields were outside the scope.
 
-[ESTIMATE 2026-11-11] The two calls are expected to cost well under $1 at
-Sonnet 4.6 rates of $3 per million input tokens, $15 per million output tokens,
-and $3.75 per million five-minute cache-write tokens. The estimate assumes
-both calls may write the cache and applies the full output-token allowance.
-Actual billing depends on provider token accounting. The code caps call
-count and output tokens. [Sonnet 4.6 pricing](https://platform.claude.com/docs/en/models/sonnet-4-6/overview), [cache pricing](https://platform.claude.com/docs/en/build-with-claude/prompt-caching#pricing).
+[VERIFIED via live preflight and admission, 2026-11-11] The configured current
+Superuser was profile `2`, mapped to Dynamics system user
+`29b0de0d-4ff7-ee11-a1fd-000d3a3621c7`. The owner's Claude OAuth account
+matched that profile. The configured application Postgres database lacked
+the six ledger tables. Comparing every migration filename with the tracker showed exactly
+`097_shared_prompt_jobs.sql` pending. A transactional DDL rehearsal rolled
+back cleanly. The canonical `scripts/apply-migrations.js` then applied exactly
+097 and skipped 94 recorded files. The shared profile catalog and both
+proposal task names were empty before publication.
+
+The service-level runner set trial configuration for its process. It left
+environment files and deployment configuration unchanged. Dataverse DAL and
+target interlocks stayed enabled. A short-lived rehearsal grant admitted
+collection POSTs for profile settings, prompt rows and AI-run audit rows.
+Request PATCH was denied by a pre-dispatch negative interlock check. The
+runner guarded the specific profile/task inputs and stable audit IDs,
+checked audit impersonation, and journaled at most two Sonnet Messages POSTs.
+The fetch guard covered HTTP writes. The ledger store used its own
+transactional Postgres connection for scoped job-state writes.
+One `proposal-staff-trial` profile revision and both v1 task rows were
+published through the existing Admin services.
+
+Cohort `6affca32-74e9-4628-ba7a-f4e43aa56b65` admitted job
+`4640cd5c-6112-473a-9217-e8a58b525384` at 18:35:20 UTC. Before admission the
+runner compared the exact approved document hash and calculated the canonical
+snapshot hash with the run's stable nonce. The saved snapshot matched
+`93684d56f4f4d87b477e230a3d303dd6810a84f0e2cc17e1e4b71a529d6baae8`
+before provider dispatch. The worker also rechecks the source manifest and
+actor before dispatch. The nonce and proposal and draft text are excluded
+from the repository.
+
+[PRE-RUN ESTIMATE 2026-11-11] The two calls were expected to cost well under $1
+at Sonnet 4.6 rates of $3 per million input tokens, $15 per million output
+tokens, and $3.75 per million five-minute cache-write tokens. The estimate
+assumed both calls could write the cache and used the full output-token
+allowance. Actual billing depends on provider token accounting. The code
+caps call count and output tokens. [Sonnet 4.6 pricing](https://platform.claude.com/docs/en/models/sonnet-4-6/overview), [cache pricing](https://platform.claude.com/docs/en/build-with-claude/prompt-caching#pricing).
+
+## Live generation outcome
+
+[VERIFIED via the scoped PostgreSQL receipt and provider usage, 2026-11-11]
+Both Sonnet 4.6 Messages POSTs returned HTTP 200. The worker saved both
+response checkpoints and ran the normal validator. One draft passed the
+format checks and remained available for staff review.
+
+| Task | Validation and retention | Uncached input | Output | Cache write | Cache read |
+|---|---|---:|---:|---:|---:|
+| Executive Summary | Format validated and retained for review. 199 words, 1,592 characters. | 370 | 337 | 21,507 | 0 |
+| Methodology | `failed_validation` / `claude_output_truncated`. Reached the 1,536-token cap. No validated draft. | 380 | 1,536 | 0 | 21,507 |
+
+The terminal job receipt is version 17, `needs_attention`. The scoped
+result read returned the retained Executive Summary. The status read
+reported the Methodology failure. Two audit POSTs returned HTTP 201, and
+both attempt receipts reached `delivered`. Readback verified the stable
+AI-run IDs, Request, v1 prompt rows, model, success/failure statuses and
+impersonation. The configured actor was `createdby`, and the service
+identity was `createdonbehalfby`. The rows carry the existing `Vercel User`
+run-source label. This was a local service run. The worker passed its
+closed, content-free payload plus the stable row ID to the audit transport.
+The final readback found the raw-output and prompt-override fields absent
+on both rows and verified the bounded status notes.
+
+| Task | Published v1 prompt ID | Dataverse AI-run ID |
+|---|---|---|
+| Executive Summary | `07203a95-fedd-f111-84ea-6045bd04539e` | `262a4fb2-af4a-4e8e-8ccd-d08f07008f93` |
+| Methodology | `43ea739a-fedd-f111-84ea-000d3a361c1f` | `7ba978ef-4ad5-4ae2-a402-77e8e16f0ea0` |
+
+Both receipts have complete usage. The Methodology call read the 21,507
+prefix tokens written by the Executive Summary call. This establishes
+cache reuse for this exact pair. The validation failure did not trigger a
+retry. The Executive Summary SHA-256 is
+`99bcdf42d3243f1b75e9a0bea4ae6bcfc6d27981688dc2c0861b87f5af443240`.
+
+Qualitative review of the retained draft found a PI-attribution problem. The
+scientific content was coherent, but the draft put the stored Project Leader
+name next to institution and co-investigator claims drawn from the proposal.
+The stored name did not appear in the PDF, and those relationships have
+not been verified for that person. The summary remains a draft. A proposed
+prompt-contract correction is to keep identity and affiliation claims out
+of the scientific draft and render the structured PI field separately.
+This finding provides no basis to change the Request's Project Leader.
+
+[ESTIMATE] The measured token usage prices to approximately **$0.11745**
+at the published Sonnet 4.6 rates above, including the $0.30 per million
+cache-read rate. Billing was not independently verified.
+
+## Scoped retention follow-up
+
+The temporary trial process ended and the gate returned to its default-off
+state. No scheduler was installed. The source and response content becomes
+eligible for physical deletion at 2026-11-12 18:35:20.575 UTC. Configuration,
+results and the deferred audit payloads become eligible on 2026-11-18
+at 18:35:20.575 UTC. The job, task and attempt receipts remain.
+
+At the next session after each deadline, Codex or the operator must run and
+verify the exact scoped cleanup. The runner matches the stored job ID under
+the four-part environment, principal, authorization and Request scope
+before deleting expired content. The command uses the retained private
+state and calls `expireContent` for this cohort only. It requires no
+Dataverse reads or active actor. Physical deletion has not yet been verified.
+
+```sh
+node scripts/run-proposal-trial-1003384.cjs --approved-request-1003384 expire /private/tmp/wmkf-proposal-trial-1003384
+```
+
+## Unpublished follow-up candidate
+
+The [corrected task inputs](SHARED_EXECUTOR_PROPOSAL_RETRY_CANDIDATE_2026-11-11.json)
+instruct both tasks to omit PI and personnel names and institutional or
+collaboration attributions. Methodology targets 300–350 words with a
+400-word validation ceiling. The candidate keeps profile revision 1,
+Sonnet 4.6 and the 1,536-token output budget. The shorter target is
+intended to leave room within the token budget.
+
+The current contract requires the frozen PI declaration and its
+`{{pi_name}}` placeholder. Admin preview rejected the candidate when the
+placeholder was omitted. Restoring it as context-only allowed both task
+inputs to pass offline validation. That checks configuration and the declared
+output contract. Live behavior of the corrected tasks is unverified. The one-shot
+runner is bound to the original v1 publication and cohort. The candidate
+is unpublished, and no further provider calls were authorized or made.
 
 ## Verification and review
 
-[VERIFIED via local commands] Final integrated proof passed **1,110 tests in 50 suites**, including three real PostgreSQL suites, after the Opus review fixes. The full application build and 25 scoped gates/self-tests passed. The staff panel passed desktop and 390px mocked-browser inspection with actual shared controls; narrow document scroll width was 390px. The unpublished candidate configuration in `SHARED_EXECUTOR_PROPOSAL_TRIAL_INPUTS_2026-11-11.json` passes the actual Admin preview validator with fabricated materials.
+[VERIFIED via local commands] Final integrated proof passed **1,110 tests in 50 suites**, including three real PostgreSQL suites, after the Opus review fixes. The full application build and 25 scoped gates/self-tests passed. The staff panel passed desktop and 390px mocked-browser inspection with actual shared controls; narrow document scroll width was 390px. The candidate configuration in `SHARED_EXECUTOR_PROPOSAL_TRIAL_INPUTS_2026-11-11.json` passed the actual Admin preview validator with fabricated materials before publication.
 
 Opus 5.5's build review requested a larger timing window. The staff worker now uses a 240-second coordination lease within a 300-second function limit, preserving the existing model timeout and persisted prompt output budget. Source expiry now terminates before preparation; a race at snapshot persistence also terminates. Known source admission failures have safe actionable responses. Discovery retries a version race. The drain reports terminal receipt state, and the CLI treats only `complete` as exit zero. Targeted and integrated regression tests pass. The [Opus review receipt](../audits/SHARED_EXECUTOR_STAFF_OPUS55_REVIEW_2026-11-11.md) records the READY follow-up, dispositions and verification limits.
 
-The branch remains undeployed. Live provider latency/cache reuse and Dataverse audit attribution remain unverified. Next, check the scoped configuration and profile/task versions, current actor, ledger storage and expiry handling. Obtain explicit approval for trial publication, activation, application API spend, and content-free audit writes before the live run. The source adapter rechecks the exact file and PI record before dispatch. Keep the configured cohort available for scoped 24-hour/seven-day expiry cleanup, or arrange explicit scoped cleanup before deactivating it. Never delete job or attempt receipts to reset the quota.
+The branch remains undeployed. The scoped run exercised the provider, cache, validator, result readback and impersonated audit delivery. Review the PI-attribution prompt contract and the Methodology length and token budget before any future live trial. A new live cohort or additional model calls require separate approval. Keep the private cleanup state until both expiry steps are verified.

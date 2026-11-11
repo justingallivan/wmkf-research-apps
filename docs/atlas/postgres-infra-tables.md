@@ -108,8 +108,9 @@ updated-by and modified-on are the only history (owner decision 2026-11-02).
 **Shared Executor profiles [BRANCH-BUILT, 2026-11-11]:** Admin stores
 create-only `executor.profiles.<key>.vNNNNNN` revisions in Dataverse using
 the existing settings table. Profile publication and fabricated preview
-have no Postgres persistence. Synthetic task publication uses the existing
-prompt audit. [Profile revision contract](dataverse-wmkf-ai-run-and-prompt.md#shared-executor-profile-publication).
+have no Postgres persistence. Versioned task publication uses the existing
+prompt audit. The approved Request 1003384 trial published one profile and
+two v1 proposal tasks through the Admin services. [Profile revision contract](dataverse-wmkf-ai-run-and-prompt.md#shared-executor-profile-publication).
 
 ## Dynamics Explorer state
 

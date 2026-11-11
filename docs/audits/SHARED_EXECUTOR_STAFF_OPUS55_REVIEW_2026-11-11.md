@@ -18,13 +18,50 @@ The full `npm run build` exited zero after the fixes. Scoped ESLint passed; the 
 
 The security/contract gate set comprises API routes, Atlas, document currency, canonical facts, document symbols, DAL, Dynamics contexts, route/service boundaries, prompt injection, GUID boundaries, and secret scanning, each followed sequentially by its self-test; docs catalog, migration manifest, and type checking also pass. All 25 checks passed again after the final documentation reconciliation. The owned scratch PostgreSQL container was removed after testing; other agents' containers were left untouched.
 
-The unpublished candidate profile/tasks pass the real Admin preview validator with fabricated material. They have not been published. No deployed application change, live application model call, Request field write, prompt/profile publication, or AI-run audit write occurred.
+The candidate profile/tasks passed the real Admin preview validator with fabricated material. This integrated local verification preceded publication and the live application trial. It made no deployment, Request field write or AI-run audit write.
 
 ## Authorized live-read boundary
 
 The initial owner-authorized inspection of Request 1003384 found a populated Project Leader and eight Submission-Documents files. The nominal narrative was a placeholder test application and the larger packet combined that application with assorted attachments. The owner later uploaded `ProposalNarrative_1003384.pdf` to AI Materials. A second owner-authorized read-only probe used the default adapter to verify the unique accepted alias, stable version and bounded preparation with the directly sourced PI record. The source policy stayed the same. Neither probe made a provider call or wrote data. See the [staff trial source receipt](../plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md#verified-owner-uploaded-trial-source).
 
-Actual model latency/cache use and Dataverse audit attribution remain unverified. Live execution requires scoped configuration, actor and storage preflight, including retention handling, followed by explicit approval for trial activation, publication, application API spend, and audit writes.
+These source probes preceded the separately approved live application trial and did not measure provider latency, cache use or audit attribution.
+
+## Live operation review and disposition
+
+The separate live operation review returned NEEDS NAMED CHANGES. Its primary
+model was Claude Opus 5.5. The JSON receipt also recorded a Claude Fable 5.2
+advisor inherited from the review configuration. This receipt is distinct
+from the two Opus-only development reviews quoted below and from the Sonnet
+4.6 application calls.
+
+| Finding | Disposition |
+|---|---|
+| Compare exact migration filenames and confirm the application database before applying 097 | Verified the exact pending set against the configured application Postgres target, rehearsed the DDL in a transaction and rolled it back, then applied only 097 through the canonical runner. The fresh-install concern is resolved by existing source. `scripts/setup-database.js` delegates to the manifest-backed fresh bootstrap. |
+| Scope local production Dataverse writes | Used the DAL and target interlocks with a short-lived process-only grant for collection POSTs to settings, prompts and AI runs. Verified Request PATCH was denied. The runner checks AI-run identity, Request and caller impersonation. |
+| Prove the exact reviewed document reaches dispatch | Verified the owner-approved file SHA-256 before admission. The runner compared the persisted canonical snapshot hash with the pre-admission value before dispatch. |
+| Complete and fence publication inputs | Used fixed task catalog titles, the verified profile ID and persisted publication UUIDs plus a stable admission key. The SQL-over-HTTP guard permits expected reads and the existing scoped publication and usage writes. |
+| Recover audit uncertainty and preserve retention scope | Reuse the stable audit ID for readback if delivery is uncertain. Content expiry operates on the exact cohort and leaves receipts intact. No automatic replay of uncertain provider or audit outcomes. |
+
+The operation review and the preflight did not themselves authorize application
+spend. The owner explicitly approved the bounded live trial separately.
+
+## Final live outcome review
+
+The targeted receipt review used Claude Opus 5.5 alone according to the
+review JSON's `modelUsage`. It confirmed **PARTIAL / `needs_attention`**,
+two approved provider calls, the cache hit, the truncation, and both
+audit attributions. The qualitative PI-attribution finding remains a
+quality failure. The reviewer assessed the receipt and candidate
+configuration without reading the PDF or draft text.
+
+| Finding | Disposition |
+|---|---|
+| The reviewer saw an older audit receipt without the content checks | The final read-only inspection confirmed absent raw output and prompt override on both rows and the bounded audit notes. The earlier receipt was read while inspection was completing. |
+| A conditional snapshot-hash check could skip an empty value | The first worker tick prepares and returns. Migration 097 requires the snapshot ID and hash to be populated together, and `saveSnapshot` freezes them. The live stored hash matched the approved hash before dispatch. The runner now requires and records the matching pair after preparation. |
+| The HTTP fetch guard does not govern the job store's database connection | Recorded the distinct boundaries. The fetch guard covers HTTP writes, and the scoped ledger uses its own Postgres transactions. |
+| The one-shot runner cannot publish the retry candidate | Intentional. The runner is bound to the original profile and v1 task creates for this cohort. A future versioned update and another cohort would require separate approval and a reviewed operation. |
+| Scoped expiry should confirm the exact persisted job | Cleanup checks the stored job ID under the full cohort scope and remains available after actor revocation. Codex or the operator owns the two dated manual cleanup steps in the [retention receipt](../plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md#scoped-retention-follow-up). |
+| Consider removing the PI name placeholder | The actual preview rejected the candidate without the required frozen-record placeholder. It was restored as context-only with output restrictions. Both unpublished candidate inputs passed offline validation. The 400-word ceiling is a planned buffer, and live generation behavior remains unverified. |
 
 ## First Opus review — verbatim
 
@@ -181,4 +218,4 @@ Owner: Codex orchestrator. Branch: `codex/coordinated-start-2026-11-10-b`, isola
 
 Status: staff workflow, source adapter, controlled runner, Admin capability extension and scoped SQL reads/quota/expiry are committed and verified locally. Runtime closure is `5652c96dd`; follow-up evidence is this receipt. No push, merge, deployment, live generation, or Request write occurred. Documentation is committed with the receipt; the final worktree check must be clean.
 
-Next action: complete scoped configuration, actor and storage preflight for Request 1003384, then prepare the exact trial publication, activation, application API-spend and audit-write approval. The uploaded narrative has passed read-only preparation under the current AI Materials policy.
+The owner-approved service-level trial used the verified narrative and process-scoped activation. It exercised two application calls and cache reuse. The Executive Summary passed format validation and requires PI-attribution review. The Methodology hit the output-token limit and failed validation. See the [live trial outcome](../plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md#live-generation-outcome).

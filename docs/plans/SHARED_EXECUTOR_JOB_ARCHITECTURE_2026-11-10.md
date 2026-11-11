@@ -1,6 +1,6 @@
 # Shared Executor and durable prompt jobs
 
-Status: **SYNTHETIC FOUNDATION, ADMIN AUTHORING, AND DEFAULT-OFF STAFF PROPOSAL DRAFT TRIAL BUILT ON THE BRANCH.** The synthetic and Admin increments have local integration evidence. The staff trial passed local integrated verification and read-only source preparation. Activation awaits scoped preflight and approval. Production integration remains planned.
+Status: **SYNTHETIC FOUNDATION, ADMIN AUTHORING, AND DEFAULT-OFF STAFF PROPOSAL DRAFT TRIAL BUILT ON THE BRANCH.** The synthetic and Admin increments have local integration evidence. The staff trial passed local integrated verification and read-only source preparation. The owner-approved Request 1003384 live trial used a controlled local process. Deployed staff and Power Automate integration remain planned.
 Owner: Justin. Design branch: `codex/coordinated-start-2026-11-10-b`.
 Evidence baseline: `a20e5f749`; source inspected on 2026-11-10 Pacific.
 
@@ -10,23 +10,23 @@ Keep task instructions in the shared Dataverse prompt library. Add an opt-in exe
 
 Power Automate owns when to request work and what business follow-up to perform. The backend owns authorized document resolution, frozen inputs and configuration, model execution, retained results and conditional writeback. This is a bounded request/task runner, not a general workflow designer or a second PA model implementation.
 
-The owner chose one backend Executor in the [Session 673 handoff](PREFLIGHT_PROMPTS_HANDOFF_2026-11-10.md). Sections marked [PLANNED] describe the broader integration. Branch evidence covers internal synthetic execution, Admin authoring, and the narrowly scoped staff draft implementation. The owner authorized read-only inspection and preparation of the uploaded narrative for Request 1003384. Trial activation, live writes, publication, application inference, and deployment remain outside the verified work.
+The owner chose one backend Executor in the [Session 673 handoff](PREFLIGHT_PROMPTS_HANDOFF_2026-11-10.md). Sections marked [PLANNED] describe the broader integration. Branch evidence covers internal synthetic execution, Admin authoring, and the narrowly scoped staff draft implementation. The owner authorized a one-cohort live trial for Request 1003384 after read-only source preparation. The local service run applied migration 097 and published the pinned profile and task rows. Deployment and Request-field writes were outside scope.
 
 ## Owner decisions for autonomous work
 
 [OWNER DECIDED in chat, 2026-11-10] Pilot tasks are Executive Summary and Methodology. Executive Summary is staff-facing, at most 200 words, covering hypothesis, innovation, approach, what is tested and potential impact. Inputs vary by task: applicant-submitted documents or assemblages of them, plus named Dataverse fields for directly stored PI information. Structured PI values take precedence over document inference; missing fields remain missing unless the task explicitly permits an identified inference. Request fields are the intended output destination; not every production field must be assigned to prove the architecture.
 
-Authorized work: implement and commit on this branch, local tests and synthetic trial writeback, OAuth adversarial plan/build reviews (initially Claude Fable; changed by the owner to Opus 5.5 on 2026-11-11), and scoped Sol/Luna/Terra subagents at the orchestrator’s discretion. No merge, deployment, production configuration/schema/data change, or live prompt publication. Paid provider tests are not authorized. The orchestrator may end review iteration when material issues are resolved and further rounds are unlikely to improve correctness.
+Authorized work: implement and commit on this branch, local tests and synthetic trial writeback, OAuth adversarial plan/build reviews (initially Claude Fable; changed by the owner to Opus 5.5 on 2026-11-11), and scoped Sol/Luna/Terra subagents at the orchestrator’s discretion. The original build authorization excluded merge, deployment, production changes, live publication and provider spend. The owner subsequently approved one Request 1003384 live trial, limited to migration 097, one profile and two task versions, at most two paid application calls, and related content-free audit writes. The orchestrator may end review iteration when material issues are resolved and further rounds are unlikely to improve correctness.
 
 ## Contract surface
 
 | Concern | Source and planned boundary |
 |---|---|
 | Entry points | [BRANCH-BUILT] Admin profile/task authoring and fabricated preview, default-off staff draft submit/status/results routes, and an unscheduled single-stage drain endpoint. [PLANNED] Staff recovery, separate PA submit/status, and scheduling. |
-| Persistence | [BRANCH-BUILT] Dataverse profile revisions and versioned task rows use existing settings/prompt entities and the task publisher’s existing audit table. The synthetic and staff draft workers use migration 097 ledgers and bounded PostgreSQL content. The staff adapter can deliver content-free audit under the current actor. [PLANNED] Real Request-field writeback and live adapter verification. |
+| Persistence | [BRANCH-BUILT] Dataverse profile revisions and versioned task rows use existing settings/prompt entities and the task publisher’s existing audit table. The synthetic and staff draft workers use migration 097 ledgers and bounded PostgreSQL content. The staff adapter delivers content-free audit under the current actor. The approved local trial applied migration 097 and published the trial definitions. [PLANNED] Real Request-field writeback. |
 | Consumers | [BRANCH-BUILT] Admin, exact profile/task validation, synthetic worker and fixture writer, staff Proposal tab, scoped status/results service, and trial worker. [PLANNED] PA polling and real destination readers. |
 | Prior findings | Cross-task document caching absent; frozen prompt seam already exists; audit failure can hide a generated result; output destinations and input sets remain undecided |
-| Scope | The branch includes a synthetic fixture, Admin authoring, and a default-off one-cohort staff draft trial. Read-only preparation verified the owner-uploaded narrative under the current policy. Scoped preflight and explicit approval for live publication and application API spend remain pending. See the [staff trial plan](SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md). |
+| Scope | The branch includes a synthetic fixture, Admin authoring, and a default-off one-cohort staff draft trial. The owner-approved local trial used the read-only verified narrative and the same source policy. Its configuration was process-scoped. See the [staff trial plan](SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md). |
 
 ```mermaid
 flowchart LR
@@ -89,8 +89,8 @@ document roles, record names, a wrapper version, and bounded input limits.
 The publication envelope records its canonical SHA-256, request UUID, and
 publication timestamp. Authoritative document resolution, extraction policy,
 and Dataverse field mappings belong to code-owned source adapters. The
-candidate staff proposal adapter is [BRANCH-BUILT] and awaits trial source
-approval. These policies are outside the editable JSON.
+staff proposal adapter used the approved Request 1003384 narrative in the
+controlled live trial. These policies are outside the editable JSON.
 
 Task publication resolves the exact profile key, revision, and hash.
 Publishing a new profile revision leaves prior task pins intact. Moving a
@@ -346,10 +346,11 @@ admission defaults off. Its one actor and Request, exact environment allowlist,
 stable nonce secret, and unscheduled cron guard are recorded in the
 [Credentials Runbook](../CREDENTIALS_RUNBOOK.md#optional--shared-executor-staff-draft-trial).
 The drain deletes only expired content in the exact configured scope, before
-checking whether the actor still has access. An operational cleanup run awaits
-rollout. Receipts survive content expiration.
+checking whether the actor still has access. The approved Request 1003384
+trial has two operator cleanup deadlines and retains its receipts. See the
+[retention receipt](SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md#scoped-retention-follow-up).
 
-Proposed broader temporary-content retention: seven days for source snapshots/raw response checkpoints, thirty days for validated unpublished results. Freeze retention at admission; do not extend it silently on polling. Before source expiry, pending work becomes expired/needs_attention rather than re-extracting a changed source. Published artifacts follow the destination's own policy. The Postgres driver expires exact content rows while retaining references/receipt metadata. A future Blob driver must delete only exact persisted object keys, never broad prefixes.
+Proposed broader temporary-content retention: seven days for source snapshots/raw response checkpoints, thirty days for validated unpublished results. Freeze retention at admission; do not extend it silently on polling. At source expiry, pending work becomes expired/needs_attention rather than re-extracting a changed source. Published artifacts follow the destination's own policy. The Postgres driver expires exact content rows while retaining references/receipt metadata. A future Blob driver must delete only exact persisted object keys, never broad prefixes.
 
 Retain content-free job/idempotency/initialization/uncertainty receipts independently. No automatic tombstone deletion in the pilot; unique keys and per-principal admission quotas bound new creation, and volume is monitored. Uncertainty never expires back into eligibility. Future metadata archival must preserve replay protection. Missing retained bytes produces an explicit expired-result outcome; it does not silently regenerate. Before enabling a larger rollout, owner approves retention and capacity/cost limits.
 
@@ -360,7 +361,7 @@ Record prompt/profile/context hashes; concrete model; provider attempt and audit
 1. **Synthetic profile and authoring foundation [BRANCH-BUILT]:** strict Admin publication and fabricated preview, profile composer and prepared-context guard. Production task authoring requires an approved runtime capability.
 2. **Synthetic durable foundation [BRANCH-BUILT]:** migration 097, content references, job/attempt/publication ledgers, checkpoint recovery, and worker. The scoped staff draft slice reuses these tables for status/results without enabling a Request-field writer.
 3. **PA admission:** Entra service policy, submit/status routes and no-model authentication/duplicate-delivery proof with Connor. Prove foreign tenant, wrong audience, role-less/delegated token, revoked local principal and cross-request job access denial.
-4. **Two-task pilot:** The synthetic fixture proves shared context and initialize-once fixture writeback. The default-off staff proposal draft implementation uses one candidate proposal PDF plus the direct PI name and has no Request-field destination. The owner-uploaded narrative passed read-only preparation. Scoped configuration, actor and storage preflight, exact prompt/profile publication, and live execution and model-cost approval remain pending. Enable real destinations individually after mapping and writeback approval.
+4. **Two-task pilot:** The synthetic fixture proves shared context and initialize-once fixture writeback. The default-off staff proposal draft implementation uses one candidate proposal PDF plus the direct PI name and has no Request-field destination. The owner-uploaded narrative passed read-only preparation. The approved live trial passed scoped preflight and exercised two provider calls. It retained a format-validated Executive Summary requiring PI-attribution review and rejected the truncated Methodology. Enable real destinations individually after mapping and writeback approval.
 5. **Controlled rollout:** new admission off by default, synthetic end-to-end app and PA delivery, then explicitly authorized metered cache/quality measurement. Migrate remaining tasks individually. No automatic rerun on file replacement.
 
 Required tests include identical prefix bytes across two tasks and app/PA callers; changed document/profile/native schema/model separation; missing/ambiguous/oversized/untrusted inputs; duplicate admission and simultaneous claim; source/permission change; worker death before dispatch, after dispatch, after response checkpoint and after remote write; audit failure after valid output; expired lease and late response; invalid raw prose/JSON/refusal/truncation; partial tasks; staff edit/clear; initialization under new event/prompt ids; expired retained content with surviving tombstone; polling/navigation races; and unknown enum handling. Real SQL tests must exercise unique constraints/locks, not mock them.
@@ -394,7 +395,7 @@ Initial synthetic foundation contract-reconcile scope: the caller was a server-o
 
 Documentation reconciliation boundary: a bounded `/sweep` reconciled the active Executor, system, storage, backend automation, lifecycle, chaining and related memory documents with the owner's single-backend direction (commit `48f82e542`). Historical dated handoffs remain historical. That pass records the approved direction. The Executor contract, Atlas, route matrix, and service catalog separately document the local synthetic and Admin increments.
 
-Settled for the synthetic pilot: Executive Summary and Methodology, staff summary brief, mixed document/Dataverse inputs and Request-field writeback. Before enabling real tasks: exact task-specific input roles/field mappings, real output field mappings and initialization policy, and retention/capacity defaults. Integration proof needed: Connor's app-only token acquisition and destination service identity. These did not prevent building the synthetic profile/job foundation, but they prevent enabling real tasks.
+Settled for the synthetic pilot: Executive Summary and Methodology, staff summary brief, mixed document/Dataverse inputs and Request-field writeback. Before enabling real tasks: exact task-specific input roles/field mappings, real output field mappings and initialization policy, and retention/capacity defaults. Integration proof needed: Connor's app-only token acquisition and destination service identity. These did not prevent building the synthetic profile/job foundation, and they remain prerequisites for general rollout beyond the controlled staff trial.
 
 
 ## 12. Synthetic build invariants
@@ -418,7 +419,7 @@ Settled for the synthetic pilot: Executive Summary and Methodology, staff summar
 
 The implemented local proof uses `synthetic.executive-summary` and `synthetic.methodology` in `environment:test`, mapping only to `fixture_summary` and `fixture_methodology`. Those labels are not Dataverse schema fields. The test uses the canonical Executor and real PostgreSQL, with synthetic provider, source/auth, audit and conditional writer adapters. The Admin preview route composes a sample and exposes no job admission or provider call.
 
-Remaining integration work: preflight scoped staff configuration, actor and storage, prove staff operation and stable-identity audit under approved live execution, finalize broader source and destination mappings, implement Entra/PA admission and polling, and prove the conditional Dataverse writer. Published limits, global capacity/rate bounds, scheduler and cleanup wiring, operator recovery, and separately authorized real quality/cache measurement remain planned. The synthetic store retains uncertainty receipts and exposes bounded content expiry, but has no automatic receipt purge or operator resolution command. These are rollout requirements, not reasons to add speculative machinery to the local proof.
+Remaining integration work: finalize broader source and destination mappings, implement Entra/PA admission and polling, and prove the conditional Dataverse writer. Published limits, global capacity/rate bounds, scheduler and cleanup wiring, operator recovery, and separately authorized quality/cache measurements beyond the single controlled trial remain planned. The synthetic store retains uncertainty receipts and exposes bounded content expiry, but has no automatic receipt purge or operator resolution command. These are rollout requirements, not reasons to add speculative machinery to the local proof.
 
 
 ## 13. Initial verification and handoff (2026-11-10)
@@ -485,11 +486,14 @@ No live writes, provider inference, or deployment were part of that run.
 [VERIFIED via branch source] The default-off trial reuses the same Executor,
 six-table ledger and bounded worker. It adds an approved-scope gate, candidate
 source adapter, two proposal task keys, staff admission/status/results routes
-and a strictly authenticated, unscheduled drain. Each job produces retained
-drafts. It has no Request-field writeback path.
+and a strictly authenticated, unscheduled drain. It retains validated
+drafts and has no Request-field writeback path.
 
 Integrated local staff verification passed. The owner-uploaded narrative
-also passed read-only source preparation. Scoped configuration, actor and
-storage preflight and explicit approval for publication and application API
-spend remain pending. Operational retention and live execution are
-unverified. See the [staff trial plan](SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md).
+also passed read-only source preparation. The separately approved
+`local-production` trial used the canonical migration and the Admin and
+worker services directly. The second call read 21,507 cached prefix tokens.
+The Methodology hit its output cap. The retained Executive Summary passed
+format validation and needs attribution review. Both deferred audits were
+delivered and read back under the configured actor. The app routes remain
+undeployed. See the [staff trial plan](SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md).

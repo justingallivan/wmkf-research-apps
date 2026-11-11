@@ -53,11 +53,16 @@ invocations. Request linkage is present only when the Executor caller supplies
 - `lib/services/execute-prompt.js` `writeRunRow()` — legacy Executor
   audit attempt. Binds the prompt when resolved and the Request when
   supplied. Both navigation names are case-sensitive.
-- **[BRANCH-BUILT, synthetic]** The job worker handles deferred audit
+- **[BRANCH-BUILT]** The shared job worker handles deferred audit
   for validated results and classified validation failures. A confirmed
   provider rejection stays on the PostgreSQL attempt with audit state
   `none`. It creates no Dataverse AI-run row. See the [synthetic job
   ledger](postgres-prompt-jobs.md#synthetic-safeguard-follow-up-2026-11-11).
+- **[VERIFIED 2026-11-11 via scoped live write and readback]** The Request
+  1003384 trial delivered two deferred audit rows, one for a retained result
+  and one for a truncated response. Readback confirmed both stable IDs, the
+  v1 prompt and Request links, and current actor impersonation.
+  [Trial receipt](../plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md#live-generation-outcome).
 - `pages/api/phase-i-dynamics/summarize.js` — Phase I summarization
 - `pages/api/grant-reporting/extract.js` — Grant Reporting extraction and goals assessment; writes a best-effort `wmkf_ai_run` audit row, not extracted values to `akoya_request` (`lib/services/grant-reporting/extract-service.js`)
 - `scripts/probe-impersonation-resmoke.js`, `scripts/probe-impersonation-as-user.js` — write sentinel rows during impersonation testing (S135). Filter `wmkf_ai_model='impersonation-resmoke'` to find them.
@@ -70,7 +75,7 @@ An audit row binds the resolved prompt when available. Request-bound producers
 supply the request link.
 Migration plans touching either entity must preserve these foreign keys.
 
-**Migration disposition:** the Dataverse AI-run entity stays in Dataverse. The branch-built synthetic PostgreSQL job ledger separately records attempt and audit-delivery state. Dynamics Explorer treats `wmkf_ai_run` as an operational log, not business data: `isOperationalLogTable` in `lib/services/dynamics-explorer/result-shaping.js` (matching against `OPERATIONAL_LOG_TABLES = new Set(['wmkf_ai_run', 'wmkf_ai_runs'])`) backs both `tools/describe-table.js`'s denial of direct schema requests for the table and `tools/composite.js`'s stripping of `wmkf_ai_run` hits from Dataverse Search results before tool output reaches Claude — moved out of the former `pages/api/dynamics-explorer/chat.js` monolith at S2 (result-shaping) and S5 (describe-table, composite) of the chat-service-extraction plan (2026-09-19).
+**Migration disposition:** the Dataverse AI-run entity stays in Dataverse. The PostgreSQL prompt-job ledger separately records attempt and audit-delivery state. Dynamics Explorer treats `wmkf_ai_run` as an operational log, not business data: `isOperationalLogTable` in `lib/services/dynamics-explorer/result-shaping.js` (matching against `OPERATIONAL_LOG_TABLES = new Set(['wmkf_ai_run', 'wmkf_ai_runs'])`) backs both `tools/describe-table.js`'s denial of direct schema requests for the table and `tools/composite.js`'s stripping of `wmkf_ai_run` hits from Dataverse Search results before tool output reaches Claude — moved out of the former `pages/api/dynamics-explorer/chat.js` monolith at S2 (result-shaping) and S5 (describe-table, composite) of the chat-service-extraction plan (2026-09-19).
 
 ## `wmkf_ai_prompt`
 
@@ -420,10 +425,10 @@ keys or malformed publications. The tracked
 key on `wmkf_settingkey`. Live metadata and index status are unprobed
 for this slice.
 
-The Admin route's GET reads revision history and the two synthetic task
-capabilities. POST reads the exact pinned revision and builds a fabricated
-preview with no provider call or writes. Synthetic task publication
-still writes `wmkf_ai_prompt` and the existing Postgres
+The Admin route's GET reads revision history and the synthetic and proposal
+task capabilities. POST reads the exact pinned revision and builds a fabricated
+preview with no provider call or writes. Versioned task publication
+writes `wmkf_ai_prompt` and the existing Postgres
 `prompt_publish_audit`. The prompt variables JSON pins the profile key,
 revision, and hash and declares prepared document context and permitted
 frozen records. Legacy automatic override declaration is skipped for a
@@ -431,12 +436,14 @@ marked row. Admin create and update validate the exact pin and mode
 before mutation. The publisher requires a UUID for both operations and
 the expected prompt version for updates.
 
-The synthetic job persists the supplied profile body and its hash in
-frozen job configuration. Runtime and checkpoint recovery read that
-snapshot. Later profile publication does not advance existing pins. This
-branch documents authoring and a synthetic consumer. Live profile/task
-publication, authoritative source selection, and real writeback have no
-proof in this increment. See the [Executor contract](../EXECUTOR_CONTRACT.md#admin-authoring-and-sample-preview).
+Jobs persist the supplied profile body and its hash in frozen configuration.
+Runtime and checkpoint recovery read that snapshot. Later profile publication
+does not advance existing pins. [VERIFIED 2026-11-11 via controlled live service
+publication] The approved Request 1003384 trial created one revision at
+`executor.profiles.proposal-staff-trial.v000001` and v1 rows for the two
+proposal tasks. The Admin HTTP route remains branch-only. The trial used
+the owner-uploaded narrative and retained one format-validated draft for
+review without writing Request fields. See the [staff trial receipt](../plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md#authorized-live-trial).
 
 ## `prompt_publish_audit` (Postgres — append-only)
 
