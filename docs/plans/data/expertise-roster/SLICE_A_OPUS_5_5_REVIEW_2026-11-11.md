@@ -5,8 +5,8 @@
 [VERIFIED via the archived review transcript below] The owner-authorized OAuth
 Opus 5.5 review returned **READY for Slice A**, with no material blockers.
 The reviewer read source only and did not rerun tests or the build. The earlier
-97-test run and build are separate checkpoint evidence. The full build predates
-the follow-up fixes and was not rerun for them.
+97-test run and build are separate checkpoint evidence.
+[VERIFIED via `outputs/roster-opus-fixes-build.log`] A fresh full build passed after the Slice A fixes at checkpoint `3a58a32e5`.
 
 The owner switched this roster continuation's future plan/build reviews to OAuth
 Opus 5.5. This is the session's reviewer choice, not a new repository policy or
@@ -20,12 +20,13 @@ SQL tests with unchanged public fingerprints. Types and scoped lint passed, and
 the coordinating session reviewed the final diffs. The review loop is closed with
 no material blockers; no additional Opus cycle was run for these low-severity fixes.
 The transcript's stated coverage gaps remain explicit limits of that source review.
-Slice B planning is underway; its rollback implementation is not built.
+The coordinating session accepted Slice B plan revision 2 after source verification;
+rollback is source-built and has an Opus 5.5 READY source review; both named regression gaps are closed and the review cycle is complete without material blockers.
 
 Historical review attempts: both preceding Fable runtime/phase reviews exited
 with "out of usage credits" and did not complete. That failure remains historical;
 the Opus source review supersedes the current review-blocked status.
-Slice B rollback is not built. Public phase execution, Production readiness and
+Rollback reconciliation is source-built for disposable schemas and has an Opus 5.5 READY source review; both named regression gaps are closed and the review cycle is complete without material blockers. Public phase execution, Production readiness and
 independent browser/SSO verification are not established by this review.
 
 Source transcript: `outputs/roster-slice-a-opus-5-5-review-1.md`, preserved verbatim

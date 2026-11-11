@@ -125,14 +125,44 @@ low-severity findings. Those four findings and the receipt-directory fsync nit a
 fixed. The final combined run passed 109 tests across five suites, including isolated
 SQL tests with unchanged public fingerprints; types and scoped lint passed. The
 coordinating session reviewed the final diffs and closed the review loop without
-another Opus cycle. The reviewer did not rerun tests or the build, and the earlier
-full build predates these follow-up fixes. Slice B planning is underway, not its
-implementation. See the full
+another Opus cycle. The reviewer did not rerun tests or the build.
+[VERIFIED via `outputs/roster-opus-fixes-build.log`] A fresh full build passed after the Slice A fixes at checkpoint `3a58a32e5`.
+The coordinating session accepted Slice B plan revision 2 after source verification;
+rollback is source-built and has an Opus 5.5 READY source review; both named regression gaps are closed and the review cycle is complete without material blockers. See the full
 [archived review and disposition](SLICE_A_OPUS_5_5_REVIEW_2026-11-11.md).
-Rollback reconciliation is not built. No control table or phase is applied to public, and the CLI refuses
+Rollback reconciliation is source-built for disposable schemas and has an Opus 5.5 READY source review; both named regression gaps are closed and the review cycle is complete without material blockers. No control table or phase is applied to public, and the CLI refuses
 public before connecting. Abandoning an uncertain create via explicit Cancel remains
 an accepted disposable-schema dead end; there is no force-clearing repair command.
 See `ALLOCATOR_CUTOVER_DESIGN_2026-11-10.md` for the accepted boundaries.
+
+## Slice B rollback implementation checkpoint
+
+[VERIFIED via the coordinating session's source review and test results] Rollback
+reconciliation is source-built for disposable schemas and has an Opus 5.5 READY source review; both named regression gaps are closed and the review cycle is complete without material blockers. The final combined run passed 103/103 tests across five suites under non-UTC
+process and SQL session time zones, including 28/28 rollback tests.
+Public fingerprints remained unchanged. Types, scoped lint, Atlas and DAL gates
+passed, as did the DAL and Atlas self-tests. The fresh Slice B full build passed
+(`outputs/roster-rollback-build.log`); Opus returned READY with no requested source fixes. Both named test gaps are closed. The coordinating session reviewed the added
+tests and closed the review cycle with no material blockers. Source is unchanged
+at `6b2c2704e`, so the prior full build remains current; no further Opus round
+is needed for the test-only additions.
+
+Original audit columns remain physically untouched and are verified through SQL
+text, including sub-millisecond precision. The preexisting baseline capture uses
+Postgres Date/JSON millisecond precision: detecting an external freeze-bypassing
+audit-only change below that precision remains a limitation. Different process
+time zones between prepare and rollback safely refuse on the frozen-source check. This does not weaken
+the physical preservation claim or establish control over external writers.
+See [the accepted rollback contract](ROLLBACK_RECONCILIATION_DESIGN_2026-11-11.md).
+The [Opus build review](ROLLBACK_BUILD_OPUS_5_5_REVIEW_2026-11-11.md) of `6b2c2704e`
+requested no source fixes. Tests for baseline-quarantined-to-bound insertion and
+rebound identity-only ID 35 refusal passed. [VERIFIED via the coordinating
+session's source trace] Current legacy consumers tolerate null audit actors: the
+roster GET returns rows without actor joins/filters, page/components do not read
+those fields, Site Visit and feedback picker projections omit them, and matching's
+`buildRosterContext` ignores them. This is source evidence, not full browser/SSO
+verification.
+No public rollback, live Dataverse rollback or Production readiness is claimed.
 
 ## Historical Fable empty-text source review transcript
 

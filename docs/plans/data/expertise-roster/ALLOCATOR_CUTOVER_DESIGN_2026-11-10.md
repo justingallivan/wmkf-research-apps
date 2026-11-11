@@ -33,10 +33,10 @@ OAuth Opus 5.5 source review returned READY with no material blockers; it did no
 rerun tests or the build. Its four low-severity findings and receipt-fsync nit are
 fixed; the final 109-test/five-suite run, isolated SQL/public-fingerprint checks,
 types and scoped lint passed. The coordinating session reviewed the final diffs and
-closed the review loop without another Opus cycle. The prior full build predates
-these fixes; no fresh full build is claimed.
+closed the review loop without another Opus cycle. The fresh post-fix full build passed at `3a58a32e5`
+(`outputs/roster-opus-fixes-build.log`).
 See [the archived review and disposition](SLICE_A_OPUS_5_5_REVIEW_2026-11-11.md).
-Slice B planning is underway; its implementation remains unbuilt. No public phase or runtime allocation canary ran.
+Rollback reconciliation is source-built for disposable schemas and has an Opus 5.5 READY source review; both named regression gaps are closed and the review cycle is complete without material blockers. See [current evidence](ENGINEERING_CHECKS_2026-11-10.md). No public phase or runtime allocation canary ran.
 
 ## Invariants
 

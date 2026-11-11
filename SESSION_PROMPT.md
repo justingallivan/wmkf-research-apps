@@ -140,17 +140,21 @@ its source review returned READY for Slice A with no material blockers. Four low
 findings and its receipt-fsync nit are fixed. The final 109-test/five-suite run,
 including isolated SQL/public-fingerprint checks, types and scoped lint passed;
 the coordinating session reviewed the diffs and closed the review loop. The reviewer
-did not rerun tests or the build; the prior full build predates these fixes. Full transcript and disposition:
+did not rerun tests or the build. [VERIFIED via `outputs/roster-opus-fixes-build.log`] A fresh full build passed after the Slice A fixes at checkpoint `3a58a32e5`. Full transcript and disposition:
 `docs/plans/data/expertise-roster/SLICE_A_OPUS_5_5_REVIEW_2026-11-11.md`.
-Rollback reconciliation is not built. Public phase execution is refused.
-Local implementation checkpoint: `a876c0efd`; preceding reviewed plan: `60c7e7558`.
-Slice B rollback planning is underway; implementation remains unbuilt. Continue
-with its separately reviewed plan/build using OAuth Opus 5.5. Do not substitute a paid review product. No push/deployment was authorized for this continuation. The worktree
+Rollback reconciliation is source-built for disposable schemas and has an Opus 5.5 READY source review; both named regression gaps are closed and the review cycle is complete without material blockers. Public phase execution is refused.
+Latest local checkpoints: Slice A fixes `3a58a32e5`, accepted Slice B plan
+`b28507035`, and rollback source `6b2c2704e`.
+The coordinating session accepted Slice B plan revision 2 after source verification;
+rollback is source-built and has an Opus 5.5 READY source review; both named regression gaps are closed and the review cycle is complete without material blockers. Continue
+its plan/build reviews using OAuth Opus 5.5. Do not substitute a paid review product. No push/deployment was authorized for this continuation. The worktree
 is preserved; no milestone log entry is required for this unreleased rehearsal.
 The accepted design and remaining boundaries are in
 `docs/plans/data/expertise-roster/ALLOCATOR_CUTOVER_DESIGN_2026-11-10.md`.
-Next: independent signed-in browser UAT, attachments, linked-person lifecycle,
-full matching persistence and cutover/rollback. Component tests are not browser UAT.
+Next: independent signed-in browser UAT, actual attachment and linked-person
+lifecycle checks, full application matching smoke, and deliberate public cutover
+and deployment admission. Bounded SQL rollback is verified; component tests are
+not browser UAT.
 The local import fixture is not a full application schema; do not claim full app UAT.
 Justin approved the minimal matching contract: active explicitly lead-eligible staff
 with enabled User links only for lead; other active staff may be consulted; validated

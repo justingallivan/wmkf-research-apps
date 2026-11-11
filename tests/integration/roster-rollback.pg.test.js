@@ -15,7 +15,7 @@ test('rollback refuses public before connecting',async()=>{
  const connect=jest.fn();await expect(runCutover({schema:'public',phase:'rollback',connect,execute:true})).rejects.toThrow(/public is refused/);expect(connect).not.toHaveBeenCalled();
 });
 live('disposable roster rollback',()=>{
- let db,dir,env,review,snapshot,connect;
+ let db,dir,env,review,snapshot,connect,quarantined;
  const timestamp='2026-04-05T06:07:08.123456Z';
  const clone=()=>structuredClone(snapshot);
  const run=(phase,extra={})=>runCutover({env,schema:db.schema,phase,acknowledge:host,manifestPath:path.join(dir,'baseline.json'),receiptPath:path.join(dir,randomUUID()+'.json'),execute:true,review,connect,readTarget:async()=>clone(),...extra});
@@ -53,6 +53,7 @@ live('disposable roster rollback',()=>{
    }
    receiptRows.push(receipt);
   }
+  quarantined=structuredClone(snapshot.profiles.find(p=>p.values.wmkf_staffuser===null));quarantined.profileGuid=randomUUID();quarantined.values.wmkf_creationkey='direct_'+quarantined.profileGuid;quarantined.values.wmkf_contactguid=null;quarantined.values.wmkf_name='Baseline unbound';quarantined.values.statecode=0;snapshot.profiles.push(quarantined);
   review={source,mapping,reviewedPlan,importReceipt:{version:2,success:true,bridgeCommitted:true,targetHost:host,datasetId:source.datasetId,textPolicy:TEXT_POLICY,sourceHash:reviewedPlan.sourceHash,mappingHash:reviewedPlan.mappingHash,rows:receiptRows}};
   // Slice A's baseline projection intentionally omits audit fields.
   const baselineRead=async()=>{const c=clone();for(const p of c.profiles){delete p.values.createdon;delete p.values.modifiedon;}return c;};
@@ -99,13 +100,25 @@ live('disposable roster rollback',()=>{
   await run('rollback');
   expect((await db.primary.query('SELECT id,dataverse_contact_id FROM expertise_roster WHERE id IN (2,3) ORDER BY id')).rows).toEqual([{id:2,dataverse_contact_id:contact3},{id:3,dataverse_contact_id:contact2}]);
  });
+ test('baseline unbound direct profile bound during active phase becomes a legacy row',async()=>{
+  await db.primary.query('INSERT INTO expertise_roster_identity(id) VALUES(43)');
+  await db.primary.query('INSERT INTO expertise_roster_binding VALUES(43,$1,$2)',[host,quarantined.profileGuid]);
+  await db.primary.query('UPDATE expertise_roster_cutover SET high_water=43');
+  expect(await run('rollback')).toMatchObject({status:'committed',insertedRows:2,nextLegacyId:44});
+  expect((await db.primary.query('SELECT id,name FROM expertise_roster WHERE id=43')).rows).toEqual([{id:43,name:'Baseline unbound'}]);
+ });
+ test('original identity-only row cannot acquire a new profile binding',async()=>{
+  const added=structuredClone(quarantined);added.profileGuid=randomUUID();added.values.wmkf_creationkey='direct_'+added.profileGuid;snapshot.profiles.push(added);
+  await db.primary.query('INSERT INTO expertise_roster_binding VALUES(35,$1,$2)',[host,added.profileGuid]);
+  const before=await state();await expect(run('rollback')).rejects.toThrow(/binding/i);expect(await state()).toEqual(before);
+ });
  test.each(['app','direct','legacy'])('new unbound %s profile refuses without changing paused SQL',async prefix=>{
   const id=randomUUID(),sourceProfile=structuredClone(snapshot.profiles[0]);sourceProfile.profileGuid=id;
   sourceProfile.values.wmkf_creationkey=prefix==='legacy'?`legacy_${randomUUID()}_99`:`${prefix}_${id}`;snapshot.profiles.push(sourceProfile);
   const before=await state();await expect(run('rollback')).rejects.toThrow(/unbound/i);expect(await state()).toEqual(before);
  });
  test('missing bound profile and malformed audit timestamp refuse without writes',async()=>{
-  const saved=snapshot.profiles.pop(),before=await state();await expect(run('rollback')).rejects.toThrow(/binding|profile/i);expect(await state()).toEqual(before);
+  const [saved]=snapshot.profiles.splice(0,1);const before=await state();await expect(run('rollback')).rejects.toThrow(/binding|profile/i);expect(await state()).toEqual(before);
   snapshot.profiles.push(saved);saved.values.wmkf_name='Changed';saved.values.modifiedon='invalid';
   await expect(run('rollback')).rejects.toThrow(/audit timestamp/i);expect(await state()).toEqual(before);
  });
