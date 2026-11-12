@@ -3,7 +3,7 @@ title: "Workflow Chaining & Token Efficiency (Design Principle)"
 domain: prompt-executor
 kind: spec
 status: active
-summary: "Chaining fields and Executor writeback are live. Power Automate-triggered jobs and the lifecycle DAG are planned."
+summary: "Executor writeback is live. Short Title Preview authentication passed. Power Automate-triggered jobs and the lifecycle DAG remain pending."
 canonical: true
 cataloged: 2026-07-02
 owner: product-engineering
@@ -182,9 +182,10 @@ The original blockers classify as follows:
    A generalized automatic `{source:"..."}` input resolver is not established
    by this document and should not be assumed.
 
-3. **Power Automate integration — PLANNED.** The July 2026 probe found no
-   prompt-Executor flow in the visible production metadata. The planned flows
-   submit and poll jobs through authenticated backend endpoints. The shared
+3. **Power Automate integration.** The July 2026 probe found no prompt-Executor
+   flow in the visible production metadata. The isolated Short Title Preview
+   subsequently verified hosted authentication for the status endpoint.
+   Power Automate flow setup and live delivery remain pending. The shared
    backend owns model calls, parsing, validation, and governed writeback.
 
 ## Honest caveats

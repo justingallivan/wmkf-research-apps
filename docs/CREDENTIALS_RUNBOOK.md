@@ -227,7 +227,7 @@ the post-flip Workbench smoke emitted `mode=on` and no denial.
 
 ### Optional — Shared Executor machine Short Title pilot
 
-**[BRANCH-BUILT, DEFAULT OFF; undeployed]** `PROMPT_JOB_MACHINE_PILOT` is
+**[ISOLATED SANDBOX PREVIEW, DEFAULT OFF ELSEWHERE]** `PROMPT_JOB_MACHINE_PILOT` is
 server-owned JSON. Unset or empty disables admission and the drain; malformed
 configuration fails closed. Its exact keys are `enabled`, `pilotId`, `requestId`,
 `sourceEventId`, `tenantId`, `audience`, `clientId`, `servicePrincipalId`, `role`,
@@ -244,9 +244,9 @@ than seven days after the check. The unscheduled machine drain requires
 
 The branch ledger gives source/response content a 24-hour expiry and result/configuration
 content seven days; receipts remain. The scoped drain can expire content under a
-valid parsed grant even after admission has stopped. Scheduling, operational
-retention verification, Entra provisioning and a live pilot require separate
-approval; no environment value or deployment is asserted here.
+valid parsed grant even after admission has stopped. The isolated Preview uses deployment-only overrides, a dedicated Entra app and
+a schema-only Neon branch. Scheduling, operational retention verification and
+a live generation trial remain pending. [Sandbox handoff](plans/POWER_AUTOMATE_PROMPT_HANDOFF_2026-11-11.md#hosted-sandbox-setup).
 
 ### Optional — Shared Executor staff draft trial
 

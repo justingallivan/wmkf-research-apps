@@ -53,8 +53,7 @@ them):
   proposal, reviewer, status, AI-content, and awardee operations.
 - **Reviewer Pool** — a planned request-agnostic surface for browsing/managing the reusable reviewer roster.
 - **Executor / Executor contract** — the written spec for "run one prompt"; implemented in Vercel
-  JS as `executePrompt()`. The planned Power Automate integration submits jobs to the same
-  backend through authenticated endpoints. See `docs/EXECUTOR_CONTRACT.md` and the
+  JS as `executePrompt()`. Power Automate will submit jobs to the same backend through authenticated endpoints. The isolated Sandbox Short Title status route has a hosted authentication proof. See `docs/EXECUTOR_CONTRACT.md` and the
   [shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md).
 - **Thin adapter** — the small amount of input-gathering + output-routing code wrapped around a
   shared prompt; what's left of an "app" once the prompt lives in Dataverse.
@@ -163,8 +162,7 @@ hangs off events and state transitions:
 1. **The prompt contract.** Every *shared* LLM call uses the **same prompt** regardless of who
    initiated it or where output goes. Shared prompts live in Dataverse (`wmkf_ai_prompt`). The
    **Executor contract** is implemented by Vercel JS `executePrompt()` in this repository.
-   [PLANNED, owner decision 2026-11-10] Power Automate will use authenticated submit and status
-   endpoints backed by the same single-prompt Executor. Profiles and the durable job service are
+   Power Automate will use authenticated submit and status endpoints backed by the same single-prompt Executor. [VERIFIED via isolated Preview] The Sandbox Short Title status test passed. Flow configuration and live delivery remain pending. Profiles and the durable job service are
    described in the [shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md).
    - *Status:* contract shipped (Vercel). The Phase I summary route plus live grantee, field-primer,
      and review services read prompts from Dataverse via the Executor; many other AI paths still use bundled in-repo prompts —

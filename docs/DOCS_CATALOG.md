@@ -187,7 +187,7 @@ related:
 | [AUDIT_S154_MEMORY_CODEX.md](AUDIT_S154_MEMORY_CODEX.md) | audit | historical |  | Independent audit performed against all 64 memory files under .claude-memory/ (MEMORY.md plus 63 individual .md files). I did not read... | 2026-07-02 |
 | [AUDIT_S154_MEMORY_V2.md](AUDIT_S154_MEMORY_V2.md) | audit | historical |  | Date: 2026-05-14 Scope: Same as V1 — every file under .claude-memory/ (64 files). | 2026-07-02 |
 | [AUDIT_S154_MEMORY.md](AUDIT_S154_MEMORY.md) | audit | historical |  | Date: 2026-05-14 Scope: Every file under .claude-memory/ (1 index + 11 feedback + 51 project + 1 user = 64 files). All read in full. Claims... | 2026-07-02 |
-| [BACKEND_AUTOMATION_PLAN.md](BACKEND_AUTOMATION_PLAN.md) | plan | active |  | The single-prompt Executor is live. Power Automate submit/status integration is planned. Grant Reporting integration destination is undecided. | 2026-07-02 |
+| [BACKEND_AUTOMATION_PLAN.md](BACKEND_AUTOMATION_PLAN.md) | plan | active |  | Executor is live. Short Title Preview authentication passed. Power Automate flow setup and the Grant Reporting destination remain open. | 2026-07-02 |
 | [CONNOR_CONTACT_MERGE_AND_REVIEWER_LINKING.md](CONNOR_CONTACT_MERGE_AND_REVIEWER_LINKING.md) | history | active |  | Date: 2026-06-25 (S289). Author: Justin + Claude. Status: discussion / questions. | 2026-07-02 |
 | [CONNOR_DATA_CLEANUP_QUESTIONS.md](CONNOR_DATA_CLEANUP_QUESTIONS.md) | plan | active |  | Running list of Dynamics data-cleanup questions for Connor: fields to fill in or correct so the apps read records correctly. Started 2026-10-29. |  |
 | [PROPOSAL_CONTEXT_EXTRACTION_PLAN.md](PROPOSAL_CONTEXT_EXTRACTION_PLAN.md) | plan | historical |  | Historical proposal for expanded structured context; existing dataExtract consumers do not establish the proposed schema or universal input contract. | 2026-07-02 |
@@ -270,11 +270,11 @@ related:
 | [MODEL_PREFLIP_REPLAY_RUNBOOK.md](MODEL_PREFLIP_REPLAY_RUNBOOK.md) | runbook | active |  | Use this before changing reviewer-affecting Claude model routing, including advancing the reviewer-finder tier fallback or removing a concrete pin. | 2026-07-02 |
 | [PEER_REVIEW_EXECUTOR_MIGRATION_PLAN.md](PEER_REVIEW_EXECUTOR_MIGRATION_PLAN.md) | plan | historical |  | Historical record of the completed peer-review-summarizer Executor migration and A7 fail-closed hardening. | 2026-07-08 |
 | [PROMPT_CACHING_PLAN.md](PROMPT_CACHING_PLAN.md) | draft | historical |  | Historical April 2026 prompt-caching experiments and early plan. Superseded for current remediation status by PROMPT_CACHING_AUDIT.md. | 2026-07-02 |
-| [PROMPT_STORAGE_DESIGN.md](PROMPT_STORAGE_DESIGN.md) | plan | active |  | Dataverse prompt rows, Executor resolution, Admin publication, and audit are live. Power Automate is planned as a client of the shared backend. | 2026-07-02 |
+| [PROMPT_STORAGE_DESIGN.md](PROMPT_STORAGE_DESIGN.md) | plan | active |  | Dataverse prompts, Executor and audit are live. Short Title Preview authentication passed. Power Automate flow setup is pending. | 2026-07-02 |
 | [STAGED_PIPELINE_IMPLEMENTATION_PLAN.md](STAGED_PIPELINE_IMPLEMENTATION_PLAN.md) | plan | historical |  | Historical staged-proposal pipeline design, not a current architecture or approved build sequence. | 2026-07-02 |
 | [STAGED_REVIEW_PIPELINE.md](STAGED_REVIEW_PIPELINE.md) | history | historical |  | Historical staged screening design; concept eligibility and successor Review Panel exist separately, not as this pipeline. | 2026-07-02 |
 | [VIRTUAL_REVIEW_PANEL.md](VIRTUAL_REVIEW_PANEL.md) | spec | historical |  | Retired 2026-10-04 (S573). Historical reference for the legacy multi-LLM Virtual Review Panel, now in _archived/; successor is the Review Panel. | 2026-07-02 |
-| [WORKFLOW_CHAINING_DESIGN.md](WORKFLOW_CHAINING_DESIGN.md) | spec | active | yes | Chaining fields and Executor writeback are live. Power Automate-triggered jobs and the lifecycle DAG are planned. | 2026-07-02 |
+| [WORKFLOW_CHAINING_DESIGN.md](WORKFLOW_CHAINING_DESIGN.md) | spec | active | yes | Executor writeback is live. Short Title Preview authentication passed. Power Automate-triggered jobs and the lifecycle DAG remain pending. | 2026-07-02 |
 
 ## prompts
 

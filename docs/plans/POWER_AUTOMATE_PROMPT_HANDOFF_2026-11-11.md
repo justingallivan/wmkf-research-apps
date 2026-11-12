@@ -1,8 +1,8 @@
 # Power Automate prompt delivery: implementation and Connor handoff
 
 Owner: Codex in `codex/power-automate-integration-2026-11-11`.
-Status: branch-built Short Title pilot; offline integration verified; no deployed machine endpoint or flow.
-Last verified: 2026-11-12 (Arizona); source and offline tests only.
+Status: isolated Short Title Sandbox Preview deployed. Hosted read-only authentication verified. Connor's Power Automate connection and generation are pending.
+Last verified: 2026-11-12 (Arizona) via hosted Preview, Entra token issuance, Neon and Sandbox Dataverse readbacks.
 
 ## Outcome
 
@@ -79,16 +79,15 @@ Raw storage diagnostics are replaced by a safe 503. No provider or cron-secret f
 
 ## Prerequisites for a real Power Automate connection
 
-[PLANNED] Reuse an approved existing API/caller registration if appropriate; do not
-create one speculatively. Verify API access-token version 2, optional `idtyp` claim,
-single tenant, app-only application permission/admin consent, exact caller and
-service-principal object IDs. Custom token signing keys are outside this initial
+The dedicated Sandbox app issues v2 client-credentials tokens with `idtyp=app`
+and the pinned application role. Connor still needs to prove token acquisition
+and protected Preview access from the actual Power Automate action. Custom token signing keys are outside this initial
 contract. The actual connection/action must obtain app-only tokens; the presence
 of an HTTP-with-Entra connector is not proof. Microsoft's
 [claims-validation guidance](https://learn.microsoft.com/en-us/entra/identity-platform/claims-validation)
 requires `idtyp=app` when authorizing an application through `azp`.
 
-The branch-built HTTP pilot registers exact routes and guards, bounds the submit
+The Sandbox Preview HTTP pilot registers exact routes and guards, bounds the submit
 body to 4 KiB and admission to one job per pilot, and returns `private, no-store`
 with authenticated status location/polling interval. Real connector issuance is
 still unproven. It uses the real ledger status projection; the isolated proof
@@ -102,7 +101,7 @@ proposal capabilities deliberately have `destinationField: null`.
 
 | Desired output | Existing key or implementation | Required handoff work |
 | --- | --- | --- |
-| Short title/objective | New `preflight.short-title`; legacy `grantee-title.generate` preserved | D37 approves `akoya_request.wmkf_wmkfprojectdescription`. Pilot initializes once with original ETag; publish/pin the separate new definition before activation. |
+| Short title/objective | New `preflight.short-title`; legacy `grantee-title.generate` preserved | D37 approves `akoya_request.wmkf_wmkfprojectdescription`. Pilot initializes once with original ETag. The isolated Preview pins the published Sandbox v1 definition. |
 | Executive summary | `proposal.executive-summary`; 200-word draft capability | Approve exact destination and audience; do not silently reuse legacy `wmkf_ai_summary` or document-section fields. |
 | Methodology | `proposal.methodology`; draft capability | Approve the destination and write policy; wording/length optimization is deferred. |
 | Personnel | Workbook P4, existing analog discovery | Approve task instructions, output shape and exact destination. |
@@ -114,17 +113,15 @@ proposal capabilities deliberately have `destinationField: null`.
 | Expertise | `expertise.recommendations` | Fourth native-schema trial completed; source/docs integrated from the now-archived other session. Recommendations only; assignment still requires Connor coordination. |
 
 All exact mappings need source/metadata and current consumer verification. Similar
-field labels do not establish equivalent semantics. No new Dataverse columns,
-prompt publication or live output writes are authorized by this offline receipt.
+field labels do not establish equivalent semantics. The Sandbox setup authorized the specific Short Title profile and prompt publication. Live output writes and broader mappings still require approval.
 
 ## First concrete handoff row: Short Title
 
-[VERIFIED via tracked prompt definition and D37 owner decision; live row not
-re-probed in this slice] This is a contract to connect, not a deployed endpoint:
+[VERIFIED via Sandbox Dataverse readback and D37 owner decision]
 
 | Contract item | Value |
 | --- | --- |
-| Dataverse prompt identity | New `wmkf_ai_promptname = preflight.short-title`, unpublished; existing legacy row remains unchanged |
+| Dataverse prompt identity | New `wmkf_ai_promptname = preflight.short-title`, published Sandbox version 1; prompt row `25d6d5db-cfde-f111-84ea-70a8a59af221` |
 | Source record | Authorized `akoya_request`, selected by Request GUID |
 | `source_title` input | `akoya_title`, required untrusted applicant text, maximum 600 characters |
 | `source_abstract` input | `wmkf_abstract`, required untrusted applicant text, maximum 20,000 characters |
@@ -133,7 +130,7 @@ re-probed in this slice] This is a contract to connect, not a deployed endpoint:
 | Approved destination | `akoya_request.wmkf_wmkfprojectdescription` |
 | Existing writer semantics | Invited-research cron writes when blank; this is not the new intake trigger |
 | Intake delivery policy | Pilot permits initialization only, one retained job per pilot; no replacement/retry API |
-| Automation state | Branch-built capability and routes; no deployed endpoint or live PA flow proof |
+| Automation state | Isolated Preview routes deployed. Hosted read-only status verified. Power Automate connection and field delivery pending |
 
 Sources: [prompt definition](../../shared/config/prompts/grantee-title.js),
 [title service](../../lib/services/grantee-title-service.js),
@@ -214,7 +211,7 @@ an explicit synthetic field-label translation in test code only, because that ea
 Short Title integration suite exercises the actual field mapping with fake
 Dataverse transport; neither is live Dataverse evidence.
 
-## Branch-built Short Title pilot and activation boundary
+## Short Title API and activation boundary
 
 [VERIFIED via branch source] POST `/api/automation/prompt-jobs` accepts exactly
 `requestId`, `sourceEventId`, `operation: "initialize"`, and
@@ -263,40 +260,97 @@ but cannot run when the policy is absent or malformed. Receipts remain permanent
 for replay/quota. Deployment environment changes require a redeploy; offline
 policy-change tests do not prove instantaneous production revocation.
 
-### Remaining before Connor's live test
+## Hosted Sandbox setup
 
-1. Offline integration and the Opus 5.5 review are complete for the branch
-   implementation; use the evidence below when preparing activation.
-2. Verify the actual API/caller registration and Power Automate app-only token
-   issuance with Connor. Reuse existing infrastructure where possible.
-3. Prepare the concrete sandbox deployment/configuration and unpublished
-   `preflight.short-title` definition for approval. Probe the runtime database
-   role's access to `pg_control_system()` and confirm exact endpoint/identity.
-4. Obtain approval for publication, deployment/configuration and a bounded paid
-   model/audit/field-write trial, then prove first fill, duplicate delivery and
-   original-ETag protection with the real connection.
-5. Give Connor the verified URL/audience/permission, Request/event/key, exact
-   submit/status example and expected field outcome. No message has been sent.
-   Expand to other prompts after destination/write contracts are agreed; keep
-   general proposal-document selection open until caching work settles.
+[VERIFIED 2026-11-12 via Vercel deployment, Neon identity and row-count probes,
+Sandbox Dataverse readback, Entra token issuance and hosted HTTP requests]
 
-### Draft setup brief for Connor (not sent)
+- Vercel Preview `dpl_EPwhUcrNtffRY3X6u7bbDrqqobGS` runs feature commit
+  `23f71d2b5` with deployment-only overrides. The deployment has no alias.
+  Shared Vercel environment settings and `main` were unchanged.
+- The Preview pins the schema-only Neon branch `pa-prompt-sandbox`
+  (`br-icy-boat-af2c8cq6`, project `falling-surf-05640504`), database `neondb`,
+  through `ep-nameless-shape-afytiwop-pooler.c-2.us-west-2.aws.neon.tech`.
+  The runtime role can read `pg_control_system()`. The pinned cluster identifier
+  is `7707368199880651424`. All six prompt ledger tables were empty at setup. Jobs, attempts and publications
+  were still at zero after the hosted GET proof.
+- The dedicated Sandbox app is both API and caller. The issued v2 token had
+  `aud` and `azp` equal to the app ID, `oid` equal to the Sandbox service
+  principal and `idtyp=app`. The app has its own `PromptJobs.Invoke` role and
+  no other resource permissions.
+- Sandbox Dataverse published the pinned Short Title v1 prompt and record-only
+  profile. Prompt SHA-256 is
+  `fbdaec1ecabfad178bbf0c9d18a564aee3964d78ee31be6578c94e368f4570eb`.
+  Profile SHA-256 is
+  `1efb08237a271e43b9a5a7c5aeb9f7769fd3b0c355d03527b6452a6eae215b8d`.
+- The policy pins pilot `2c082c6e-d40a-48f3-9a5d-07f9a5ee2437`, Request
+  `63dab4af-178f-4bbc-b24d-3ccbaf74cbfc` (Sandbox 1000339) and source event
+  `3c745b72-300d-4a0c-83c3-d45d355679e4`. It expires at
+  `2026-11-18T19:32:31.511Z`. The Request has a title and blank destination.
+  It is missing the required abstract. The app secret expires November 19 UTC.
+  The deployment-specific share link lasts six days.
 
-We have built the first Power Automate prompt path for Short Title. Your flow will
-submit a Request GUID, source-event GUID and stable idempotency key; the backend
-will read the published Dataverse prompt, generate/validate the objective, and
-initialize `wmkf_wmkfprojectdescription` only when blank and unchanged. Repeated
-submissions return the same job. The flow then polls authenticated status; it does
-not call Anthropic or write the output field itself.
+### Connor's read-only authentication test
 
-Before the first sandbox test, we need to identify the existing Power Automate
-connection/caller application, if any, and prove that it can obtain an app-only
-Entra v2 token for this API. We will provide the approved endpoint, audience,
-permission, pinned test Request/event and exact request example after that setup
-is verified. The code is not deployed or enabled yet. This first test deliberately
-uses title and abstract fields; the general proposal-document source remains open.
+1. Obtain the deployment-specific Vercel share link and short-lived Sandbox app
+   secret through the approved secure handoff. Run the
+   [Node.js 20+ test helper](../../scripts/test-pa-sandbox-auth.cjs) with
+   `node scripts/test-pa-sandbox-auth.cjs /secure/path/credentials.json` to establish
+   the Vercel protection cookie, acquire an Entra client-credentials token and
+   make the status request. The helper passed all three hosted checks below. The private JSON file contains only `clientSecret`
+   and `shareSecret`. The test uses an intentionally absent job ID.
+2. For the Power Automate action, use tenant
+   `baea89d4-d4a9-449a-b1d6-ec31fb5b380c`, client ID and audience
+   `e4493960-9701-4c0b-ae21-7a9716af67ba`, and scope
+   `api://e4493960-9701-4c0b-ae21-7a9716af67ba/.default`.
+   The assigned application role is `PromptJobs.Invoke`. The pinned service
+   principal is `f3ed2ad8-f171-4c03-bfa3-5e5db934eff0`.
+3. With the Vercel protection cookie and `Authorization: Bearer <access_token>`,
+   send GET to the [Sandbox status test endpoint](https://wmkfresearchapps-n7hku44p8-justin-gallivans-projects.vercel.app/api/automation/prompt-jobs/f7a2a5e4-9cc5-4a57-8dab-9e8898049608).
+   Expected success for this test is HTTP 404 and
+   `{"error":"machine_job_not_found"}`. Without a valid application token the
+   same cookie-authenticated request returns HTTP 401 and
+   `{"error":"machine_auth_invalid"}`. All three observed responses used
+   `Cache-Control: private, no-store`.
+
+This handoff authorizes only the read-only helper test. The app credential has
+`PromptJobs.Invoke`, which also authorizes POST within the pilot policy. Share
+the credential and share-link token through an agreed secure channel. Keep
+both out of plaintext email, chat and the repository. The channel is pending
+and nothing has been sent to Connor.
+
+The deployment's share-link query handshake returns a redirect and protection
+cookie. A share-link token supplied directly as `x-vercel-protection-bypass`
+returned the Vercel sign-in redirect. Confirm Connor's actual action can
+carry the protection cookie and obtain the app-only token. The hosted probe
+proved route access, Entra verification and the pinned ledger read. It used
+GET only and created no job, worker tick, provider call or Request write.
+
+### Full submit and delivery test
+
+After separate authorization, prepare a suitable abstract on the pinned Request.
+A bounded live test then needs explicit approval for the model call, audit, worker
+ticks and conditional field write. Use the exact Request/event above and a stable
+UUID `Idempotency-Key` for POST. Poll the returned status location. Confirm the
+first fill of `wmkf_wmkfprojectdescription`, same-key replay and original-ETag
+protection before enabling any flow. The worker remains unscheduled. Expansion
+to additional tasks needs agreed source, destination and write policies.
+
+The Neon branch has no automatic deletion so it can retain trial receipts.
+No cleanup is scheduled. The sandbox owner should retire the setup after the
+trial or deliberately renew access if another test is approved.
 
 ## Verification and review receipts
+
+### Hosted Sandbox readiness review (November 12)
+
+The authorized Opus 5.5 OAuth review ran with tools disabled. It found no
+blockers for the read-only authentication check. Generation and the actual
+Power Automate integration remain pending. The helper now distinguishes
+credential-file failures from token failures, explicitly selects the Vercel
+protection cookie, and describes the result as acceptance by the Sandbox
+status route. Reviewed packet SHA-256
+`68039f92787ab421552d481b930d434d46407300100b64ee43c91335896e3b10`.
 
 ### Short Title machine integration (November 12)
 
@@ -312,7 +366,7 @@ schemas were confirmed absent. Type
 checking and relevant API, DAL/context, route boundary, injection tagging, Atlas,
 secret/scaffolding, documentation and fact gates passed, with their applicable
 self-tests run sequentially. The existing three external-materials guard warnings
-remain; the inherited J27-066 documentation failure is outside this change.
+remained. The inherited J27-066 documentation failure was resolved in the hosted setup documentation pass.
 
 Opus 5.5 reviewed the plan and build via subscription OAuth, tools disabled. The
 user approved the exact build packet, SHA-256
@@ -352,10 +406,7 @@ live deployment or prompt-quality approval.
 
 The scoped durable-fact pass updated the handoff, Executor contract, architecture,
 Atlas, credentials runbook, service catalog, route matrix and generated route count
-(333). Historical test receipts below remain dated history. Deployment, actual
-Entra/Power Automate issuance, published prompt/profile rows, hosted database-role
-identity permission and real source/write behavior remain unverified activation
-prerequisites. No whole-repository or live-state reconciliation is claimed.
+(333). Historical test receipts below remain dated history. This offline evidence preceded the [hosted Sandbox setup](#hosted-sandbox-setup).
 
 ### Status/delivery slice
 
@@ -386,7 +437,7 @@ bounded changes. Final combined verification passed 218 tests: 62 authentication
 gates with sequential self-tests, and documentation gates passed. The isolated
 `wmkf-pa-delivery-20261111` PostgreSQL container was removed after its unique test
 schemas were confirmed absent. This historical slice did not include routes or source wiring. The current
-branch-built pilot above still requires live activation and connector proof.
+hosted pilot above still requires Connor’s connector proof and an approved generation test.
 
 ### Earlier authentication/admission slice
 
@@ -424,9 +475,7 @@ The inherited V4 implementation commit `d6919c949` is integrated as `810ae6b11`;
 the proof suite was rerun against it. No main push/deployment or live Dataverse,
 SharePoint, application PostgreSQL writes or application model calls occurred in this slice.
 Startup checks passed except the pre-existing `check:j27-register` stale J27-066
-excerpt in `docs/BACKEND_AUTOMATION_PLAN.md`. This remains a known documentation
-failure, not a green whole-repository result.
+excerpt in `docs/BACKEND_AUTOMATION_PLAN.md`. The hosted setup documentation pass
+rebound that excerpt to the current roadmap and reran the register check.
 
-Durable-fact scope: new offline components only. Existing architecture/interface
-references to a future **deployed** PA endpoint remain accurate; the discovery
-handoff and SESSION_PROMPT describe dated prior sessions. Shared V4 source/docs were released and integrated; that session is now archived. No whole-repository reconciliation claimed.
+This proof slice covered offline components. The discovery handoff and SESSION_PROMPT describe earlier sessions. Shared V4 source and documentation were integrated, and that session was archived.

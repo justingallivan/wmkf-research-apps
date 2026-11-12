@@ -11,7 +11,7 @@ The configured application Postgres database applied exactly 097. The
 owner-approved, process-scoped `local-production` trial admitted one
 Request 1003384 draft job using these tables. It retained one format-validated
 summary, rejected the truncated Methodology, delivered both audits, and
-settled at `needs_attention`. A separately approved second cohort used both v2 tasks, retained the validated summary, rejected the over-limit Methodology and also settled at `needs_attention` with both audits delivered. The HTTP routes remain undeployed. [Trial receipt](../plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md#authorized-live-trial).
+settled at `needs_attention`. A separately approved second cohort used both v2 tasks, retained the validated summary, rejected the over-limit Methodology and also settled at `needs_attention` with both audits delivered. The staff pilot was neither activated nor exercised through HTTP in the isolated Power Automate Preview. [Trial receipt](../plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md#authorized-live-trial).
 
 | Table | Persisted contract |
 | --- | --- |
@@ -38,7 +38,7 @@ Audit exceptions are unknown unless the adapter explicitly proves a definitive r
 
 ## Default-off machine Short Title pilot
 
-[VERIFIED via branch source; live activation unproven] `admitMachineTitle` reuses
+[VERIFIED via source and isolated Preview status probe] `admitMachineTitle` reuses
 migration 097 for one `preflight.short-title` initialization job per pinned pilot.
 The sole destination is `wmkf_wmkfprojectdescription`. Generic admission rejects
 this task. Two pinned transactions surround external source/prompt loading: exact
@@ -58,9 +58,10 @@ semantics. No machine result/retry endpoint exists. Exact-scope cleanup runs for
 valid disabled or expired policy; absent/malformed policy cannot clean up. Source
 and response retention is 24 hours, other content seven days; receipts remain.
 
-The three machine routes are branch-built and unscheduled/undeployed. Their
-status is content-free; a successful admission is not completed field delivery.
-[Activation and handoff](../plans/POWER_AUTOMATE_PROMPT_HANDOFF_2026-11-11.md).
+The isolated Preview pins a schema-only Neon branch with all six ledger tables
+empty at setup. The content-free status probe exercises app authorization and
+the runtime database pin. The worker is unscheduled. Live admission and delivery
+are pending. [Activation and handoff](../plans/POWER_AUTOMATE_PROMPT_HANDOFF_2026-11-11.md#hosted-sandbox-setup).
 
 ## Typed recommendations fixture
 

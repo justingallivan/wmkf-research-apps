@@ -30,7 +30,7 @@ Admin can author immutable profile revisions and registered text task versions
 and render a fabricated sample. [Staff trial](#staff-proposal-draft-trial),
 [typed fixture](#typed-recommendations-fixture).
 
-**Branch-built, default off:** A narrow Sandbox `preflight.short-title` machine pilot has submit/status routes, Entra app-only authorization and an unscheduled drain. Its record-only profile freezes Request title and abstract, then uses the shared Executor and conditional Request-field delivery. It is undeployed and has no live pilot evidence. Broader PA task enablement and deployment remain planned.
+**Isolated Sandbox Preview, default off elsewhere:** A narrow Sandbox `preflight.short-title` machine pilot has submit/status routes, Entra app-only authorization and an unscheduled drain. Its record-only profile freezes Request title and abstract, then uses the shared Executor and conditional Request-field delivery. The hosted status check exercises app authorization and the pinned ledger. Connor's connection, live admission, generation and delivery remain unproven. See the [Sandbox handoff](plans/POWER_AUTOMATE_PROMPT_HANDOFF_2026-11-11.md#hosted-sandbox-setup).
 See the [shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md).
 
 **Created:** 2026-04-24 (Session 109, reconciliation pass)
@@ -54,7 +54,7 @@ The shipped path covers **Pattern A, dual-caller prompts, and Pattern B/C Vercel
 
 **In scope:**
 - Single-shot Anthropic prompts and explicitly allowed OpenAI prompt snapshots (system + user, no multi-turn)
-- Server-side callers, including user-triggered Vercel routes. Power Automate status triggers are planned through the job service.
+- Server-side callers, including user-triggered Vercel routes. The isolated Sandbox Preview exposes the Short Title status endpoint through the job service. Power Automate flow setup is pending.
 - Summarization, classification, multi-output extraction
 - Prompts that mix Dynamics-sourced inputs, SharePoint file inputs, and caller-supplied overrides
 - Individual invocations within caller-orchestrated sequences. Callers can use persisted Dynamics outputs or pass approved shared inputs to multiple calls.
@@ -515,7 +515,7 @@ Each caller decides whether the user invoking it can clobber populated target fi
 | Interactive Vercel route (button click in UI) | `false` | User is in front of the screen — surface the conflict, let them confirm. Vercel route turns `blocked: true` into HTTP 409, UI shows existing content + "Overwrite?" button, user re-submits with `forceOverwrite: true`. |
 | Vercel test harness | `true` | Test runs use clean fixtures or controlled overwrites. |
 
-The proposed Power Automate job API uses server-owned operation and writeback
+The Sandbox Short Title job API uses server-owned operation and writeback
 policies. Its contract is separate from the in-process `forceOverwrite` input.
 See the [shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md).
 
@@ -678,7 +678,7 @@ metadata without proof/result payloads or freshness observations. A
 separate default-off GET branch reads only compatible Sandbox recommendation
 receipts after exact staff authorization and same-target freshness checks.
 The local operator trial below is the only Sandbox admission path.
-Production delivery and a live PA pilot remain planned; the separate Sandbox machine HTTP path is branch-built and default off.
+Production delivery remains planned. The isolated Sandbox Short Title Preview verified machine status authentication. Power Automate flow setup and live delivery remain pending.
 [Sandbox read contract](plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#sandbox-recommendations-read).
 
 ### Local Sandbox recommendations trial
@@ -758,7 +758,7 @@ revision and both v1 task rows. The local trial used process-scoped
 configuration. Its second invocation reused the cached document prefix.
 The summary passed format validation and needs attribution review. The
 Methodology reached the output cap and was rejected. Both AI-run audits
-were delivered. A separately approved v2 cohort reused profile revision 1 and published both v2 tasks. The v2 summary passed validation and needs staff review for grounding caveats. The v2 Methodology finished but failed its word cap and had substantive grounding errors. Both v2 audits were delivered. The Workbench, Admin and cron HTTP endpoints remain undeployed. See the [staff trial receipts](plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md#second-controlled-trial).
+were delivered. A separately approved v2 cohort reused profile revision 1 and published both v2 tasks. The v2 summary passed validation and needs staff review for grounding caveats. The v2 Methodology finished but failed its word cap and had substantive grounding errors. Both v2 audits were delivered. The staff pilot was neither activated nor exercised through HTTP in the isolated Power Automate Preview. See the [staff trial receipts](plans/SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md#second-controlled-trial).
 
 ### Admin authoring and sample preview
 
@@ -815,7 +815,7 @@ npx jest tests/unit/prompt-jobs-worker.test.js --runInBand
 - First prompt row: `phase-i.summary` (system/body split, single raw-text output to `wmkf_ai_summary`, `guard: "skip-if-populated"`)
 
 **Still deferred (post-May 1 status — re-verify before consuming):**
-- Production Power Automate operation, broader machine authorization and destination enablement. A narrow Sandbox Short Title machine submit/status path and conditional Request-field delivery are branch-built, default off and undeployed; no live pilot is claimed. See the [shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md).
+- Production Power Automate operation, broader machine authorization and destination enablement. The isolated Short Title Preview has a hosted status proof. Connor's connection and end-to-end Dataverse delivery remain pending. See the [Sandbox handoff](plans/POWER_AUTOMATE_PROMPT_HANDOFF_2026-11-11.md#hosted-sandbox-setup).
 - `prior_output` source kind
 - `overridePromptBody` input
 - Streaming Executor variant
