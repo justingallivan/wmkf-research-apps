@@ -292,39 +292,72 @@ Sandbox Dataverse readback, Entra token issuance and hosted HTTP requests]
 
 ### Connor's read-only authentication test
 
-1. Obtain the deployment-specific Vercel share link and short-lived Sandbox app
-   secret through the approved secure handoff. Run the
-   [Node.js 20+ test helper](../../scripts/test-pa-sandbox-auth.cjs) with
-   `node scripts/test-pa-sandbox-auth.cjs /secure/path/credentials.json` to establish
-   the Vercel protection cookie, acquire an Entra client-credentials token and
-   make the status request. The helper passed all three hosted checks below. The private JSON file contains only `clientSecret`
-   and `shareSecret`. The test uses an intentionally absent job ID.
-2. For the Power Automate action, use tenant
-   `baea89d4-d4a9-449a-b1d6-ec31fb5b380c`, client ID and audience
-   `e4493960-9701-4c0b-ae21-7a9716af67ba`, and scope
-   `api://e4493960-9701-4c0b-ae21-7a9716af67ba/.default`.
-   The assigned application role is `PromptJobs.Invoke`. The pinned service
-   principal is `f3ed2ad8-f171-4c03-bfa3-5e5db934eff0`.
-3. With the Vercel protection cookie and `Authorization: Bearer <access_token>`,
-   send GET to the [Sandbox status test endpoint](https://wmkfresearchapps-n7hku44p8-justin-gallivans-projects.vercel.app/api/automation/prompt-jobs/f7a2a5e4-9cc5-4a57-8dab-9e8898049608).
-   Expected success for this test is HTTP 404 and
-   `{"error":"machine_job_not_found"}`. Without a valid application token the
-   same cookie-authenticated request returns HTTP 401 and
-   `{"error":"machine_auth_invalid"}`. All three observed responses used
-   `Cache-Control: private, no-store`.
+Connor, please run one manual status check in Power Automate before we connect
+Short Title to a workflow. The test runs entirely in Power Automate and uses
+an intentionally absent job ID. I’ll share the two temporary credential values
+separately through a secure channel. Please run it before **November 18, 2026
+at 19:30 UTC** so the test finishes before the Sandbox policy expires.
 
-This handoff authorizes only the read-only helper test. The app credential has
-`PromptJobs.Invoke`, which also authorizes POST within the pilot policy. Share
-the credential and share-link token through an agreed secure channel. Keep
-both out of plaintext email, chat and the repository. The channel is pending
-and nothing has been sent to Connor.
+1. Create an **Instant cloud flow** with **Manually trigger a flow**. Add the
+   built-in **HTTP** premium action. This test requires existing access to
+   that action.
+2. Set the HTTP action fields as follows.
 
-The deployment's share-link query handshake returns a redirect and protection
-cookie. A share-link token supplied directly as `x-vercel-protection-bypass`
-returned the Vercel sign-in redirect. Confirm Connor's actual action can
-carry the protection cookie and obtain the app-only token. The hosted probe
-proved route access, Entra verification and the pinned ledger read. It used
-GET only and created no job, worker tick, provider call or Request write.
+   | Field | Value |
+   | --- | --- |
+   | Method | `GET` |
+   | URI | `https://wmkfresearchapps-n7hku44p8-justin-gallivans-projects.vercel.app/api/automation/prompt-jobs/f7a2a5e4-9cc5-4a57-8dab-9e8898049608` |
+   | Advanced parameters → Cookie | Paste the supplied `_vercel_jwt=…` value as one line without quotes, a `Cookie:` prefix or a trailing newline |
+   | Authentication | `Active Directory OAuth` |
+   | Tenant | `baea89d4-d4a9-449a-b1d6-ec31fb5b380c` |
+   | Audience | `api://e4493960-9701-4c0b-ae21-7a9716af67ba` |
+   | Client ID | `e4493960-9701-4c0b-ae21-7a9716af67ba` |
+   | Credential Type | `Secret` |
+   | Secret | Paste the Sandbox app secret supplied privately |
+
+   Leave **Headers** and **Body** empty. The action acquires the application
+   token from its authentication settings. Use the dedicated **Cookie** field.
+   Microsoft's HTTP workflow documentation says the runtime strips a
+   `Cookie` entry from **Headers**. [Microsoft HTTP action documentation](https://learn.microsoft.com/en-us/azure/connectors/connectors-native-http#omitted-http-headers)
+3. Under the HTTP action's **Settings**, set **Retry Policy** to **None** and
+   turn **Secure Inputs** on. For this
+   content-free GET only, leave **Secure Outputs** off so you can inspect
+   the status and body. Restrict flow ownership. Keep the credential values
+   out of flow exports, screenshots, email and chat.
+4. Save and run the flow once. Open the HTTP action in run history. It will
+   appear failed because the expected status is **404**. The test passes only
+   if the response also has the exact body `{"error":"machine_job_not_found"}`.
+   Report the HTTP status and response error code. An HTML login page or sign-in
+   redirect means Preview protection did not accept the cookie. If Power Automate
+   reports a token acquisition error before the HTTP request, check the OAuth
+   settings and report the sanitized message. If there is no HTTP response,
+   report the sanitized action error. Network or environment policy can also
+   prevent the request.
+5. After reporting the result, delete the temporary flow and notify the
+   sandbox owner so they can revoke the credentials.
+
+### Evidence and credential scope
+
+[VERIFIED 2026-11-12 via hosted HTTP probe] A pre-issued deployment-specific
+Vercel protection cookie let the client call the status URL directly, with
+the Preview's protection settings intact. The Entra client-credentials request
+used the same client ID shown above as both caller and API. It used the v1
+token endpoint and resource
+`api://e4493960-9701-4c0b-ae21-7a9716af67ba`. Entra returned a v2 token with
+`idtyp=app`, the bare app GUID as `aud`, and the `PromptJobs.Invoke` role. The
+hosted GET with the cookie and no token returned 401
+`{"error":"machine_auth_invalid"}`. With both credentials it returned 404
+`{"error":"machine_job_not_found"}`. Both used `Cache-Control: private, no-store`
+and returned no `Set-Cookie` header. The 404 proves the protected route accepted
+the app token and reached the pinned ledger. Connor's run is the first test of
+the actual Power Automate action.
+
+The cookie expires at `2026-11-18T19:35:34Z`, shortly after the Sandbox policy.
+The test authorizes GET only. The app's `PromptJobs.Invoke` role also permits
+POST within the pilot policy. The secure credential handoff is pending and
+nothing has been sent to Connor. The
+[Node helper](../../scripts/test-pa-sandbox-auth.cjs) remains available to
+operators diagnosing the Preview separately.
 
 ### Full submit and delivery test
 
@@ -351,6 +384,13 @@ credential-file failures from token failures, explicitly selects the Vercel
 protection cookie, and describes the result as acceptance by the Sandbox
 status route. Reviewed packet SHA-256
 `68039f92787ab421552d481b930d434d46407300100b64ee43c91335896e3b10`.
+
+The subsequent Opus 5.5 OAuth review found the Power Automate handoff ready
+after clarifying temporary-flow cleanup and credential revocation,
+pre-request error handling, and the shared client ID in the hosted proof.
+The instructions above incorporate all three changes. Reviewed packet SHA-256
+`31067f0e5e62a2683062be12718a85bf10fca094e364d94b3593e0a8123aae39`.
+Connor's actual flow run is pending.
 
 ### Short Title machine integration (November 12)
 
