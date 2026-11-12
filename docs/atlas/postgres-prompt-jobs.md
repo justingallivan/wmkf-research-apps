@@ -1,7 +1,7 @@
 ---
 title: Shared Executor job ledger
 status: branch-built
-last_verified: 2026-11-11
+last_verified: 2026-11-12
 ---
 
 # Shared Executor job ledger
@@ -18,7 +18,7 @@ settled at `needs_attention`. A separately approved second cohort used both v2 t
 | `prompt_jobs` | Environment, authenticated principal key, separate authorization scope, Request ID, caller-command hash, source-event ID, retention, snapshot hash/reference, original Request ETag, and monotonic version. Unique environment/principal/idempotency key. |
 | `prompt_job_tasks` | Frozen prompt/profile/configuration hashes, reviewed model, task key, generation and writeback states, and validated-result reference. One row per task key in a job. |
 | `prompt_job_attempts` | Durable dispatch intent, attempt number, stable audit-run ID, response and audit references, numeric usage and completeness, and safe error code. Uncertain attempts remain fenced. |
-| `prompt_job_initializations` | One active slot per environment/Request/fixture field. Captures blankness and content hash under the job's original ETag. A known terminal pre-publication failure can release a slot while preserving history. |
+| `prompt_job_initializations` | One active slot per environment/Request/approved destination field. Captures blankness and content hash under the job's original ETag. A known terminal pre-publication failure can release a slot while preserving history. |
 | `prompt_job_publications` | One physical operation per initialization job, with original ETag, immutable payload hash/reference, contributing task and reservation IDs, and dispatch outcome. |
 | `prompt_job_content` | Bounded temporary JSON payloads for configuration, source, normalized response, validated result, audit and exact publication. Stores the SHA-256, byte count and expiry for each immutable row. |
 
@@ -35,6 +35,32 @@ Claim uses a transaction advisory lock plus a partial unique per-Request lease i
 A second initialization job cannot capture its Request ETag while an earlier initialized job has pending writeback, including a different field or a slot released by a failed sibling. It waits across worker ticks and captures the new ETag after the earlier publication settles.
 
 Audit exceptions are unknown unless the adapter explicitly proves a definitive rejection. Neither unknown nor failed delivery is automatically resent, and both block publication. A publication waits for all tasks to reach a known terminal generation state and cannot proceed while a contributing audit dispatch is in flight or uncertain. It coalesces eligible validated outputs into one immutable command and records the contributing IDs. Confirmed outcomes update all contributing task receipts together. Draft-only work has no Request writeback. Known pre-dispatch or validation failures release only their eligible slots before a physical publication exists. A field already holding staff content stays protected.
+
+## Default-off machine Short Title pilot
+
+[VERIFIED via branch source; live activation unproven] `admitMachineTitle` reuses
+migration 097 for one `preflight.short-title` initialization job per pinned pilot.
+The sole destination is `wmkf_wmkfprojectdescription`. Generic admission rejects
+this task. Two pinned transactions surround external source/prompt loading: exact
+replay and all-state quota first, then recheck and atomic admission. The scope-wide
+advisory lock spans environments/principals, and retained receipts count after
+content expiry. The pool's explicit endpoint and a hash of endpoint, PostgreSQL
+system identifier and database name jointly bind the database; inability to read
+that identity fails closed.
+
+The configuration retains prompt/profile pins, source-record manifest and policy
+fingerprint. The sealed record-only snapshot retains original title/abstract,
+without a proposal document. Snapshot/dispatch verify the manifest. The worker
+rechecks current policy and source, excludes legacy Invited Requests, uses the
+shared Executor and deferred content-free audit, then publishes with the original
+ETag. Protected content, conflict and uncertainty retain their existing ledger
+semantics. No machine result/retry endpoint exists. Exact-scope cleanup runs for
+valid disabled or expired policy; absent/malformed policy cannot clean up. Source
+and response retention is 24 hours, other content seven days; receipts remain.
+
+The three machine routes are branch-built and unscheduled/undeployed. Their
+status is content-free; a successful admission is not completed field delivery.
+[Activation and handoff](../plans/POWER_AUTOMATE_PROMPT_HANDOFF_2026-11-11.md).
 
 ## Typed recommendations fixture
 

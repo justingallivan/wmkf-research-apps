@@ -18,6 +18,7 @@ import { executePrompt } from '../../lib/services/execute-prompt.js';
 import { LLMClient } from '../../lib/services/llm-client.js';
 import { canonical, hashProfile, MAX_PROFILE_RESPONSE_BYTES, sha256 } from '../../lib/services/prompt-jobs/profile.js';
 import { SYNTHETIC_MAX_OUTPUT_TOKENS } from '../../lib/services/prompt-jobs/capabilities.js';
+import { buildMachineTitleDefinition, MACHINE_TITLE_MODEL, MACHINE_TITLE_TASK } from '../../lib/services/prompt-jobs/machine-title-contract.js';
 import { prepareContextSnapshot } from '../../lib/services/prompt-jobs/context.js';
 import { buildUntrustedContentPreamble } from '../../lib/utils/ai-payload-boundary.js';
 import * as requestAdapter from '../../lib/dataverse/adapters/grant-request.js';
@@ -206,4 +207,53 @@ test.each(['  ', '[]'])('legacy variables %s retain pre-profile behavior',async 
   runAdapter.create.mockResolvedValueOnce({wmkf_ai_runid:'cccccccc-cccc-cccc-cccc-cccccccccccc'});
   const result=await executePrompt({promptName:row.wmkf_ai_promptname,promptSnapshot:row,runSource:'Vercel Test',requireNoPersistence:true});
   expect(result.parsed.summary).toContain('RESULT_CANARY');expect(mockComplete).toHaveBeenCalledTimes(1);expect(runAdapter.create).toHaveBeenCalledTimes(1);
+});
+
+function titleOptions() {
+  const { profile: titleProfile, task } = buildMachineTitleDefinition();
+  const titleScope = { environment: 'test-sandbox', authorizationScope: 'pa-short-title:cccccccc-cccc-4ccc-8ccc-cccccccccccc', requestId };
+  const titleSnapshot = prepareContextSnapshot({
+    profile: titleProfile, scope: titleScope, nonceSecret, documents: [],
+    records: [
+      { name: 'source_title', present: true, value: 'The applicant study', provenance: 'akoya_title' },
+      { name: 'source_abstract', present: true, value: 'A source abstract long enough for the title source gate.', provenance: 'wmkf_abstract' },
+    ],
+  });
+  return options({
+    promptName: MACHINE_TITLE_TASK, runSource: 'PowerAutomate Test',
+    profiledContext: { profile: titleProfile, snapshot: titleSnapshot, scope: titleScope, nonceSecret },
+    promptSnapshot: {
+      wmkf_ai_promptid: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', wmkf_promptversion: 1,
+      wmkf_ai_promptname: task.name, wmkf_ai_model: task.model, wmkf_ai_maxtokens: task.maxTokens,
+      wmkf_ai_temperature: task.temperature, wmkf_ai_systemprompt: task.systemPrompt, wmkf_ai_promptbody: task.body,
+      wmkf_ai_promptvariables: task.variables, wmkf_ai_promptoutputschema: task.outputSchema,
+    },
+  });
+}
+
+test.each(['To study', 'Preface\n“To study.”'])('normalizes the Short Title %j after saving the raw response', async text => {
+  const args = titleOptions();
+  mockComplete.mockResolvedValueOnce({ ...response(text), model: MACHINE_TITLE_MODEL });
+  const result = await executePrompt(args);
+  expect(result.parsed).toEqual({ edited_title: 'To study' });
+  expect(args.onResponse).toHaveBeenCalledWith(expect.objectContaining({ response: expect.objectContaining({ text }) }));
+  expect(mockComplete).toHaveBeenCalledTimes(1);
+  expect(runAdapter.create).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['To do', 'claude_output_empty'],
+  ['I cannot provide that objective.', 'profile_output_invalid'],
+])('rejects invalid Short Title %j after response checkpointing', async (text, code) => {
+  const args = titleOptions();
+  mockComplete.mockResolvedValueOnce({ ...response(text), model: MACHINE_TITLE_MODEL });
+  await expect(executePrompt(args)).rejects.toMatchObject({ code, paidCall: true, deferredAudit: expect.any(Object) });
+  expect(args.onResponse).toHaveBeenCalledTimes(1);
+  expect(mockComplete).toHaveBeenCalledTimes(1);
+  expect(runAdapter.create).not.toHaveBeenCalled();
+});
+
+test('keeps the default raw output floor on existing profiled tasks', async () => {
+  mockComplete.mockResolvedValueOnce(response('To study'));
+  await expect(executePrompt(options())).rejects.toMatchObject({ code: 'claude_output_empty' });
 });

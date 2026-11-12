@@ -30,9 +30,7 @@ Admin can author immutable profile revisions and registered text task versions
 and render a fabricated sample. [Staff trial](#staff-proposal-draft-trial),
 [typed fixture](#typed-recommendations-fixture).
 
-**Planned (owner decision, 2026-11-10):** Power Automate will submit and poll
-jobs through authenticated endpoints. PA routes, Entra authorization,
-real Request-field destinations, and broader task enablement remain planned.
+**Branch-built, default off:** A narrow Sandbox `preflight.short-title` machine pilot has submit/status routes, Entra app-only authorization and an unscheduled drain. Its record-only profile freezes Request title and abstract, then uses the shared Executor and conditional Request-field delivery. It is undeployed and has no live pilot evidence. Broader PA task enablement and deployment remain planned.
 See the [shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md).
 
 **Created:** 2026-04-24 (Session 109, reconciliation pass)
@@ -680,7 +678,7 @@ metadata without proof/result payloads or freshness observations. A
 separate default-off GET branch reads only compatible Sandbox recommendation
 receipts after exact staff authorization and same-target freshness checks.
 The local operator trial below is the only Sandbox admission path.
-Production delivery, machine HTTP authorization and PA remain planned.
+Production delivery and a live PA pilot remain planned; the separate Sandbox machine HTTP path is branch-built and default off.
 [Sandbox read contract](plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#sandbox-recommendations-read).
 
 ### Local Sandbox recommendations trial
@@ -817,7 +815,7 @@ npx jest tests/unit/prompt-jobs-worker.test.js --runInBand
 - First prompt row: `phase-i.summary` (system/body split, single raw-text output to `wmkf_ai_summary`, `guard: "skip-if-populated"`)
 
 **Still deferred (post-May 1 status — re-verify before consuming):**
-- Authenticated Power Automate submit/status, Entra machine authorization, and real Request-field destinations. See the [shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md).
+- Production Power Automate operation, broader machine authorization and destination enablement. A narrow Sandbox Short Title machine submit/status path and conditional Request-field delivery are branch-built, default off and undeployed; no live pilot is claimed. See the [shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md).
 - `prior_output` source kind
 - `overridePromptBody` input
 - Streaming Executor variant

@@ -126,3 +126,27 @@ describe('write-core baseUrl preference — default-preserving for the no-baseUr
     expect(url).toBe(`https://${PROD_HOST}/api/data/v9.2/wmkf_requestdocuments(abc-123)`);
   }));
 });
+
+
+describe('optional expected write origin', () => {
+  const origin = `https://${SANDBOX_HOST}`;
+  test.each(['create', 'update'])('%s refuses environment drift during token await before HTTP', kind => ctx(async () => {
+    process.env.DYNAMICS_URL = origin;
+    const svc = { ...singletonLikeSvc(), getAccessToken: async () => { process.env.DYNAMICS_URL = `https://${PROD_HOST}`; return 'token'; }, _writeFetch: jest.fn() };
+    const operation = kind === 'create' ? createRecord(svc, 'wmkf_ai_runs', {}, { expectedOrigin: origin }) : updateRecord(svc, 'akoya_requests', 'abc', {}, { expectedOrigin: origin });
+    await expect(operation).rejects.toThrow('Dataverse write origin is invalid or changed.');
+    expect(svc._writeFetch).not.toHaveBeenCalled(); expect(fetch).not.toHaveBeenCalled();
+  })());
+  test('uses actual service baseUrl over environment for the fence', ctx(async () => {
+    const svc = { ...sandboxSvc(), _writeFetch: jest.fn().mockResolvedValue(okResponse()) };
+    await createRecord(svc, 'wmkf_ai_runs', {}, { expectedOrigin: origin });
+    expect(svc._writeFetch).toHaveBeenCalledTimes(1);
+    await expect(updateRecord(svc, 'akoya_requests', 'abc', {}, { expectedOrigin: `https://${PROD_HOST}` })).rejects.toThrow('Dataverse write origin is invalid or changed.');
+    expect(svc._writeFetch).toHaveBeenCalledTimes(1);
+  }));
+  test.each(['http://example.invalid','https://user@example.invalid','https://example.invalid/','https://example.invalid/path','https://example.invalid?x=1','not a URL'])('rejects noncanonical expected origin %s', expectedOrigin => ctx(async () => {
+    const svc = { ...singletonLikeSvc(), _writeFetch: jest.fn() };
+    await expect(createRecord(svc, 'wmkf_ai_runs', {}, { expectedOrigin })).rejects.toThrow('Dataverse write origin is invalid or changed.');
+    expect(svc._writeFetch).not.toHaveBeenCalled();
+  })());
+});

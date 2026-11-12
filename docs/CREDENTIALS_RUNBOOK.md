@@ -225,6 +225,29 @@ the post-flip Workbench smoke emitted `mode=on` and no denial.
 
 **B4 deployment contract [VERIFIED via branch source, 2026-09-29]:** The “fails open” descriptions above apply only to the older read-side fences. B4 requires `SYNTHETIC_REVIEWER_ISOLATION=on` before any existing-person reviewer bind or identity edit, including ordinary people. A marked synthetic reviewer also requires `TEST_REQUEST_ISOLATION=on` and an exact server-read Request/person binding. If either switch is off, unset, or invalid, the acceptance drain pauses **all** jobs before Contact, honorarium, or BILL writes; maintenance reports the configuration pause as failed. Keep both switches at literal `on` in every environment receiving B4. For a B4 rollback, redeploy the prior code before disabling either switch; disabling a switch alone interrupts reviewer workflows. Verify the environment's wave29 and wave30 columns before deploying B4.
 
+### Optional — Shared Executor machine Short Title pilot
+
+**[BRANCH-BUILT, DEFAULT OFF; undeployed]** `PROMPT_JOB_MACHINE_PILOT` is
+server-owned JSON. Unset or empty disables admission and the drain; malformed
+configuration fails closed. Its exact keys are `enabled`, `pilotId`, `requestId`,
+`sourceEventId`, `tenantId`, `audience`, `clientId`, `servicePrincipalId`, `role`,
+`promptId`, `promptVersion`, `promptHash`, `profileHash`, `databaseIdentity`,
+`databaseEndpoint`, and `expiresAt`. IDs are GUIDs; hashes are lowercase SHA-256;
+the endpoint must match the configured Postgres host and port and the database
+identity is independently checked. The grant pins one Sandbox Request/event,
+app principal, prompt/profile and database. Local production and Production
+are refused; the registered Sandbox origin and literal-on Dataverse interlock and
+DAL enforcement are required. `PROMPT_JOB_NONCE_SECRET` must be at least 32 UTF-8
+bytes and remain stable for retained content. The active grant expires no later
+than seven days after the check. The unscheduled machine drain requires
+`CRON_SECRET` even in development.
+
+The branch ledger gives source/response content a 24-hour expiry and result/configuration
+content seven days; receipts remain. The scoped drain can expire content under a
+valid parsed grant even after admission has stopped. Scheduling, operational
+retention verification, Entra provisioning and a live pilot require separate
+approval; no environment value or deployment is asserted here.
+
 ### Optional — Shared Executor staff draft trial
 
 **[VERIFIED via branch source, 2026-11-11]** The staff proposal draft trial

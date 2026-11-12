@@ -1,5 +1,6 @@
 /** @jest-environment node */
 import { getPromptProfiles, publishPromptProfile, previewSharedTask, validateSharedTaskPublication } from '../../lib/services/admin/prompt-profiles-service';
+import { buildMachineTitleDefinition, MACHINE_TITLE_TASK } from '../../lib/services/prompt-jobs/machine-title-contract.js';
 import { hashProfile } from '../../lib/services/prompt-jobs/profile';
 
 const id = '00000000-0000-4000-8000-000000000002';
@@ -113,5 +114,30 @@ it('the unpublished controlled-trial input artifact passes the real Admin previe
   expect(hashProfile(candidate.profile)).toBe(candidate.profileHash);
   await publishPromptProfile({profile:candidate.profile,expectedVersion:0,requestId:id},deps);
   for(const task of candidate.tasks)await expect(previewSharedTask({task},deps)).resolves.toMatchObject({sampleOnly:true});
-  expect((await getPromptProfiles(deps)).tasks.map(task=>task.name)).toEqual(['synthetic.executive-summary','synthetic.methodology','proposal.executive-summary','proposal.methodology']);
+  expect((await getPromptProfiles(deps)).tasks.map(task=>task.name)).toEqual(['synthetic.executive-summary','synthetic.methodology','proposal.executive-summary','proposal.methodology',MACHINE_TITLE_TASK]);
+});
+
+it('validates the Short Title candidate in the governed Admin preview and publication checks', async () => {
+  const { deps } = store();
+  const { profile, task } = buildMachineTitleDefinition();
+  await publishPromptProfile({ profile, expectedVersion: 0, requestId: id }, deps);
+  const result = await previewSharedTask({ task }, deps);
+  expect(result.preview.documentBlock).toContain('[]');
+  expect(result.preview.taskSuffix).toContain('Sample source_title');
+  expect(result.preview.taskSuffix).toContain('Sample source_abstract');
+  await expect(validateSharedTaskPublication({ name: task.name, payload: task, requestId: id, creating: true }, deps)).resolves.toBe(true);
+});
+
+it('rejects unsupported record-only profile publication and nonzero title temperature', async () => {
+  const { deps } = store();
+  const { profile, task } = buildMachineTitleDefinition();
+  const args = { expectedVersion: 0, requestId: id };
+  await expect(publishPromptProfile({ ...args, profile: { ...profile, key: 'another-record-only' } }, deps))
+    .rejects.toMatchObject({ code: 'invalid_profile' });
+  await expect(publishPromptProfile({ ...args, profile: { ...profile, recordNames: ['source_title'] } }, deps))
+    .rejects.toMatchObject({ code: 'invalid_profile' });
+  expect(deps.createSettingStrict).not.toHaveBeenCalled();
+  await publishPromptProfile({ ...args, profile }, deps);
+  await expect(validateSharedTaskPublication({ name: task.name, payload: { ...task, temperature: 0.2 }, requestId: id, creating: true }, deps))
+    .rejects.toMatchObject({ code: 'invalid_shared_task' });
 });

@@ -13,6 +13,7 @@ const KNOWN_GUARDS = [
   'requireAuth',
   'requireAuthWithProfile',
   'requireAppAccess',
+  'requireMachinePromptAccess',
   'requireSuperuser',
   'verifyCronSecret',
   'verifyDossierCronSecret',

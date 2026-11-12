@@ -174,7 +174,7 @@ describePg('offline authenticated machine admission on isolated PostgreSQL', () 
       readRequest: async () => ({ _etag: 'W/"baseline"', [TITLE_DESTINATION]: value }),
       patchRequest: async () => { throw Error('No writes in capture proof'); } });
     const target = await delivery.readTarget({ job: admitted.job,
-      tasks: [{ task_key: 'grantee-title.generate', destination_field: TITLE_DESTINATION }] });
+      tasks: [{ task_key: 'preflight.short-title', destination_field: TITLE_DESTINATION }] });
     const claim = await store.claim({ jobId: admitted.job.id });
     const fence = { jobId: admitted.job.id, leaseToken: claim.leaseToken };
     // The current ledger enables only synthetic initialization. Test its opaque

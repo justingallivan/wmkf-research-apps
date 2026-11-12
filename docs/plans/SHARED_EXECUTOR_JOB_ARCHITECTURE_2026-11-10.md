@@ -210,7 +210,7 @@ Three separate mechanisms must remain visible: retained source snapshot (avoids 
 
 ## 5. Submit and poll through a bounded API
 
-Proposed public-to-PA routes:
+[BRANCH-BUILT, DEFAULT OFF; undeployed] Narrow Sandbox machine pilot routes:
 
 ```text
 POST /api/automation/prompt-jobs
@@ -229,7 +229,7 @@ requires the configured bearer in all environments and advances one bounded
 stage. The drain is unscheduled. Known source-admission failures return safe
 409 codes. The Proposal tab retries discovery after a status-version race. See the [Executor contract](../EXECUTOR_CONTRACT.md#staff-proposal-draft-trial).
 
-[PLANNED] The PA POST accepts a request GUID, a nonempty deduplicated bounded list of approved task keys, an approved operation (`initialize` or `generate-draft` in the pilot), and a stable source-event id for initialization. Require a UUID `Idempotency-Key` header. No prompt body, model override, actor id, destination field, source URL, token, callback URL or arbitrary output schema is accepted.
+[BRANCH-BUILT, DEFAULT OFF] The initial machine pilot POST accepts one configured Request GUID, the single `preflight.short-title` task, `initialize`, and its configured source-event id. Broader task lists and operations remain planned. Require a UUID `Idempotency-Key` header. No prompt body, model override, actor id, destination field, source URL, token, callback URL or arbitrary output schema is accepted.
 
 One job covers one request. PA loops over requests; there is no initial multi-request transaction or arbitrary task graph. Validate all submitted task names and permissions before accepting any. Return 202 only after the job and child tasks commit; return an authenticated status location. Derive the principal key from verified identity, namespaced by human/application kind. Reauthorize even an idempotency replay. Repeat submissions with the same principal/environment/key and same normalized payload return the same job. A changed payload under that key is 409. Freeze versions on first admission, so retries cannot pick up newer published prompts.
 
@@ -241,7 +241,7 @@ PA records the returned job id before polling, retries transport failures using 
 
 ### Machine authorization
 
-[PLANNED] Use a dedicated single-tenant Entra application permission for the API and an allowlisted PA caller application. Require a token for this API audience, pinned tenant/issuer and supported token version; verify signature, expiry/not-before, app-only identity and explicit app role. Bind the validated client identity to server-owned request/program/task/destination permissions. Reject role-less, delegated, foreign-tenant and wrong-audience tokens on this machine route. Do not impersonate a human from request input.
+[BRANCH-BUILT, DEFAULT OFF] The narrow machine guard validates app-only Entra tokens against configured tenant, audience, client, service principal and role pins. Deployment, permission provisioning and a live PA connection remain planned. The broader design uses a dedicated single-tenant Entra application permission for the API and an allowlisted PA caller application. Require a token for this API audience, pinned tenant/issuer and supported token version; verify signature, expiry/not-before, app-only identity and explicit app role. Bind the validated client identity to server-owned request/program/task/destination permissions. Reject role-less, delegated, foreign-tenant and wrong-audience tokens on this machine route. Do not impersonate a human from request input.
 
 [VERIFIED via Microsoft documentation] Client credentials identifies an application with administrator-granted permissions; the resource API must validate the access token. The preauthorized HTTP with Entra connector uses delegated identity, so it is not evidence that an app-only flow is configured. [Client credentials](https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-client-creds-grant-flow), [access-token validation](https://learn.microsoft.com/en-us/entra/identity-platform/access-tokens), [connector identity](https://learn.microsoft.com/en-us/connectors/webcontents/).
 
@@ -421,7 +421,7 @@ Settled for the synthetic pilot: Executive Summary and Methodology, staff summar
 
 The implemented local proof uses `synthetic.executive-summary` and `synthetic.methodology` in `environment:test`, mapping only to `fixture_summary` and `fixture_methodology`. Those labels are not Dataverse schema fields. The test uses the canonical Executor and real PostgreSQL, with synthetic provider, source/auth, audit and conditional writer adapters. The Admin preview route composes a sample and exposes no job admission or provider call.
 
-Remaining integration work: finalize broader source and destination mappings, implement Entra/PA admission and polling, and prove the conditional Dataverse writer. Published limits, global capacity/rate bounds, scheduler and cleanup wiring, operator recovery, and separately authorized quality/cache measurements beyond the single controlled trial remain planned. The synthetic store retains uncertainty receipts and exposes bounded content expiry, but has no automatic receipt purge or operator resolution command. These are rollout requirements, not reasons to add speculative machinery to the local proof.
+Remaining integration work: finalize broader source and destination mappings, deploy and prove Entra/PA admission and polling, and prove the conditional Dataverse writer in an authorized live pilot. The narrow default-off Sandbox Short Title path is branch-built and undeployed. Published limits, global capacity/rate bounds, scheduler and cleanup wiring, operator recovery, and separately authorized quality/cache measurements beyond the single controlled trial remain planned. The synthetic store retains uncertainty receipts and exposes bounded content expiry, but has no automatic receipt purge or operator resolution command. These are rollout requirements, not reasons to add speculative machinery to the local proof.
 
 
 ## 13. Initial verification and handoff (2026-11-10)

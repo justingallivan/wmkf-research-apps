@@ -1,8 +1,8 @@
 # Power Automate prompt delivery: implementation and Connor handoff
 
 Owner: Codex in `codex/power-automate-integration-2026-11-11`.
-Status: partial, offline foundation; no deployed machine endpoint or flow.
-Last verified: 2026-11-11 (Pacific).
+Status: branch-built Short Title pilot; offline integration verified; no deployed machine endpoint or flow.
+Last verified: 2026-11-12 (Arizona); source and offline tests only.
 
 ## Outcome
 
@@ -35,7 +35,7 @@ issuer/tenant, RS256 signature, caller application, service-principal object ID,
 `iat`/`nbf`/`exp` with a two-hour maximum lifetime. The server config is reread after
 verification, and the returned assertion rechecks configuration and expiration
 before later protected operations. A tenant change replaces the cached key resolver.
-No token claim chooses a JWKS URL. There is no environment binding or route yet.
+No token claim chooses a JWKS URL. The new default-off machine pilot binds this verifier to the three routes described below.
 
 Identity is `app:entra-v2:<tenant>:<client>:<service-principal>`. This is distinct
 from the existing human trial identities and is additionally bounded by exact
@@ -88,12 +88,11 @@ of an HTTP-with-Entra connector is not proof. Microsoft's
 [claims-validation guidance](https://learn.microsoft.com/en-us/entra/identity-platform/claims-validation)
 requires `idtyp=app` when authorizing an application through `azp`.
 
-The later HTTP slice must register exact routes and guards with the proxy/security
-matrix, bound request body and admission capacity, return `private, no-store` plus
-authenticated status location/polling interval, and prove real connector issuance.
-It must not promote this isolated proof facade to a production queue. General
-submit/status handling must map all durable task/writeback states, including
-unknown outcomes and partial success, rather than using the queued-only proof DTO.
+The branch-built HTTP pilot registers exact routes and guards, bounds the submit
+body to 4 KiB and admission to one job per pilot, and returns `private, no-store`
+with authenticated status location/polling interval. Real connector issuance is
+still unproven. It uses the real ledger status projection; the isolated proof
+facade remains test-only.
 
 ## Prompt-to-field handoff inventory
 
@@ -103,16 +102,16 @@ proposal capabilities deliberately have `destinationField: null`.
 
 | Desired output | Existing key or implementation | Required handoff work |
 | --- | --- | --- |
-| Short title/objective | `grantee-title.generate`; existing title service | D37 explicitly approves `akoya_request.wmkf_wmkfprojectdescription`; preserve the objective wording and existing callers. Verify the current published row and new-flow refresh policy before enabling writeback. |
+| Short title/objective | New `preflight.short-title`; legacy `grantee-title.generate` preserved | D37 approves `akoya_request.wmkf_wmkfprojectdescription`. Pilot initializes once with original ETag; publish/pin the separate new definition before activation. |
 | Executive summary | `proposal.executive-summary`; 200-word draft capability | Approve exact destination and audience; do not silently reuse legacy `wmkf_ai_summary` or document-section fields. |
-| Methodology | `proposal.methodology`; draft capability | Reconcile workbook overview length with the longer trial draft before assigning a destination. |
+| Methodology | `proposal.methodology`; draft capability | Approve the destination and write policy; wording/length optimization is deferred. |
 | Personnel | Workbook P4, existing analog discovery | Approve task instructions, output shape and exact destination. |
 | Intake rationale | Workbook P5 | Define versioned storage/write contract, not an unconditional overwrite. |
 | Field/method keywords | Workbook P7 shared task | Obtain approved controlled vocabularies; D26 placeholder lists are not production values. |
 | Intake flags | Workbook P6, provisional rubric | Approve rubric, evidence and versioned destination. |
 | Open questions | Cross-task output in workbook P | Decide accumulation/deduplication and references; not automatically another model call. |
 | Staff notes/rationale | Human-editable workbook Q | Preserve human edits and intentional clearing; not automatically another model call. |
-| Expertise | `expertise.recommendations` | Other session owns fourth trial. Recommendations only; assignments still require coordination with Connor. |
+| Expertise | `expertise.recommendations` | Fourth native-schema trial completed; source/docs integrated from the now-archived other session. Recommendations only; assignment still requires Connor coordination. |
 
 All exact mappings need source/metadata and current consumer verification. Similar
 field labels do not establish equivalent semantics. No new Dataverse columns,
@@ -125,7 +124,7 @@ re-probed in this slice] This is a contract to connect, not a deployed endpoint:
 
 | Contract item | Value |
 | --- | --- |
-| Dataverse prompt identity | `wmkf_ai_promptname = grantee-title.generate`; historical November 10 Admin readback was v2, requiring fresh readback before pinning a rollout |
+| Dataverse prompt identity | New `wmkf_ai_promptname = preflight.short-title`, unpublished; existing legacy row remains unchanged |
 | Source record | Authorized `akoya_request`, selected by Request GUID |
 | `source_title` input | `akoya_title`, required untrusted applicant text, maximum 600 characters |
 | `source_abstract` input | `wmkf_abstract`, required untrusted applicant text, maximum 20,000 characters |
@@ -133,8 +132,8 @@ re-probed in this slice] This is a contract to connect, not a deployed endpoint:
 | Prompt output target | `none`; caller/backend delivery owns writeback |
 | Approved destination | `akoya_request.wmkf_wmkfprojectdescription` |
 | Existing writer semantics | Invited-research cron writes when blank; this is not the new intake trigger |
-| Intake delivery decision still needed | First initialization versus explicit replacement; workbook “Overwrite” does not override the existing protection of staff changes |
-| Automation state | Not registered as a shared job capability; no PA endpoint or flow proof |
+| Intake delivery policy | Pilot permits initialization only, one retained job per pilot; no replacement/retry API |
+| Automation state | Branch-built capability and routes; no deployed endpoint or live PA flow proof |
 
 Sources: [prompt definition](../../shared/config/prompts/grantee-title.js),
 [title service](../../lib/services/grantee-title-service.js),
@@ -186,12 +185,11 @@ remain running until the worker observes their outcome or expired lease.
 retention can change state at the same version. A future poller must not discard a
 same-version status observation. Any remaining generation, audit or publication
 work suggests another poll (five seconds), even when the aggregate needs attention;
-settled responses use null. A needs-attention response is not automatically terminal. These are service DTOs, not
-HTTP responses; no new route exists yet.
+settled responses use null. A needs-attention response is not automatically terminal. The new submit/status routes return this DTO inside `{job}`.
 
 [BRANCH-BUILT, offline verification] `request-field-delivery.js` implements the
 worker's capture/write interfaces for the existing approved Short Title column
-only. It has no default transport or runtime caller. Capture authorizes before and
+only. The machine worker binds its transport to the Request DAL. Capture authorizes before and
 after the read, requires an explicit selected field and concrete ETag, preserves
 null versus empty-string hashes, and treats whitespace as existing staff content.
 Write accepts only the approved physical field, a nonblank string within the
@@ -207,34 +205,157 @@ reservation, publication and retained receipts must own first-event eligibility
 and replay protection. Blankness alone never authorizes refilling a staff-cleared
 field. Runtime binding must use the normal grant-request DAL adapter, current
 machine permission and target interlock; this helper adds no bypass or human
-impersonation. Existing task capabilities still prohibit real Request publication,
-so a real Short Title job is not enabled by adding this adapter.
+impersonation. The new title capability permits only its approved field under the pinned machine
+pilot. Other proposal and expertise tasks still carry no real destination.
 
 Tests exercise the real Dynamics write-core serialization with its physical HTTP
 seam replaced, and the real PostgreSQL `captureTarget` contract. The latter uses
-an explicit synthetic field-label translation in test code only, because current
-ledger initialization remains synthetic-only. It proves hash/blankness capture
-and protected-content status, not production field admission or live Dataverse.
+an explicit synthetic field-label translation in test code only, because that earlier test exercises the synthetic ledger contract. The separate
+Short Title integration suite exercises the actual field mapping with fake
+Dataverse transport; neither is live Dataverse evidence.
 
-## Next implementation sequence
+## Branch-built Short Title pilot and activation boundary
 
-1. Wire authenticated machine submission/status and a bounded worker composition,
-   preserving existing prompt text. Add the actual permitted task/source/delivery
-   contract without relaxing staff or expertise trial guards. No additional prompt
-   wording decision is required to build these boundaries.
-2. Start real field-delivery wiring with the approved Short Title destination;
-   keep other mappings disabled until their exact columns and write policies are
-   agreed. The existing Short Title prompt is a legacy override-input task, not a
-   profiled shared job. Preserve its current callers while adding durable-job
-   execution support; do not publish incompatible metadata into that existing row.
-3. Prove the chosen Power Automate connection and bounded submit/replay/status
-   path, then run an explicitly authorized model/writeback trial. Test first fill,
-   duplicate delivery, staff edits/clearing, partial failure and unknown outcomes.
-4. Hand Connor the tested calling/field contract, then optimize or expand the
-   individual prompts separately. General document selection remains open; no
-   fixture or trial source policy silently becomes the all-prompt default.
+[VERIFIED via branch source] POST `/api/automation/prompt-jobs` accepts exactly
+`requestId`, `sourceEventId`, `operation: "initialize"`, and
+`taskKeys: ["preflight.short-title"]`, plus a UUID `Idempotency-Key` header.
+GET `/api/automation/prompt-jobs/[jobId]` returns content-free scoped status.
+New/active jobs return 202; settled replays return 200. Responses include a relative
+Location, no-store, and Retry-After only while work remains. These routes use
+app-only Entra authentication, independently of staff browser sessions.
+
+The unscheduled POST `/api/cron/drain-machine-prompt-jobs` requires the exact cron
+secret and advances one server-selected stage. Power Automate does not receive
+that secret or choose a worker job ID. Before Connor can run a full test, the
+approved deployment must arrange bounded worker ticks; accepting a job alone
+will not advance it.
+
+`PROMPT_JOB_MACHINE_PILOT` is a default-off, exact server policy. It pins the
+sandbox deployment/target, tenant/audience/caller/service principal/role, pilot,
+Request/source event, prompt ID/version/hash, profile hash, actual database
+endpoint plus cluster/database fingerprint, and an expiry no more than seven days
+away. DAL and target enforcement must both be on; the independent snapshot nonce
+must be stable. See the credentials runbook for exact configuration. No new
+schema, security role, registration or schedule is created by this code.
+
+Admission first verifies the database and locks/replays/counts receipts, commits,
+then reads the source and prompt outside a transaction. A second pinned transaction
+rechecks replay/quota and admits the frozen configuration. Invalid source returns
+422 without consuming the pilot slot; changed keys hit the one-job cap even after
+content expiry. Configuration stores hashes/provenance, not source text. The
+sealed snapshot retains the original title/abstract as untrusted records, without
+a fabricated document. Invited Requests are excluded to avoid the legacy title
+cron's current eligible cohort.
+
+The worker rechecks policy, source and original Request version before dispatch,
+including after durable dispatch intent. It uses the shared Executor, validates
+and normalizes the title, records a content-free audit, then conditionally patches
+only the approved field using the captured ETag. Existing nonblank/whitespace
+content is protected. A later row edit yields conflict; ambiguous delivery remains
+unknown, without automatic resend. Within the pinned ledger/deployment, the pilot receipt prevents refilling a later
+staff-cleared field. Do not re-pilot the same Request under a different database
+or deployment to bypass that receipt; cross-database initialization is not fenced. It cannot constrain unrelated writers: the legacy cron could
+still fill a cleared field if Request eligibility later changes.
+
+Source/response content expires after 24 hours; configuration/result/audit content
+after seven days. Exact-scope cleanup can run with a valid disabled/expired policy,
+but cannot run when the policy is absent or malformed. Receipts remain permanently
+for replay/quota. Deployment environment changes require a redeploy; offline
+policy-change tests do not prove instantaneous production revocation.
+
+### Remaining before Connor's live test
+
+1. Offline integration and the Opus 5.5 review are complete for the branch
+   implementation; use the evidence below when preparing activation.
+2. Verify the actual API/caller registration and Power Automate app-only token
+   issuance with Connor. Reuse existing infrastructure where possible.
+3. Prepare the concrete sandbox deployment/configuration and unpublished
+   `preflight.short-title` definition for approval. Probe the runtime database
+   role's access to `pg_control_system()` and confirm exact endpoint/identity.
+4. Obtain approval for publication, deployment/configuration and a bounded paid
+   model/audit/field-write trial, then prove first fill, duplicate delivery and
+   original-ETag protection with the real connection.
+5. Give Connor the verified URL/audience/permission, Request/event/key, exact
+   submit/status example and expected field outcome. No message has been sent.
+   Expand to other prompts after destination/write contracts are agreed; keep
+   general proposal-document selection open until caching work settles.
+
+### Draft setup brief for Connor (not sent)
+
+We have built the first Power Automate prompt path for Short Title. Your flow will
+submit a Request GUID, source-event GUID and stable idempotency key; the backend
+will read the published Dataverse prompt, generate/validate the objective, and
+initialize `wmkf_wmkfprojectdescription` only when blank and unchanged. Repeated
+submissions return the same job. The flow then polls authenticated status; it does
+not call Anthropic or write the output field itself.
+
+Before the first sandbox test, we need to identify the existing Power Automate
+connection/caller application, if any, and prove that it can obtain an app-only
+Entra v2 token for this API. We will provide the approved endpoint, audience,
+permission, pinned test Request/event and exact request example after that setup
+is verified. The code is not deployed or enabled yet. This first test deliberately
+uses title and abstract fields; the general proposal-document source remains open.
 
 ## Verification and review receipts
+
+### Short Title machine integration (November 12)
+
+[VERIFIED via source and offline tests] The final combined run passed **625 tests
+in 30 suites**, with no skipped tests. It includes real RSA authentication,
+route/proxy policy, source bounds, record-only task isolation, the actual Executor
+with a fake provider, real PostgreSQL admission/worker/publication, conditional
+write-core transport, human edits and clearing, unknown audit/write outcomes,
+post-intent denial/unavailability, and disabled/expired exact-scope cleanup.
+No live application provider, Dataverse or shared database was invoked. The
+isolated `wmkf-pa-title-20261112` PostgreSQL container was removed after its test
+schemas were confirmed absent. Type
+checking and relevant API, DAL/context, route boundary, injection tagging, Atlas,
+secret/scaffolding, documentation and fact gates passed, with their applicable
+self-tests run sequentially. The existing three external-materials guard warnings
+remain; the inherited J27-066 documentation failure is outside this change.
+
+Opus 5.5 reviewed the plan and build via subscription OAuth, tools disabled. The
+user approved the exact build packet, SHA-256
+`43638d14e779757cccab41e44283c8afd80048c90be3bbed89e266a2cc9fa0b2`.
+Receipt: `/private/tmp/wmkf-pa-title-build-review-20261112.json` (supplementary).
+The verdict was NAMED CHANGES. Root adjudication and closure:
+
+- C1 accepted: a failed post-intent check before returning to the Executor is
+  known not to have called the provider. It now terminalizes as
+  `failed_pre_dispatch`, releases its slot, retains quota and never retries.
+  Three actual-Executor/SQL race tests prove denial and unavailable checks.
+- C2 accepted: record-only profiles are reserved for the exact title definition.
+  Publication, admission and composition reject proposal/synthetic use of that
+  profile, including a correctly sealed negative-test snapshot.
+- C3 refuted: `machine-admission-proof.js` already existed at the base commit,
+  remains an offline regression fixture, and is neither newly added nor connected
+  to runtime by this change. No destructive removal was needed.
+- P1–P5 resolved by source and tests: the write core preserves the exact original
+  If-Match and 412 status; cleanup predicates bind all four scope fields; admission
+  validates the extended configuration and capability; record manifests survive
+  sealing; `PowerAutomate Test` maps to accepted run-source value 682090004.
+- N1/N2/N3/N5 addressed: generic admission rejects the reserved scope; Request and
+  audit writes pin the actual origin after token acquisition; title metadata
+  explicitly requires empty system text and temperature zero (token ceiling was
+  already enforced); stale source comments were corrected.
+- N4 intentionally retains conservative validation: noncanonical punctuation may
+  be rejected as `failed_validation`. Broadening legacy title normalization is
+  unnecessary for safe delivery and would change a separate caller's behavior.
+
+Root also found that PostgreSQL connection query parameters could override a URL
+host. The policy now rejects overrides, duplicate parameters and fragments; only
+one optional `sslmode=require` or `sslmode=verify-full` is accepted. Focused tests
+prove this and actual Dataverse origin changes across token acquisition. These
+bounded fixes were closed by source review and regression tests; another review
+iteration would not add useful evidence. This is an engineering verdict, not
+live deployment or prompt-quality approval.
+
+The scoped durable-fact pass updated the handoff, Executor contract, architecture,
+Atlas, credentials runbook, service catalog, route matrix and generated route count
+(333). Historical test receipts below remain dated history. Deployment, actual
+Entra/Power Automate issuance, published prompt/profile rows, hosted database-role
+identity permission and real source/write behavior remain unverified activation
+prerequisites. No whole-repository or live-state reconciliation is claimed.
 
 ### Status/delivery slice
 
@@ -264,8 +385,8 @@ bounded changes. Final combined verification passed 218 tests: 62 authentication
 84 status, 50 delivery and 22 real-PostgreSQL cases. Scoped lint/types, DAL/context
 gates with sequential self-tests, and documentation gates passed. The isolated
 `wmkf-pa-delivery-20261111` PostgreSQL container was removed after its unique test
-schemas were confirmed absent. Real route, grant, scheduler, source and Dataverse
-wiring remain required before a deployment verdict.
+schemas were confirmed absent. This historical slice did not include routes or source wiring. The current
+branch-built pilot above still requires live activation and connector proof.
 
 ### Earlier authentication/admission slice
 
@@ -308,5 +429,4 @@ failure, not a green whole-repository result.
 
 Durable-fact scope: new offline components only. Existing architecture/interface
 references to a future **deployed** PA endpoint remain accurate; the discovery
-handoff and SESSION_PROMPT describe dated prior sessions. Shared V4 docs remain
-owned by the other active session. No whole-repository reconciliation claimed.
+handoff and SESSION_PROMPT describe dated prior sessions. Shared V4 source/docs were released and integrated; that session is now archived. No whole-repository reconciliation claimed.

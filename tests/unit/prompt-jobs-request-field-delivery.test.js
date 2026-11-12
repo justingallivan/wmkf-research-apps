@@ -10,7 +10,7 @@ const requestId = randomUUID();
 const operationId = randomUUID();
 const job = () => ({ id, request_id: requestId, operation: 'initialize', environment: 'test',
   principal_key: 'app:fixture', authorization_scope: 'pa:fixture', target_etag: 'W/"123"' });
-const tasks = [{ task_key: 'grantee-title.generate', destination_field: FIELD }];
+const tasks = [{ task_key: 'preflight.short-title', destination_field: FIELD }];
 function setup(value = null) {
   const authorize = jest.fn(async () => true);
   const readRequest = jest.fn(async () => ({ _etag: 'W/"123"', [FIELD]: value }));

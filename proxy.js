@@ -40,6 +40,11 @@ const GRAPH_UPLOAD_ORIGIN = 'https://*.up.1drv.com';
 const PRESENTATION_UPLOAD_PAGE = /^\/meeting-tracker\/visits\/[^/]+\/?$/;
 const TRANSCRIPTION_PILOT_PAGE = /^\/admin\/transcription-pilot(?:\/|$)/;
 const PRESENTATION_MATERIALS_PAGE = /^\/external\/presentation\/[^/]+\/?$/;
+export function isMachinePromptRoute(pathname = '') {
+  return pathname === '/api/automation/prompt-jobs' ||
+    /^\/api\/automation\/prompt-jobs\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pathname);
+}
+
 // Outside-facing and auth surfaces; every other page is a staff page.
 const NON_STAFF_PAGE = /^\/(?:external|apply|auth|api)(?:\/|$)/;
 
@@ -220,7 +225,7 @@ export default async function proxy(req, event) {
     pathname, method: req.method, searchParams: req.nextUrl?.searchParams,
   });
   if (!policy.dedicated) {
-    if (isLegacyProxyPassThrough(pathname)) return NextResponse.next();
+    if (isMachinePromptRoute(pathname) || isLegacyProxyPassThrough(pathname)) return NextResponse.next();
     return sharedAuthProxy(req, event);
   }
   if (!policy.identityVerified || !policy.allowed

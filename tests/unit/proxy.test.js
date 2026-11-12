@@ -346,3 +346,13 @@ describe('proxy authorized callback', () => {
     });
   });
 });
+
+describe('machine prompt proxy route boundaries', () => {
+  const { isMachinePromptRoute } = require('../../proxy');
+  test.each(['/api/automation/prompt-jobs','/api/automation/prompt-jobs/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'])('passes exact machine route %s to route authorization', path => {
+    expect(isMachinePromptRoute(path)).toBe(true);
+  });
+  test.each(['/api/automation/prompt-jobs/','/api/automation/prompt-jobs/not-a-guid','/api/automation/prompt-jobs/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/result','/api/automation/other'])('does not pass adjacent path %s', path => {
+    expect(isMachinePromptRoute(path)).toBe(false);
+  });
+});

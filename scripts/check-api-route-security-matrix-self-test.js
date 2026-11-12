@@ -79,6 +79,12 @@ function buildFixtures() {
       expectWarned: true,
     },
     {
+      name: 'machine-guard',
+      source: "export default function handler(req, res) { requireMachinePromptAccess(req); res.end(); }\n",
+      matrixRow: row('machine-guard', 'Machine', '`requireMachinePromptAccess`'),
+      expectWarned: false,
+    },
+    {
       name: 'known-guard',
       source: "import { requireAppAccess } from '../../lib/utils/auth';\nexport default function handler(req, res) { requireAppAccess(req, res); res.end(); }\n",
       matrixRow: row('known-guard', 'App-scoped', '`requireAppAccess`'),
