@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## November 2026 — Shared Executor native recommendations proven in Sandbox (Session 674, Codex)
+
+**Milestone:** The shared Executor admitted, generated, validated and served a retained native-schema recommendations draft in Sandbox.
+**Sessions:** Session 674 covered the shared architecture, four bounded trials and Opus 5.5 reviews.
+**Ship state:**
+- The branch implements sealed context, versioned task profiles and a durable PostgreSQL ledger with fenced dispatch, recovery, audit and retention.
+- Compiler version 2 constrains recommendation GUIDs to the frozen roster and preserves closed validation and compiler version 1 compatibility.
+- The first three trials withheld invalid results. The fourth retained a validated draft after one call, delivered its audit and returned available/current through the signed Sandbox GET.
+- Sandbox proof only, with no Request-field writes or deployment. Power Automate integration was handed off separately.
+**Why it matters:** The trial verified that one shared backend can retain and serve a draft while preserving exact authorization, freshness and audit boundaries.
+**Pointers:** [Shared Executor architecture](docs/plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md), [native Sandbox trial](docs/plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#live-native-schema-trial-outcome), commits `aa763f044`, `d6919c949`, `23b39df83`.
+
 ## November 2026 — J27 First Cut ships in Workbench (Session 667, Codex)
 
 **Milestone:** J27 lead PDs and superusers can save First Cut on the Proposal tab.

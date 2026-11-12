@@ -1,59 +1,74 @@
-# Session 674 Prompt: Shared pre-flight prompts and proposal caching
+# Session 675 Prompt: Shared Executor trial complete; PA integration handed off
 
-## Session 673 Summary (Codex, 2026-11-10)
+## Session 674 Summary (Codex, 2026-11-11)
 
-Owner requested stopping discovery and resuming architecture planning/building next session.
-Detailed decisions, spreadsheet inventory, source evidence, live Admin edits, and proposed phases:
-`docs/plans/PREFLIGHT_PROMPTS_HANDOFF_2026-11-10.md`.
+**Destination:** `codex/coordinated-start-2026-11-10-b`, isolated worktree
+`/private/tmp/wmkf-coordinated-start-2026-11-10-b`. Keep runtime and session docs
+on this branch; no main promotion or deployment. Numbering is branch-local.
+The preceding complete handoff is retrievable with
+`git show 23b39df83:SESSION_PROMPT.md`; its inherited concurrent-stream index
+also points to `33a233633:SESSION_PROMPT.md`. Both are historical, not current
+permissions or worktree authority.
 
-Docs destination and resume branch: `codex/coordinated-start-2026-11-10-b`.
-No runtime changes or main promotion. Complete preceding handoff is preserved at
-`git show 33a233633:SESSION_PROMPT.md`; read it for other streams' constraints before acting.
-Session numbering is local to this branch; reconcile concurrent numbering on any later merge.
+### Completed — verified by source, tests and controlled live trial
 
-### Completed
+- Built the shared profile/context, durable job/checkpoint and typed recommendation architecture; authoritative boundaries are in `docs/plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md` and `docs/plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md`.
+- Added compiler 2 native JSON Schema derived from the frozen roster, preserving compiler 1 checkpoints and closed domain validation. No output repair, automatic retry or fallback.
+- Ran four authorized Sandbox trials on Request 1000339. Prior failures remain intact. The fourth returned complete valid JSON: 548 output tokens, 1,869 characters, all measured brevity targets, no identity/schema errors or duplicate recommendations.
+- Fourth job `27232d4d-1be9-4489-b7a1-1fda69b05551`; sole-current Sandbox prompt v4 `6e1443be-e662-41ca-bcc0-469614c00745`; success audit `20754273-7a8e-4619-9a44-5199d1f12022` delivered/read back. Normal Microsoft OAuth staff GET returned available/current; anonymous GET redirected to sign-in.
+- One HTTP 200 provider POST; usage-based estimate $0.15441075 versus conservative preflight ceiling $1.212980. Shared PostgreSQL host `ep-frosty-credit-afovxswa-pooler.c-2.us-west-2.aws.neon.tech`, database `neondb`, was explicitly approved for scoped ledger writes. No Request-field writes, Production Dataverse writes or deployment.
+- Opus 5.5 ordinary OAuth plan/build reviews completed; named changes were closed by focused tests and source review. Exact packet hashes and evidence are in the task-interface plan. The local server is stopped and the roster/source coordination hold is released.
 
-- Saved workbook H:Q preflight field requirements, Flags/List caveats, and existing prompt analogs in the linked handoff.
-- Production Admin: adapted PD expertise prompt v1 stored under Pre-flight, unconnected; short-title v2 set to Sonnet 5.5 / 4096 tokens and moved to Pre-flight. UI readbacks verified then; re-read before edits.
-- Verified Executor caches system instructions, not proposal user text; 22 mocked boundary/transport tests pass. No paid model runs.
-- Owner selected PA triggering one backend Executor, replacing the earlier proposed PA-native executor direction. Architecture remains planned, not built.
+### Key commits
+
+- `7b140b6ee`, `3ce88acb6` — roster-derived schema and conflict guidance.
+- `aa763f044`, `62b396ddf` — native compiler, compatible checkpoints and documentation.
+- `d6919c949` — exact fourth-trial admission, candidate, runner and failure-path tests.
+- `23b39df83` — successful trial evidence and eight reconciled documentation surfaces.
 
 ## Next Items
 
 ### Verified Open
 
-1. Refine the opt-in task/profile contract, Admin editing design and document-cache composition. Evidence: current composeMessages/callProvider/applyVariableBoundaries in `lib/services/execute-prompt.js`; linked handoff records gaps.
-2. Design authenticated PA submission/status and durable retry/writeback contract after checking existing job infrastructure and Atlas. No generic endpoint was built here.
-3. Discuss Executive Summary wording/audience with Justin, using Phase I Writeup Draft's 150–200-word summary section. Chairs sharing is changing. Then discuss remaining workbook prompts individually.
+1. **Staff assessment of recommendation quality.** Structural, identity, length and freshness checks passed; scientific suitability and conflict clearance are still human review. Evidence: task-interface plan, “Live native-schema trial outcome.” Do not treat a zero-conflict model result as independent clearance.
+2. **Due-only retention cleanup for the four jobs.** Commands and each job’s deadlines are in the task-interface plan. Fourth source/response deadline: `2026-11-13T04:03:52.504Z`; configuration/result/audit deadline: `2026-11-19T04:03:52.504Z`. These are Nov 12 and Nov 18 at 9:03:52 p.m. America/Phoenix. Recheck current time, exact job/database bindings and retained content before acting. No cleanup was run by this stop. The runner's `expire` mode refuses early cleanup; preserve quota receipts and the approved SharePoint PDF.
+
+### Handed Off — do not duplicate
+
+Power Automate integration is owned by the other Codex chat
+`01a1c633-9230-78c3-ad45-13450c921093`, branch
+`codex/power-automate-integration-2026-11-11`, recorded worktree
+`/private/tmp/wmkf-pa-integration-20261111`. Its owner reported an isolated
+machine-auth/admission proof and ongoing status/ETag delivery work; those
+changes were not audited or imported here. Read its current handoff and
+`docs/plans/POWER_AUTOMATE_PROMPT_HANDOFF_2026-11-11.md` on that branch before
+planning. User priority there is plumbing and Dataverse field delivery, not
+further prompt wording. Shared surfaces were released after `d6919c949`.
 
 ### Parked / Owner Decisions
 
-- PD assignment integration waits for roster readiness; stored prompt is unconnected.
-- Exact document inputs, destinations, controlled keyword lists, audiences, and rerun policy need discussion before implementation.
-- Native JSON schemas can invalidate shared caches; preserve validation and test actual reuse before claiming savings.
+- Production rollout, broader machine enablement, scheduling, additional prompt destinations and Request writeback are outside this completed trial. Coordinate with the PA owner; do not infer deployment/provisioning authority.
+- Native schema acceptance is proven for this one proposal/roster. Broader quality, schema scale and cache savings are not established by this result.
 
 ### Do Not Reopen Without New Decision
 
-- One backend Executor for app and PA; no duplicated PA Anthropic executor.
-- Legible task instructions separate from shared security/cache machinery.
-- No automatic reruns/flags on file replacement (inherited J27 constraint); snapshots apply when a run is explicitly initiated.
-- No main runtime promotion, paid tests, environment changes, fixture cleanup or unrelated work authorized by this handoff.
+- No fifth job or extra paid generation is authorized. The durable quota rejects a fifth receipt, including after content cleanup. Ask before any future authorized generation expected to exceed $10.
+- Keep one backend Executor for app and PA, exact caller authorization, sealed source/roster bindings and strict domain validation. No guessed identities, result unwrapping, repair generation or duplicated PA provider executor.
+- No automatic reruns on file replacement; no main promotion, environment changes, credential provisioning, or other-session worktree switching.
 
-## Concurrent streams — inherited, not freshly audited
+## Concurrent workstreams — compact routing index
 
-| Stream | Last worked by | Resume in | Read first | First step |
-|---|---|---|---|---|
-| **A. J27 cycle page and request page** | Claude, Session 672 (2026-11-10) | `/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model`, checked out on `claude/j27-cycle-page` at `0bfca223d`, pushed. `claude/j27-read-model` (the sandbox Preview branch) is at `393da5dde`, two documentation commits behind | Stream A below; alignment log D53 to D61 on the branch | Give the sandbox test requests J27-shaped files (Stream A, Verified Open 1) |
-| **B. Expertise roster** | Codex, Session 670 | `codex/expertise-roster-foundation-2026-11-09` at `1aedcb25d`, pushed (unverified work in progress; last verified foundation `d2b467e84`). Recorded worktree `/private/tmp/wmkf-codex-isolated-start-2026-11-09` | Stream B below; `docs/plans/EXPERTISE_ROSTER_HANDOFF_2026-11-09.md`, which is the authoritative resume boundary | Review and test the work in progress before extending it |
-| **C. Request narratives** | Codex, Session 669 | `codex/request-narratives-2026-11-09` at `06e1ba6a4`, pushed and verified. Recorded worktree `/private/tmp/wmkf-request-narratives` | Stream C below; `docs/plans/REQUEST_NARRATIVES_HANDOFF_2026-11-09.md` | Power Automate initialization contract with Connor, then the J27 integration review |
+| Stream | Owner / recorded boundary | Resume source |
+|---|---|---|
+| Shared Executor / expertise trial | This chat; complete at `23b39df83`, stop docs follow | Task-interface plan and this branch |
+| Power Automate integration | Other Codex chat, branch above; active owner-reported work | Its current handoff and PA prompt handoff plan |
+| Expertise roster | Same other chat; prior roster checkout recorded clean at `0b4c88a79`; no current hold | `docs/plans/EXPERTISE_ROSTER_HANDOFF_2026-11-09.md` and owner confirmation |
+| J27 / Request narratives / other inherited streams | Not re-audited here | Historical complete index at `23b39df83:SESSION_PROMPT.md` and `33a233633:SESSION_PROMPT.md`; verify current owner before acting |
 
+## Verification and local artifacts
 
-The table is a dated index from `33a233633:SESSION_PROMPT.md`, not current authorization or live branch verification. Full constraints, other streams (Factory/reports), preservation rules and unresolved decisions remain retrievable at that exact Git reference. Do not switch or modify their worktrees.
-
-## Testing and close
-
-- Startup: 72 gates/self-tests passed sequentially in this worktree earlier this session.
-- Focused Executor suite: 22 tests passed; provider behavior untested live.
-- Claim-evidence report unavailable; no row invented. Memory router unchanged.
-- No DEVELOPMENT_LOG entry required: architecture not shipped; only prompt/config edits in Admin.
-- CLAUDE.md unchanged. Documentation-only commit and push on this branch; see Git log for the handoff commit.
+- 232 unit tests / nine suites; 93 real disposable PostgreSQL tests / three suites; final affected PostgreSQL suite 60 tests after review closure. Scoped lint/types, source gates and self-tests, documentation gates and isolated production webpack build passed.
+- No active local server or disposable database remains from this trial. Private state is local-only under `/private/tmp/wmkf-expertise-sandbox-trial-1000339-v4-20261111`; `e2e-receipt.json` is the clean content-free receipt. Do not commit credentials, snapshots, results or private state. On another machine, do not reconstruct missing state or copy secrets into Git; obtain a deliberate secure handoff before cleanup.
+- Claim-evidence report was attempted but local state was unavailable; no observation row invented. Memory router unchanged.
+- Milestone determination: a new architecture was built and proven in Sandbox, so a DEVELOPMENT_LOG milestone is required and included in this stop. CLAUDE.md conventions remain unchanged.
+- Stop documentation and push stay on this feature branch. Check Git log and remote tracking for the final stop commit.
