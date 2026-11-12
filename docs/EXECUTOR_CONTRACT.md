@@ -643,7 +643,8 @@ checkpoint binding and text result shape continue to apply to text tasks.
 
 The task pins `contractVersion:2`, an explicit compiler version and the
 code-owned `expertise-recommendations-v1` result contract. The original
-fixture and three live trial prompts selected compiler version 1.
+fixture and first three live trial prompts selected compiler version 1.
+The fourth trial selected compiler version 2.
 Admission freezes the roster
 fingerprint. The v2 sealed snapshot carries private roster context for
 validation. The composer rebuilds the visible `roster_block` from that
@@ -660,8 +661,9 @@ the prompt, provider request and both budgets, and adds a canonical
 provider-schema hash to the existing typed checkpoint binding. A changed
 schema invalidates that checkpoint for recovery. The frozen parser
 specification and closed domain validator still decide acceptance.
-Compiler version 1 keeps its existing payload and binding. No prompt
-publication or additional trial is included. [Native compiler contract](plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#native-recommendation-output-compiler).
+Compiler version 1 keeps its existing payload and binding. The fourth
+Sandbox trial verified one native call and authenticated delivery of a
+validated result. [Native compiler contract](plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#native-recommendation-output-compiler).
 
 The Executor checks the model JSON against the closed roster contract
 before projection and derives canonical recommendation fields from the
@@ -688,12 +690,12 @@ registered Sandbox target, ledger database identity, staff/app scope
 and current prompt/profile definition before admitting a sole
 `expertise.recommendations` draft. A durable admission fence counts every
 Sandbox recommendations receipt across both Sandbox environment labels.
-The only successors are the two authorized jobs in the exact retained
+The only successors are the three authorized jobs in the exact retained
 lineage. Fresh admission requires the pinned prior job or jobs, their
 specific terminal validation failures, delivered audits and unexpired
 configurations. Each uses the same actor/app, Request, source, profile
-and database, plus a new scope, key and prompt revision. All three
-receipts count after expiry, so the fence refuses a fourth job. Exact
+and database, plus a new scope, key and prompt revision. All four
+receipts count after expiry, so the fence refuses a fifth job. Exact
 authorized replay keeps the original frozen job.
 The source producer extracts the same bounded PDF bytes it hashes, with
 no PI lookup. The v2 snapshot seals the proof and exact roster. The

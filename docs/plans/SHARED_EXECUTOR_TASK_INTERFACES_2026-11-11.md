@@ -1,6 +1,6 @@
 # Shared Executor task interfaces
 
-**Status [BRANCH-BUILT, offline fixture and default-off Sandbox runtime], [LIVE-VERIFIED, three bounded trials through authenticated withholding], and [PLANNED, broader caller integration].**
+**Status [BRANCH-BUILT, offline fixture and default-off Sandbox runtime], [LIVE-VERIFIED, four bounded trials with one authenticated current result], and [PLANNED, broader caller integration].**
 This checkpoint coordinates the proposal-draft and expertise recommendation
 streams. The shared infrastructure owner controls the capability
 registry, Admin compiler, authorization, Executor, worker and ledger. The roster
@@ -121,8 +121,8 @@ projection. The route reuses the offline facade's receipt, owner,
 authorization and expiry fences.
 
 The GET remains read-only. The local operator trial below supplies a
-separate admission path. A signed GET returning an available, current
-Sandbox result remains unverified. The trial uses Sandbox Dataverse and
+separate admission path. The fourth trial verified a signed GET returning
+an available, current Sandbox result. The trial uses Sandbox Dataverse and
 the approved shared PostgreSQL ledger. PA and deployment remain outside
 the trial.
 
@@ -218,8 +218,9 @@ local signed GET. The browser showed only the Request and job IDs,
 task key, contract version, expiry, `status: unavailable` and
 `freshness: unknown`. The separate anonymous GET returned 307 to
 sign-in. This verifies authenticated withholding after a failed
-generation. A signed GET with an available, current recommendation
-remains unverified. The local server was stopped after the check.
+generation. At that point a signed GET with an available, current
+recommendation was still unverified. The local server was stopped after
+the check.
 
 ### Sandbox trial retention
 
@@ -318,8 +319,8 @@ The normal Microsoft OAuth session read only the second job's metadata,
 with `status: unavailable` and `freshness: unknown`. The separate
 anonymous GET returned 307 to sign-in. The local server was stopped
 after the check. The two trials verify withholding on distinct validation
-failures. An available, current recommendation has yet to be verified
-live. The trial made no Request-field writes or deployment. At the time
+failures. An available, current recommendation was still unverified
+at that point. The trial made no Request-field writes or deployment. At the time
 of this run, both receipts counted against the two-job quota. The
 separately approved third trial below tests a tighter response-length
 instruction while keeping the closed JSON and role validator.
@@ -364,7 +365,7 @@ boundary.
 | --- | --- |
 | Exact lineage | Under the same Sandbox-wide transaction lock, fresh admission requires the two exact prior jobs and no other Sandbox recommendations job. Each has one terminal task and attempt and a delivered audit. The v1 error must be `profile_output_invalid` and the v2 error `claude_output_truncated`. |
 | Frozen pins | Both retained configurations must be unexpired. The store reconstructs the v1 and v2 command hashes from the exact receipts and requires the same Request, staff actor, backend app, database, source and profile pins. |
-| Identity and quota | The third job uses a new scope, idempotency key and prompt GUID at version 3. Exact replay precedes new admission checks. All three receipts remain quota-bearing after cleanup, and the fence rejects a fourth job. |
+| Identity and quota | The third job uses a new scope, idempotency key and prompt GUID at version 3. Exact replay precedes new admission checks. All three receipts remain quota-bearing after cleanup. At this revision the fence rejected a fourth job. |
 | Publication | The operator verifies the unchanged profile and the exact two-row prompt history, with v1 noncurrent and v2 current. It creates v3 noncurrent, conditionally demotes v2 and promotes v3 with same-observation ETags and persisted write intents, and reads back sole-current v3. The earlier prompt bodies and v1 state remain intact. Uncertain publication stops for inspection. |
 | Dispatch and retention | One draft task permits at most one Sonnet 4.6 call after the existing source/roster, access and spend checks. The same checkpoint, validator, audit and read guards apply. Source/response expiry remains 24 hours and configuration/result/audit expiry seven days for the third job. |
 
@@ -470,8 +471,8 @@ The normal Microsoft OAuth browser session displayed only the exact
 job's metadata with `status: unavailable` and `freshness: unknown`.
 An anonymous GET returned 307 to sign-in. The local server was stopped
 after verification. The trial made no Request-field writes or
-deployment. The ledger retains all three receipts and denies a fourth
-job. This outcome motivated the offline native compiler below. A
+deployment. At this revision the ledger retained all three receipts and
+denied a fourth job. This outcome motivated the offline native compiler below. A
 post-trial regression confirms that the
 validator accepts a valid inner recommendation object and rejects the
 same object under the metadata wrapper. The focused contract suite
@@ -559,9 +560,119 @@ review required no code changes. The additional evidence was verified
 locally without another review.
 
 Native schema acceptance, grammar overhead and cache behavior remain
-unverified against the provider. Any fourth trial would need a new
-reviewed prompt, policy and admission path, plus separate authorization.
-The current ledger still denies it. [Anthropic structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs).
+unverified against the provider. At the close of the offline compiler
+work, a fourth trial still needed a new reviewed prompt, policy and
+admission path, plus separate authorization. [Anthropic structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs).
+
+## Authorized native-schema trial
+
+[LIVE-VERIFIED] The owner approved one native-schema trial for the same
+Sandbox Request 1000339 and shared ledger. The
+[v4 candidate](EXPERTISE_SANDBOX_1000339_CANDIDATE_V4_2026-11-11.json)
+has SHA-256 `2ee6db99915482d5d1f22dd7a523eb73c45fb63ddd2924a6468d285c10562fb7`.
+It changes the task body and selects compiler version 2. The profile,
+model, temperature, 4,096-token ceiling and result contract stay fixed.
+It keeps the role and brevity instructions and asks for the direct
+recommendation object, including empty arrays only for categories
+present in the native schema.
+
+[VERIFIED via the plan review receipt] The 114,345-byte ordinary OAuth
+packet had SHA-256
+`007bb41bf5850abe648c62860a84a84697a766608b8a7d51d7b85ab61e0035e7`.
+The one-turn review reported only `claude-opus-5-5` and 106,664 ms
+elapsed. Its verdict was NAMED CHANGES. The review requires the
+operator to reconstruct each historical prompt row from its own
+candidate, allow only the v4 body and compiler-selection delta,
+and cross-check prior local receipts. It also asks for a test of the
+actual provider wire shape and one-call failure handling, plus proof
+that the closed version mapping preserves v1–v3 replay and binds v4
+to compiler 2. The offline candidate check must exercise omitted
+category arrays and the existing normalization to empty arrays.
+
+The approved run permits one Sonnet 4.6 request after fresh source,
+roster, actor, prompt and budget checks. It requires separate owner
+confirmation if the expected generation cost exceeds $10. An
+unavailable or rejected response does not authorize another dispatch.
+The operator initialized private state and verified read-only source
+preparation before publication and dispatch.
+
+[VERIFIED via branch source at `d6919c949` and loopback PostgreSQL]
+Under the same transaction lock, fresh v4 admission requires exactly
+the three pinned prior jobs. It checks their terminal errors, delivered
+audits, unexpired configurations and original grant hashes. V1–v3 retain
+compiler 1 and their replay hashes. V4 requires compiler 2 and a new
+scope, key and prompt GUID at version 4. All four receipts count after
+content expiry. The fence denies a fifth job.
+
+The runner reconstructs each historical prompt row from its own
+candidate. It permits only the v4 task-body and compiler-selection
+changes, then fences the exact history switch with fresh ETags and
+persisted intents. Offline checks verified omitted category arrays
+normalize to empty arrays. The actual mocked Executor-to-LLMClient
+request passed the exact native wire guard, including rejection of
+extra request options. A definitive provider 400 stays terminal;
+an uncertain 503 stays held. Both produce a scoped content-free audit
+and neither permits a repeat request.
+
+[VERIFIED via build review and local checks] The 252,133-byte source
+packet had SHA-256
+`0729d783966d8a1a16ce7232b10aaf31b3551e09efee736d3ce182ed30890e8b`.
+The one-turn ordinary OAuth review used only `claude-opus-5-5`, took
+137,421 ms and returned NAMED CHANGES. It accepted the core lineage,
+publication and audit contracts. The local closure verified the actual
+runner wrapper, waiting before dispatch on unavailable schema
+derivation, durable guard-denial metadata, content-free preflight
+schema counts and the offline schema subset check. The 232 unit tests
+across nine suites and the earlier 93 tests across three real
+PostgreSQL suites passed. The final affected PostgreSQL suite passed
+60 tests after the review fixes. Scoped lint, types, runner guards and
+the isolated environment-free production build passed.
+
+### Live native-schema trial outcome
+
+[VERIFIED via scoped publication, ledger and audit readback, provider
+receipt, and signed browser GET] Sandbox prompt
+`6e1443be-e662-41ca-bcc0-469614c00745` became sole-current v4.
+Job `27232d4d-1be9-4489-b7a1-1fda69b05551` completed with one Sonnet
+4.6 POST, HTTP 200, and no runner guard denial. The provider accepted
+the exact 6,342-byte native schema with 88 enum entries in this run.
+The preflight input bound was 137,914 with 4,096 output tokens and a
+$1.212980 estimated ceiling.
+
+The response ended at `end_turn` with 548 output tokens and 1,869
+characters. The closed validator passed with zero schema or identity
+issues. The retained draft has two leads, zero staff consultations,
+three consultant overlaps, one Board entry and zero conflicts. The
+longest rationale was 19 words and 153 characters. The gap was 257
+characters and the Board note 62 characters. All trial targets passed
+with zero duplicate or conflicted recommendations. This verifies the
+output contract on this proposal and roster. Scientific suitability
+and conflict-of-interest clearance require staff review.
+
+Provider usage was 17,109 input, 548 output, 25,297 cache-write and
+zero cache-read tokens. Estimated usage cost was $0.15441075.
+Content-free success audit `20754273-7a8e-4619-9a44-5199d1f12022`
+was delivered and read back.
+
+The normal Microsoft OAuth Chrome session first saw unavailable/unknown
+metadata during completion. After reload it showed the validated
+result as available/current. An anonymous GET returned 307 to sign-in.
+The local server was stopped. The trial made no Request-field writes,
+Production Dataverse writes or deployment. The ledger retains all
+four receipts and denies a fifth job.
+
+### Fourth-trial retention
+
+Run exact-job expiry after **2026-11-13 04:03:52.504 UTC** for source
+and response and again after **2026-11-19 04:03:52.504 UTC** for
+configuration, validated result and audit content.
+
+```sh
+node scripts/run-expertise-sandbox-trial-1000339.cjs expire /private/tmp/wmkf-expertise-sandbox-trial-1000339-v4-20261111
+```
+
+The deletion checks remain due. The approved SharePoint PDF and all
+four quota-bearing receipts remain in place.
 
 ## Capability and result path
 
