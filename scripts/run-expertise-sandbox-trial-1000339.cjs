@@ -10,6 +10,11 @@ const root = path.resolve(__dirname, '..');
 const candidateDigest = '5060ea160f58ec90ab54736e40180cbddb61d8073089faa930e1cb8eb3d44679';
 const successorDigest = '8022bb7771a842efe533a5983c7059c3bff264b77cf54e2173dd0eac62f26795';
 const thirdDigest = '0c5ae42ab2b1023b2c2e04200b2a4f71ac48f01b4892f15d23500904e99d9889';
+const fourthDigest = '2ee6db99915482d5d1f22dd7a523eb73c45fb63ddd2924a6468d285c10562fb7';
+const thirdStatePath = '/private/tmp/wmkf-expertise-sandbox-trial-1000339-v3-20261111/state.json';
+const fourthDirectory = '/private/tmp/wmkf-expertise-sandbox-trial-1000339-v4-20261111';
+const thirdJobId = '21af0399-0fd7-4d5f-9eb2-b5a77d4ff1fd';
+const thirdPromptId = 'd4a0677b-58a9-46f7-a742-f9da5273cf62';
 const predecessorStatePath = '/private/tmp/wmkf-expertise-sandbox-trial-20261111/state.json';
 const secondStatePath = '/private/tmp/wmkf-expertise-sandbox-trial-1000339-v2-20261111/state.json';
 const thirdDirectory = '/private/tmp/wmkf-expertise-sandbox-trial-1000339-v3-20261111';
@@ -21,6 +26,7 @@ function candidateFile(digest) {
   if (digest === candidateDigest) return path.join(root, 'docs/plans/EXPERTISE_SANDBOX_1000339_CANDIDATE_2026-11-11.json');
   if (digest === successorDigest && /^[a-f0-9]{64}$/.test(successorDigest)) return path.join(root, 'docs/plans/EXPERTISE_SANDBOX_1000339_CANDIDATE_V2_2026-11-11.json');
   if (digest === thirdDigest && /^[a-f0-9]{64}$/.test(thirdDigest)) return path.join(root, 'docs/plans/EXPERTISE_SANDBOX_1000339_CANDIDATE_V3_2026-11-11.json');
+  if (digest === fourthDigest) return path.join(root, 'docs/plans/EXPERTISE_SANDBOX_1000339_CANDIDATE_V4_2026-11-11.json');
   throw new Error('Unknown candidate');
 }
 function readCandidate(digest) {
@@ -112,12 +118,64 @@ function allowedRead(url, method) {
   return ['GET', 'HEAD'].includes(method) && ['https://graph.microsoft.com',
     'https://orgd9e66399.crm.dynamics.com', 'https://appriver3651007194.sharepoint.com'].includes(url.origin);
 }
-function providerIntent(url, method, mode, body, posts) {
-  return mode === 'tick' && method === 'POST' && url.origin === 'https://api.anthropic.com'
+function providerIntent(url, method, mode, body, posts, nativeRequired = false, expectedNativeConfig = null,
+  canonicalize = value => req('./lib/services/prompt-jobs/profile.js').canonical(value)) {
+  if (!(mode === 'tick' && method === 'POST' && url.origin === 'https://api.anthropic.com'
     && url.pathname === '/v1/messages' && body?.model === 'claude-sonnet-4-6'
-    && body?.max_tokens === 4096 && posts === 0;
+    && body?.max_tokens === 4096 && posts === 0)) return false;
+  if (!nativeRequired) return true;
+  if (url.href !== 'https://api.anthropic.com/v1/messages' || !expectedNativeConfig || Object.keys(body).sort().join(',') !== 'max_tokens,messages,model,output_config,system,temperature'
+    || body.temperature !== 0 || !Array.isArray(body.messages) || body.messages.length !== 1
+    || body.messages[0]?.role !== 'user' || Object.keys(body.messages[0]).sort().join(',') !== 'content,role') return false;
+  try { return canonicalize(body.output_config) === canonicalize(expectedNativeConfig); } catch { return false; }
 }
-function checkGuards() {
+function createNativeExecutor({ executePrompt, row, canonical, parseExecutionSpec, composeProfileTask, effectiveProviderOutputSchema }) {
+  let expected = null;
+  return {
+    getExpectedNativeConfig: () => expected,
+    executePrompt: async args => {
+      let config;
+      try {
+        if (expected !== null || canonical(args.promptSnapshot) !== canonical(row)) throw new Error('Native dispatch binding mismatch');
+        const { profile, snapshot, scope, nonceSecret } = args.profiledContext || {};
+        const spec = parseExecutionSpec(args.promptSnapshot);
+        const composed = composeProfileTask({ promptRow: args.promptSnapshot, profile, snapshot, scope, nonceSecret });
+        const output = effectiveProviderOutputSchema(composed, spec);
+        if (spec.compilerVersion !== 2 || output.generationMode !== 'native-json-schema' || !output.jsonSchema) throw new Error('Native schema unavailable');
+        config = { format: { type: 'json_schema', schema: output.jsonSchema } };
+      } catch { throw Object.assign(new Error('Native dispatch check unavailable'), { code: 'dispatch_check_unavailable' }); }
+      expected = config;
+      try { return await executePrompt(args); } finally { expected = null; }
+    },
+  };
+}
+function denyProviderGuard(state, save) {
+  state.providerGuardDenied = true;
+  save();
+  throw new Error('Provider guard denied');
+}
+function lintNativeSchema(schema) {
+  const allowed = new Set(['type','properties','required','additionalProperties','anyOf','enum','items','description']);
+  const active = new Set();
+  function walk(node) {
+    if (!node || typeof node !== 'object' || Array.isArray(node) || active.has(node)) throw new Error('Native schema invalid');
+    active.add(node);
+    if (Object.keys(node).some(key => !allowed.has(key))) throw new Error('Native schema keyword invalid');
+    if (node.type === 'object' && node.additionalProperties !== false) throw new Error('Native schema object is open');
+    if (node.properties !== undefined) {
+      if (node.type !== 'object' || !node.properties || typeof node.properties !== 'object' || Array.isArray(node.properties)) throw new Error('Native schema properties invalid');
+      for (const value of Object.values(node.properties)) walk(value);
+    }
+    if (node.items !== undefined) walk(node.items);
+    if (node.anyOf !== undefined) {
+      if (!Array.isArray(node.anyOf)) throw new Error('Native schema union invalid');
+      for (const value of node.anyOf) walk(value);
+    }
+    active.delete(node);
+  }
+  walk(schema);
+}
+async function checkGuards() {
   const testLedger = { databaseIdentity: 'a'.repeat(64), hostname: LEDGER_HOST, database: LEDGER_DATABASE };
   const validUrl = `postgresql://fixture:fixture@${LEDGER_HOST}/${LEDGER_DATABASE}?sslmode=require`;
   checkDatabaseUrl(validUrl, testLedger);
@@ -185,6 +243,22 @@ function checkGuards() {
   reserveAuditIntent(auditState, runId);
   let retryDenied = false; try { reserveAuditIntent(auditState, runId); } catch { retryDenied = true; }
   if (!retryDenied || auditState.auditRunId !== runId) throw new Error('Audit retry guard self-test failed');
+  const v3 = readCandidate(thirdDigest), v4 = readCandidate(fourthDigest);
+  if (!validCandidateEvolution(v4, v3, true, canonical)) throw new Error('Native candidate evolution invalid');
+  const changed = JSON.parse(JSON.stringify(v4));
+  const changedVariables = JSON.parse(changed.task.variables);
+  changedVariables.variables[0].required = false;
+  changed.task.variables = JSON.stringify(changedVariables);
+  if (validCandidateEvolution(changed, v3, true, canonical)) throw new Error('Undeclared metadata drift accepted');
+  const candidates = [candidateDigest, successorDigest, thirdDigest, fourthDigest].map(readCandidate);
+  const historical = candidates.map((item, index) => candidateRow(item.task, `fixture-${index}`, index + 1));
+  const historyRows = historical.map((item, index) => ({ ...item, wmkf_ai_iscurrent: index === 2,
+    wmkf_ai_promptstatus: 682090001, _etag: `etag-${index}` }));
+  checkPublicationHistory(historyRows, historical[2], historical[3], historical.slice(0, 2), true, false, canonical);
+  const changedHistory = historyRows.map(item => ({ ...item })); changedHistory[0].wmkf_ai_promptvariables = historical[3].wmkf_ai_promptvariables;
+  let historicalDriftDenied = false;
+  try { checkPublicationHistory(changedHistory, historical[2], historical[3], historical.slice(0, 2), true, false, canonical); } catch { historicalDriftDenied = true; }
+  if (!historicalDriftDenied) throw new Error('Historical compiler drift accepted');
   const provider = new URL('https://api.anthropic.com/v1/messages');
   const good = { model: 'claude-sonnet-4-6', max_tokens: 4096 };
   if (!providerIntent(provider, 'POST', 'tick', good, 0)
@@ -196,24 +270,74 @@ function checkGuards() {
     || allowedRead(new URL('https://wmkf.crm.dynamics.com/api/data/v9.2/'), 'GET')
     || allowedRead(new URL('https://graph.microsoft.com/v1.0/me'), 'POST')
     || !allowedRead(new URL('https://graph.microsoft.com/v1.0/me'), 'GET')) throw new Error('Guard self-test failed');
+  const deniedState = {}; let savedDenial = false;
+  try { denyProviderGuard(deniedState, () => { savedDenial = deniedState.providerGuardDenied === true; }); } catch { /* expected */ }
+  if (!savedDenial) throw new Error('Provider denial was not persisted before rejection');
+  for (const invalidSchema of [{ type: 'object', properties: {} }, { type: 'string', maxLength: 10 }]) {
+    let denied = false; try { lintNativeSchema(invalidSchema); } catch { denied = true; }
+    if (!denied) throw new Error('Native schema lint self-test failed');
+  }
+  const factoryRow = { id: 'fixture' }; const delegatedError = new Error('delegate'); let calls = 0; let wrapper;
+  wrapper = createNativeExecutor({ row: factoryRow, canonical: JSON.stringify,
+    parseExecutionSpec: () => ({ compilerVersion: 2 }), composeProfileTask: () => ({}),
+    effectiveProviderOutputSchema: () => ({ generationMode: 'native-json-schema', jsonSchema: { type: 'string' } }),
+    executePrompt: async () => { calls++; if (!wrapper.getExpectedNativeConfig()) throw new Error('Missing scoped config'); throw delegatedError; },
+  });
+  let mismatchCode;
+  try { await wrapper.executePrompt({ promptSnapshot: { id: 'foreign' } }); } catch (error) { mismatchCode = error.code; }
+  if (mismatchCode !== 'dispatch_check_unavailable' || calls !== 0 || wrapper.getExpectedNativeConfig() !== null) throw new Error('Wrapper predispatch check failed');
+  let caught;
+  try { await wrapper.executePrompt({ promptSnapshot: factoryRow }); } catch (error) { caught = error; }
+  if (caught !== delegatedError || calls !== 1 || wrapper.getExpectedNativeConfig() !== null) throw new Error('Wrapper scope check failed');
+  const expectedNative = { format: { type: 'json_schema', schema: { type: 'object', properties: { profile_guid: { type: 'string', enum: ['aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'] } } } } };
+  const nativeBody = { model: 'claude-sonnet-4-6', max_tokens: 4096, messages: [{ role: 'user', content: 'fixture' }],
+    temperature: 0, system: [], output_config: expectedNative };
+  const nativeAllowed = body => providerIntent(provider, 'POST', 'tick', body, 0, true, expectedNative);
+  const { output_config: ignoredConfig, ...missingConfig } = nativeBody;
+  if (!ignoredConfig || !nativeAllowed(nativeBody) || providerIntent(provider, 'POST', 'tick', nativeBody, 0, true, null)
+    || nativeAllowed(missingConfig) || providerIntent(new URL('https://api.anthropic.com/v1/messages?extra=1'), 'POST', 'tick', nativeBody, 0, true, expectedNative)
+    || providerIntent(provider, 'POST', 'recover', nativeBody, 0, true, expectedNative)
+    || providerIntent(provider, 'POST', 'tick', nativeBody, 1, true, expectedNative)
+    || nativeAllowed({ ...nativeBody, output_config: { format: { type: 'json_schema', schema: { type: 'string' } } } })
+    || nativeAllowed({ ...nativeBody, messages: [...nativeBody.messages, { role: 'assistant', content: '{' }] })
+    || nativeAllowed({ ...nativeBody, thinking: { type: 'enabled' } }) || nativeAllowed({ ...nativeBody, tools: [] })
+    || nativeAllowed({ ...nativeBody, tool_choice: { type: 'auto' } }) || nativeAllowed({ ...nativeBody, arbitrary: true })
+    || nativeAllowed({ ...nativeBody, output_config: { format: { type: 'json_schema', schema: { type: 'object', properties: { profile_guid: { type: 'string', enum: ['bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'] } } } } } })
+    || nativeAllowed({ ...nativeBody, output_config: { ...expectedNative, effort: 'low' } })
+    || nativeAllowed({ ...nativeBody, temperature: 0.5 })) throw new Error('Native wire guard self-test failed');
   return { guards: 'passed', providerLimit: 1 };
 }
-registerHooks({ resolve(specifier, context, next) {
+if (require.main === module) registerHooks({ resolve(specifier, context, next) {
   try { return next(specifier, context); } catch (error) {
     if (specifier.startsWith('.') && !/\.[a-z]+$/i.test(specifier)) return next(`${specifier}.js`, context);
     throw error;
   }
 } });
 
+function validCandidateEvolution(candidate, previous, native, canonical) {
+  try {
+    const { body, variables, ...rest } = candidate.task;
+    const { body: previousBody, variables: previousVariables, ...previousRest } = previous.task;
+    if (typeof body !== 'string' || body === previousBody || candidate.profileHash !== previous.profileHash
+      || canonical(candidate.profile) !== canonical(previous.profile) || canonical(rest) !== canonical(previousRest)) return false;
+    if (!native) return variables === previousVariables;
+    const before = JSON.parse(previousVariables), after = JSON.parse(variables);
+    if (before?.execution?.compilerVersion !== 1 || after?.execution?.compilerVersion !== 2) return false;
+    after.execution.compilerVersion = 1;
+    return canonical(after) === canonical(before);
+  } catch { return false; }
+}
+function candidateRow(task, promptId, version) {
+  return { wmkf_ai_promptid: promptId, wmkf_ai_promptname: task.name, wmkf_ai_systemprompt: task.systemPrompt,
+    wmkf_ai_promptbody: task.body, wmkf_ai_promptvariables: task.variables, wmkf_ai_promptoutputschema: task.outputSchema,
+    wmkf_ai_model: task.model, wmkf_ai_temperature: task.temperature, wmkf_ai_maxtokens: task.maxTokens, wmkf_promptversion: version };
+}
 function checkCandidate(digest = candidateDigest) {
   const candidate = readCandidate(digest);
-  if (digest === successorDigest || digest === thirdDigest) {
-    const previous = readCandidate(digest === thirdDigest ? successorDigest : candidateDigest);
+  if ([successorDigest, thirdDigest, fourthDigest].includes(digest)) {
+    const previous = readCandidate(digest === fourthDigest ? thirdDigest : digest === thirdDigest ? successorDigest : candidateDigest);
     const { canonical } = req('./lib/services/prompt-jobs/profile.js');
-    const { body, ...rest } = candidate.task;
-    const { body: previousBody, ...previousRest } = previous.task;
-    if (typeof body !== 'string' || body === previousBody || candidate.profileHash !== previous.profileHash
-      || canonical(candidate.profile) !== canonical(previous.profile) || canonical(rest) !== canonical(previousRest)) throw new Error('Successor candidate mismatch');
+    if (!validCandidateEvolution(candidate, previous, digest === fourthDigest, canonical)) throw new Error('Successor candidate mismatch');
   }
   const { hashProfile, parseExecutionSpec } = req('./lib/services/prompt-jobs/profile.js');
   const { validateTaskCapability } = req('./lib/services/prompt-jobs/capabilities.js');
@@ -223,7 +347,7 @@ function checkCandidate(digest = candidateDigest) {
   if (hashProfile(candidate.profile) !== candidate.profileHash) throw new Error('Profile hash mismatch');
   const task = candidate.task;
   const row = { wmkf_ai_promptid: crypto.randomUUID(), wmkf_ai_promptname: task.name,
-    wmkf_promptversion: digest === thirdDigest ? 3 : digest === successorDigest ? 2 : 1, wmkf_ai_systemprompt: task.systemPrompt, wmkf_ai_promptbody: task.body,
+    wmkf_promptversion: digest === fourthDigest ? 4 : digest === thirdDigest ? 3 : digest === successorDigest ? 2 : 1, wmkf_ai_systemprompt: task.systemPrompt, wmkf_ai_promptbody: task.body,
     wmkf_ai_promptvariables: task.variables, wmkf_ai_promptoutputschema: task.outputSchema,
     wmkf_ai_model: task.model, wmkf_ai_maxtokens: task.maxTokens, wmkf_ai_temperature: task.temperature };
   parseExecutionSpec(row);
@@ -243,9 +367,16 @@ function checkCandidate(digest = candidateDigest) {
       extractionVersion: 'fixture-v1', text: 'Synthetic physics proposal.' }],
     records: [built.rosterRecord], rosterSnapshot: built.snapshot });
   const composed = composeProfileTask({ promptRow: row, profile: candidate.profile, snapshot, scope, nonceSecret });
-  validateRecommendationsOutput({ proposal_summary: {}, staff_assignment: { primary: null, secondary: null },
-    staff_consultation: [], consultant_overlap: [], board_interest: [], expertise_gaps: { has_gaps: false, description: null },
-    conflicts: [] }, composed.rosterContext);
+  if (digest === fourthDigest) lintNativeSchema(composed.providerOutputSchema?.jsonSchema);
+  const fixture = { proposal_summary: {}, staff_assignment: { primary: null, secondary: null },
+    staff_consultation: [], expertise_gaps: { has_gaps: false, description: null }, conflicts: [] };
+  if (digest !== fourthDigest) { fixture.consultant_overlap = []; fixture.board_interest = []; }
+  const validated = validateRecommendationsOutput(fixture, composed.rosterContext);
+  if (digest === fourthDigest && (composed.providerOutputSchema?.generationMode !== 'native-json-schema'
+    || !Array.isArray(validated.consultant_overlap) || validated.consultant_overlap.length
+    || !Array.isArray(validated.board_interest) || validated.board_interest.length
+    || Object.hasOwn(composed.providerOutputSchema.jsonSchema.properties, 'consultant_overlap')
+    || Object.hasOwn(composed.providerOutputSchema.jsonSchema.properties, 'board_interest'))) throw new Error('Native fixture mismatch');
   return { candidateDigest: digest, profileHash: candidate.profileHash, compiler: 'passed', outputContract: 'passed' };
 }
 
@@ -259,17 +390,25 @@ function readPrivateJson(file) {
   return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
 function initialize(directory, version = 1) {
-  if (![1, 2, 3].includes(version)) throw new Error('Unsupported trial');
+  if (![1, 2, 3, 4].includes(version)) throw new Error('Unsupported trial');
   const second = version > 1;
+  const fourth = version === 4;
   const third = version === 3;
-  const digest = third ? thirdDigest : second ? successorDigest : candidateDigest;
+  const digest = fourth ? fourthDigest : third ? thirdDigest : second ? successorDigest : candidateDigest;
   checkCandidate(digest);
   let predecessor;
   if (second) {
-    if (directory !== (third ? thirdDirectory : successorDirectory)) throw new Error('Invalid successor directory');
-    predecessor = readPrivateJson(third ? secondStatePath : predecessorStatePath);
-    if (predecessor.version !== 1 || predecessor.candidateDigest !== (third ? successorDigest : candidateDigest)
-      || predecessor.jobId !== (third ? secondJobId : predecessorJobId) || (third && (predecessor.promptId !== secondPromptId
+    if (directory !== (fourth ? fourthDirectory : third ? thirdDirectory : successorDirectory)) throw new Error('Invalid successor directory');
+    predecessor = readPrivateJson(fourth ? thirdStatePath : third ? secondStatePath : predecessorStatePath);
+    if (fourth) {
+      const first = readPrivateJson(predecessorStatePath), secondState = readPrivateJson(secondStatePath);
+      if (predecessor.promptId !== thirdPromptId || predecessor.predecessorJobId !== secondJobId
+        || predecessor.predecessorPromptId !== secondState.promptId || predecessor.ancestorPromptId !== first.promptId
+        || secondState.promptId !== secondPromptId || secondState.predecessorPromptId !== first.promptId
+        || secondState.predecessorJobId !== predecessorJobId || first.jobId !== predecessorJobId || secondState.jobId !== secondJobId) throw new Error('Historical state mismatch');
+    }
+    if (predecessor.version !== 1 || predecessor.candidateDigest !== (fourth ? thirdDigest : third ? successorDigest : candidateDigest)
+      || predecessor.jobId !== (fourth ? thirdJobId : third ? secondJobId : predecessorJobId) || (third && (predecessor.promptId !== secondPromptId
         || predecessor.predecessorJobId !== predecessorJobId || !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(predecessor.predecessorPromptId || '')))
       || !predecessor.sourceProof || predecessor.providerPosts !== 1 || !predecessor.auditRunId
       || !predecessor.profilePublicationId || !predecessor.promptId) throw new Error('Invalid predecessor receipt');
@@ -296,8 +435,8 @@ function initialize(directory, version = 1) {
     scopeId: crypto.randomUUID(), idempotencyKey: crypto.randomUUID(), promptId: crypto.randomUUID(),
     profilePublicationId: second ? predecessor.profilePublicationId : crypto.randomUUID(), nonceSecret: crypto.randomBytes(32).toString('hex'),
     sourceProof: second ? predecessor.sourceProof : null, providerPosts: 0,
-    ...(second ? { predecessorJobId: third ? secondJobId : predecessorJobId, predecessorPromptId: predecessor.promptId,
-      ...(third ? { ancestorPromptId: predecessor.predecessorPromptId } : {}) } : {}) };
+    ...(second ? { predecessorJobId: fourth ? thirdJobId : third ? secondJobId : predecessorJobId, predecessorPromptId: predecessor.promptId,
+      ...(fourth ? { ancestorPromptIds: [predecessor.ancestorPromptId, predecessor.predecessorPromptId] } : third ? { ancestorPromptId: predecessor.predecessorPromptId } : {}) } : {}) };
   const fd = fs.openSync(path.join(directory, 'state.json'), 'wx', 0o600);
   try { fs.writeFileSync(fd, JSON.stringify(state)); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
   const dirFd = fs.openSync(directory, 'r');
@@ -417,13 +556,22 @@ async function liveStage(mode, directory) {
       || state.databaseIdentity !== ledger.databaseIdentity || !state.sourceProof || !Number.isInteger(state.providerPosts)
       || state.providerPosts < 0 || state.providerPosts > 1) throw new Error('Trial state mismatch');
     checkCandidate(state.candidateDigest);
+    const fourth = state.candidateDigest === fourthDigest;
     const third = state.candidateDigest === thirdDigest;
-    const second = state.candidateDigest === successorDigest || third;
-    const priorJobId = third ? secondJobId : predecessorJobId;
+    const second = state.candidateDigest === successorDigest || third || fourth;
+    const priorJobId = fourth ? thirdJobId : third ? secondJobId : predecessorJobId;
     if (second !== Boolean(state.predecessorJobId) || (second && state.predecessorJobId !== priorJobId)) throw new Error('Invalid successor state');
     if (second) {
-      const previous = readPrivateJson(third ? secondStatePath : predecessorStatePath);
-      if (previous.jobId !== priorJobId || previous.candidateDigest !== (third ? successorDigest : candidateDigest)
+      const previous = readPrivateJson(fourth ? thirdStatePath : third ? secondStatePath : predecessorStatePath);
+      if (fourth) {
+        const first = readPrivateJson(predecessorStatePath), secondState = readPrivateJson(secondStatePath);
+        if (first.jobId !== predecessorJobId || secondState.jobId !== secondJobId || secondState.promptId !== secondPromptId
+          || previous.promptId !== thirdPromptId || previous.predecessorJobId !== secondJobId
+          || secondState.predecessorJobId !== predecessorJobId || secondState.predecessorPromptId !== first.promptId
+          || previous.ancestorPromptId !== first.promptId || previous.predecessorPromptId !== secondState.promptId
+          || JSON.stringify(state.ancestorPromptIds) !== JSON.stringify([first.promptId, secondState.promptId])) throw new Error('Historical state mismatch');
+      }
+      if (previous.jobId !== priorJobId || previous.candidateDigest !== (fourth ? thirdDigest : third ? successorDigest : candidateDigest)
         || (third && (previous.promptId !== secondPromptId || previous.predecessorJobId !== predecessorJobId
           || state.ancestorPromptId !== previous.predecessorPromptId))
         || previous.promptId !== state.predecessorPromptId || previous.profilePublicationId !== state.profilePublicationId
@@ -435,7 +583,7 @@ async function liveStage(mode, directory) {
     const task = candidate.task;
     const row = { wmkf_ai_promptid: state.promptId, wmkf_ai_promptname: task.name, wmkf_ai_systemprompt: task.systemPrompt,
       wmkf_ai_promptbody: task.body, wmkf_ai_promptvariables: task.variables, wmkf_ai_promptoutputschema: task.outputSchema,
-      wmkf_ai_model: task.model, wmkf_ai_temperature: task.temperature, wmkf_ai_maxtokens: task.maxTokens, wmkf_promptversion: third ? 3 : second ? 2 : 1 };
+      wmkf_ai_model: task.model, wmkf_ai_temperature: task.temperature, wmkf_ai_maxtokens: task.maxTokens, wmkf_promptversion: fourth ? 4 : third ? 3 : second ? 2 : 1 };
     const save = () => {
       const next = path.join(directory, 'state.next');
       const fd = fs.openSync(next, 'wx', 0o600);
@@ -467,6 +615,7 @@ async function liveStage(mode, directory) {
     const originalFetch = globalThis.fetch;
     let allowedAuditRunId = null;
     let allowedPatch = null;
+    let nativeExecutor = null;
     globalThis.fetch = async (input, options = {}) => {
       const url = fetchUrl(input);
       const method = (options.method || 'GET').toUpperCase();
@@ -478,7 +627,12 @@ async function liveStage(mode, directory) {
         return originalFetch(input, { ...options, redirect: 'manual' });
       }
       if (allowedRead(url, method)) return originalFetch(input, { ...options, redirect: 'manual' });
-      let body; try { body = JSON.parse(options.body); } catch { throw new Error('Unexpected network request'); }
+      const providerAttempt = fourth && mode === 'tick' && method === 'POST'
+        && (url.origin === 'https://api.anthropic.com' || url.pathname === '/v1/messages');
+      let body; try { body = JSON.parse(options.body); } catch {
+        if (providerAttempt) denyProviderGuard(state, save);
+        throw new Error('Unexpected network request');
+      }
       const headers = new Headers(options.headers);
       if (allowedStaffProfileRead(url, method, body, headers, app.POSTGRES_URL, state.profileId)) {
         return originalFetch(input, { ...options, redirect: 'manual' });
@@ -501,7 +655,7 @@ async function liveStage(mode, directory) {
       } else if (allowedPublicationPatch({ mode, second, url, method, body, headers, expected: allowedPatch })) {
         const key = allowedPatch.value ? 'promoteIntent' : 'demoteIntent';
         reservePublicationIntent(state, key); allowedPatch = null; intent = key;
-      } else if (providerIntent(url, method, mode, body, state.providerPosts)) {
+      } else if (providerIntent(url, method, mode, body, state.providerPosts, fourth, nativeExecutor?.getExpectedNativeConfig() ?? null)) {
         state.providerPosts = 1; intent = 'provider';
       } else if (mode === 'tick' && method === 'POST' && url.origin === 'https://orgd9e66399.crm.dynamics.com'
         && url.pathname === '/api/data/v9.2/wmkf_ai_runs') {
@@ -516,9 +670,14 @@ async function liveStage(mode, directory) {
           || body.wmkf_ai_promptoverride != null) throw new Error('Audit scope rejected');
         reserveAuditIntent(state, allowedAuditRunId);
         allowedAuditRunId = null; intent = 'audit';
-      } else throw new Error('Network write rejected');
+      } else {
+        if (providerAttempt) denyProviderGuard(state, save);
+        throw new Error('Network write rejected');
+      }
       state.lastWriteIntent = intent; save();
-      return originalFetch(input, { ...options, redirect: 'manual' });
+      const response = await originalFetch(input, { ...options, redirect: 'manual' });
+      if (intent === 'provider') { state.providerStatus = response.status; save(); }
+      return response;
     };
     const { withDalContext } = req('./lib/dataverse/core/context.js');
     const { createPromptJobStore } = req('./lib/services/prompt-jobs/store.js');
@@ -555,18 +714,19 @@ async function liveStage(mode, directory) {
           || verifiedProfiles[0].requestId !== state.profilePublicationId
           || canonical(verifiedProfiles[0].profile) !== canonical(candidate.profile)) throw new Error('Profile readback mismatch');
         if (second) {
-          const oldTask = readCandidate(third ? successorDigest : candidateDigest).task;
-          const oldRow = { ...row, wmkf_ai_promptid: state.predecessorPromptId, wmkf_ai_promptbody: oldTask.body,
-            wmkf_promptversion: third ? 2 : 1 };
-          const ancestorRow = third ? { ...row, wmkf_ai_promptid: state.ancestorPromptId,
-            wmkf_ai_promptbody: readCandidate(candidateDigest).task.body, wmkf_promptversion: 1 } : null;
+          const oldRow = candidateRow(readCandidate(fourth ? thirdDigest : third ? successorDigest : candidateDigest).task,
+            state.predecessorPromptId, fourth ? 3 : third ? 2 : 1);
+          const ancestors = fourth ? [
+            candidateRow(readCandidate(candidateDigest).task, state.ancestorPromptIds[0], 1),
+            candidateRow(readCandidate(successorDigest).task, state.ancestorPromptIds[1], 2),
+          ] : third ? [candidateRow(readCandidate(candidateDigest).task, state.ancestorPromptId, 1)] : [];
           // Query the complete small history directly: the shared list helper
           // normalizes missing value arrays and cannot prove completeness.
           const { DynamicsService } = req('./lib/services/dynamics-service.js');
           const rows = async () => {
             const params = new URLSearchParams({
               '$select': [...Object.keys(row), 'wmkf_ai_iscurrent', 'wmkf_ai_promptstatus'].join(','),
-              '$filter': "wmkf_ai_promptname eq 'expertise.recommendations'", '$top': '4', '$count': 'true',
+              '$filter': "wmkf_ai_promptname eq 'expertise.recommendations'", '$top': '5', '$count': 'true',
             });
             const token = await DynamicsService.getAccessToken();
             const response = await fetch(`https://orgd9e66399.crm.dynamics.com/api/data/v9.2/wmkf_ai_prompts?${params}`,
@@ -576,7 +736,7 @@ async function liveStage(mode, directory) {
             return strictHistory(data, item => DynamicsService.processAnnotations(item));
           };
           const checkRow = (item, expected, current) => checkPublicationRow(item, expected, current, canonical);
-          const checkRows = (items, oldCurrent, newCurrent) => checkPublicationHistory(items, oldRow, row, third ? [ancestorRow] : [], oldCurrent, newCurrent, canonical);
+          const checkRows = (items, oldCurrent, newCurrent) => checkPublicationHistory(items, oldRow, row, ancestors, oldCurrent, newCurrent, canonical);
           if (state.publicationComplete) {
             checkRows(await rows(), false, true);
             const actual = await aiPrompt.getExecutorPromptById(state.promptId, 'https://orgd9e66399.crm.dynamics.com');
@@ -585,8 +745,8 @@ async function liveStage(mode, directory) {
           }
           if (state.promptWriteIntent || state.demoteIntent || state.promoteIntent) throw new Error('Publication requires reconciliation');
           const beforeRows = await rows();
-          if (beforeRows.length !== (third ? 2 : 1) || new Set(beforeRows.map(item => item.wmkf_ai_promptid)).size !== beforeRows.length) throw new Error('Publication history mismatch');
-          if (third) checkRow(beforeRows.find(item => item.wmkf_ai_promptid === ancestorRow.wmkf_ai_promptid), ancestorRow, false);
+          if (beforeRows.length !== ancestors.length + 1 || new Set(beforeRows.map(item => item.wmkf_ai_promptid)).size !== beforeRows.length) throw new Error('Publication history mismatch');
+          for (const ancestor of ancestors) checkRow(beforeRows.find(item => item.wmkf_ai_promptid === ancestor.wmkf_ai_promptid), ancestor, false);
           const initialOld = beforeRows.find(item => item.wmkf_ai_promptid === oldRow.wmkf_ai_promptid);
           checkRow(initialOld, oldRow, true);
           const initialEtag = initialOld._etag;
@@ -646,7 +806,15 @@ async function liveStage(mode, directory) {
             || check._createdby_value !== appUsers[0].systemuserid || check._createdonbehalfby_value != null || check.wmkf_ai_rawoutput != null || check.wmkf_ai_promptoverride != null
             || ['wmkf_ai_status','wmkf_ai_runsource','wmkf_ai_model','wmkf_ai_promptversion','wmkf_ai_promptoverridden','wmkf_ai_notes'].some(key => check[key] !== payload[key])) throw new Error('Audit readback mismatch');
         };
-        return await trial.advanceSandboxRecommendationTrial({ recoverResponse: mode === 'recover' }, { audit });
+        const overrides = { audit };
+        if (fourth) {
+          const { executePrompt } = req('./lib/services/execute-prompt.js');
+          const { composeProfileTask, effectiveProviderOutputSchema } = req('./lib/services/prompt-jobs/context.js');
+          const { parseExecutionSpec } = req('./lib/services/prompt-jobs/profile.js');
+          nativeExecutor = createNativeExecutor({ executePrompt, row, canonical, parseExecutionSpec, composeProfileTask, effectiveProviderOutputSchema });
+          overrides.executePrompt = nativeExecutor.executePrompt;
+        }
+        return await trial.advanceSandboxRecommendationTrial({ recoverResponse: mode === 'recover' }, overrides);
       }
       if (mode === 'inspect') {
         const result = await store.readValidatedSandboxRecommendations({ ...owner, jobId: state.jobId });
@@ -656,6 +824,7 @@ async function liveStage(mode, directory) {
           try { fs.writeFileSync(fd, JSON.stringify(result)); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
         }
         return { stage: 'inspected', validation: 'stored-contract', currentFreshness: 'not-checked', httpE2e: false, resultAvailable: Boolean(result?.results?.some(item => item.status === 'available')), providerPosts: state.providerPosts,
+          providerGuardDenied: state.providerGuardDenied === true, providerStatus: state.providerStatus ?? null,
           jobId: state.jobId, sourceExpiresAt: views[0].job.source_expires_at, resultExpiresAt: views[0].job.result_expires_at,
           tasks: views[0].tasks.map(x => ({ state: x.state, errorCode: x.error_code })),
           attempts: views[0].attempts.map(x => ({ state: x.state, auditState: x.audit_state, auditRunId: x.audit_run_id, errorCode: x.error_code, usage: x.usage, usageComplete: x.usage_complete })) };
@@ -675,19 +844,23 @@ async function liveStage(mode, directory) {
 async function main() {
   let result;
   if (process.argv.length === 3 && process.argv[2] === 'offline-check') result = checkCandidate();
-  else if (process.argv.length === 3 && process.argv[2] === 'guard-test') result = checkGuards();
+  else if (process.argv.length === 3 && process.argv[2] === 'guard-test') result = await checkGuards();
   else if (process.argv.length === 3 && process.argv[2] === 'offline-check-v2') result = checkCandidate(successorDigest);
   else if (process.argv.length === 4 && process.argv[2] === 'init') result = initialize(process.argv[3]);
   else if (process.argv.length === 3 && process.argv[2] === 'offline-check-v3') result = checkCandidate(thirdDigest);
   else if (process.argv.length === 4 && process.argv[2] === 'init-second') result = initialize(process.argv[3], 2);
   else if (process.argv.length === 4 && process.argv[2] === 'init-third') result = initialize(process.argv[3], 3);
+  else if (process.argv.length === 3 && process.argv[2] === 'offline-check-v4') result = checkCandidate(fourthDigest);
+  else if (process.argv.length === 4 && process.argv[2] === 'init-fourth') result = initialize(process.argv[3], 4);
   else if (process.argv.length === 4 && process.argv[2] === 'prepare') result = await prepareSource(process.argv[3]);
   else if (process.argv.length === 4 && ['publish','preflight','admit','tick','recover','inspect','expire'].includes(process.argv[2])) result = await liveStage(process.argv[2], process.argv[3]);
   else throw new Error('Invalid trial stage');
   process.stdout.write(`${JSON.stringify(result)}\n`);
 }
-main().catch(error => {
+if (require.main === module) main().catch(error => {
   const frames = [...String(error.stack || '').matchAll(/([\w.-]+\.(?:c?js|mjs)):(\d+):(\d+)/g)].slice(0, 4).map(match => match[0]);
   process.stderr.write(JSON.stringify({ stageFailed: true, frames }) + '\n');
   process.exitCode = 1;
 });
+
+module.exports = { providerIntent, createNativeExecutor, denyProviderGuard, lintNativeSchema };
