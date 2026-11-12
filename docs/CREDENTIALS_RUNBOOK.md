@@ -278,11 +278,11 @@ requires exactly `requestId`, `jobId`, `profileId`, `systemUserId`,
 staff subject and one exact Sandbox Request/job to the machine app and
 cohort. The reader independently checks the active Sandbox app grant.
 Unset, invalid or mismatched configuration withholds access. The read grant
-confers no admission rights. A temporary local grant for the live
-Sandbox job passed the signed metadata-only withholding check. The
-available/current result path remains unverified in a live run.
+confers no admission rights. Temporary local grants verified signed
+metadata-only withholding for failed Sandbox jobs and an available,
+current validated result for the fourth job.
 [Sandbox recommendations contract](plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#sandbox-recommendations-read),
-[live outcome](plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#live-sandbox-trial-outcome).
+[live outcome](plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#live-native-schema-trial-outcome).
 
 ### Optional — Local Sandbox recommendations trial
 
@@ -300,7 +300,8 @@ exact keys `requestId`, `systemUserId`, `azureId`, `applicationId`,
 `databaseIdentity`. An approved successor also supplies
 `predecessorJobId`: the pinned first job UUID
 `d85b9e13-a7a1-44a9-ae39-5961f4a9696a` for v2, or pinned second job UUID
-`ba425a76-1257-4b6a-a54d-1c7fc6ceb3fe` for v3. The first seven values are
+`ba425a76-1257-4b6a-a54d-1c7fc6ceb3fe` for v3, or pinned third job UUID
+`21af0399-0fd7-4d5f-9eb2-b5a77d4ff1fd` for v4. The first seven values are
 lowercase GUIDs and `profileId` is a positive safe integer. `DYNAMICS_CLIENT_ID` must exactly
 match `applicationId`. The hash pins are lowercase SHA-256 values.
 `sourceHash` binds the canonical target-bound PDF proof, and
@@ -309,7 +310,7 @@ name. The trial verifies the configured ledger before preflight,
 admission and worker advancement. The operator runner also pins the
 endpoint hostname. The application database is shared by Production and
 Preview. The Sandbox Dataverse trial's ledger writes target that
-database. The owner approved the first scoped trial and two exact
+database. The owner approved the first scoped trial and three exact
 successors on the same shared ledger.
 [Source review receipt](audits/EXPERTISE_SANDBOX_ADMISSION_OPUS55_2026-11-11.md#live-boundary).
 

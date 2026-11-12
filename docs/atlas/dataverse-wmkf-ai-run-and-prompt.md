@@ -73,10 +73,13 @@ invocations. Request linkage is present only when the Executor caller supplies
   back content-free failure audit `60b9bab4-d197-4043-a3ed-0dd5b97bbfab`
   for v2 after the response truncated. The v3 response-length trial read
   back content-free failure audit `35ce89a3-5ae2-479c-ba53-9df8c449333a`
-  after the complete JSON failed the closed output schema.
+  after the complete JSON failed the closed output schema. The v4 native
+  trial delivered and read back content-free success audit
+  `20754273-7a8e-4619-9a44-5199d1f12022` for the validated result.
   [First Sandbox trial](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#live-sandbox-trial-outcome),
   [second trial](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#live-successor-outcome),
-  [third trial](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#live-response-length-trial-outcome).
+  [third trial](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#live-response-length-trial-outcome),
+  [fourth trial](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#live-native-schema-trial-outcome).
 - `pages/api/phase-i-dynamics/summarize.js` — Phase I summarization
 - `pages/api/grant-reporting/extract.js` — Grant Reporting extraction and goals assessment; writes a best-effort `wmkf_ai_run` audit row, not extracted values to `akoya_request` (`lib/services/grant-reporting/extract-service.js`)
 - `scripts/probe-impersonation-resmoke.js`, `scripts/probe-impersonation-as-user.js` — write sentinel rows during impersonation testing (S135). Filter `wmkf_ai_model='impersonation-resmoke'` to find them.

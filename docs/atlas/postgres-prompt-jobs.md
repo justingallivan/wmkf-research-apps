@@ -77,17 +77,18 @@ path adds no tables, admission or dispatch. [Shared task interfaces](../plans/SH
 ## Local Sandbox recommendations trial
 
 [VERIFIED via branch source at `2a0f4d6bd`, successors `2ae930fe2`
-and `aaac59d2f`, and loopback PostgreSQL] The local, default-off operator trial reuses the six
+and `aaac59d2f`, fourth-trial extension `d6919c949`, and loopback PostgreSQL] The local, default-off operator trial reuses the six
 migration 097 tables. Admission pins the configured PostgreSQL cluster
 and database. The same transaction takes a Sandbox-wide advisory lock,
 checks exact replay and counts every `expertise.recommendations` job across
 `local-sandbox` and `preview-sandbox` regardless of state, cohort or app.
 Fixture jobs are outside the predicate. A fresh v2 job requires the exact
 first job alone. A fresh v3 job requires the exact first and second jobs
-alone. Their audited failure states and unexpired configurations prove the
-same owner, source, profile and database bindings. Each successor requires
-a new scope, key and prompt revision. All three receipts count after
-expiry, so the same fence denies a fourth job. The sole draft task per
+alone. A fresh v4 job requires exactly the three pinned prior jobs. Their
+audited failure states and unexpired configurations prove the same owner,
+source, profile and database bindings. Each successor requires a new
+scope, key and prompt revision. All four receipts count after expiry,
+so the same fence denies a fifth job. The sole draft task per
 job carries a typed v2 seal
 and checkpoint, one fenced dispatch attempt and no field reservation.
 A response saved before an unavailable currentness or access check can
@@ -104,11 +105,14 @@ Sandbox audit was delivered. The authorized successor saved one response
 and reached terminal `claude_output_truncated` at the output ceiling,
 with its separate audit delivered. The third job saved one compact
 complete response, failed the closed model-output schema and delivered
-its separate audit. None retained a validated result. Physical cleanup
-remains due at each job's scoped expiry deadlines.
+its separate audit. Those three jobs retained no validated result. The
+fourth job completed after one native-schema call, retained the validated
+typed result and delivered its audit. Physical cleanup remains due at
+each job's scoped expiry deadlines.
 [First trial and retention](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#live-sandbox-trial-outcome),
 [second trial and retention](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#live-successor-outcome),
-[third trial and retention](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#live-response-length-trial-outcome).
+[third trial and retention](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#live-response-length-trial-outcome),
+[fourth trial and retention](../plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#live-native-schema-trial-outcome).
 
 ## Synthetic safeguard follow-up (2026-11-11)
 
