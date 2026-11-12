@@ -29,11 +29,12 @@ import { canonical, hashProfile, parseExecutionSpec, sha256 } from '../../lib/se
 import { composeProfileTask, effectiveProviderOutputSchema, prepareContextSnapshot, recommendationSourceProof, sandboxRecommendationSourceProof } from '../../lib/services/prompt-jobs/context.js';
 import { createRecommendationsReader } from '../../lib/services/prompt-jobs/recommendations-reader.js';
 import { readStaffRecommendation } from '../../lib/services/prompt-jobs/staff-recommendations-service.js';
-import { readRecommendationsAccessPolicy, readRecommendationsTrialPolicy, RECOMMENDATIONS_SANDBOX_ORIGIN, RECOMMENDATIONS_TRIAL_PREDECESSOR_JOB_ID, RECOMMENDATIONS_TRIAL_SECOND_JOB_ID } from '../../lib/services/prompt-jobs/recommendations-sandbox-policy.js';
+import { matchesRecommendationsTrialDefinition, readRecommendationsAccessPolicy, readRecommendationsTrialPolicy, RECOMMENDATIONS_SANDBOX_ORIGIN, RECOMMENDATIONS_TRIAL_PREDECESSOR_JOB_ID, RECOMMENDATIONS_TRIAL_SECOND_JOB_ID, RECOMMENDATIONS_TRIAL_THIRD_JOB_ID } from '../../lib/services/prompt-jobs/recommendations-sandbox-policy.js';
 import { admitSandboxRecommendationTrial, advanceSandboxRecommendationTrial, preflightSandboxRecommendationTrial } from '../../lib/services/prompt-jobs/sandbox-recommendations-trial.js';
 import { EXPERTISE_RESULT_CONTRACT, EXPERTISE_TASK_KEY } from '../../lib/services/prompt-jobs/capabilities.js';
 import { buildRecommendationsSnapshot, validateRecommendationsOutput } from '../../lib/services/expertise-finder/recommendations-contract.js';
 import roster from '../../lib/services/expertise-finder/roster-contract.cjs';
+import { createNativeExecutor, denyProviderGuard, providerIntent } from '../../scripts/run-expertise-sandbox-trial-1000339.cjs';
 
 const databaseUrl=process.env.TEST_REQUEST_LEDGER_TEST_URL;
 if (!databaseUrl && process.env.TEST_REQUEST_LEDGER_REQUIRE==='1') throw new Error('TEST_REQUEST_LEDGER_TEST_URL required');
@@ -58,13 +59,13 @@ function providerResponse(text='RESULT_CANARY This synthetic response describes 
     usage:{inputTokens:100,outputTokens:20,cacheCreationTokens:80,cacheReadTokens:0}};
 }
 
-function expertiseFixture({ withSourceProof = false, compilerVersion = 1, stable = false, roles = [], model, documentLimit } = {}) {
+function expertiseFixture({ withSourceProof = false, compilerVersion = 1, stable = false, roles = [], model, documentLimit, candidate, promptVersion = 1 } = {}) {
   const id = stable ? n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}` : () => randomUUID();
   const requestId = id(1);
   const scope = { environment: 'test', authorizationScope: `expertise-fixture:${id(2)}`, requestId };
   const owner = { ...scope, principalKey: 'app:offline-fixture' };
   const documentRoles = withSourceProof ? ['proposal', 'fixture-appendix'] : ['proposal'];
-  const expertiseProfile = { ...profile, documentRoles, recordNames: ['roster_block'],
+  const expertiseProfile = candidate?.profile ?? { ...profile, documentRoles, recordNames: ['roster_block'],
     limits: { ...profile.limits, maxDocuments: documentRoles.length, maxRecordBytes: 64_000,
       ...(documentLimit ? { maxDocumentBytes: documentLimit, maxTotalDocumentBytes: documentLimit } : {}) } };
   const profileGuid = id(3);
@@ -82,7 +83,7 @@ function expertiseFixture({ withSourceProof = false, compilerVersion = 1, stable
   }))] };
   const built = buildRecommendationsSnapshot(rosterProjection);
   const promptRow = { ...prompt('executive-summary'), wmkf_ai_promptid: id(5), wmkf_ai_promptname: EXPERTISE_TASK_KEY,
-    ...(model ? { wmkf_ai_model: model } : {}), wmkf_ai_maxtokens: 4096, wmkf_ai_promptbody: 'Recommend expertise for this proposal. {{roster_block}}',
+    wmkf_promptversion: promptVersion, ...(model ? { wmkf_ai_model: model } : {}), wmkf_ai_maxtokens: 4096, wmkf_ai_promptbody: 'Recommend expertise for this proposal. {{roster_block}}',
     wmkf_ai_promptvariables: JSON.stringify({ execution: { contractVersion: 2, mode: 'shared-document-task',
       profile: { key: expertiseProfile.key, revision: expertiseProfile.revision, sha256: hashProfile(expertiseProfile) },
       resultContract: EXPERTISE_RESULT_CONTRACT, compilerVersion }, variables: [
@@ -90,6 +91,7 @@ function expertiseFixture({ withSourceProof = false, compilerVersion = 1, stable
       { name: 'roster_block', source: { kind: 'frozen_record' }, required: true },
     ] }),
     wmkf_ai_promptoutputschema: JSON.stringify({ parseMode: 'json', outputs: [{ name: 'recommendations', target: { kind: 'none' } }] }),
+    ...(candidate ? candidatePrompt(candidate.task) : {}),
   };
   const sourceDocuments = documentRoles.map(role => ({ role, id: `fabricated-${role}`, version: '1', extractionVersion: 'fixture-v1', sha256: 'a'.repeat(64) }));
   const sourceProof = recommendationSourceProof(documentRoles, sourceDocuments);
@@ -111,6 +113,19 @@ function expertiseFixture({ withSourceProof = false, compilerVersion = 1, stable
   return { owner, input, promptRow, snapshotArgs, snapshot, built, rosterHash, etag, userGuid, output, rosterProjection, sourceObservation };
 }
 
+function readTrialCandidate(version) {
+  const suffix = version === 1 ? '' : `_V${version}`;
+  return JSON.parse(fs.readFileSync(path.join(process.cwd(), `docs/plans/EXPERTISE_SANDBOX_1000339_CANDIDATE${suffix}_2026-11-11.json`), 'utf8'));
+}
+
+function candidatePrompt(task) {
+  return {
+    wmkf_ai_promptname: task.name, wmkf_ai_systemprompt: task.systemPrompt, wmkf_ai_promptbody: task.body,
+    wmkf_ai_promptvariables: task.variables, wmkf_ai_promptoutputschema: task.outputSchema, wmkf_ai_model: task.model,
+    wmkf_ai_temperature: task.temperature, wmkf_ai_maxtokens: task.maxTokens,
+  };
+}
+
 function fixtureExecution(f) {
   const { profile: definition, scope } = f.snapshotArgs;
   return {
@@ -121,16 +136,18 @@ function fixtureExecution(f) {
   };
 }
 
-function mockProviderWire(output) {
+function mockProviderWire(output, { status = 200, onFetch } = {}) {
   const actual = jest.requireActual('../../lib/services/llm-client.js');
   LLMClient.mockImplementationOnce(options => new actual.LLMClient(options));
   return jest.spyOn(globalThis, 'fetch').mockImplementation(async (url, options) => {
     expect(url).toBe('https://api.anthropic.com/v1/messages');
     expect(options.method).toBe('POST');
-    return new Response(JSON.stringify({
+    if (onFetch) await onFetch();
+    const body = status === 200 ? {
       model: 'claude-sonnet-4-6', stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify(output) }],
       usage: { input_tokens: 100, output_tokens: 20, cache_creation_input_tokens: 80, cache_read_input_tokens: 0 },
-    }), { status: 200 });
+    } : { error: { type: 'synthetic_provider_error', message: 'Synthetic generation schema failure' } };
+    return new Response(JSON.stringify(body), { status });
   });
 }
 
@@ -1110,7 +1127,7 @@ suite('local Sandbox recommendation admission and controlled stages', () => {
     activateGrant(grant);
     const deps = { ...first.deps, prompt: jest.fn(async () => promptRow), source };
     return { ...first, promptRow, grant, policy: readRecommendationsTrialPolicy(), deps,
-      admit: () => admitSandboxRecommendationTrial(deps), tick: () => advanceSandboxRecommendationTrial({}, deps) };
+      admit: () => admitSandboxRecommendationTrial(deps), tick: args => advanceSandboxRecommendationTrial(args, deps) };
   }
 
   async function admitRecorded(trial, jobId) {
@@ -1128,7 +1145,8 @@ suite('local Sandbox recommendation admission and controlled stages', () => {
   }
 
   test('compiler 2 budget counts effective provider schema in Sandbox preflight and before dispatch', async () => {
-    const t = trial({}, expertiseFixture({ compilerVersion: 2, roles: ['Consultant', 'Board'], documentLimit: 220_000 }));
+    const t = trial({ predecessorJobId: RECOMMENDATIONS_TRIAL_THIRD_JOB_ID },
+      expertiseFixture({ compilerVersion: 2, promptVersion: 4, roles: ['Consultant', 'Board'], documentLimit: 220_000 }));
     const { environment, requestId, authorizationScope } = t.policy;
     const scope = { environment, requestId, authorizationScope };
     const prepared = await t.deps.source.prepare();
@@ -1141,10 +1159,13 @@ suite('local Sandbox recommendation admission and controlled stages', () => {
       const measure = outputSchema => Buffer.byteLength(canonical({
         system: composed.system, messages: composed.userContent, outputSchema,
       })) + 4096;
-      return { snapshot, oldBytes: measure(spec.outputSchema), nativeBytes: measure(schema) };
+      return { snapshot, oldBytes: measure(spec.outputSchema), nativeBytes: measure(schema),
+        schemaBytes: Buffer.byteLength(JSON.stringify(schema.jsonSchema)) };
     }
     const initial = compile(prepared.document);
-    expect(await preflightSandboxRecommendationTrial(t.deps)).toMatchObject({ inputUpperBound: initial.nativeBytes });
+    expect(await preflightSandboxRecommendationTrial(t.deps)).toMatchObject({
+      inputUpperBound: initial.nativeBytes, schema: { bytes: initial.schemaBytes, enumEntries: 10 },
+    });
     const document = { ...prepared.document, text: prepared.document.text + 'x'.repeat(195_000 - initial.oldBytes) };
     const grown = compile(document);
     expect(grown.oldBytes).toBe(195_000);
@@ -1263,7 +1284,8 @@ suite('local Sandbox recommendation admission and controlled stages', () => {
     await expectLimit(successor(first, { grantPatch: { azureId: randomUUID() } }));
     await expectLimit(successor(first, { grantPatch: { applicationId: randomUUID() } }));
     await expectLimit(successor(first, { grantPatch: { sourceDriveId: 'b!another-drive' } }));
-    await expectLimit(successor(first, { promptPatch: { wmkf_promptversion: first.promptRow.wmkf_promptversion + 2 } }));
+    await expect(successor(first, { promptPatch: { wmkf_promptversion: first.promptRow.wmkf_promptversion + 2 } }).admit())
+      .rejects.toMatchObject({ code: 'recommendations_trial_prompt_unavailable' });
     await expectLimit(successor(first, { promptPatch: { wmkf_ai_promptid: first.promptRow.wmkf_ai_promptid } }));
     await pool.query("UPDATE prompt_job_attempts SET error_code='profile_inputs_changed_after_dispatch'");
     await expectLimit(successor(first));
@@ -1319,7 +1341,7 @@ suite('local Sandbox recommendation admission and controlled stages', () => {
       await pool.query('UPDATE prompt_jobs SET payload_hash=$2 WHERE id=$1', [jobId, digest]);
     }
     await expectLimit(makeThird({ azureId: randomUUID() }));
-    await expectLimit(makeThird({}, { wmkf_promptversion: 4 }));
+    await expect(makeThird({}, { wmkf_promptversion: 4 }).admit()).rejects.toMatchObject({ code: 'recommendations_trial_prompt_unavailable' });
     await expectLimit(makeThird({}, { wmkf_ai_promptid: first.promptRow.wmkf_ai_promptid }));
 
     const third = makeThird();
@@ -1345,6 +1367,229 @@ suite('local Sandbox recommendation admission and controlled stages', () => {
     expect((await pool.query('SELECT 1 FROM prompt_jobs')).rowCount).toBe(3);
     expect((await pool.query('SELECT 1 FROM prompt_job_attempts')).rowCount).toBe(3);
     expect(mockComplete).toHaveBeenCalledTimes(3);
+  });
+
+  async function recordedFourthHistory(beforeThirdAudit) {
+    const first = trial({}, expertiseFixture({ candidate: readTrialCandidate(1) }));
+    first.deps.audit = jest.fn(async () => {});
+    await admitRecorded(first, RECOMMENDATIONS_TRIAL_PREDECESSOR_JOB_ID);
+    await failFirst(first);
+    expect(await first.tick()).toEqual({ stage: 'audit_delivered' });
+
+    const second = successor(first, { promptPatch: candidatePrompt(readTrialCandidate(2).task) });
+    await admitRecorded(second, RECOMMENDATIONS_TRIAL_SECOND_JOB_ID);
+    mockComplete.mockResolvedValueOnce({ ...providerResponse(JSON.stringify(second.output)), stopReason: 'max_tokens' });
+    expect(await second.tick()).toEqual({ stage: 'failed_validation' });
+    expect(await second.tick()).toEqual({ stage: 'audit_delivered' });
+
+    const third = successor(second, { grantPatch: { predecessorJobId: RECOMMENDATIONS_TRIAL_SECOND_JOB_ID },
+      promptPatch: candidatePrompt(readTrialCandidate(3).task) });
+    await admitRecorded(third, RECOMMENDATIONS_TRIAL_THIRD_JOB_ID);
+    mockComplete.mockResolvedValueOnce(providerResponse(JSON.stringify({ resultContract: EXPERTISE_RESULT_CONTRACT, modelOutput: third.output })));
+    expect(await third.tick()).toEqual({ stage: 'failed_validation' });
+
+    const makeFourth = ({ grantPatch = {}, promptPatch = {} } = {}) => successor(third, {
+      grantPatch: { predecessorJobId: RECOMMENDATIONS_TRIAL_THIRD_JOB_ID, ...grantPatch },
+      promptPatch: { ...candidatePrompt(readTrialCandidate(4).task), ...promptPatch },
+    });
+    if (beforeThirdAudit) await beforeThirdAudit(makeFourth);
+    activateGrant(third.grant);
+    expect(await third.tick()).toEqual({ stage: 'audit_delivered' });
+    return { history: [
+      [first, RECOMMENDATIONS_TRIAL_PREDECESSOR_JOB_ID],
+      [second, RECOMMENDATIONS_TRIAL_SECOND_JOB_ID],
+      [third, RECOMMENDATIONS_TRIAL_THIRD_JOB_ID],
+    ], makeFourth };
+  }
+
+  function fourthNativeConfig(fourth) {
+    const { environment, requestId, authorizationScope } = fourth.policy;
+    const scope = { environment, requestId, authorizationScope };
+    const snapshotArgs = { ...fourth.snapshotArgs, scope };
+    const snapshot = prepareContextSnapshot(snapshotArgs);
+    const composed = composeProfileTask({ ...snapshotArgs, snapshot, promptRow: fourth.promptRow });
+    return { format: { type: 'json_schema', schema: composed.providerOutputSchema.jsonSchema } };
+  }
+
+  function bindFourthExecutor(fourth, row = fourth.promptRow, delegate = executePrompt) {
+    const wrapper = createNativeExecutor({ executePrompt: delegate, row, canonical, parseExecutionSpec,
+      composeProfileTask, effectiveProviderOutputSchema });
+    fourth.deps.executePrompt = wrapper.executePrompt;
+    return wrapper;
+  }
+
+  function mockFourthWire(fourth, { status = 200, onFetch, deny = false } = {}) {
+    const wrapper = bindFourthExecutor(fourth);
+    const wire = mockProviderWire(nativeFixtureOutput(fourth), { status, onFetch });
+    const providerFetch = jest.fn(wire.getMockImplementation());
+    const state = { providerPosts: 0 };
+    const save = jest.fn(() => ({ ...state }));
+    wire.mockImplementation((url, options) => {
+      const body = JSON.parse(options.body);
+      if (deny) body.temperature = 1;
+      if (!providerIntent(new URL(url), options.method, 'tick', body, state.providerPosts, true,
+        wrapper.getExpectedNativeConfig(), canonical)) return denyProviderGuard(state, save);
+      state.providerPosts = 1;
+      save();
+      return providerFetch(url, options);
+    });
+    return { wrapper, wire, providerFetch, state, save };
+  }
+
+  function expectFourthWire(wire, expectedNativeConfig) {
+    expect(wire).toHaveBeenCalledTimes(1);
+    const [[url, request]] = wire.mock.calls;
+    const body = JSON.parse(request.body);
+    expect(providerIntent(new URL(url), request.method, 'tick', body, 0, true, expectedNativeConfig, canonical)).toBe(true);
+    expect(body.messages.map(message => message.role)).toEqual(['user']);
+    expect(body.output_config).toEqual(expectedNativeConfig);
+    expect(new Headers(request.headers).has('anthropic-beta')).toBe(false);
+  }
+
+  test('fourth admission verifies all three audited failures, preserves exact replays and denies a fifth', async () => {
+    const { history, makeFourth } = await recordedFourthHistory(async make => {
+      await expect(make().admit()).rejects.toMatchObject({ code: 'prompt_job_trial_limit' });
+    });
+    for (const [past, jobId] of history) {
+      const digest = sha256(canonical({ kind: `expertise-recommendations-trial-v${past.promptRow.wmkf_promptversion}`, policy: past.policy }));
+      expect((await pool.query('SELECT payload_hash FROM prompt_jobs WHERE id=$1', [jobId])).rows[0].payload_hash).toBe(digest);
+      await pool.query('UPDATE prompt_jobs SET payload_hash=$2 WHERE id=$1', [jobId, '0'.repeat(64)]);
+      await expect(makeFourth().admit()).rejects.toMatchObject({ code: 'prompt_job_trial_limit' });
+      await pool.query('UPDATE prompt_jobs SET payload_hash=$2 WHERE id=$1', [jobId, digest]);
+    }
+    await expect(makeFourth({ promptPatch: { wmkf_promptversion: 5 } }).admit())
+      .rejects.toMatchObject({ code: 'recommendations_trial_prompt_unavailable' });
+    const legacy = makeFourth({ promptPatch: { wmkf_ai_promptvariables: history[2][0].promptRow.wmkf_ai_promptvariables } });
+    await expect(legacy.admit()).rejects.toMatchObject({ code: 'recommendations_trial_prompt_unavailable' });
+    const malformed = makeFourth({ promptPatch: { wmkf_ai_promptvariables: '{' } });
+    expect(matchesRecommendationsTrialDefinition(malformed.promptRow, malformed.snapshotArgs.profile, malformed.policy)).toBe(false);
+    const fourth = makeFourth();
+    const preflight = await preflightSandboxRecommendationTrial(fourth.deps);
+    const receipts = await Promise.all([fourth.admit(), fourth.admit()]);
+    expect(receipts.map(receipt => receipt.replayed).sort()).toEqual([false, true]);
+    expect(receipts.find(receipt => !receipt.replayed).budget).toEqual(preflight);
+    expect(preflight.schema).toEqual({ bytes: Buffer.byteLength(JSON.stringify(fourthNativeConfig(fourth).format.schema)), enumEntries: 4 });
+    const [{ jobId }] = receipts;
+    expect(receipts[1].jobId).toBe(jobId);
+    const claim = await store.claim({ jobId });
+    const fence = { jobId, leaseToken: claim.leaseToken };
+    try {
+      await expect(store.markAttemptFailed({ ...fence, taskId: claim.tasks[0].id, outcome: 'failed_pre_dispatch',
+        errorCode: 'provider_rejected', deferredAudit: { wmkf_ai_notes: 'No dispatch attempt' } }))
+        .rejects.toMatchObject({ code: 'invalid_prompt_job_failure' });
+    } finally { await store.releaseClaim(fence); }
+
+    fourth.deps.audit = jest.fn(async () => {});
+    expect(await fourth.tick()).toEqual({ stage: 'snapshot_saved' });
+    const transport = mockFourthWire(fourth);
+    const delegate = jest.fn(executePrompt);
+    const mismatch = bindFourthExecutor(fourth, { ...fourth.promptRow, wmkf_promptversion: 5 }, delegate);
+    try {
+      expect(await fourth.tick()).toEqual({ stage: 'waiting' });
+      const waiting = await store.readJob({ ...fourth.policy, jobId });
+      expect(waiting.tasks[0].state).toBe('queued');
+      expect(waiting.attempts).toEqual([]);
+      expect(delegate).not.toHaveBeenCalled();
+      expect(transport.wire).not.toHaveBeenCalled();
+      expect(mismatch.getExpectedNativeConfig()).toBeNull();
+
+      fourth.deps.executePrompt = transport.wrapper.executePrompt;
+      expect(await fourth.tick()).toEqual({ stage: 'validated' });
+      expect(await fourth.tick()).toEqual({ stage: 'audit_delivered' });
+      expect(await fourth.tick()).toEqual({ stage: 'complete' });
+      expectFourthWire(transport.providerFetch, fourthNativeConfig(fourth));
+      expect(transport.state.providerPosts).toBe(1);
+      expect(transport.wrapper.getExpectedNativeConfig()).toBeNull();
+    } finally { transport.wire.mockRestore(); }
+    const result = await store.readValidatedSandboxRecommendations({ ...fourth.policy, jobId });
+    expect(result.results[0]).toMatchObject({ status: 'available', result: { consultant_overlap: [], board_interest: [] } });
+    expect(fourth.deps.audit).toHaveBeenCalledTimes(1);
+
+    const [first, firstJobId] = history[0];
+    await pool.query("UPDATE prompt_job_content SET expires_at=clock_timestamp()-interval '1 second' WHERE job_id=$1 AND kind='configuration'", [firstJobId]);
+    expect(await store.expireSandboxRecommendationContent({ ...first.policy, jobId: firstJobId })).toBe(1);
+    for (const [past, id] of history) {
+      activateGrant(past.grant);
+      await expect(past.admit()).resolves.toEqual({ jobId: id, replayed: true });
+    }
+    activateGrant(fourth.grant);
+    await expect(fourth.admit()).resolves.toEqual({ jobId, replayed: true });
+    await expect(makeFourth().admit()).rejects.toMatchObject({ code: 'prompt_job_trial_limit' });
+    await expect(makeFourth({ grantPatch: { predecessorJobId: jobId } }).admit())
+      .rejects.toMatchObject({ code: 'recommendations_trial_disabled' });
+    expect((await pool.query('SELECT 1 FROM prompt_jobs')).rowCount).toBe(4);
+    expect(mockComplete).toHaveBeenCalledTimes(3);
+  });
+
+  test.each([[400, 'failed_pre_dispatch', 'provider_rejected'], [503, 'unknown', 'provider_outcome_unknown']])(
+    'fourth native POST %s is audited and stays terminal without another request', async (providerStatus, state, errorCode) => {
+      const { makeFourth } = await recordedFourthHistory();
+      const fourth = makeFourth();
+      fourth.deps.audit = jest.fn(async () => {});
+      const jobId = await admitted(fourth);
+      const expectedNativeConfig = fourthNativeConfig(fourth);
+      let guardedState, foreignAuditRejected;
+      const transport = mockFourthWire(fourth, { status: providerStatus, onFetch: async () => {
+        const { tasks: [task], attempts: [attempt] } = await store.readJob({ ...fourth.policy, jobId });
+        const { rows: [{ lease_token: leaseToken }] } = await pool.query('SELECT lease_token FROM prompt_jobs WHERE id=$1', [jobId]);
+        guardedState = attempt.state;
+        activateGrant({ ...fourth.grant, scopeId: randomUUID() });
+        try {
+          await expect(store.markAttemptFailed({ jobId, leaseToken, taskId: task.id, attemptId: attempt.id,
+            outcome: state, errorCode, deferredAudit: { wmkf_ai_notes: 'Do not retain this foreign audit.' } }))
+            .rejects.toMatchObject({ code: 'invalid_prompt_job_failure' });
+          foreignAuditRejected = true;
+        } finally { activateGrant(fourth.grant); }
+      } });
+      try {
+        expect(await fourth.tick()).toEqual({ stage: state });
+        expect(guardedState).toBe('dispatching');
+        expect(foreignAuditRejected).toBe(true);
+        expectFourthWire(transport.providerFetch, expectedNativeConfig);
+        expect(transport.wrapper.getExpectedNativeConfig()).toBeNull();
+        const beforeAudit = await store.readJob({ ...fourth.policy, jobId });
+        expect(beforeAudit.tasks[0]).toMatchObject({ state, error_code: errorCode, result_content_id: null });
+        expect(beforeAudit.attempts).toEqual([expect.objectContaining({
+          state, error_code: errorCode, response_content_id: null, audit_state: 'pending',
+        })]);
+        expect(await fourth.tick()).toEqual({ stage: 'audit_delivered' });
+        expect(fourth.deps.audit).toHaveBeenCalledTimes(1);
+        expect(fourth.deps.audit.mock.calls[0][0].payload).toMatchObject({
+          wmkf_ai_promptversion: 4, wmkf_ai_status: 682090001,
+          wmkf_ai_notes: 'profiled=true; outcome=failed; code=profile_execution_failed; stopReason=unknown',
+        });
+        expect(await fourth.tick()).toEqual({ stage: 'needs_attention' });
+        expect(await fourth.tick({ recoverResponse: true })).toEqual({ stage: 'unavailable' });
+        const final = await store.readJob({ ...fourth.policy, jobId });
+        expect(final.attempts).toEqual([expect.objectContaining({ id: beforeAudit.attempts[0].id, state, audit_state: 'delivered' })]);
+        expect(transport.wire).toHaveBeenCalledTimes(1);
+        expect(transport.state.providerPosts).toBe(1);
+        expect(mockComplete).toHaveBeenCalledTimes(3);
+      } finally { transport.wire.mockRestore(); }
+    },
+  );
+
+  test('fourth native guard denial records intent and never reaches the provider', async () => {
+    const { makeFourth } = await recordedFourthHistory();
+    const fourth = makeFourth();
+    fourth.deps.audit = jest.fn(async () => {});
+    const jobId = await admitted(fourth);
+    const transport = mockFourthWire(fourth, { deny: true });
+    try {
+      expect(await fourth.tick()).toEqual({ stage: 'unknown' });
+      expect(transport.wire).toHaveBeenCalledTimes(1);
+      expect(transport.providerFetch).not.toHaveBeenCalled();
+      expect(transport.save.mock.results).toEqual([{ type: 'return', value: { providerPosts: 0, providerGuardDenied: true } }]);
+      expect(transport.wrapper.getExpectedNativeConfig()).toBeNull();
+      expect(await fourth.tick()).toEqual({ stage: 'audit_delivered' });
+      expect(await fourth.tick()).toEqual({ stage: 'needs_attention' });
+      const job = await store.readJob({ ...fourth.policy, jobId });
+      expect(job.attempts).toEqual([expect.objectContaining({
+        state: 'unknown', error_code: 'provider_outcome_unknown', audit_state: 'delivered',
+      })]);
+      expect(transport.wire).toHaveBeenCalledTimes(1);
+      expect(transport.providerFetch).not.toHaveBeenCalled();
+    } finally { transport.wire.mockRestore(); }
   });
 
   test('rejects a mismatched database and same idempotency key with different binding', async () => {
