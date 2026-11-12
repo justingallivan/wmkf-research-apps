@@ -9,7 +9,9 @@ Last verified: 2026-11-11 (Pacific).
 Justin clarified the deliverable on November 11: give Connor prompts stored in
 Dataverse, structured so his Power Automate flows can call them and populate the
 expected Dataverse output fields. Connection/application details are unknown to
-Justin and are not a reason to expand infrastructure.
+Justin and are not a reason to expand infrastructure. Justin subsequently clarified
+that working plumbing takes priority over optimizing prompt wording or length.
+Existing prompt content stays unchanged; no Methodology length choice was made.
 
 The accepted execution boundary remains one shared backend Executor, as recorded
 in [the discovery handoff](PREFLIGHT_PROMPTS_HANDOFF_2026-11-10.md): Power Automate
@@ -160,22 +162,112 @@ These distinctions are source/metadata evidence, not fresh live-schema proof.
 See [AI extension definitions](../../lib/dataverse/schema/wave2-existing/akoya_request-ai-extensions.json)
 and [Request narrative handoff](REQUEST_NARRATIVES_HANDOFF_2026-11-09.md).
 
+## Status and conditional delivery plumbing
+
+[BRANCH-BUILT, offline verification] `machine-status.js` projects an already
+scoped, authorized ledger view to a content-free machine DTO. It checks the actual
+migration/store combinations of task, attempt, audit and publication state. Unknown
+values or inconsistent tuples return a fixed `job_state_inconsistent` 503 rather
+than a false success. The current one-attempt lifecycle is explicit; a future
+retry implementation must extend this reader alongside its writer.
+
+The precedence is uncertainty/attention, active work, then settled outcomes.
+Initial queued work becomes running after snapshot or target capture. A known
+failed or protected-content task is failed; it yields partial when a sibling was
+successfully delivered. Success requires validated generation and delivered audit,
+plus applied writeback for initialization. Applied delivery remains successful
+after temporary content expires. Draft generation remains a historical success
+after expiry, but this machine DTO exposes no result endpoint or recovery action:
+`resultAvailable` is false and `recoveryActions` is empty. Pending audit or
+unstarted publication whose content expires requires attention. In-flight writes
+remain running until the worker observes their outcome or expired lease.
+
+`version` tracks durable ledger mutations. `observedAt` records projection time;
+retention can change state at the same version. A future poller must not discard a
+same-version status observation. Any remaining generation, audit or publication
+work suggests another poll (five seconds), even when the aggregate needs attention;
+settled responses use null. A needs-attention response is not automatically terminal. These are service DTOs, not
+HTTP responses; no new route exists yet.
+
+[BRANCH-BUILT, offline verification] `request-field-delivery.js` implements the
+worker's capture/write interfaces for the existing approved Short Title column
+only. It has no default transport or runtime caller. Capture authorizes before and
+after the read, requires an explicit selected field and concrete ETag, preserves
+null versus empty-string hashes, and treats whitespace as existing staff content.
+Write accepts only the approved physical field, a nonblank string within the
+2,000-character limit, and the exact original ETag frozen on the job. It freezes
+canonical request/operation identity and payload before asynchronous authorization.
+It calls the injected PATCH adapter once, with the original `If-Match` and
+`noFallback:true`; 412 is conflict, every other transport exception is unknown.
+Neither path refreshes the ETag or retries. An unrelated Request field edit can
+cause the same conservative 412 because the version is row-wide.
+
+The adapter is **not initialization deduplication**. The existing ledger's
+reservation, publication and retained receipts must own first-event eligibility
+and replay protection. Blankness alone never authorizes refilling a staff-cleared
+field. Runtime binding must use the normal grant-request DAL adapter, current
+machine permission and target interlock; this helper adds no bypass or human
+impersonation. Existing task capabilities still prohibit real Request publication,
+so a real Short Title job is not enabled by adding this adapter.
+
+Tests exercise the real Dynamics write-core serialization with its physical HTTP
+seam replaced, and the real PostgreSQL `captureTarget` contract. The latter uses
+an explicit synthetic field-label translation in test code only, because current
+ledger initialization remains synthetic-only. It proves hash/blankness capture
+and protected-content status, not production field admission or live Dataverse.
+
 ## Next implementation sequence
 
-1. Finish the per-task field matrix against the Request narrative workstream and
-   the intended workbook columns. Identify exact missing decisions once, together.
-2. Prepare the smallest first publishable prompt bundle with explicit output
-   validators and field/write contracts; Opus reviews instructions and implementation.
-   Preserve existing prompt callers and published revisions.
-3. Add real machine submit/status and shared worker admission for those approved
-   capabilities. Connect the chosen document source and measured cache grouping;
-   do not assume all task schemas share the measured prose-task cache.
-4. Prove real Power Automate authentication and bounded duplicate delivery without
-   a paid model call, then an explicitly authorized generation/writeback trial.
-5. Verify staff edits/clearing, partial failure, replay, unknown outcomes and
-   conditional writeback; hand Connor the tested trigger/polling recipe.
+1. Wire authenticated machine submission/status and a bounded worker composition,
+   preserving existing prompt text. Add the actual permitted task/source/delivery
+   contract without relaxing staff or expertise trial guards. No additional prompt
+   wording decision is required to build these boundaries.
+2. Start real field-delivery wiring with the approved Short Title destination;
+   keep other mappings disabled until their exact columns and write policies are
+   agreed. The existing Short Title prompt is a legacy override-input task, not a
+   profiled shared job. Preserve its current callers while adding durable-job
+   execution support; do not publish incompatible metadata into that existing row.
+3. Prove the chosen Power Automate connection and bounded submit/replay/status
+   path, then run an explicitly authorized model/writeback trial. Test first fill,
+   duplicate delivery, staff edits/clearing, partial failure and unknown outcomes.
+4. Hand Connor the tested calling/field contract, then optimize or expand the
+   individual prompts separately. General document selection remains open; no
+   fixture or trial source policy silently becomes the all-prompt default.
 
 ## Verification and review receipts
+
+### Status/delivery slice
+
+Opus 5.5 reviewed both plan and build through subscription OAuth with tools
+disabled. Named changes addressed: active-work polling under needs-attention,
+real write-core 412/500 outcome checks, and real-ledger lifecycle projection.
+The existing worker already catches writer exceptions after dispatch and persists
+unknown; a real PostgreSQL/worker test now proves this. Changing dispatch order
+was rejected because the existing durable-intent boundary is correct. Imports
+were moved to the top of the test file; scoped lint and type checks passed.
+
+The real PostgreSQL tests cover queued, snapshot, target capture, dispatch intent,
+response, validation, audit pending/dispatch/delivery, publication ready/dispatch,
+applied/conflict/unknown/expired, and content cleanup. Separate cases cover partial
+publication with protected staff content, source/response-stage expiry, validation
+failure and unknown provider outcome. They use fabricated model/audit values and
+no application model or Dataverse calls. No staff-scientific-quality claim follows
+from these engineering tests.
+
+Review packets: plan SHA-256
+`8a79e2215d8b9a3465bdfe1dfd90dcbeb91b5df3eacaa85e44c952947ac742eb`; build SHA-256
+`c5d99f56e47e9aa42cb98d73a20d08029f8039946bfc1fbd6b0b7e424d1bbfae`.
+Local supplementary receipts: `/private/tmp/wmkf-pa-plumbing-plan.json` and
+`/private/tmp/wmkf-pa-plumbing-build.json`. Root closes the named findings using
+the targeted regression tests; another review iteration is not needed for these
+bounded changes. Final combined verification passed 218 tests: 62 authentication,
+84 status, 50 delivery and 22 real-PostgreSQL cases. Scoped lint/types, DAL/context
+gates with sequential self-tests, and documentation gates passed. The isolated
+`wmkf-pa-delivery-20261111` PostgreSQL container was removed after its unique test
+schemas were confirmed absent. Real route, grant, scheduler, source and Dataverse
+wiring remain required before a deployment verdict.
+
+### Earlier authentication/admission slice
 
 Plan reviewed by Claude Opus 5.5 through subscription OAuth, tools disabled.
 Verdict NAMED CHANGES: explicit lifetime checks, tenant-key isolation, safe error
