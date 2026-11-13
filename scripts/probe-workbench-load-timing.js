@@ -17,6 +17,10 @@ const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-timing-'));
 fs.symlinkSync(path.join(root, 'node_modules'), path.join(temporary, 'node_modules'));
 const output = path.join(temporary, 'probe.cjs');
 buildSync({ entryPoints: [path.join(__dirname, 'lib/workbench-timing-entry.js')], outfile: output,
-  bundle: true, platform: 'node', format: 'cjs', packages: 'external', logLevel: 'error' });
+  bundle: true, platform: 'node', format: 'cjs', packages: 'external', logLevel: 'error',
+  // A bundled module that calls createRequire(import.meta.url) (lib/db/ledger-registry.js,
+  // reached through the J27 integrity facts) needs a real URL; esbuild leaves it empty in CJS.
+  banner: { js: "const __bundleImportMetaUrl = require('node:url').pathToFileURL(__filename).href;" },
+  define: { 'import.meta.url': '__bundleImportMetaUrl' } });
 require(output).main().catch((error) => { console.error(error.message); process.exitCode = 1; })
   .finally(() => fs.rmSync(temporary, { recursive: true, force: true }));
