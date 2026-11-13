@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## November 2026 — Durable Power Automate prompt jobs reach sandbox proof (Session 674, Codex)
+
+**Milestone:** Established the shared Executor job architecture for authenticated Power Automate submission, polling and conditional Dataverse delivery.
+**Sessions:** Long-running expertise/Executor integration, closed as branch-local Session 674.
+**Ship state:**
+- Isolated Sandbox Short Title delivery and supervised worker progression passed; retained receipts prevented duplicate generation/writeback. Production rollout and unattended scheduling remain unactivated.
+- Sandbox native-schema expertise recommendations validated and reached authenticated staff readback; assignment remains excluded.
+- Executive Summary reuses Lay Abstract; manual editing and granted configurable Short Title destinations are branch-built, not deployed. Connor's existing test remains unchanged.
+**Why it matters:** Power Automate can use one backend with frozen inputs, durable outcomes and protected staff fields, without duplicating provider logic.
+**Pointers:** `docs/plans/POWER_AUTOMATE_PROMPT_HANDOFF_2026-11-11.md`, `docs/plans/PA_CONFIGURABLE_DESTINATIONS_2026-11-13.md`; `23f71d2b5`, `65726e852`, `1e84f1fb8`, `557df880e`, `d8d100a65`, `23d000af0`.
+
 ## November 2026 — J27 First Cut ships in Workbench (Session 667, Codex)
 
 **Milestone:** J27 lead PDs and superusers can save First Cut on the Proposal tab.
