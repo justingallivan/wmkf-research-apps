@@ -66,7 +66,13 @@ these changes:
   (attested: branch, commit, Ready); the stable alias points at it. Previous
   targets the same day: `dpl_THWVcsoBdLRjDACMEukwuUE69VgT` (redeploy of
   `5f81733db` with the new setting) and before it
-  `dpl_HfWztktsLVVAXXAYLS26kgbFfMkE`. Six branch-scoped Config settings now;
+  `dpl_HfWztktsLVVAXXAYLS26kgbFfMkE`. **Superseded later the same day:**
+  after the Codex review fix the branch is at `72368357e` and the alias
+  points at `dpl_CLcVRmYVBNEShTeszJeqH9ebheU7` (attested: branch, commit,
+  Ready); `dpl_ARxww8Gb6byXvihGmTWzGPC1Lorv` is the previous target. In the
+  browser, #1000386 opened from its row read "Next: Identify reviewers", and
+  the reviewer counts were read once on opening and once per return to the
+  Overview. Six branch-scoped Config settings now;
   remove all six at promotion or retirement.
 - **Deliberations fixture, 2026-11-12 (owner go).** The sandbox had no
   request in Deliberations. One presentation record was added to #1000383
