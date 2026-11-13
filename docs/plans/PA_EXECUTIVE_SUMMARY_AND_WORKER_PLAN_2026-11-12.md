@@ -19,7 +19,8 @@ new database, generic field mapper or another application merely for this slice.
 `Submission-Documents`. The combined Narrative-Bibliography PDF in `AI Materials`
 is for reviewer matching, not Summary input or a Summary prerequisite. No fallback
 to that PDF, applicant abstract or Phase I staff version. The existing AI Materials
-source adapter belongs to prior trials; the dedicated Summary adapter is not built.
+source adapter belongs to prior trials; the dedicated Summary adapter is now built
+and synthetic-tested offline, with no runtime importer or machine admission wiring.
 
 ## Evidence and boundaries
 
@@ -127,7 +128,7 @@ original ETag across the complete submit → generation → publication → staf
 
 | Claim | Evidence | Status / disconfirming check |
 | --- | --- | --- |
-| Summary source is Submission-Documents narrative; matching keeps combined PDF | Owner's explicit source decision in this chat | VERIFIED intent; source adapter implementation still required |
+| Summary source is Submission-Documents narrative; matching keeps combined PDF | Owner's explicit source decision in this chat | VERIFIED intent; dedicated adapter built offline, runtime wiring still required |
 | Current editor permits early saves and skips unchanged text | `lib/services/workbench/request-narratives-service.js`, `canEdit` / `saveRequestNarratives` | VERIFIED source; readiness is absent from these guards |
 | Worker captures baseline after source preparation | `lib/services/prompt-jobs/worker.js`, `advanceJob`; `store.js`, `captureTarget` | VERIFIED source; an earlier edit-and-clear defeats blankness alone |
 | Permanent Summary reservation needs explicit implementation | `store.js`, `markAttemptFailed` | VERIFIED gap: only MACHINE_TITLE_TASK is exempt from known-failure release |
@@ -395,3 +396,37 @@ eligibility remain unknown/planned; no external-state certification is claimed.
 Documentation gates and sequential self-tests: doc-currency, fact-consistency,
 canonical-pointers, atlas, doc-symbol-refs and build-claim-freshness passed.
 No runtime, schema, credential, deployment or Connor test change.
+
+## Offline Summary source adapter (2026-11-13)
+
+[VERIFIED via source and synthetic tests] `lib/services/prompt-jobs/summary-source.js`
+exports `createSummarySource` with `inspect`, `prepare` and `isCurrent`. The separate
+policy `submission-documents-summary-pi-v1` selects exactly
+`Submission-Documents/Project-Narrative_{Request#}.pdf` under one active Request
+location. This candidate filename awaits Connor's confirmation before activation.
+The existing staff/recommendation adapters and source policies are unchanged.
+
+| Invariant | Enforcement / verification |
+| --- | --- |
+| Narrative only, no fallback | Exact folder/name; tests supply combined PDF, legacy narrative and applicant abstract while removing the narrative |
+| Caller supplies authorized Request context | Header requires caller authorization and trusted DAL context; no public route, worker or admission imports the adapter |
+| Frozen source and authoritative PI | Manifest pins Request, contact/name hash, Graph site/drive/item/version/ETag; checks before and after download and after extraction |
+| Bounded, trustworthy shape | 20 MiB download cap, PDF magic bytes, nonblank extraction, existing profile UTF-8/snapshot limits; errors contain safe codes only |
+| Shared snapshot contract | Existing sealed context builder retains raw-byte hash, extraction version, document text and PI provenance; integrity readback tested |
+| No durable or external side effect in verification | All source/extraction dependencies mocked or injected; no database, provider, Graph, Dataverse or deployment calls |
+
+Unknown/foreign manifest policy, invalid scope/profile, absent/ambiguous location,
+changed source and invalid bytes fail closed. Transport uncertainty is distinguished
+from confirmed stale input. Freshness is a bounded observation, not a lock: future
+worker integration must recheck source and authorization before side effects.
+`isCurrent` compares metadata/PI; it does not redownload or promise content freshness
+if an external producer violates revision semantics. Raw bytes are hashed at preparation.
+No extraction-helper refactor, new persistence, migration, status or API was added.
+Partial-batch success and UI state are N/A; this adapter returns one snapshot or fails.
+
+Validation: 68 tests across the Summary source, existing proposal source and context
+suites passed with synthetic inputs. Scoped ESLint and repository type check passed.
+Independent read-only build review found no material issues. No real PDF extraction,
+live source/authorization or cache savings is claimed. Staff-edit marker, event
+eligibility, grants and initialization/publication wiring remain unimplemented.
+Connor's test, deployed code and configuration remain untouched.

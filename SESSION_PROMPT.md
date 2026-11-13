@@ -70,7 +70,8 @@ No runtime promotion to main is authorized by this handoff.
 
 1. Executive Summary source is SETTLED (owner, November 13): project narrative
    in Submission-Documents. Combined Narrative-Bibliography is for reviewer matching;
-   Summary neither reads nor waits for it. Source adapter remains to be implemented.
+   Summary neither reads nor waits for it. Dedicated summary-source.js is built
+   offline with synthetic tests; machine admission/worker wiring remains absent.
    See the revised Summary worker/field plans.
 2. Summary automatic delivery needs the exact intake/readiness ordering, external
    writer/visibility checks, and the proposed atomic staff-edit Boolean contract

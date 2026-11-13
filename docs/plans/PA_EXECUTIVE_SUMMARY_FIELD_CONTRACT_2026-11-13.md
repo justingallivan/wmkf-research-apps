@@ -117,7 +117,8 @@ Sweep Mode A scope: field identity, current app readers/writers and implementati
 status. Related worker plan, narrative handoff, Atlas and route inventory are updated
 in the same change. Production label changes, external flows/forms/roles, field
 contents and first-event activation remain unknown or open. Source intent is now
-settled by the owner; the new source adapter and staff-edit protection are planned. Build review and test results are recorded after verification below.
+settled by the owner; the dedicated source adapter is built and synthetic-tested
+offline without admission wiring. Staff-edit protection remains planned. Build review and test results are recorded after verification below.
 
 ## Build verification and release boundary
 
