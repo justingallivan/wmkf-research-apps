@@ -118,4 +118,13 @@ gets no id and never matches, so it waits forever on a build that finished in
 under a minute. Capture with `2>&1` and parse `awk '$1=="id"{print $2}'`, then
 attest branch and commit through `vercel api /v13/deployments/<id>` meta.
 
+**VERIFIED 2026-11-12 (Session 674), Vercel CLI 65.14:** a new branch-scoped
+setting reaches a Preview only on a rebuild; `vercel redeploy <deployment-url>
+--target preview` rebuilt the same commit with it (about 2 minutes). To find
+the build a push made, `vercel ls --meta githubCommitSha=<full sha>` lists it
+with its Ready state. Run `vercel env ls` / `env add` from the main checkout
+(linked); a worktree without `.vercel` reports "isn't linked to a project".
+The positional `vercel env ls preview <branch>` form is deprecated; use
+`--environment preview --git-branch <branch>`.
+
 Related: [[project-vercel-sensitive-env-pull-empty]], [[project-dev-environment]], [[project-local-dev-auth-setup]], [[project-branded-domains]].
