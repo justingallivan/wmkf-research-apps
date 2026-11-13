@@ -101,6 +101,37 @@ test('opened on Peer Review, the page loads the reviewer counts itself and the s
   expect(global.fetch.mock.calls.filter(([url]) => String(url).startsWith('/api/workbench/reviewer-rollup'))).toHaveLength(1);
 });
 
+// Codex review of cc603be5e: the Overview used to fetch fresh counts on every visit, so
+// returning to it after invitations or reports showed current guidance. The page-owned
+// rollup must keep that: opening the Overview again reads the counts again.
+test('returning to the Overview reads the reviewer counts again and the strip follows the new counts', async () => {
+  routeTab = 'peer-review'; routeSection = 'reports';
+  const view = render(<WorkbenchRequest staffReviewSummary />);
+  await act(async () => { pending.get('/api/workbench/resolve-request?requestId=request-a')(resolved('request-a')); });
+  await screen.findByLabelText('Where this request stands');
+  const rollupUrl = '/api/workbench/reviewer-rollup?requestId=request-a';
+  const answer = (counts) => { const body = { success: true, counts, needed: 3 }; return { ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) }; };
+  await waitFor(() => expect(pending.has(rollupUrl)).toBe(true));
+  await act(async () => { pending.get(rollupUrl)(answer({ candidates: 2, invited: 0, accepted: 0, completed: 0, received: 0 })); });
+  await waitFor(() => expect(screen.getByLabelText('Where this request stands')).toHaveTextContent('Next: Send reviewer invitations'));
+  pending.delete(rollupUrl);
+  routeTab = 'overview'; routeSection = undefined;
+  view.rerender(<WorkbenchRequest staffReviewSummary />);
+  await waitFor(() => expect(pending.has(rollupUrl)).toBe(true));
+  await act(async () => { pending.get(rollupUrl)(answer({ candidates: 3, invited: 3, accepted: 3, completed: 0, received: 3 })); });
+  await waitFor(() => expect(screen.getByLabelText('Where this request stands')).toHaveTextContent('Next: Read the reviewer reports'));
+  expect(global.fetch.mock.calls.filter(([url]) => String(url) === rollupUrl)).toHaveLength(2);
+});
+
+test('a request opened on the Overview reads the reviewer counts once', async () => {
+  render(<WorkbenchRequest staffReviewSummary />);
+  await act(async () => { pending.get('/api/workbench/resolve-request?requestId=request-a')(resolved('request-a')); });
+  await screen.findByLabelText('Where this request stands');
+  await waitFor(() => expect(pending.has('/api/workbench/reviewer-rollup?requestId=request-a')).toBe(true));
+  await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+  expect(global.fetch.mock.calls.filter(([url]) => String(url).startsWith('/api/workbench/reviewer-rollup'))).toHaveLength(1);
+});
+
 test('a pre-2027 request makes no page-level reviewer counts read', async () => {
   render(<WorkbenchRequest />);
   await act(async () => { pending.get('/api/workbench/resolve-request?requestId=request-a')(resolved('request-a', false)); });

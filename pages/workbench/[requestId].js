@@ -127,7 +127,10 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
   // The strip needs reviewer counts on whichever tab the request opens on (a Peer
   // Review list row links to the Peer Review tab), so a 2027-or-later page loads the
   // rollup here and the Overview reads this state (C7 amendment, 2026-11-12).
-  const j27ReviewerProgress = useReviewerProgress(visibleContext?.j27 ? routeRequestId : null);
+  // Each opening of the Overview reads the counts again, as the Overview's own fetch
+  // did on every mount, so guidance is current after invitations or reports.
+  const [overviewVisit, setOverviewVisit] = useState(0);
+  const j27ReviewerProgress = useReviewerProgress(visibleContext?.j27 ? routeRequestId : null, overviewVisit);
   useEffect(() => {
     if (visibleContext?.j27 && routeRequestId && j27ReviewerProgress.status !== 'loading') {
       reportJ27Facts(routeRequestId, { progress: j27ReviewerProgress });
@@ -217,6 +220,14 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
   useEffect(() => {
     if (activeTab === 'staff-deliberations') setVisitEditorRequestId(routeRequestId);
   }, [activeTab, routeRequestId]);
+
+  // Returning to the Overview from another tab reads the reviewer counts again;
+  // the first load already reads them, so it is not counted as a return.
+  const previousTabRef = useRef(activeTab);
+  useEffect(() => {
+    if (activeTab === 'overview' && previousTabRef.current !== 'overview') setOverviewVisit((n) => n + 1);
+    previousTabRef.current = activeTab;
+  }, [activeTab]);
 
   useEffect(() => {
     const scroller = tabScrollerRef.current;

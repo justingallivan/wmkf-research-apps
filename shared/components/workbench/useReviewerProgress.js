@@ -2,12 +2,13 @@
  * Reviewer rollup for one request (counts only): { status, data: { counts, needed, hint } }.
  * Used by the Overview tab, and by the request page for 2027-or-later requests so the
  * J27 stage strip has reviewer counts whichever tab the request opens on.
- * A falsy requestId fetches nothing and reads as loading.
+ * A falsy requestId fetches nothing and reads as loading. A change of `refreshKey`
+ * reads again (the request page bumps it each time the Overview is opened).
  */
 import { useState, useEffect, useRef } from 'react';
 import { requestEnvelope } from '../../utils/api-request';
 
-export default function useReviewerProgress(requestId) {
+export default function useReviewerProgress(requestId, refreshKey = 0) {
   const requestKey = String(requestId || '').toLowerCase();
   const [state, setState] = useState({ status: 'loading', data: null, requestKey: '' });
   const reqRef = useRef(0);
@@ -30,7 +31,7 @@ export default function useReviewerProgress(requestId) {
         if (!cancelled && token === reqRef.current) setState({ status: 'error', data: null, requestKey });
       });
     return () => { cancelled = true; };
-  }, [requestId, requestKey]);
+  }, [requestId, requestKey, refreshKey]);
 
   return state.requestKey === requestKey ? state : { status: 'loading', data: null };
 }
