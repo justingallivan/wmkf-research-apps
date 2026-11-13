@@ -1,3 +1,5 @@
+let mockMachineDestinationPolicy = null;
+jest.mock('../../lib/services/prompt-jobs/machine-pilot-policy.js', () => ({ ...jest.requireActual('../../lib/services/prompt-jobs/machine-pilot-policy.js'), readMachinePilotPolicy: () => mockMachineDestinationPolicy }));
 /**
  * Multi-output PATCH coalescing tests for the Prompt Executor.
  *
@@ -63,6 +65,7 @@ jest.mock('../../lib/services/dynamics-service', () => ({
 }));
 
 beforeEach(() => {
+  mockMachineDestinationPolicy = null;
   fetchedBodies.length = 0;
   updateCalls.length = 0;
   auditCalls.length = 0;
@@ -592,4 +595,10 @@ describe('Executor response-completeness + native structured output', () => {
     runSource: 'Vercel Test', overrideVariables: { x: 'value' }, forceOverwrite: true })).rejects.toThrow('dedicated initialization contract');
   expect(fetchedBodies).toHaveLength(0);
   expect(updateCalls).toHaveLength(0);
+});
+
+test('generic Executor cannot bypass configured machine-field reservation',async()=>{
+ mockMachineDestinationPolicy={destinationGrant:{field:'wmkf_trialtitle',type:'Memo',maxLength:2000}};
+ await expect(run([{name:'summary',target:{kind:'akoya_request',field:'WMKF_trialtitle'},guard:'always-overwrite'}],{summary:'Would refill cleared field'})).rejects.toThrow('durable job initialization');
+ expect(fetchedBodies).toHaveLength(0);expect(updateCalls).toHaveLength(0);
 });

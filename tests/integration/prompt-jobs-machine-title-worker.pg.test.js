@@ -3,6 +3,11 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import pg from 'pg';
 const mockComplete = jest.fn();
+let mockMachinePolicy = null;
+jest.mock('../../lib/services/prompt-jobs/machine-pilot-policy.js', () => ({
+  ...jest.requireActual('../../lib/services/prompt-jobs/machine-pilot-policy.js'),
+  readMachinePilotPolicy: () => mockMachinePolicy,
+}));
 jest.mock('../../lib/services/llm-client.js', () => ({ DEFAULT_TIMEOUT_MS:120000,
   LLMClient:jest.fn().mockImplementation(()=>({complete:mockComplete})) }));
 jest.mock('../../lib/dataverse/adapters/grant-request.js',()=>({getById:jest.fn(()=>{throw Error('Live read forbidden');}),updateById:jest.fn(()=>{throw Error('Live write forbidden');})}));
@@ -13,6 +18,7 @@ import { admitMachineJob, readMachineJob } from '../../lib/services/prompt-jobs/
 import { runMachineJobTick } from '../../lib/services/prompt-jobs/machine-worker.js';
 import { createMachineTitleSource } from '../../lib/services/prompt-jobs/machine-title-source.js';
 import { buildMachineTitleDefinition, MACHINE_TITLE_TASK, MACHINE_TITLE_FIELD } from '../../lib/services/prompt-jobs/machine-title-contract.js';
+import { validateDestinationMetadata } from '../../lib/services/prompt-jobs/machine-destination.js';
 import { machinePilotScope, machineDatabaseEndpoint } from '../../lib/services/prompt-jobs/machine-pilot-policy.js';
 import { canonical, hashProfile, sha256 } from '../../lib/services/prompt-jobs/profile.js';
 
@@ -35,11 +41,12 @@ suite('machine title actual admission/worker/Executor with real isolated PG',()=
   afterAll(async()=>{if(originalKey===undefined)delete process.env.CLAUDE_API_KEY;else process.env.CLAUDE_API_KEY=originalKey;
     try{if(pool)await pool.end();}finally{try{if(schema)await admin.query(`DROP SCHEMA "${schema}" CASCADE`);}finally{if(admin)await admin.end();}}});
   beforeEach(()=>{process.env.CLAUDE_API_KEY='synthetic-unused-key';mockComplete.mockReset().mockResolvedValue({text:'To explore cell signaling',content:[{type:'text',text:'To explore cell signaling'}],model:'claude-sonnet-5-5',stopReason:'end_turn',stopDetails:null,refused:false,usageComplete:true,usage:{inputTokens:100,outputTokens:10,cacheCreationTokens:0,cacheReadTokens:0}});});
-  function fixture(initial=null){
-    const {profile,task}=buildMachineTitleDefinition();const promptId=randomUUID();
+  function fixture(initial=null,destinationField){
+    const {profile,task}=buildMachineTitleDefinition({destinationField});const field=destinationField||MACHINE_TITLE_FIELD;const promptId=randomUUID();
     const promptRow={wmkf_ai_promptid:promptId,wmkf_promptversion:1,wmkf_ai_promptname:task.name,wmkf_ai_promptbody:task.body,wmkf_ai_systemprompt:task.systemPrompt,wmkf_ai_model:task.model,wmkf_ai_maxtokens:task.maxTokens,wmkf_ai_temperature:task.temperature,wmkf_ai_promptvariables:task.variables,wmkf_ai_promptoutputschema:task.outputSchema};
-    const pilotId=randomUUID();let policy={pilotId,enabled:true,requestId:randomUUID(),sourceEventId:randomUUID(),authorizationScope:`pa-short-title:${pilotId}`,principalKey:'app:entra-v2:worker-fixture',environment:'test-sandbox',expiresAt:new Date(Date.now()+86400000).toISOString(),databaseEndpoint:endpoint,databaseIdentity,promptId,promptVersion:1,promptHash:sha256(canonical(promptRow)),profileHash:hashProfile(profile)};
-    let row={_etag:'W/"1"',akoya_title:'Applicant title',wmkf_abstract:'A synthetic abstract that explains the experimental hypothesis and research approach.',wmkf_phaseistatus:null,[MACHINE_TITLE_FIELD]:initial};
+    const pilotId=randomUUID();let policy={pilotId,enabled:true,requestId:randomUUID(),sourceEventId:randomUUID(),authorizationScope:`pa-short-title:${pilotId}`,principalKey:'app:entra-v2:worker-fixture',environment:'test-sandbox',expiresAt:new Date(Date.now()+86400000).toISOString(),databaseEndpoint:endpoint,databaseIdentity,promptId,promptVersion:1,promptHash:sha256(canonical(promptRow)),profileHash:hashProfile(profile),...(destinationField?{destinationGrant:{field:destinationField,type:'Memo',maxLength:2000}}:{})};
+    mockMachinePolicy = policy;
+    let row={_etag:'W/"1"',akoya_title:'Applicant title',wmkf_abstract:'A synthetic abstract that explains the experimental hypothesis and research approach.',wmkf_phaseistatus:null,[field]:initial};
     const store=createPromptJobStore(pool,{readMachinePolicy:()=>policy,machineDatabaseEndpoint:endpoint});
     const readRequest=jest.fn(async id=>{expect(id).toBe(policy.requestId);return {...row};});
     const patchRequest=jest.fn(async(id,fields,options)=>{
@@ -48,10 +55,12 @@ suite('machine title actual admission/worker/Executor with real isolated PG',()=
       row={...row,...fields,_etag:'W/"2"'};
     });
     const audit=jest.fn(async()=>{});const source=createMachineTitleSource({readRequest});
-    const deps={store,policy:()=>policy,source,readRequest,patchRequest,audit,executePrompt,prompt:jest.fn(async()=>promptRow),profiles:jest.fn(async()=>({profiles:[{profile,sha256:hashProfile(profile)}]})),now:()=>Date.now(),nonceSecret:()=> 'offline-machine-title-nonce-secret-32bytes'};
+    const metadata={LogicalName:field,AttributeType:'Memo',MaxLength:2000,Format:'Text',SourceType:0,AttributeOf:null,RequiredLevel:{Value:'None'},IsValidForRead:true,IsValidForUpdate:true,IsSecured:false};
+    const checkDestination=jest.fn(async p=>validateDestinationMetadata(metadata,p.destinationGrant));
+    const deps={store,checkDestination,policy:()=>policy,source,readRequest,patchRequest,audit,executePrompt,prompt:jest.fn(async()=>promptRow),profiles:jest.fn(async()=>({profiles:[{profile,sha256:hashProfile(profile)}]})),now:()=>Date.now(),nonceSecret:()=> 'offline-machine-title-nonce-secret-32bytes'};
     const access={policy,scope:machinePilotScope(policy),assertCurrent:()=>{}};
     const args={access,idempotencyKey:randomUUID(),body:{requestId:policy.requestId,sourceEventId:policy.sourceEventId,taskKeys:[MACHINE_TITLE_TASK],operation:'initialize'}};
-    return {deps,args,store,patchRequest,audit,readRequest,getRow:()=>row,edit:(value='Staff edit')=>{row={...row,_etag:'W/"edited"',[MACHINE_TITLE_FIELD]:value};},policy:patch=>{policy={...policy,...patch};}};
+    return {deps,args,store,patchRequest,audit,readRequest,metadata,field,getRow:()=>row,edit:(value='Staff edit')=>{row={...row,_etag:'W/"edited"',[field]:value};},policy:patch=>{policy={...policy,...patch};mockMachinePolicy=policy;}};
   }
   async function throughAudit(f){
     const admitted=await admitMachineJob(f.args,f.deps);const stages=[];
@@ -60,6 +69,56 @@ suite('machine title actual admission/worker/Executor with real isolated PG',()=
     expect(mockComplete).toHaveBeenCalledTimes(1);expect(f.audit).toHaveBeenCalledTimes(1);
     return admitted.job.jobId;
   }
+  test.each(['wmkf_trialtitleone','wmkf_trialtitletwo'])('configured target %s traverses actual worker and freezes destination across current prompt edits', async field=>{
+    const f=fixture(null,field);
+    const admitted=await admitMachineJob(f.args,f.deps);
+    const initialPromptCalls=f.deps.prompt.mock.calls.length;
+    f.deps.prompt.mockResolvedValue({wmkf_ai_promptoutputschema:JSON.stringify({outputs:[{target:{kind:'akoya_request',field:'wmkf_another'}}]})});
+    expect((await admitMachineJob(f.args,f.deps)).job.jobId).toBe(admitted.job.jobId);
+    expect(f.deps.prompt).toHaveBeenCalledTimes(initialPromptCalls);
+    for(let i=0;i<5;i++)await runMachineJobTick(f.deps);
+    expect((await readMachineJob({jobId:admitted.job.jobId,access:f.args.access},f.deps)).job.state).toBe('succeeded');
+    expect(f.readRequest).toHaveBeenCalledWith(f.args.body.requestId,{select:field});
+    expect(f.patchRequest).toHaveBeenCalledWith(f.args.body.requestId,{[field]:'To explore cell signaling'},{ifMatch:'W/"1"',noFallback:true});
+    expect(f.getRow()).not.toHaveProperty(MACHINE_TITLE_FIELD);
+    f.edit(null);
+    await admitMachineJob(f.args,f.deps);await runMachineJobTick(f.deps);
+    expect(f.getRow()[field]).toBeNull();expect(mockComplete).toHaveBeenCalledTimes(1);expect(f.patchRequest).toHaveBeenCalledTimes(1);
+  });
+  test.each(['Human text',' ', '\n'])('configured target protects existing %j before provider dispatch',async value=>{
+    const f=fixture(value,'wmkf_trialtitleone');await admitMachineJob(f.args,f.deps);
+    await runMachineJobTick(f.deps);await runMachineJobTick(f.deps);await runMachineJobTick(f.deps);
+    expect(f.getRow()[f.field]).toBe(value);expect(mockComplete).not.toHaveBeenCalled();expect(f.patchRequest).not.toHaveBeenCalled();
+  });
+  test('metadata failure before reservation leaves no job; later schema drift stops provider',async()=>{
+    const f=fixture(null,'wmkf_trialtitleone');f.metadata.IsSecured=true;
+    await expect(admitMachineJob(f.args,f.deps)).rejects.toThrow('incompatible');
+    expect((await f.store.listJobs(f.args.access.scope))).toEqual([]);
+    f.metadata.IsSecured=false;await admitMachineJob(f.args,f.deps);await runMachineJobTick(f.deps);await runMachineJobTick(f.deps);
+    f.metadata.AttributeType='Integer';expect(await runMachineJobTick(f.deps)).toEqual({stage:'waiting'});
+    expect((await pool.query('SELECT state FROM prompt_job_tasks WHERE job_id IN (SELECT id FROM prompt_jobs WHERE request_id=$1)',[f.args.body.requestId])).rows).toEqual([{state:'queued'}]);
+    expect(mockComplete).not.toHaveBeenCalled();expect(f.patchRequest).not.toHaveBeenCalled();
+  });
+  test('configured-field concurrent edit stops once at original ETag',async()=>{
+    const f=fixture(null,'wmkf_trialtitleone');await throughAudit(f);f.edit('Human revision');
+    expect(await runMachineJobTick(f.deps)).toEqual({stage:'conflict'});
+    await runMachineJobTick(f.deps);expect(f.patchRequest).toHaveBeenCalledTimes(1);expect(f.getRow()[f.field]).toBe('Human revision');
+  });
+  test('configured metadata drift before PATCH prevents physical write',async()=>{
+    const f=fixture(null,'wmkf_trialtitleone');await throughAudit(f);f.metadata.MaxLength=100;
+    await expect(runMachineJobTick(f.deps)).rejects.toThrow('incompatible');
+    expect((await pool.query('SELECT state FROM prompt_job_publications WHERE job_id IN (SELECT id FROM prompt_jobs WHERE request_id=$1)',[f.args.body.requestId])).rows).toEqual([]);
+    expect(f.patchRequest).not.toHaveBeenCalled();expect(mockComplete).toHaveBeenCalledTimes(1);
+    f.metadata.MaxLength=2000;
+    expect(await runMachineJobTick(f.deps)).toEqual({stage:'published'});
+    expect(f.patchRequest).toHaveBeenCalledTimes(1);expect(mockComplete).toHaveBeenCalledTimes(1);
+  });
+  test('tampered permanent destination fails exact status check, not just syntax',async()=>{
+    const f=fixture(null,'wmkf_trialtitleone');const admitted=await admitMachineJob(f.args,f.deps);
+    await pool.query('UPDATE prompt_job_tasks SET destination_field=$2 WHERE job_id=$1',[admitted.job.jobId,'wmkf_trialtitletwo']);
+    await expect(readMachineJob({jobId:admitted.job.jobId,access:f.args.access},f.deps)).rejects.toMatchObject({code:'job_state_inconsistent'});
+    await expect(runMachineJobTick(f.deps)).rejects.toThrow();expect(mockComplete).not.toHaveBeenCalled();expect(f.patchRequest).not.toHaveBeenCalled();
+  });
   test('one call traverses snapshot, dispatch, audit and conditional write; stable replay never regenerates',async()=>{
     const f=fixture();const jobId=await throughAudit(f);
     expect(await runMachineJobTick(f.deps)).toEqual({stage:'published'});
@@ -132,7 +191,7 @@ suite('machine title actual admission/worker/Executor with real isolated PG',()=
     const attempts=await pool.query('SELECT state,error_code,audit_state FROM prompt_job_attempts WHERE task_id IN (SELECT id FROM prompt_job_tasks WHERE job_id=$1)',[result.job.jobId]);
     expect(attempts.rows).toEqual([{state:'failed_pre_dispatch',error_code:change==='source_unavailable'?'profile_execution_failed':'dispatch_denied',audit_state:'none'}]);
     const slots=await pool.query('SELECT released_at IS NOT NULL AS released FROM prompt_job_initializations WHERE job_id=$1',[result.job.jobId]);
-    expect(slots.rows).toEqual([{released:true}]);
+    expect(slots.rows).toEqual([{released:false}]);
     if(change==='policy')f.policy({enabled:true});
     await expect(admitMachineJob({...f.args,idempotencyKey:randomUUID()},f.deps)).rejects.toMatchObject({httpStatus:429,code:'prompt_job_trial_limit'});
     expect(mockComplete).not.toHaveBeenCalled();expect(f.patchRequest).not.toHaveBeenCalled();

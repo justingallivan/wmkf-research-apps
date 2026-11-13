@@ -26,7 +26,7 @@ The existing source adapter is evidence of a prior trial, not a decision for thi
 | Summary capability exists: `proposal.executive-summary`, output `summary`, 200-word cap, destination null | `lib/services/prompt-jobs/capabilities.js` | VERIFIED source |
 | Prior staff trials retained summaries but made no Request-field writes | `SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md`, dated live receipts | VERIFIED historical; not a fresh content-quality approval |
 | Current machine route accepts only `preflight.short-title`, initialize, one pinned Request/event | `machine-service.js`, `machine-pilot-policy.js` | VERIFIED source; Summary cannot be enabled by changing a prompt row |
-| Machine writer permits only `wmkf_wmkfprojectdescription` | `request-field-delivery.js` | VERIFIED source; not a generic delivery adapter |
+| Legacy machine scope targets `wmkf_wmkfprojectdescription`; new branch configurations can declare an approved direct text field | `request-field-delivery.js`, `machine-destination.js` | VERIFIED source; exact prompt target + server grant, Summary still gated; see [configuration contract](PA_CONFIGURABLE_DESTINATIONS_2026-11-13.md) |
 | Proposal source currently pins AI Materials and Project Leader name | `proposal-source.js`, `createProposalSource` | VERIFIED source; future document policy OPEN |
 | Legacy `wmkf_ai_summary` has writers and readers | `phase-i-dynamics/summarize-service.js`, `cycle-dossier-generation.js`, `workbench/resolve-request-service.js` | VERIFIED source; not an unused destination |
 | Machine drain is POST-only, server selects one stage, no schedule entry | `pages/api/cron/drain-machine-prompt-jobs.js`, `machine-worker.js`, `vercel.json` | VERIFIED source |

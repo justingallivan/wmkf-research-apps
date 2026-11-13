@@ -583,6 +583,15 @@ keys require the bounded staff trial scope below. Each Executor output declares
 for initialization. The worker owns authorization, freshness, audit, and any
 separately authorized fixture writer.
 
+The separate `preflight.short-title` machine capability retains its legacy fixed-field
+configuration. [VERIFIED via branch source and isolated PostgreSQL tests] New explicit
+configurations can reuse `target:{kind:'akoya_request',field:...}` with an exact server
+`destinationGrant`. This declares the durable worker destination, never an inline
+Executor write. Generic calls reject profiled rows and cannot write the configured
+machine field in that deployment. Destination, hashes, reservation and publication
+are frozen per job; known machine failures do not release initialization slots.
+See the [configurable destination contract](plans/PA_CONFIGURABLE_DESTINATIONS_2026-11-13.md).
+
 ### Worker-only inputs and ordering
 
 Every invocation requires `promptSnapshot`, a matching `requestId`, and
@@ -620,7 +629,7 @@ worker context. These arguments are internal server data.
    `waiting` without creating an attempt. A definitive Anthropic 400, 401,
    429, or 529 rejection records `provider_rejected` in the PostgreSQL
    attempt, reusing `failed_pre_dispatch` even though the provider responded.
-   This terminal state releases eligible slots. It keeps audit state `none`,
+   This terminal state releases eligible synthetic fixture slots; machine Short Title reservations remain retained. It keeps audit state `none`,
    so the rejection has no Dataverse AI-run row. `paidCall:true` marks a
    received response or rejection. Billing is a separate provider fact.
    Ambiguous outcomes become `unknown` and hold their fences. A saved response

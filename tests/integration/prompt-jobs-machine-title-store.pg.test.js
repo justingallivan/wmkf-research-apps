@@ -45,8 +45,8 @@ describePg('Short Title ledger policy, replay and publication', () => {
     if (admin) await admin.end();
   });
 
-  function fixture() {
-    const { profile, task } = buildMachineTitleDefinition();
+  function fixture(destinationField) {
+    const { profile, task } = buildMachineTitleDefinition({destinationField});
     const promptId = randomUUID();
     const promptRow = {
       wmkf_ai_promptid: promptId, wmkf_promptversion: 1, wmkf_ai_promptname: task.name,
@@ -67,16 +67,37 @@ describePg('Short Title ledger policy, replay and publication', () => {
       environment: 'test-sandbox', expiresAt: new Date(Date.now() + 86400000).toISOString(),
       databaseEndpoint: endpoint, databaseIdentity, promptId, promptVersion: 1, role: 'PromptJobs.Admit',
       promptHash: sha256(canonical(promptRow)), profileHash: hashProfile(profile),
+      ...(destinationField ? {destinationGrant:{field:destinationField,type:'Memo',maxLength:2000}} : {}),
     };
     const store = createPromptJobStore(pool, { readMachinePolicy: () => policy, machineDatabaseEndpoint: endpoint });
     const command = { ...machinePilotScope(policy), operation: 'initialize', sourceEventId: policy.sourceEventId,
       idempotencyKey: randomUUID(), tasks: [{ taskKey: MACHINE_TITLE_TASK }] };
     return {
-      command, store, profile, records, configuration: { promptRow, profile, manifest },
+      command, store, profile, records, getPolicy:()=>policy, configuration: { promptRow, profile, manifest },
       setPolicy: patch => { policy = { ...policy, ...patch }; },
     };
   }
 
+  test('destination edits with stale prompt hash cannot admit even when grant is edited to match',async()=>{
+    const f=fixture('wmkf_trialtitleone');const schema=JSON.parse(f.configuration.promptRow.wmkf_ai_promptoutputschema);
+    schema.outputs[0].target.field='wmkf_trialtitletwo';f.configuration.promptRow.wmkf_ai_promptoutputschema=JSON.stringify(schema);
+    f.setPolicy({destinationGrant:{field:'wmkf_trialtitletwo',type:'Memo',maxLength:2000}});
+    await expect(f.store.admitMachineTitle(f.command,{loadConfiguration:async()=>f.configuration})).rejects.toMatchObject({code:'machine_pilot_configuration'});
+    expect(await f.store.listJobs(f.command)).toEqual([]);
+  });
+  test('new event and scope cannot evade the physical-field reservation, including after failure and expiry', async()=>{
+    const field='wmkf_trialtitleone';const a=fixture(field);
+    const admitted=await a.store.admitMachineTitle(a.command,{loadConfiguration:async()=>a.configuration});
+    const lease=await a.store.claim({jobId:admitted.job.id,leaseMs:60000});
+    await a.store.markAttemptFailed({jobId:admitted.job.id,leaseToken:lease.leaseToken,taskId:admitted.tasks[0].id,outcome:'failed_pre_dispatch',errorCode:'dispatch_denied'});
+    const b=fixture(field);b.command.requestId=a.command.requestId;b.setPolicy({requestId:a.command.requestId});b.configuration.manifest.requestId=a.command.requestId;
+    await expect(b.store.admitMachineTitle(b.command,{loadConfiguration:async()=>b.configuration})).rejects.toMatchObject({code:'prompt_job_initialization_reserved'});
+    await pool.query("UPDATE prompt_jobs SET source_expires_at=now()-interval '2 days',result_expires_at=now()-interval '1 day' WHERE id=$1",[admitted.job.id]);
+    await a.store.expireContent({scope:a.command});
+    await expect(b.store.admitMachineTitle(b.command,{loadConfiguration:async()=>b.configuration})).rejects.toMatchObject({code:'prompt_job_initialization_reserved'});
+    const c=fixture('wmkf_trialtitletwo');c.command.requestId=a.command.requestId;c.setPolicy({requestId:a.command.requestId});c.configuration.manifest.requestId=a.command.requestId;
+    expect((await c.store.admitMachineTitle(c.command,{loadConfiguration:async()=>c.configuration})).tasks[0].destination_field).toBe('wmkf_trialtitletwo');
+  });
   test('rejects the generic entry point, admits once and replays before source load', async () => {
     const f = fixture();
     const { store, command, configuration } = f;

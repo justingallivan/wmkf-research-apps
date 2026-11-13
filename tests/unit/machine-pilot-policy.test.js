@@ -56,3 +56,12 @@ test('scope and auth projections contain only exact pinned fields',()=>{
  expect(machineAuthPolicy(p)).toEqual({enabled:true,tenantId:id,audience:id,clientId:id,servicePrincipalId:id,role:'PromptJobs.Execute'});
  expect(machineAuthPolicy({...p,enabled:false})).toBeNull();
 });
+
+test('optional explicit destination grant is exact; legacy policy has no new default key',()=>{
+ const legacy=read();expect(legacy).not.toHaveProperty('destinationGrant');
+ const grant={field:'wmkf_trialtitle',type:'Memo',maxLength:2000};
+ expect(read(env({...config(),destinationGrant:grant})).destinationGrant).toEqual(grant);
+ for(const bad of [null,[],{}, {...grant,field:'wmkf_layabstract'}, {...grant,maxLength:100}, {...grant,field:'WMKF_trialtitle'}]){
+  expect(()=>read(env({...config(),destinationGrant:bad}))).toThrow();
+ }
+});
