@@ -195,4 +195,50 @@ describe('fetchReviewerRollup (characterization)', () => {
     expect(firstOrChain.split(' or ')).toEqual(ids.slice(0, 25).map((id) => `_wmkf_request_value eq ${id}`));
     expect(secondOrChain.split(' or ')).toEqual(ids.slice(25).map((id) => `_wmkf_request_value eq ${id}`));
   });
+
+  describe('chunk concurrency', () => {
+    // 150 ids = 6 chunks; each chunk's first id names it.
+    const ids = Array.from({ length: 150 }, (_, i) => `${String(i).padStart(8, '0')}-0000-4000-8000-000000000000`);
+    const chunkOf = (opts) => Math.floor(Number(opts.filter.match(/eq (\d{8})-/)[1]) / 25);
+
+    test('reads at most four chunks at a time and counts every chunk', async () => {
+      const pending = [];
+      let inFlight = 0;
+      let peak = 0;
+      jest.spyOn(DynamicsService, 'queryAllRecords').mockImplementation((_set, opts) => {
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        const id = ids[chunkOf(opts) * 25];
+        return new Promise((resolve) => pending.push(() => {
+          inFlight -= 1;
+          resolve({ records: [{ _wmkf_request_value: id, wmkf_selected: true }] });
+        }));
+      });
+      const result = fetchReviewerRollup(ids);
+      await new Promise((r) => setImmediate(r));
+      expect(pending).toHaveLength(4);
+      // Finish out of order: the last started first.
+      while (pending.length) {
+        pending.pop()();
+        await new Promise((r) => setImmediate(r));
+      }
+      const out = await result;
+      expect(peak).toBe(4);
+      expect(Object.keys(out).sort()).toEqual([0, 1, 2, 3, 4, 5].map((c) => ids[c * 25]).sort());
+      for (const c of [0, 1, 2, 3, 4, 5]) expect(out[ids[c * 25]].candidates).toBe(1);
+    });
+
+    test('a failed chunk fails the rollup and starts no further chunk', async () => {
+      const started = [];
+      jest.spyOn(DynamicsService, 'queryAllRecords').mockImplementation(async (_set, opts) => {
+        const chunk = chunkOf(opts);
+        started.push(chunk);
+        if (chunk === 0) throw new Error('chunk read failed');
+        await new Promise((r) => setImmediate(r));
+        return { records: [] };
+      });
+      await expect(fetchReviewerRollup(ids)).rejects.toThrow('chunk read failed');
+      expect(started.sort()).toEqual([0, 1, 2, 3]);
+    });
+  });
 });
