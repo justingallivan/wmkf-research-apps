@@ -11,6 +11,10 @@
  *   suggestions (any), pre-site-visit and Final documents (list facts only),
  *   site-visit summaries;
  * - all of them together, as the dashboard runs them (Promise.all).
+ * Each round also times the request-list query for each cycle with the
+ * page's own columns, cycle and program filter, but without the visibility
+ * filter, so it returns every Research request in the cycle (a stand-in for
+ * a large 2027 list; past cycles show staff few rows).
  * With --email, each round also runs the whole cycle-page server read
  * (`loadDashboard`, the code behind /api/workbench/dashboard) for each cycle,
  * all of Research, and prints its phases: PD lookup, program scope, and the
@@ -138,6 +142,10 @@ async function main() {
   const suggestions = await import('../lib/dataverse/adapters/reviewer-suggestion.js');
   const { REQUEST_DOCUMENT_ARTIFACT_TYPE } = await import('../shared/config/requestDocument.js');
   const { chunk, mapBounded } = await import('../lib/utils/chunk.js');
+  const { proposalListQueryShape } = await import('../lib/services/workbench/dashboard-service.js');
+  const { buildProgramScopeFilter } = await import('../lib/services/workbench/program-scope-service.js');
+  const { linkedCycleFilter } = await import('../lib/dataverse/adapters/operations-grant-cycle.js');
+  const requests = await import('../lib/dataverse/adapters/grant-request.js');
 
   const { ids, available, perCycle, programId } = await researchRequestIds();
   print(`Research requests in ${CYCLES.join(', ')}: ${available} (${Object.entries(perCycle).map(([c, n]) => `${c} ${n}`).join(', ')}); timing ${ids.length}`);
@@ -180,6 +188,13 @@ async function main() {
       for (const [label, fn] of Object.entries(set)) await timed(label, fn);
       const all = await timed('ALL TOGETHER', async () => { await Promise.all(Object.values(set).map((fn) => fn())); return null; });
       totals.set(level, [...(totals.get(level) || []), all.wall]);
+    }
+    for (const cycleCode of CYCLES) {
+      await timed(`request list query ${cycleCode}`, () => run(() => requests.queryAllRequests({
+        ...proposalListQueryShape(),
+        filter: [`(${linkedCycleFilter(cycleCode)})`, buildProgramScopeFilter(programId)].join(' and '),
+        orderby: 'akoya_requestnum asc',
+      })));
     }
     if (pd) {
       for (const cycleCode of CYCLES) {
