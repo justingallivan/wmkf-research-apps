@@ -111,13 +111,21 @@ suite('offline Summary composition: real worker/ledger, synthetic capability and
     };
     const staff = text => patch(prepareSummaryStaffEdit({ text, version: row.version }));
     const audit = jest.fn(async () => {});
+    const generate = jest.fn(async () => OUTPUT);
     const executePrompt = jest.fn(async args => {
       const snapshot = verifyContextSnapshot({ ...args.profiledContext });
       expect(snapshot.documents[0].text).toBe(TEXT);
       expect(snapshot.records[0].value).toBe('Synthetic PI');
       expect(args.requireNoPersistence).toBe(true);
-      await args.onDispatch();
-      await args.onResponse({ version: 1, binding: sha256('fixture response'), response: { text: OUTPUT } });
+      if (args.responseCheckpoint) {
+        expect(args.onDispatch).toBeUndefined();
+        expect(args.onResponse).toBeUndefined();
+        expect(args.responseCheckpoint.response.text).toBe(OUTPUT);
+      } else {
+        await args.onDispatch();
+        const text = await generate();
+        await args.onResponse({ version: 1, binding: sha256('fixture response'), response: { text } });
+      }
       return { parsed: { summary: OUTPUT }, deferredAudit: {
         wmkf_ai_status: 682090000, wmkf_ai_runsource: 682090005, wmkf_ai_model: promptRow.wmkf_ai_model,
         'wmkf_ai_Prompt@odata.bind': `/wmkf_ai_prompts(${promptRow.wmkf_ai_promptid})`,
@@ -147,7 +155,7 @@ suite('offline Summary composition: real worker/ledger, synthetic capability and
         } } };
       },
     };
-    return { command, jobId, deps, source, files, filename, staff, writer, audit, executePrompt,
+    return { command, jobId, deps, source, files, filename, staff, writer, audit, executePrompt, generate,
       read: () => store.readJob({ jobId, environment: 'test', principalKey: command.principalKey }),
       row: () => ({ ...row }), tick: () => advanceJob(deps),
       replaceSource: () => { files[filename] = { ...files[filename], eTag: 'W/"source2"', versionId: '2' }; } };
@@ -305,6 +313,176 @@ suite('offline Summary composition: real worker/ledger, synthetic capability and
     expect(f.writer).toHaveBeenCalledTimes(1);
     expect(f.executePrompt).toHaveBeenCalledTimes(1);
     await reserved(f);
+  });
+
+  // Expire only this fixture's held lease; no sleeps or wall-clock races.
+  const expireLease = f => pool.query(
+    "UPDATE prompt_jobs SET lease_expires_at=clock_timestamp()-interval '1 second' WHERE id=$1", [f.jobId]);
+  async function hold(f) {
+    const claim = await store.claim({ jobId: f.jobId, leaseMs: 60000 });
+    expect(claim).not.toBeNull();
+    return { claim, fence: { jobId: f.jobId, leaseToken: claim.leaseToken } };
+  }
+
+  test.each([
+    { definitive: true, applied: false },
+    { definitive: false, applied: false },
+    { definitive: false, applied: true },
+  ])('audit failure %j blocks publication without retry', async ({ definitive, applied }) => {
+    const f = await fixture();
+    await stages(f, [...prepared, 'validated']);
+    const auditRecords = [];
+    f.audit.mockImplementation(async ({ runId }) => {
+      if (applied) auditRecords.push(runId);
+      throw Object.assign(Error('Synthetic audit failure or lost acknowledgement'), { definitive });
+    });
+    await stages(f, [definitive ? 'audit_failed' : 'audit_unknown']);
+    await store.admit(f.command); await f.tick(); await f.tick();
+    expect((await f.read()).attempts[0].audit_state).toBe(definitive ? 'failed' : 'unknown');
+    expect(auditRecords).toHaveLength(applied ? 1 : 0);
+    expect(f.audit).toHaveBeenCalledTimes(1);
+    expect(f.generate).toHaveBeenCalledTimes(1);
+    expect(f.writer).not.toHaveBeenCalled();
+    expect((await f.read()).publication).toBeNull();
+    await reserved(f);
+  });
+
+  test('saved response resumes validation without another generation', async () => {
+    const f = await fixture();
+    const execute = f.executePrompt.getMockImplementation();
+    f.executePrompt.mockImplementationOnce(async args => {
+      await execute(args); // Commit response, then lose the validation result.
+      throw Error('Synthetic interruption after response checkpoint');
+    });
+    await stages(f, [...prepared, 'needs_attention']);
+    const saved = await f.read();
+    expect(saved.tasks[0].state).toBe('response_saved');
+    expect(saved.attempts).toHaveLength(1);
+    await stages(f, ['validated', 'audit_delivered', 'published']);
+    expect(f.executePrompt).toHaveBeenCalledTimes(2);
+    expect(f.generate).toHaveBeenCalledTimes(1);
+    expect(f.executePrompt.mock.calls[1][0].responseCheckpoint.response.text).toBe(OUTPUT);
+    expect((await f.read()).attempts[0].id).toBe(saved.attempts[0].id);
+    expect(f.audit).toHaveBeenCalledTimes(1);
+    expect(f.writer).toHaveBeenCalledTimes(1);
+  });
+
+  test('expired saved response cannot trigger regeneration', async () => {
+    const f = await fixture();
+    const execute = f.executePrompt.getMockImplementation();
+    f.executePrompt.mockImplementationOnce(async args => { await execute(args); throw Error('After checkpoint'); });
+    await stages(f, [...prepared, 'needs_attention']);
+    await pool.query("UPDATE prompt_job_content SET expires_at=now()-interval '1 second' WHERE job_id=$1 AND kind='response'", [f.jobId]);
+    await stages(f, ['expired']);
+    await f.tick();
+    expect(f.generate).toHaveBeenCalledTimes(1);
+    expect(f.executePrompt).toHaveBeenCalledTimes(1);
+    expect(f.writer).not.toHaveBeenCalled();
+    expect((await f.read()).tasks[0].state).toBe('expired');
+  });
+
+  test.each(['generation', 'audit', 'publication'])('abandoned %s intent becomes unknown on lease recovery; late completion is fenced', async phase => {
+    const f = await fixture();
+    await stages(f, phase === 'generation' ? prepared : phase === 'audit' ? [...prepared, 'validated'] : generated);
+    const { claim, fence } = await hold(f);
+    const taskId = claim.tasks[0].id;
+    let attempt, publication;
+    if (phase === 'generation') attempt = await store.markDispatching({ ...fence, taskId });
+    else if (phase === 'audit') {
+      attempt = claim.attempts[0];
+      expect(await store.markAuditDispatching({ ...fence, taskId, attemptId: attempt.id })).not.toBeNull();
+    } else {
+      publication = await store.freezePublication(fence);
+      expect(await store.markPublicationDispatched({ ...fence, operationId: publication.id })).not.toBeNull();
+    }
+    // No releaseClaim: simulate a process that vanished with durable intent held.
+    await expireLease(f);
+    await stages(f, ['needs_attention']);
+    const recovered = await f.read();
+    if (phase === 'generation') {
+      expect(recovered.tasks[0].state).toBe('unknown');
+      expect(await store.saveResponse({ ...fence, taskId, attemptId: attempt.id,
+        response: { response: { text: 'Late response' } } })).toBeNull();
+    } else if (phase === 'audit') {
+      expect(recovered.attempts[0].audit_state).toBe('unknown');
+      expect(await store.markAudit({ ...fence, taskId, attemptId: attempt.id, outcome: 'delivered' })).toBeNull();
+    } else {
+      expect(recovered.publication.state).toBe('unknown');
+      expect(await store.finishPublication({ ...fence, operationId: publication.id, outcome: 'applied' })).toBeNull();
+    }
+    expect(await store.releaseClaim(fence)).toBeNull();
+    expect(await f.read()).toEqual(recovered);
+    await f.tick(); await f.tick();
+    expect(f.generate).toHaveBeenCalledTimes(phase === 'generation' ? 0 : 1);
+    expect(f.audit).toHaveBeenCalledTimes(phase === 'publication' ? 1 : 0);
+    expect(f.writer).not.toHaveBeenCalled();
+    await reserved(f);
+  });
+
+  test('expired lease before side-effect intent can safely resume', async () => {
+    const f = await fixture();
+    await stages(f, prepared);
+    const { fence } = await hold(f);
+    await expireLease(f);
+    await stages(f, ['validated', 'audit_delivered', 'published']);
+    expect(await store.releaseClaim(fence)).toBeNull();
+    expect(f.generate).toHaveBeenCalledTimes(1);
+    expect(f.writer).toHaveBeenCalledTimes(1);
+  });
+
+  test('old lease cannot release a newer active lease or freeze its publication', async () => {
+    const f = await fixture();
+    await stages(f, generated);
+    const old = await hold(f);
+    await expireLease(f);
+    const current = await hold(f);
+    expect(current.fence.leaseToken).not.toBe(old.fence.leaseToken);
+    expect(await store.freezePublication(old.fence)).toBeNull();
+    expect(await store.releaseClaim(old.fence)).toBeNull();
+    expect((await pool.query('SELECT lease_token FROM prompt_jobs WHERE id=$1', [f.jobId])).rows[0].lease_token)
+      .toBe(current.fence.leaseToken);
+    expect(await store.freezePublication(current.fence)).toMatchObject({ state: 'ready', expected_etag: 'W/"1"' });
+    await store.releaseClaim(current.fence);
+    await stages(f, ['published']);
+    expect(f.writer).toHaveBeenCalledTimes(1);
+  });
+
+  test('still-running old worker cannot checkpoint a late response after replacement recovers its lease', async () => {
+    const f = await fixture();
+    await stages(f, prepared);
+    let signalStarted, releaseGeneration;
+    const started = new Promise(resolve => { signalStarted = resolve; });
+    const blocked = new Promise(resolve => { releaseGeneration = resolve; });
+    f.generate.mockImplementationOnce(async () => { signalStarted(); await blocked; return OUTPUT; });
+    const oldTick = f.tick();
+    let startupTimer;
+    try {
+      await Promise.race([
+        started,
+        oldTick.then(() => { throw Error('Worker exited before generation barrier'); }),
+        new Promise((_, reject) => {
+          startupTimer = setTimeout(() => reject(Error('Generation barrier startup timeout')), 2000);
+        }),
+      ]);
+      clearTimeout(startupTimer);
+      await expireLease(f);
+      await stages(f, ['needs_attention']);
+      const recovered = await f.read();
+      expect(recovered.tasks[0].state).toBe('unknown');
+      releaseGeneration();
+      expect(await oldTick).toEqual({ stage: 'needs_attention' });
+      expect(await f.read()).toEqual(recovered);
+      expect((await pool.query("SELECT count(*)::int AS n FROM prompt_job_content WHERE job_id=$1 AND kind='response'", [f.jobId])).rows)
+        .toEqual([{ n: 0 }]);
+      await f.tick();
+      expect(f.generate).toHaveBeenCalledTimes(1);
+      expect(f.writer).not.toHaveBeenCalled();
+      await reserved(f);
+    } finally {
+      clearTimeout(startupTimer);
+      releaseGeneration();
+      await oldTick;
+    }
   });
 
   test('rehearsal does not enable real Summary initialize', async () => {

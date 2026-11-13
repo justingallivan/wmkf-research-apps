@@ -527,7 +527,7 @@ destination. No production capability, admission rule, worker or schema is chang
 
 Trace: synthetic admission → real narrative adapter/sealed snapshot → marker-aware
 fake target capture → fake Executor dispatch/response hooks → real validation and
-SQL checkpoints → fake successful audit → real frozen publication → fake conditional
+SQL checkpoints → fake audit → real frozen publication → fake conditional
 record write → durable readback/replay. The fake record models atomic text/marker
 saves. Exact source naming remains a candidate convention awaiting the intake
 producer; the test does not settle it. No ready flag or actual marker column exists
@@ -549,13 +549,15 @@ Summary receipt retention through failures/expiry using hypothetical SQL receipt
 Neither suite claims an admitted real Summary end-to-end path. No capability mock,
 production guard removal or runtime admission bypass was introduced for the rehearsal.
 
-Verification: 96 tests across four suites passed, including 17 new rehearsal cases,
-10 companion reservation cases and 69 source/edit-helper unit cases. Temporarily
+Verification after the resilience follow-up: 107 tests across four suites passed,
+including 28 rehearsal cases, 10 companion reservation cases and 69 source/edit-helper
+unit cases. The initial composition build passed 96 tests before that follow-up. Temporarily
 removing the helper's marker guard made three rehearsal tests fail; the original
 helper was restored. Independent read-only review found no material issues. Tests
 use fake PDF extraction, Executor, authorization, audit and Dataverse behavior;
-there is no live evidence for those systems. Audit failure, process interruption
-and lease expiry are not exercised by this new composition suite. The real worker's
+there is no live evidence for those systems. Audit failure and simulated interruption/
+lease expiry are covered by the resilience follow-up below; actual process kills
+and provider checkpoint-binding validation are not exercised by this suite. The real worker's
 unmapped Summary-source preparation error propagates safely in the missing-source
 case; future integration still needs explicit error/status semantics.
 
@@ -567,3 +569,34 @@ Scoped ESLint, documentation currency/catalog/symbol gates and sequential availa
 self-tests passed. The restored-marker rehearsal passed all 17 cases again. The
 new disposable PostgreSQL container and its volume were removed after verification;
 the pre-existing roster database container was left untouched.
+
+
+### Offline interruption and recovery follow-up (2026-11-13)
+
+[VERIFIED via the same rehearsal suite and isolated PostgreSQL] Eleven additional
+cases exercise the real worker/store recovery boundaries. The fake Executor now
+separately counts generation and validates supplied saved-response content, allowing
+two Executor invocations to prove one generation. These tests model interruption at
+durable checkpoints, not OS process termination or live provider behavior.
+
+| Invariant | Evidence |
+| --- | --- |
+| Audit failure/uncertainty blocks publication | Definitive failure and lost acknowledgement before/after a fake audit record exists; no audit retry |
+| Saved response is reusable without regeneration | One durable attempt, two validation invocations, one generation; expired response never regenerates |
+| Abandoned side effects remain fenced | Real generation/audit/publication dispatch intents followed by fixture-only SQL lease expiry become unknown under replacement worker |
+| Work before dispatch can resume | Expired pre-intent lease safely completes with one generation/publication |
+| Old lease cannot alter replacement state | Late response/audit/publication completion and old release return null, preserving recovered receipts; old lease cannot release an active new lease |
+| Still-running worker cannot save late response | Generation waits on a controlled barrier while a replacement worker recovers the expired lease; resumed old worker saves no response and makes no publication |
+
+Independent read-only review identified a possible test hang if the old worker exited
+before reaching the generation barrier. The test now races barrier entry against early
+worker completion/rejection and a bounded startup timeout, with barrier/timer cleanup
+in finally. All 107 tests passed after this fix. No production source, schema, intake
+policy, actual marker column, external service, deployment or Connor fixture changed.
+The existing synthetic known-failure release exception and disabled real Summary
+admission remain explicit. This completes the planned offline resilience pass;
+remaining Summary integration depends on Connor's intake answers and writer coverage.
+
+Scoped ESLint and documentation currency/catalog/symbol checks with sequential
+available self-tests passed. The follow-up disposable PostgreSQL container and its
+volume were removed; the pre-existing roster database remained untouched.

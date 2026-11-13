@@ -58,7 +58,9 @@ staff-edit command builder and synthetic row-version race tests are also branch-
 (`summary-edit-protection.js`); actual marker schema/writers and intake contracts
 remain open. The offline composition rehearsal now drives the real worker/store
 through the existing synthetic Summary capability with fake external adapters;
-96 tests passed, including 27 PostgreSQL cases. Real Summary admission/publication
+107 tests passed, including 38 PostgreSQL cases. Recovery tests cover audit
+uncertainty, saved responses, lease expiry and stale workers; no process kills or
+live provider behavior are claimed. Real Summary admission/publication
 remain disabled; synthetic known-failure release is not real Summary retention.
 See the Summary worker plan's offline rehearsal evidence. No live calls or deployment.
 
