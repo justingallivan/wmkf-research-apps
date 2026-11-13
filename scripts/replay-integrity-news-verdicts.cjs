@@ -59,7 +59,10 @@ function modelOutcome(text) {
   try {
     const fenced = text.trim().match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
     const parsed = JSON.parse(fenced?.[1] ?? text);
-    return `${parsed.outcome} (${Array.isArray(parsed.findings) ? parsed.findings.length : '?'} findings)`;
+    // Print only fixed labels: a malformed response may carry names or links.
+    const outcome = ['flag_for_review', 'clear', 'inconclusive'].includes(parsed?.outcome) ? parsed.outcome : 'unrecognized outcome';
+    const findings = Array.isArray(parsed?.findings) ? String(parsed.findings.length) : '?';
+    return `${outcome} (${findings} findings)`;
   } catch {
     return 'not JSON';
   }
