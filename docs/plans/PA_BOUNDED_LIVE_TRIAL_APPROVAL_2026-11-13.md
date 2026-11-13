@@ -1,7 +1,9 @@
 # Bounded automatic Short Title trial — approval packet
 
-Status: PREPARED, NOT APPROVED OR EXECUTED. Read-only deployment inspection and
-Factory preparation only. Connor’s existing deployment/job/credentials remain unchanged.
+Status: APPROVED by Justin, then STOPPED at the sole Factory Request create attempt
+on 2026-11-13 UTC. No new Request survived; no deployment or AI call occurred.
+Connor’s existing deployment/job/credentials remain unchanged. The approved plan
+below is retained for evidence; its stop conditions prohibit blindly resuming.
 
 ## Timing evidence
 
@@ -299,3 +301,46 @@ exclusive intent receipt, exact readback, no retry). It passed Node syntax check
 no seed call was made. The loader passed the real Factory CLI help load and ESLint.
 Documentation/fact/secret gates passed. Do not represent these checks as a live trial.
 No additional review cycle is needed for this named closure.
+
+## Execution outcome — stopped before deployment or generation
+
+[VERIFIED 2026-11-13 UTC via Factory execute receipt and read-only recovery]
+Justin approved this packet in chat. The original preparation manifest remained
+unexpired, and execute reran its built-in preflight. The exact approved Request POST
+was attempted once at 03:29:35.510Z. At 03:30:00.952Z Dataverse returned HTTP 400,
+code `0x80040265`, with “The remote server returned an error: (500) Internal Server
+Error.” Factory execution stopped. No bypass flag was supplied; no workflow, role,
+permission or policy was changed. No abstract seed, Preview deployment, job admission,
+worker tick, model call, audit or output publication was attempted.
+
+`rehearse-test-request-sandbox.mjs --inspect` confirmed `requestExists:false` for
+`a92c0f69-90ec-4c24-bc19-f26a0bfc18b6`, no linked document locations, payment rows or
+regarding emails. The Factory receipt records post-create steps skipped; folder
+provisioning was never entered, so no explicit SharePoint create was attempted.
+This is a failed create, not a successful automatic-worker rehearsal.
+
+The read-only `probe-sandbox-request-create-failure.mjs` window
+03:29:30Z–03:30:10Z found failed process sessions associated with workflows:
+
+- `a79f8f94-8acc-ee11-907a-000d3a341b5a`: Copy Applicant to Payee when Grant is Entered.
+- `0799474f-f2db-f111-84ea-70a8a5b1c1c6`: GOverify- check Publication 78 on create of a request record.
+
+Exact workflow-ID GETs confirmed these names and active states. Workflow logs report
+an HTTP 500 propagated through an update activity. These are bounded diagnostic
+observations, not proof of the root cause inside the downstream external service.
+No workflow was disabled and no second create was sent.
+
+Before/after operator receipts compare equal for Connor’s selected Request fields
+and ETag `61847906`, and for the complete scoped ledger proof: original job at
+version 16, one attempt, one applied publication and the same validated result.
+The database still has one job/attempt/publication in total. No new runtime deployment
+or remote credentials were created; unused deployment-only secret values were prepared
+locally in a private file only. Keep the rejected-create receipt; do not remove it to
+rerun. Repair/authorization of sandbox create automation, followed by a new bounded
+execution decision, is needed before this fresh-Request trial can resume.
+
+Supplementary local receipts: `/private/tmp/wmkf-pa-auto-trial-factory-receipt-20261113.json`,
+`/private/tmp/wmkf-pa-auto-trial-inspect-20261113.log`, and
+`/private/tmp/wmkf-pa-auto-trial-create-diagnostic-20261113.log`. The durable facts
+above are retained independently of those temporary files. Approval did not authorize
+workflow bypass, fixing live workflow configuration, or substituting an existing Request.

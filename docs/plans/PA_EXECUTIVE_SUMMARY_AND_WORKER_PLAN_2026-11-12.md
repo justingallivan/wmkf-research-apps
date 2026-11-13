@@ -299,6 +299,9 @@ The current worker function has Max Duration ≤300 seconds. This resolves the
 for a future one. No timeout call was performed. The existing 240-second lease
 and lease-end-minus-five-second provider deadline remain source-verified; this
 is not a wall-clock performance guarantee. The [bounded live-trial approval packet](PA_BOUNDED_LIVE_TRIAL_APPROVAL_2026-11-13.md)
-records the evidence, new preallocated synthetic Request, separate Preview/scope,
-side effects and stop conditions. Factory preparation was read-only; no new objects,
-deployments, worker calls, model calls or grants were created. Approval is pending.
+records the evidence, preallocated synthetic Request, proposed separate Preview/scope,
+side effects and stop conditions. Justin approved execution, but the sole Factory
+Request create was rejected with HTTP 400 / downstream 500. Read-only recovery
+confirmed the Request absent. No deployment, worker/model call or grant was created;
+Connor’s Request and ledger remained unchanged. The trial is stopped under its
+no-retry/no-bypass conditions, pending resolution of sandbox create automation.

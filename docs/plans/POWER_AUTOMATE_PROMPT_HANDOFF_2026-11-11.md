@@ -98,9 +98,11 @@ records the next proposed slice while Connor tests. Summary remains draft-only;
 source, exact destination, audience and initialization/refresh semantics still need
 decisions. The plan separates supervised sandbox stage advancement from eventual
 Production scheduling. Its bounded operator driver is built and tested offline;
-it has not been run live. A [separate bounded trial is prepared for approval](PA_BOUNDED_LIVE_TRIAL_APPROVAL_2026-11-13.md),
-with the current deployment’s 300-second worker duration verified read-only.
-This leaves the pilot intact and does not activate a schedule.
+it has not been run live. A [separate bounded trial was approved but stopped at Request creation](PA_BOUNDED_LIVE_TRIAL_APPROVAL_2026-11-13.md#execution-outcome--stopped-before-deployment-or-generation).
+Dataverse rejected the sole create attempt; read-only recovery found the Request
+absent. No new deployment or model call occurred, and Connor’s source and ledger
+are unchanged. The current deployment’s 300-second worker duration was verified
+read-only. No schedule is active.
 
 ## Prompt-to-field handoff inventory
 
