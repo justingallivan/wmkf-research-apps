@@ -51,7 +51,8 @@ No runtime promotion to main is authorized by this handoff.
 
 ### Verified Open
 
-1. Await Connor's completed-job POST/replay/poll results. His earlier status check
+1. Await Connor's completed-job POST/replay/poll results. Owner sent the test email
+   on November 13. His earlier status check
    reportedly passed; this later flow has not been reported complete in this chat.
    Evidence: `docs/plans/CONNOR_POWER_AUTOMATE_SUBMIT_POLL_TEST_2026-11-12.md` and
    owner's latest instruction to leave his test undisturbed. Inspect sanitized results,
@@ -67,11 +68,14 @@ No runtime promotion to main is authorized by this handoff.
 
 ### Owner Decision Needed
 
-1. Executive Summary source: Submission-Documents narrative versus combined
-   narrative/bibliography in AI Materials remains OPEN pending caching coordination.
-   Evidence: owner instruction; Summary field/worker plans. No Phase I staff-version input.
-2. Summary automatic delivery needs initialization-event eligibility and external
-   writer/visibility checks. Field identity is settled; source and activation are not.
+1. Executive Summary source is SETTLED (owner, November 13): project narrative
+   in Submission-Documents. Combined Narrative-Bibliography is for reviewer matching;
+   Summary neither reads nor waits for it. Source adapter remains to be implemented.
+   See the revised Summary worker/field plans.
+2. Summary automatic delivery needs the exact intake/readiness ordering, external
+   writer/visibility checks, and the proposed atomic staff-edit Boolean contract
+   (name/security/provisioning and all writers). Source and output field are settled;
+   marker implementation, new-cohort eligibility and activation are not.
    Evidence: `docs/plans/PA_EXECUTIVE_SUMMARY_FIELD_CONTRACT_2026-11-13.md`.
 3. Production authorization, deployment and unattended scheduling require their own
    plan/approval; the supervised driver is not a production scheduler. Evidence:

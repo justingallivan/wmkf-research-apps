@@ -90,8 +90,10 @@ Content / abstract:
   The original two-field branch is documented in the historical
   `docs/plans/REQUEST_NARRATIVES_HANDOFF_2026-11-09.md`; this assessment remains separate
   from the governed Initial Assessment artifact. App deployment and automatic Summary
-  delivery are not enabled by the field reuse. Source and initialization-event decisions
-  remain open; see `docs/plans/PA_EXECUTIVE_SUMMARY_FIELD_CONTRACT_2026-11-13.md`.
+  delivery are not enabled by the field reuse. The owner selected the project narrative
+  in `Submission-Documents` on November 13; combined Narrative-Bibliography remains
+  reviewer-matching input. Initialization timing and the proposed monotonic staff-edit
+  Boolean remain planned/unprovisioned; see `docs/plans/PA_EXECUTIVE_SUMMARY_FIELD_CONTRACT_2026-11-13.md`.
 
 Governed artifact pointers:
 - `wmkf_currentinitialassessment` (Lookup →

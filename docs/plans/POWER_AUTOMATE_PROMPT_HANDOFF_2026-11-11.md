@@ -95,8 +95,9 @@ facade remains test-only.
 
 The [Executive Summary and worker automation plan](PA_EXECUTIVE_SUMMARY_AND_WORKER_PLAN_2026-11-12.md)
 records the next proposed slice while Connor tests. Summary remains draft-only;
-source, exact destination, audience and initialization/refresh semantics still need
-decisions. The plan separates supervised sandbox stage advancement from eventual
+the source is the Submission-Documents project narrative and the destination is
+Lay Abstract (`wmkf_layabstract`). Staff-edit marker implementation, intake event,
+audience and activation remain open; combined Narrative-Bibliography is for matching. The plan separates supervised sandbox stage advancement from eventual
 Production scheduling. Its bounded operator driver passed a
 [separate live trial on Request 1000389](PA_BOUNDED_LIVE_TRIAL_APPROVAL_2026-11-13.md#automatic-worker-trial--passed):
 five sequential ticks, one generation/audit/publication, exact output readback and
@@ -114,7 +115,7 @@ proposal capabilities deliberately have `destinationField: null`.
 | Desired output | Existing key or implementation | Required handoff work |
 | --- | --- | --- |
 | Short title/objective | New `preflight.short-title`; legacy `grantee-title.generate` preserved | D37 approves `akoya_request.wmkf_wmkfprojectdescription`. Pilot initializes once with original ETag. The isolated Preview pins the published Sandbox v1 definition. |
-| Executive summary | `proposal.executive-summary`; 200-word draft capability | Review the [proposed dedicated field contract](PA_EXECUTIVE_SUMMARY_FIELD_CONTRACT_2026-11-13.md); destination/audience/event remain unapproved and document selection stays open. |
+| Executive summary | `proposal.executive-summary`; 200-word draft capability | Use the Submission-Documents narrative and existing Lay Abstract field per the [field contract](PA_EXECUTIVE_SUMMARY_FIELD_CONTRACT_2026-11-13.md); staff-edit marker, event, audience and activation remain open. |
 | Methodology | `proposal.methodology`; draft capability | Approve the destination and write policy; wording/length optimization is deferred. |
 | Personnel | Workbook P4, existing analog discovery | Approve task instructions, output shape and exact destination. |
 | Intake rationale | Workbook P5 | Define versioned storage/write contract, not an unconditional overwrite. |

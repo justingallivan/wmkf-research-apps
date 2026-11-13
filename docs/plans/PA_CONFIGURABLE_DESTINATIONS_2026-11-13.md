@@ -2,7 +2,8 @@
 
 Status: implementation in the isolated feature branch; no deployment or live policy,
 prompt, Request or credential changes. Connor’s test remains on its existing immutable
-Preview. Executive Summary document selection and first-event eligibility remain OPEN.
+Preview. Executive Summary uses the Submission-Documents narrative by owner decision;
+first-event eligibility and staff-edit protection remain unimplemented.
 
 ## Scope and owner decision
 
@@ -138,4 +139,5 @@ remain authoritative for machine initialization.
 Owner: Codex. Branch: `codex/power-automate-integration-2026-11-11`.
 Next action: separately approve an actual destination/policy and bounded live trial
 if needed. No deployment, prompt publication, credentials or Connor test changed.
-Summary document selection remains open. No migration or new persisted enum/status.
+Summary source is settled; see the Summary worker plan for the proposed staff-edit
+Boolean and open event contract. This destination slice adds no migration or persisted enum/status.

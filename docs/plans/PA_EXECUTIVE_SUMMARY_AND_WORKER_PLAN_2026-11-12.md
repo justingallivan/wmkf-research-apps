@@ -10,14 +10,16 @@ See the [trial receipt](PA_BOUNDED_LIVE_TRIAL_APPROVAL_2026-11-13.md#automatic-w
 ## Recommendation
 
 Reuse the shared Executor and migration 097 ledger. Keep Executive Summary draft-only
-until its document source and initialization event are approved. Plan automatic processing as
+until its initialization event and staff-edit protection contract are implemented and approved for activation. Plan automatic processing as
 backend-owned durable worker ticks; Power Automate submits and polls, with no provider
 implementation, direct output PATCH or cron credential. Do not add a queue service,
 new database, generic field mapper or another application merely for this slice.
 
-Document selection remains open between the project narrative in Submission-Documents
-and the narrative/bibliography in AI Materials. No Phase I staff-version dependency.
-The existing source adapter is evidence of a prior trial, not a decision for this flow.
+[OWNER DECIDED 2026-11-13] Summary uses the project narrative in
+`Submission-Documents`. The combined Narrative-Bibliography PDF in `AI Materials`
+is for reviewer matching, not Summary input or a Summary prerequisite. No fallback
+to that PDF, applicant abstract or Phase I staff version. The existing AI Materials
+source adapter belongs to prior trials; the dedicated Summary adapter is not built.
 
 ## Evidence and boundaries
 
@@ -27,15 +29,15 @@ The existing source adapter is evidence of a prior trial, not a decision for thi
 | Prior staff trials retained summaries but made no Request-field writes | `SHARED_EXECUTOR_STAFF_TRIAL_2026-11-11.md`, dated live receipts | VERIFIED historical; not a fresh content-quality approval |
 | Current machine route accepts only `preflight.short-title`, initialize, one pinned Request/event | `machine-service.js`, `machine-pilot-policy.js` | VERIFIED source; Summary cannot be enabled by changing a prompt row |
 | Legacy machine scope targets `wmkf_wmkfprojectdescription`; new branch configurations can declare an approved direct text field | `request-field-delivery.js`, `machine-destination.js` | VERIFIED source; exact prompt target + server grant, Summary still gated; see [configuration contract](PA_CONFIGURABLE_DESTINATIONS_2026-11-13.md) |
-| Proposal source currently pins AI Materials and Project Leader name | `proposal-source.js`, `createProposalSource` | VERIFIED source; future document policy OPEN |
+| Proposal source currently pins AI Materials and Project Leader name | `proposal-source.js`, `createProposalSource` | VERIFIED existing staff-trial source; Summary requires the separately selected Submission-Documents policy |
 | Legacy `wmkf_ai_summary` has writers and readers | `phase-i-dynamics/summarize-service.js`, `cycle-dossier-generation.js`, `workbench/resolve-request-service.js` | VERIFIED source; not an unused destination |
 | Machine drain is POST-only, server selects one stage, no schedule entry | `pages/api/cron/drain-machine-prompt-jobs.js`, `machine-worker.js`, `vercel.json` | VERIFIED source |
 | Current pilot rejects Production deployment classes and expires after at most seven days | `machine-pilot-policy.js` | VERIFIED source; not production-ready policy |
 
 Live metadata and consumer checks now establish the existing Lay Abstract destination.
 See the [field contract](PA_EXECUTIVE_SUMMARY_FIELD_CONTRACT_2026-11-13.md) for the
-owner-approved reuse and the branch-built staff editor. Source selection, external
-writer/visibility checks and event eligibility remain activation gates.
+owner-approved reuse and the branch-built staff editor. Source selection is settled; external
+writer/visibility checks, staff-edit protection and event eligibility remain activation gates.
 
 ## Executive Summary delivery contract
 
@@ -45,7 +47,7 @@ writer/visibility checks and event eligibility remain activation gates.
 | Prompt | Dataverse versioned task instructions and execution profile; pin ID, revision and hashes at admission. Re-read current rows before publishing a new prompt definition, then freeze admitted job pins; no new prompt publication in this plan |
 | Content | Existing summary starting point, maximum 200 words. Wording optimization deferred; audience and grounding still require review |
 | Required records | Current profile requires the directly stored Project Leader name as `pi_name`; do not remove it silently |
-| Document | Server-selected full-proposal source under one versioned policy; exact folder/file composition remains OPEN |
+| Document | Project narrative in `Submission-Documents`, server-selected under a versioned policy; proposed exact name `Project-Narrative_{Request#}.pdf` must be verified against the intake producer |
 | Output | Validated nonblank `summary` text under existing profile bounds; JSON/profile envelope remains the existing Executor contract |
 | Immediate persistence | Retained validated draft in existing ledger; bounded expiry, not permanent output storage |
 | Final destination | Owner-approved existing `akoya_request.wmkf_layabstract`; staff label Executive Summary, stable API key `lay_abstract`, Memo 100,000 characters |
@@ -58,7 +60,7 @@ visibility and the approved first-initialization event. Preserve staff edits and
 clearing. Output format validation is not scientific quality approval; no Chairs
 distribution follows from this change.
 
-### Source and cache contract independent of document choice
+### Selected source and cache contract
 
 Freeze Request/authorization scope, document identity, revision/ETag, extraction
 version and content hash, plus required record values, prompt and profile pins.
@@ -70,7 +72,73 @@ Use the existing prepared snapshot and cache-prefix composition. Cache reuse req
 compatible model/settings/schema and the same authorized content; measure after
 selection, do not promise savings. A replaced file does not automatically rerun jobs.
 A new explicit run freezes new source identity. Durable result reuse/idempotency is
-separate from provider caching. No extraction framework expansion while source is open.
+separate from provider caching. Scope participates in the wrapper nonce; the same PDF
+does not establish cross-scope prefix compatibility. Do not widen authorization for
+cache reuse or add an extraction framework for this slice.
+
+### Staff-edit protection and initialization eligibility
+
+[PLANNED, owner requested inclusion 2026-11-13] Add one monotonic Request Boolean
+meaning “staff edited Summary”; its logical name, security and provisioning are
+not yet settled. It is not an existing field or an implemented guarantee.
+
+- Every deliberate staff Summary save or clear sets the marker true in the same
+  concrete-ETag PATCH as `wmkf_layabstract`. An explicit clear of an already blank
+  field must record intent, despite the current service's unchanged-text shortcut.
+  Reads, untouched fields and failed conditional saves do not set it. The editor
+  needs an explicit way to express that clear intent; no autosave is introduced.
+- Never automatically reset the marker. Inventory external forms, flows and other
+  writers; all manual-edit paths must set it atomically and ordinary writes must
+  not clear it. An asynchronous follow-up marker write leaves a race and is insufficient.
+- Read marker, Summary value and ETag together. True, missing or unreadable marker
+  denies automatic initialization; nonempty/whitespace text remains protected.
+  A false default does not prove historical non-editing: admit only a specifically
+  enrolled new intake cohort after protection is in force, with no blanket backfill.
+- An edit before capture is detected by the marker; one after capture changes the
+  row ETag and causes the original conditional publication to conflict. Never refresh
+  that ETag to force delivery. Staff may edit without waiting for AI completion.
+- Retain the per-Request/physical-field initialization receipt through failure,
+  expiry, clearing and source changes. The marker protects manual intent; the receipt
+  prevents another automatic attempt. Neither replaces the other.
+
+[UNKNOWN] The exact first-intake event and readiness ordering need Connor's flow
+contract. The newer J27 branch decision D56 identifies `wmkf_readyforreview`, but
+`J27_READY_FOR_REVIEW_VISIBILITY_PLAN_2026-11-02.md` records it as completion of
+assembly and AI. The source predicate `shared/config/requestReadiness.js` filters
+staff discovery; `workbench/request-narratives-service.js` does not gate editing on
+readiness. Reset/resubmission semantics and external flow enforcement are unverified.
+Do not use this Boolean as both an AI prerequisite and AI-completion signal.
+
+Proposed ordering, pending that contract: narrative finalized → submit Summary job
+with a stable intake event identity → finish required processing → mark ready for
+staff. Summary does not wait for the combined reviewer PDF. Define the outcome when
+Summary is protected, failed or uncertain before making readiness depend on it.
+A readiness reset, file replacement or fresh event ID never grants another automatic
+initialization. Connor's existing Short Title test is a separate, unchanged scope.
+
+Required offline regressions: edit then clear before capture; explicit blank clear;
+edit during generation; atomic save failure; missing/true marker; forbidden marker
+reset; duplicate event and event-ID change; known failure and content expiry retaining
+the Summary reservation; exact narrative selection with combined PDF also present;
+missing narrative must not fall back. Test source identity/revision changes and the
+original ETag across the complete submit → generation → publication → staff readback flow.
+
+### Evidence for the revised contract (2026-11-13)
+
+| Claim | Evidence | Status / disconfirming check |
+| --- | --- | --- |
+| Summary source is Submission-Documents narrative; matching keeps combined PDF | Owner's explicit source decision in this chat | VERIFIED intent; source adapter implementation still required |
+| Current editor permits early saves and skips unchanged text | `lib/services/workbench/request-narratives-service.js`, `canEdit` / `saveRequestNarratives` | VERIFIED source; readiness is absent from these guards |
+| Worker captures baseline after source preparation | `lib/services/prompt-jobs/worker.js`, `advanceJob`; `store.js`, `captureTarget` | VERIFIED source; an earlier edit-and-clear defeats blankness alone |
+| Permanent Summary reservation needs explicit implementation | `store.js`, `markAttemptFailed` | VERIFIED gap: only MACHINE_TITLE_TASK is exempt from known-failure release |
+| Proposed marker closes both edit races if all writers participate | Atomic text/marker PATCH + existing original-ETag publication | PLANNED; external writers and new marker not tested/provisioned |
+| Readiness timing and writer inventory | Branch-local readiness plan and newer J27 decision record | UNKNOWN external lifecycle; no flow or live system changed |
+
+Existing source/context/conditional-writer/editor tests passed (106 tests in four
+suites); readiness/editor checks passed (45 tests in two suites, overlapping).
+Those checks do not test the proposed marker. Independent read-only review identified
+blank-clear intent, all-writer coverage, new-cohort eligibility and permanent Summary
+receipts as requirements. Historical Opus receipts below do not approve these new edits.
 
 ### Smallest implementation after decisions
 
@@ -90,9 +158,11 @@ separate from provider caching. No extraction framework expansion while source i
    DAL. Reuse reservation/publication machinery and the original row ETag; do not
    globally change `proposal.executive-summary` from draft to initialize for its
    existing staff callers. Make the new mode explicit in reviewed capability checks.
-4. Preserve staff text, including whitespace and intentional clearing. Initialization
+4. Implement the staff-edit protection above, including whitespace and intentional clearing. Initialization
    receipt survives source/prompt changes, expiry and deployment changes in the same
-   database. Never relocate the Request into a fresh database to evade its receipt.
+   database. Extend permanent machine reservation semantics explicitly to Summary:
+   current known-failure slot retention is Short Title-specific (`store.js`,
+   `markAttemptFailed`). Never relocate the Request into a fresh database to evade its receipt.
 5. Unknown provider/audit/write outcomes stay fenced; no automatic resend or new
    model generation. Retain validated output on write conflict within retention;
    any recovery requires a separately reviewed authorized operation.
@@ -189,10 +259,10 @@ claimed from that driver. Existing paid runtime approval does not authorize a ne
 
 1. Await Connor’s POST/replay/poll result; independently verify existing ledger and
    field still unchanged afterward. No new infrastructure depends on that test.
-2. Writer wiring waits for external writer/visibility checks and initialization-event
-   eligibility. The existing Lay Abstract destination is approved and staff editing is branch-built. Machine admission
-   and any Summary trial additionally wait for source selection with the caching work.
-   Neither is Summary-ready while its prerequisites remain open.
+2. Source and destination are settled. Before implementation, settle the exact intake
+   event/readiness ordering, verify the narrative naming contract, specify the staff-edit
+   marker and every writer that must maintain it, and identify the eligible new cohort.
+   The existing staff editor is branch-built; the marker and automatic Summary path are not.
 3. The bounded driver now has offline tests (below). Scheduler implementation and
    future scheduler budget verification remain pending. The supervised driver trial
    and its Preview duration verification passed. Review any scheduler implementation
@@ -202,12 +272,13 @@ claimed from that driver. Existing paid runtime approval does not authorize a ne
    dispatch to later slices using the same contracts.
 
 Contract-reconcile scope: documentation planning, existing machine routes/store/status,
-Summary capability/source and conditional writer; no new persisted shape or enum.
+Summary capability/source and conditional writer; this update proposes one Dataverse
+Boolean, but creates no schema or runtime changes.
 Partial-success, async/freshness and consumer compatibility requirements are above.
 Helper extraction and migrations are N/A in this planning slice. Source evidence
 shows why neither adding a prompt row nor adding a cron line is sufficient.
 
-## Opus 5.5 review and closure
+## Historical Opus 5.5 review of the earlier worker plan
 
 Reviewed via Claude Code subscription OAuth, tools disabled. Packet SHA-256
 `aa021d700b2f1bef202057bfc474c42c194671007a704e37f64d06ba342d90ac`.
@@ -305,3 +376,22 @@ and scoped ledger also remained unchanged. The
 [trial receipt](PA_BOUNDED_LIVE_TRIAL_APPROVAL_2026-11-13.md#automatic-worker-trial--passed)
 records exact pins and evidence. This is supervised operator automation, not an
 unattended Production scheduler. No schedule is active.
+
+## Source-decision reconciliation (2026-11-13)
+
+Sweep Mode A: Summary input decision and proposed staff-edit protection only.
+Authority: owner's explicit Submission-Documents narrative decision; inspected
+source adapter, staff save service, worker baseline capture, reservation release
+and readiness predicate. Updated current Summary plans, machine handoff, branch
+session handoff, Request Atlas and architecture mapping; historical trial outcomes
+remain unchanged. The bounded trial's forward-looking source statements now point
+to the settled decision rather than reopening it. Other tasks' source policies and
+older dated trial evidence are outside this change. Searches across docs, memory,
+wiki and runtime classified prior staff/recommendation AI Materials inputs as
+historical or task-specific, not the new Summary policy. Remaining live stale
+source-selection claims in these in-scope surfaces: zero after repeat search.
+External readiness lifecycle, writer coverage, marker schema and new-cohort
+eligibility remain unknown/planned; no external-state certification is claimed.
+Documentation gates and sequential self-tests: doc-currency, fact-consistency,
+canonical-pointers, atlas, doc-symbol-refs and build-claim-freshness passed.
+No runtime, schema, credential, deployment or Connor test change.

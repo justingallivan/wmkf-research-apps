@@ -150,7 +150,8 @@ Synthetic abstract:
 
 This trial proves automatic sequential stage advancement on an operator machine,
 not unattended Production scheduling, Power Automate end-to-end generation, or
-Executive Summary delivery. Source choice for future proposal prompts stays open.
+Executive Summary delivery. Summary now has an owner-selected Submission-Documents
+narrative source; this historical Short Title approval does not authorize Summary execution.
 
 ## Executable preparation and deployment pins
 
@@ -455,7 +456,7 @@ Supplementary private receipts: `/private/tmp/wmkf-pa-auto-title-job-state-20261
 `/private/tmp/wmkf-pa-auto-title-audit-proof-20261112.json`. The filename date is inherited
 from the operator helpers; the run timestamps above are authoritative. Retain the
 Request, folder, location and ledger under the existing trial retention; no deletion
-or additional infrastructure was introduced. Summary source/destination and Production
-scheduling decisions remain open. Existing Opus plan/build reviews cover the unchanged
+or additional infrastructure was introduced. Summary source/destination are now settled in the linked Summary plan; automatic
+Summary activation and Production scheduling remain open. Existing Opus plan/build reviews cover the unchanged
 driver logic; the mechanical pin substitutions and 20-test rerun are the approved
 post-admission checkpoint, not a new architecture review.

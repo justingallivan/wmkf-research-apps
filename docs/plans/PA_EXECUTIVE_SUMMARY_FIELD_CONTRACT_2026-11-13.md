@@ -2,7 +2,8 @@
 
 Owner: Codex, branch `codex/power-automate-integration-2026-11-11`.
 Status: owner-approved field reuse; Sandbox schema verified; staff implementation on this branch, not deployed.
-Document selection and automatic initialization remain OPEN. Connor’s Short Title
+Summary source is the owner-selected Submission-Documents project narrative.
+Automatic initialization and the proposed staff-edit marker remain unimplemented. Connor’s Short Title
 Preview, policy, credentials, Request and ledger are not changed by this work.
 
 ## Decision and verified connections
@@ -76,18 +77,22 @@ it is preserved for parity and does not establish an active flow.
 
 ## Automatic delivery remains gated
 
-The field decision is settled; input and first-submission eligibility are not.
+Source and output field are settled; first-submission eligibility and staff-edit
+protection remain unimplemented.
 No paid Summary call, automatic writer or new policy is enabled. The existing draft
 prompt/profile is unchanged. Future delivery must:
 
-1. Select the full-proposal source with the caching work: Submission-Documents
-   project narrative versus AI Materials combined narrative/bibliography. No Phase I
-   staff version or opportunistic fallback. Preserve required stored PI name unless
+1. Use the owner-selected project narrative in `Submission-Documents` (2026-11-13).
+   The combined Narrative-Bibliography PDF is for reviewer matching, not Summary.
+   No dependency on its creation, Phase I staff version or opportunistic fallback. Preserve required stored PI name unless
    separately changed. Freeze source identities/revisions/hashes and configuration.
-2. Name the authoritative first-submission event and establish eligibility before
-   staff edits. A blank field cannot reveal an earlier deliberate edit-and-clear.
-   Inspect external writers and existing content before activation; no blanket
-   tenant-wide overwrite or confidentiality guarantee is claimed.
+2. Name the authoritative first-submission event and readiness ordering. Implement
+   the proposed monotonic staff-edit Boolean atomically with every staff Summary
+   save/clear, including explicit blank clears; missing/true marker denies machine
+   initialization. Specify its schema and cover all external writers before enabling
+   a new intake cohort. False/default cannot establish existing records’ edit history.
+   The [worker plan](PA_EXECUTIVE_SUMMARY_AND_WORKER_PLAN_2026-11-12.md#staff-edit-protection-and-initialization-eligibility)
+   owns details and remaining decisions. No tenant-wide guarantee is claimed.
 3. Use a separate exact machine grant and initialize operation, with the existing
    durable per-Request/physical-field reservation and publication receipts. Preserve
    receipts across expiry and edits/clearing; no automatic refill or relocation to
@@ -111,8 +116,8 @@ Older dated metadata receipts remain historical evidence, not current provisioni
 Sweep Mode A scope: field identity, current app readers/writers and implementation
 status. Related worker plan, narrative handoff, Atlas and route inventory are updated
 in the same change. Production label changes, external flows/forms/roles, field
-contents, source selection and first-event activation are excluded and remain unknown
-or open. Build review and test results are recorded after verification below.
+contents and first-event activation remain unknown or open. Source intent is now
+settled by the owner; the new source adapter and staff-edit protection are planned. Build review and test results are recorded after verification below.
 
 ## Build verification and release boundary
 
