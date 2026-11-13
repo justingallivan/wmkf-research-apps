@@ -126,7 +126,13 @@ these changes:
   lists every request with a current Draft Writeup and no Final Writeup,
   its linked and document cycle codes and presentation count, and flags
   the ones the guard would refuse. Dry run on the sandbox: two requests,
-  none refused. Not yet run on Production.
+  none refused. **Owner run on Production, 2026-11-12:** one request,
+  #1003313 (no Grant Cycle link, document D26, Draft Writeup in complete
+  review, one presentation record); none refused. With a presentation
+  record the earlier-cycle exception does not apply whatever the link, so
+  the new rule does not touch it: group review there needs its presentation
+  to read as ended under Production's state/status pairs, as before
+  `91fc83581`. Whether it does was not checked.
 - **Before promotion: the J27 list's cost at volume (owner-run Production
   read).** `DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-workbench-load-timing.js
   --email=<staff email> --profile-id=<id> --cycle=D26 --scope=all --later-facts=yes`
@@ -134,7 +140,16 @@ these changes:
   three batched later-phase reads over the same request ids (the list runs
   them only for 2027-or-later rows, so D26 gives the volume). Prints timings
   and counts only. The script was extended 2026-11-12 to pass the cycle;
-  before, it timed only the cycle picker. Not yet run.
+  before, it timed only the cycle picker. **Owner run on Production,
+  2026-11-12** (after `dabdf5378` fixed the bundle): D26, all program
+  directors, 25 requests. Request list 2,766 ms cold / 706 ms warm, mostly
+  program catalog and assignments; the three later-phase reads over the 25
+  ids 934 ms cold / 439 ms warm, no fact unavailable (they run beside the
+  other reads in the list, so they add at most that); Deliberations panel
+  3,034 / 1,028 ms. Not measured: a 300-request cycle. At 25 ids per batch
+  this run needed one batch per read, while 300 would need about twelve
+  (Codex's count of 36 queries); whether the batches run in sequence was
+  not checked.
 - **Preview needs `FINAL_WRITEUP_SCHEMA_READY=on`** for its branch to show
   the review stages (group and leadership review) and to rehearse the Final
   Assessment list's standing chips. It is set for Production and another
