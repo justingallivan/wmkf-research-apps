@@ -102,7 +102,7 @@ describe('batch facts', () => {
     readLatestIntegrityStates.mockResolvedValue(new Map());
     const loaded = await loadJ27Facts([REQ, 'other']);
     expect(existsAnySuggestionForRequests).toHaveBeenCalledTimes(1);
-    expect(existsAnySuggestionForRequests).toHaveBeenCalledWith([REQ, 'other']);
+    expect(existsAnySuggestionForRequests).toHaveBeenCalledWith([REQ, 'other'], { concurrency: 4 });
     expect(readLatestIntegrityStates).toHaveBeenCalledWith('orgd9e66399.crm.dynamics.com', [REQ, 'other']);
     expect(loaded.anySuggestion.has(REQ)).toBe(true);
   });

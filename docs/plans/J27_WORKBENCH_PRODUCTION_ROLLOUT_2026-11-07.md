@@ -149,7 +149,12 @@ these changes:
   3,034 / 1,028 ms. Not measured: a 300-request cycle. At 25 ids per batch
   this run needed one batch per read, while 300 would need about twelve
   (Codex's count of 36 queries); whether the batches run in sequence was
-  not checked.
+  not checked. *(2026-11-13: they did run in sequence, 25 requests per
+  chunk. The J27 list reads now run four chunks at a time
+  (`J27_READ_CONCURRENCY`, `lib/services/workbench/j27-later-facts.js`), so
+  at most 20 Dataverse queries are in flight across the five reads; other
+  callers of the three adapters stay sequential. Still not measured on a
+  large cycle.)*
 - **Preview needs `FINAL_WRITEUP_SCHEMA_READY=on`** for its branch to show
   the review stages (group and leadership review) and to rehearse the Final
   Assessment list's standing chips. It is set for Production and another

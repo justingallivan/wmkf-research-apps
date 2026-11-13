@@ -47,3 +47,36 @@ test('the rollup query is untouched: it still restricts to selected or declined 
   await findForRollup(`_wmkf_request_value eq ${id(1)}`);
   expect(queryAllRecords.mock.calls[0][1].filter).toContain('wmkf_selected eq true or wmkf_declined eq true');
 });
+
+test('with concurrency, chunks run together and a capped chunk still refuses the whole read', async () => {
+  let inFlight = 0;
+  let peak = 0;
+  queryAllRecords.mockImplementation(async (_set, options) => {
+    inFlight += 1; peak = Math.max(peak, inFlight);
+    await new Promise((resolve) => setImmediate(resolve));
+    inFlight -= 1;
+    const first = /eq ([0-9a-f-]+)/.exec(options.filter)[1];
+    return { records: [{ _wmkf_request_value: first }] };
+  });
+  const ids = Array.from({ length: 100 }, (_, i) => id(i + 1));
+  const found = await existsAnySuggestionForRequests(ids, { concurrency: 4 });
+  expect(queryAllRecords).toHaveBeenCalledTimes(4);
+  expect(peak).toBe(4);
+  expect([...found]).toEqual([id(1), id(26), id(51), id(76)]);
+
+  queryAllRecords.mockReset().mockResolvedValueOnce({ records: [] }).mockResolvedValueOnce({ records: [], capped: true }).mockResolvedValue({ records: [] });
+  await expect(existsAnySuggestionForRequests(ids, { concurrency: 4 })).rejects.toThrow('incomplete');
+});
+
+test('without the option the chunks run one at a time', async () => {
+  let inFlight = 0;
+  let peak = 0;
+  queryAllRecords.mockImplementation(async () => {
+    inFlight += 1; peak = Math.max(peak, inFlight);
+    await new Promise((resolve) => setImmediate(resolve));
+    inFlight -= 1;
+    return { records: [] };
+  });
+  await existsAnySuggestionForRequests(Array.from({ length: 75 }, (_, i) => id(i + 1)));
+  expect(peak).toBe(1);
+});

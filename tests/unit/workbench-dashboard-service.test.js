@@ -500,7 +500,7 @@ describe('J27 read model on the proposal list (plan C7)', () => {
     expect(queryAllRequests.mock.calls[0][0].select).toContain('_wmkf_grantcycle_value');
     expect(queryAllRequests.mock.calls[0][0].select).toContain('wmkf_phaseiistatus');
     expect(existsAnySuggestionForRequests).toHaveBeenCalledTimes(1);
-    expect(existsAnySuggestionForRequests).toHaveBeenCalledWith(['r-80', 'r-85']);
+    expect(existsAnySuggestionForRequests).toHaveBeenCalledWith(['r-80', 'r-85'], { concurrency: 4 });
     expect(readLatestIntegrityStates).toHaveBeenCalledTimes(1);
     expect(getCycleDatesById).toHaveBeenCalledTimes(1);
     expect(getCycleDatesById).toHaveBeenCalledWith('cycle-j27');

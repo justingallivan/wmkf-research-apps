@@ -282,7 +282,7 @@ describe('loadJ27LaterFacts', () => {
     const facts = await loadJ27LaterFacts([request(), second], d);
     expect(d.findDocuments).toHaveBeenCalledTimes(2);
     expect(d.findSiteVisits).toHaveBeenCalledTimes(1);
-    expect(d.findSiteVisits).toHaveBeenCalledWith([R, OTHER]);
+    expect(d.findSiteVisits).toHaveBeenCalledWith([R, OTHER], { concurrency: 4 });
     expect(d.findDocuments.mock.calls.every(([ids, opts]) => ids.length === 2 && opts.listFactsOnly === true)).toBe(true);
     expect(facts.get(R)).toEqual({
       presentation: { status: 'present', exists: true, id: V, ended: true, legacyException: false },

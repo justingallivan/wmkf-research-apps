@@ -232,7 +232,7 @@ describe('J27 read model (plan C7)', () => {
     readLatestIntegrityStates.mockResolvedValue(new Map([[REQ, { status: 'present', latest: { flagged: true, reviewed: false, provenance: 'automated' } }]]));
     const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '', today: new Date('2027-03-16T12:00:00Z') });
     expect(existsAnySuggestionForRequests).toHaveBeenCalledTimes(1);
-    expect(existsAnySuggestionForRequests).toHaveBeenCalledWith([REQ]);
+    expect(existsAnySuggestionForRequests).toHaveBeenCalledWith([REQ], { concurrency: 4 });
     expect(readLatestIntegrityStates).toHaveBeenCalledTimes(1);
     expect(loadJ27LaterFacts).toHaveBeenCalledTimes(1);
     // Budget: Dataverse reads = suggestions (1) + program catalog (1) + later facts (one load, 3 batched
