@@ -57,7 +57,11 @@ these changes:
 merge alone would have shown Production staff the J27 cycle page, the
 request-page strip and readiness-only discovery, and would have run the J27
 reads (including the integrity join on `j27_integrity_jobs`, which needs
-migration 096). `WORKBENCH_PHASE_RELEASE` now gates all of these; unset in
+migration 096). `WORKBENCH_PHASE_RELEASE` now gates all of these, and the
+cycle page receives the server's answer as a prop (`phaseRelease` from
+`pages/workbench.js`), so the shell neither chooses nor anticipates the
+J27 layout and never starts a J27 row read while the cycle list loads
+(Codex review finding, fixed 2026-11-13); unset in
 Production, every discovery consumer builds `main`'s filter and the old
 request list keeps Advancing / Set aside (restored for 2027-or-later rows,
 owner 2026-11-13). Setting it `on` is **not** the release by itself: the
@@ -68,8 +72,26 @@ Production on merge by the owner's decision: offramp refusals (D7/D63), the
 group-review guard (D63/D64), the 2027+ Proposal-tab files and staff version
 (D59 to D61), the nav order, the Scoring card for 2027+ with an explicit
 Save outside the phase layout, and the reviewer Invite list excluding
-candidates whose review was already received. The integrity news-analysis
-change (`318f9642c`, `35a445bec`) is not gated and awaits a comparison.
+candidates whose review was already received.
+
+- **Integrity news analysis, 2026-11-13.** Production keeps main's news
+  analysis (the free-text prompt and the "no concerns found" rule);
+  the structured rule from `318f9642c` and `35a445bec` runs only outside
+  Production (`structuredNewsAdmitted` in
+  `lib/services/integrity-service.js`). It does not follow
+  `WORKBENCH_PHASE_RELEASE`; lifting the hold is a code change. Reason:
+  the structured rule flags only when both excerpts appear verbatim in a
+  result's title or snippet, and all 592 stored Google News results in
+  Production have an empty snippet [VERIFIED via
+  `scripts/probe-integrity-news-verdict-sizing.cjs`, owner-run 2026-11-13:
+  79 screenings, 129 news searches, 16 flagged under the old rule, 111
+  with more than the 5 stored results]. `main` maps the snippet the same
+  way, so live screens see headlines only. A flag would need the headline
+  to name the conduct and identify the person beyond their name.
+  `scripts/replay-integrity-news-verdicts.cjs` re-judges the 16 old flags
+  under the structured rule from their stored results (owner-run; one
+  model call each). The fix (richer source text or a headline-only rule)
+  is an open design decision.
 
 - **Preview walk-through and move, 2026-11-12.** The owner walked the
   Preview and Claude took a second look in Chrome. The Final Assessment
