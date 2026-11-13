@@ -1,0 +1,132 @@
+{
+  "production": {
+    "at": "2026-11-13T04:30:02.100Z",
+    "origin": "https://wmkf.crm.dynamics.com",
+    "field": {
+      "@odata.type": "#Microsoft.Dynamics.CRM.MemoAttributeMetadata",
+      "MetadataId": "b96d22b9-bcdc-f111-84e8-000d3a31b218",
+      "AttributeType": "Memo",
+      "IsValidForRead": true,
+      "IsValidForUpdate": true,
+      "IsSecured": false,
+      "IsManaged": false,
+      "LogicalName": "wmkf_layabstract",
+      "SchemaName": "wmkf_LayAbstract",
+      "Description": {
+        "LocalizedLabels": [
+          {
+            "Label": "Optional request lay abstract, initialized once by the external Power Automate workflow and subsequently edited by staff. Never automatically regenerate or overwrite staff edits, including intentional clearing.",
+            "LanguageCode": 1033,
+            "IsManaged": false,
+            "MetadataId": "00bf9bf8-705f-4f4b-8e89-9ef8f4e49806",
+            "HasChanged": null
+          }
+        ],
+        "UserLocalizedLabel": {
+          "Label": "Optional request lay abstract, initialized once by the external Power Automate workflow and subsequently edited by staff. Never automatically regenerate or overwrite staff edits, including intentional clearing.",
+          "LanguageCode": 1033,
+          "IsManaged": false,
+          "MetadataId": "00bf9bf8-705f-4f4b-8e89-9ef8f4e49806",
+          "HasChanged": null
+        }
+      },
+      "DisplayName": {
+        "LocalizedLabels": [
+          {
+            "Label": "Lay Abstract",
+            "LanguageCode": 1033,
+            "IsManaged": false,
+            "MetadataId": "135464cb-38bb-432c-858b-cedb87bb864c",
+            "HasChanged": null
+          }
+        ],
+        "UserLocalizedLabel": {
+          "Label": "Lay Abstract",
+          "LanguageCode": 1033,
+          "IsManaged": false,
+          "MetadataId": "135464cb-38bb-432c-858b-cedb87bb864c",
+          "HasChanged": null
+        }
+      },
+      "IsAuditEnabled": {
+        "Value": true,
+        "CanBeChanged": true,
+        "ManagedPropertyLogicalName": "canmodifyauditsettings"
+      },
+      "RequiredLevel": {
+        "Value": "None",
+        "CanBeChanged": true,
+        "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+      },
+      "MaxLength": 100000,
+      "Format": "Text"
+    },
+    "runtimeProjectionAccepted": true,
+    "literalPromptBindings": []
+  },
+  "sandbox": {
+    "at": "2026-11-13T04:30:52.383Z",
+    "origin": "https://orgd9e66399.crm.dynamics.com",
+    "field": {
+      "@odata.type": "#Microsoft.Dynamics.CRM.MemoAttributeMetadata",
+      "MetadataId": "262feecc-1adf-f111-84ea-70a8a5b1c1c6",
+      "AttributeType": "Memo",
+      "IsValidForRead": true,
+      "IsValidForUpdate": true,
+      "IsSecured": false,
+      "IsManaged": false,
+      "LogicalName": "wmkf_layabstract",
+      "SchemaName": "wmkf_LayAbstract",
+      "Description": {
+        "LocalizedLabels": [
+          {
+            "Label": "Optional request lay abstract, initialized once by the external Power Automate workflow and subsequently edited by staff. Never automatically regenerate or overwrite staff edits, including intentional clearing.",
+            "LanguageCode": 1033,
+            "IsManaged": false,
+            "MetadataId": "35d08199-3e9f-4940-9075-93ecd3f85542",
+            "HasChanged": null
+          }
+        ],
+        "UserLocalizedLabel": {
+          "Label": "Optional request lay abstract, initialized once by the external Power Automate workflow and subsequently edited by staff. Never automatically regenerate or overwrite staff edits, including intentional clearing.",
+          "LanguageCode": 1033,
+          "IsManaged": false,
+          "MetadataId": "35d08199-3e9f-4940-9075-93ecd3f85542",
+          "HasChanged": null
+        }
+      },
+      "DisplayName": {
+        "LocalizedLabels": [
+          {
+            "Label": "Lay Abstract",
+            "LanguageCode": 1033,
+            "IsManaged": false,
+            "MetadataId": "e912e478-bcd7-41f2-bb4b-01bdb0bac6b4",
+            "HasChanged": null
+          }
+        ],
+        "UserLocalizedLabel": {
+          "Label": "Lay Abstract",
+          "LanguageCode": 1033,
+          "IsManaged": false,
+          "MetadataId": "e912e478-bcd7-41f2-bb4b-01bdb0bac6b4",
+          "HasChanged": null
+        }
+      },
+      "IsAuditEnabled": {
+        "Value": true,
+        "CanBeChanged": true,
+        "ManagedPropertyLogicalName": "canmodifyauditsettings"
+      },
+      "RequiredLevel": {
+        "Value": "None",
+        "CanBeChanged": true,
+        "ManagedPropertyLogicalName": "canmodifyrequirementlevelsettings"
+      },
+      "MaxLength": 100000,
+      "Format": "Text"
+    },
+    "runtimeProjectionAccepted": true,
+    "literalPromptBindings": []
+  }
+}

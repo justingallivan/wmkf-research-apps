@@ -25,6 +25,7 @@ export default async function handler(req, res) {
       return res.status(200).json(result);
     } catch (error) {
       if (error instanceof ServiceHttpError) return res.status(error.httpStatus).json({ error: error.message });
+      if ([401, 403].includes(error?.status)) return res.status(403).json({ error: 'Your staff identity does not have permission to access this Request text.' });
       // No request text or provider bodies in logs/responses.
       console.error('Request narrative operation failed', { status: error?.status });
       return res.status(503).json({ error: 'Request text is unavailable. Check that the Request narrative fields are provisioned, then reload before retrying.' });

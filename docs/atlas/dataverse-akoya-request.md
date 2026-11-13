@@ -78,18 +78,20 @@ Content / abstract:
 - `wmkf_abstract` (full proposal abstract; added by WMKF, not in vendor schema)
 - `wmkf_excludedreviewers` (free-form names)
 - `wmkf_layabstract` and `wmkf_initialassessment` (optional plain-text Memo,
-  100,000 characters each) — **[SCHEMA LIVE 2026-11-09; APP BRANCH-BUILT]**.
-  Owner-approved Wave `36-request-narratives` created both fields in Production.
-  Independent `probe-request-narrative-fields.js --target=prod --verify` confirmed
-  exact typed metadata and runtime column selection without reading or changing
-  Request content. App contract on `codex/request-narratives-2026-11-09` (not on main):
-  `lay_abstract` / `initial_assessment`, read and conditionally saved through
-  `/api/workbench/request-narratives` and the Overview Request text card.
-  External Power Automate supplies the initial text; no app generation or
-  automatic replacement. This assessment text is separate from the governed
-  Initial Assessment document pointer below. Provisioning evidence and the external
-  one-time initialization requirements are recorded in
-  `docs/plans/REQUEST_NARRATIVES_HANDOFF_2026-11-09.md`.
+  100,000 characters each) — Production schema created November 9; Lay Abstract alone
+  was provisioned and independently verified in Sandbox November 13 UTC (metadata
+  parity and zero-row runtime projection). Justin confirmed
+  on November 12 that Lay Abstract is the intended **Executive Summary** field.
+  The PA integration branch reuses `wmkf_layabstract` with stable API key `lay_abstract`
+  and staff-facing Executive Summary label; it keeps the Dataverse label Lay Abstract.
+  Its explicit allowlist exposes only this field through the separate Overview card
+  and GET/PATCH `/api/workbench/request-narratives`, with linked lead-PD/superuser
+  conditional saves. Initial Assessment is not selected or writable in that integration.
+  The original two-field branch is documented in the historical
+  `docs/plans/REQUEST_NARRATIVES_HANDOFF_2026-11-09.md`; this assessment remains separate
+  from the governed Initial Assessment artifact. App deployment and automatic Summary
+  delivery are not enabled by the field reuse. Source and initialization-event decisions
+  remain open; see `docs/plans/PA_EXECUTIVE_SUMMARY_FIELD_CONTRACT_2026-11-13.md`.
 
 Governed artifact pointers:
 - `wmkf_currentinitialassessment` (Lookup →

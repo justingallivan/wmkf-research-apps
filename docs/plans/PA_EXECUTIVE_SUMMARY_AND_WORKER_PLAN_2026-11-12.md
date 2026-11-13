@@ -2,14 +2,15 @@
 
 Owner: Codex; branch `codex/power-automate-integration-2026-11-11`.
 Status: supervised Short Title worker trial passed on isolated Request 1000389.
-Executive Summary and unattended scheduling remain proposed and unactivated.
+Executive Summary uses the existing Lay Abstract field; staff editing is branch-built.
+Automatic Summary delivery and unattended scheduling remain unactivated.
 Connor’s original Short Title deployment, Request and scoped ledger are unchanged.
 See the [trial receipt](PA_BOUNDED_LIVE_TRIAL_APPROVAL_2026-11-13.md#automatic-worker-trial--passed).
 
 ## Recommendation
 
 Reuse the shared Executor and migration 097 ledger. Keep Executive Summary draft-only
-until its exact destination and audience are approved. Plan automatic processing as
+until its document source and initialization event are approved. Plan automatic processing as
 backend-owned durable worker ticks; Power Automate submits and polls, with no provider
 implementation, direct output PATCH or cron credential. Do not add a queue service,
 new database, generic field mapper or another application merely for this slice.
@@ -31,16 +32,12 @@ The existing source adapter is evidence of a prior trial, not a decision for thi
 | Machine drain is POST-only, server selects one stage, no schedule entry | `pages/api/cron/drain-machine-prompt-jobs.js`, `machine-worker.js`, `vercel.json` | VERIFIED source |
 | Current pilot rejects Production deployment classes and expires after at most seven days | `machine-pilot-policy.js` | VERIFIED source; not production-ready policy |
 
-No new live schema probe was needed to preserve these boundaries. Availability/type,
-length, security and existing contents of a prospective Summary column are UNKNOWN
-until an exact destination is chosen and read-only metadata/consumer probes run.
+Live metadata and consumer checks now establish the existing Lay Abstract destination.
+See the [field contract](PA_EXECUTIVE_SUMMARY_FIELD_CONTRACT_2026-11-13.md) for the
+owner-approved reuse and the branch-built staff editor. Source selection, external
+writer/visibility checks and event eligibility remain activation gates.
 
-## Executive Summary contract to approve
-
-The [field contract and live column inventory](PA_EXECUTIVE_SUMMARY_FIELD_CONTRACT_2026-11-13.md)
-propose a dedicated Request field after read-only Sandbox/Production metadata and
-source-consumer inspection. Field, audience and event semantics remain unapproved;
-document selection remains open.
+## Executive Summary delivery contract
 
 | Contract | Proposed value / decision boundary |
 | --- | --- |
@@ -51,17 +48,15 @@ document selection remains open.
 | Document | Server-selected full-proposal source under one versioned policy; exact folder/file composition remains OPEN |
 | Output | Validated nonblank `summary` text under existing profile bounds; JSON/profile envelope remains the existing Executor contract |
 | Immediate persistence | Retained validated draft in existing ledger; bounded expiry, not permanent output storage |
-| Final destination | UNDECIDED. Recommend a dedicated Request Executive Summary column if no semantically correct existing column is approved. Candidate `wmkf_executivesummary` is now documented in the field-contract proposal; do not provision without approval |
-| Excluded automatic mappings | `wmkf_ai_summary`, Lay Abstract, Initial Assessment and Pre-Site document sections are not approved substitutes |
+| Final destination | Owner-approved existing `akoya_request.wmkf_layabstract`; staff label Executive Summary, stable API key `lay_abstract`, Memo 100,000 characters |
+| Excluded automatic mappings | `wmkf_ai_summary`, Initial Assessment and Pre-Site document sections are not approved substitutes |
 | Delivery proposal | One-time initialization only, never automatic replacement; this is a proposal, not an owner-approved refresh policy |
 | Audience | Staff review initially proposed. Chairs distribution remains OPEN; storing in Dataverse alone does not enforce an audience |
 
-Before field implementation, record exact entity/column/type/limit, business owner,
-readers/editors, permissions and approved initialization event. Compare existing schema
-and consumers first; create one column only if needed and explicitly approved. If
-refresh/overwrite is required, stop and review a replacement contract instead of
-silently weakening initialization. Output format validation is not scientific quality
-approval. No delivery to Chairs follows from a successful API call.
+The destination is settled. Before automatic delivery, confirm external writers,
+visibility and the approved first-initialization event. Preserve staff edits and
+clearing. Output format validation is not scientific quality approval; no Chairs
+distribution follows from this change.
 
 ### Source and cache contract independent of document choice
 
@@ -194,8 +189,8 @@ claimed from that driver. Existing paid runtime approval does not authorize a ne
 
 1. Await Connor’s POST/replay/poll result; independently verify existing ledger and
    field still unchanged afterward. No new infrastructure depends on that test.
-2. Writer wiring waits for destination, audience/column security, initialization event
-   and refresh semantics, plus read-only schema/consumer checks. Machine admission
+2. Writer wiring waits for external writer/visibility checks and initialization-event
+   eligibility. The existing Lay Abstract destination is approved and staff editing is branch-built. Machine admission
    and any Summary trial additionally wait for source selection with the caching work.
    Neither is Summary-ready while its prerequisites remain open.
 3. The bounded driver now has offline tests (below). Scheduler implementation and

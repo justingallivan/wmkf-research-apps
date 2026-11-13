@@ -583,3 +583,13 @@ describe('Executor response-completeness + native structured output', () => {
     expect(updateCalls.filter((c) => c.entitySet === 'akoya_requests')).toHaveLength(1);
   });
 });
+
+ test.each(['wmkf_layabstract', 'WMKF_LayAbstract', ' wmkf_layabstract ', 'akoya_request.wmkf_layabstract'])('reserved Summary target %s rejects before provider even with overwrite', async field => {
+  promptRow = buildPromptRow([{ name: 'summary', target: { kind: 'akoya_request', field, jsonPath: '$.summary' }, guard: 'always-overwrite' }]);
+  setClaudeJson({ summary: 'Would overwrite human text' });
+  getRecordImpl = async () => ({ ...REQUEST_ROW, wmkf_layabstract: 'Human text' });
+  await expect(executePrompt({ promptName: 'test.multi-output', requestId: REQUEST_ROW.akoya_requestid,
+    runSource: 'Vercel Test', overrideVariables: { x: 'value' }, forceOverwrite: true })).rejects.toThrow('dedicated initialization contract');
+  expect(fetchedBodies).toHaveLength(0);
+  expect(updateCalls).toHaveLength(0);
+});

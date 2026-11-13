@@ -208,6 +208,18 @@ describe('publishPrompt', () => {
     }));
   });
 
+  it('rejects a configurable Executive Summary target before audit or publication', async () => {
+    aiPrompt.queryCurrentRows.mockResolvedValue({ records: [currentRow()] });
+    const outputSchema = JSON.stringify({ outputs: [{ name: 'summary', target: {
+      kind: 'akoya_request', field: 'WMKF_LayAbstract', jsonPath: '$.summary',
+    } }] });
+    await expect(publishPrompt(args({ outputSchema }))).rejects.toMatchObject({
+      httpStatus: 400, body: expect.objectContaining({ status: 'invalid_output_schema' }),
+    });
+    expect(sql).not.toHaveBeenCalled();
+    expect(aiPrompt.create).not.toHaveBeenCalled();
+  });
+
   it('rejects a malformed edited output schema before audit or write', async () => {
     aiPrompt.queryCurrentRows.mockResolvedValue({ records: [currentRow()] });
 

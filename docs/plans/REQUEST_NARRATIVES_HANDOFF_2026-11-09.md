@@ -1,4 +1,11 @@
-# Optional Request narrative text — 2026-11-09
+# Historical handoff: optional Request narrative text — 2026-11-09
+
+This document records the original two-field branch and its November 9 verification.
+Current follow-on: [Executive Summary field contract](PA_EXECUTIVE_SUMMARY_FIELD_CONTRACT_2026-11-13.md).
+The PA integration branch cherry-picks the original code, labels Lay Abstract as
+Executive Summary, and enables only `lay_abstract`. Initial Assessment remains outside
+that integration. The historical behavior and test counts below describe the original
+branch; they are not a claim of current app deployment or an active Power Automate flow.
 
 Owner: Codex. Branch: `codex/request-narratives-2026-11-09`.
 Worktree: `/private/tmp/wmkf-request-narratives`.

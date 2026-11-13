@@ -121,15 +121,15 @@ function NarrativeEditor({ requestId }) {
 
   return (
     <Card hover={false}>
-      <h2 className="text-base font-semibold text-gray-900">Request text</h2>
-      <p className="mt-1 text-sm text-gray-600">Initially supplied by Power Automate. Staff changes are saved only when you choose Save.</p>
+      <h2 className="text-base font-semibold text-gray-900">Executive Summary</h2>
+      <p className="mt-1 text-sm text-gray-600">Staff changes are saved only when you choose Save.</p>
       {!draft && !error && <p role="status">Loading request text…</p>}
       {draft && <form onSubmit={save} className="mt-4 space-y-4">
         {Object.entries(REQUEST_NARRATIVE_FIELDS).map(([key, field]) => <div key={key}>
           <label htmlFor={`request-${key}`} className="block text-sm font-medium text-gray-900">{field.label}</label>
           {saved.canEdit ? <textarea
             id={`request-${key}`} rows={8} maxLength={REQUEST_NARRATIVE_MAX_LENGTH}
-            value={draft[key]} disabled={busy || needsReload}
+            value={draft[key]} disabled={busy} readOnly={needsReload}
             onChange={event => { setDraft(current => ({ ...current, [key]: event.target.value })); setNotice(''); }}
             className="mt-1 w-full rounded-lg border border-gray-300 p-3 text-sm"
           /> : <p id={`request-${key}`} className="mt-1 whitespace-pre-wrap text-sm text-gray-700">{draft[key] || 'Not yet provided.'}</p>}

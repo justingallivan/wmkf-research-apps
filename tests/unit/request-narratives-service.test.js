@@ -14,9 +14,9 @@ const row = { akoya_requestid: requestId, _wmkf_programdirector_value: callerSys
 const originalImpersonation = process.env.DYNAMICS_IMPERSONATION_ENABLED;
 afterAll(() => { if (originalImpersonation === undefined) delete process.env.DYNAMICS_IMPERSONATION_ENABLED; else process.env.DYNAMICS_IMPERSONATION_ENABLED = originalImpersonation; });
 beforeEach(() => { process.env.DYNAMICS_IMPERSONATION_ENABLED = 'true'; jest.resetAllMocks(); getById.mockResolvedValue({ ...row }); getUserRole.mockResolvedValue('read_only'); });
-test('reads both external texts without writing or generating', async () => {
+test('reads Executive Summary under the stable API key without writing or generating', async () => {
   expect(await readRequestNarratives(input)).toMatchObject({ lay_abstract: row.wmkf_layabstract,
-    initial_assessment: row.wmkf_initialassessment, version: input.version, canEdit: true });
+    version: input.version, canEdit: true });
   expect(updateById).not.toHaveBeenCalled();
 });
 test('saves only supplied changed fields, with concrete ETag and trusted actor', async () => {
@@ -24,9 +24,9 @@ test('saves only supplied changed fields, with concrete ETag and trusted actor',
   expect(updateById).toHaveBeenCalledWith(requestId, { wmkf_layabstract: 'Edited by staff' },
     { ifMatch: input.version, actingUserSystemId: callerSystemId, noFallback: true });
 });
-test('both fields persist and read back verbatim, including Unicode/newlines', async () => {
+test('Executive Summary persists and reads back verbatim, including Unicode/newlines', async () => {
   updateById.mockImplementation(async (_, patch) => Object.assign(row, patch));
-  const changes = { lay_abstract: '  A\nβ  ', initial_assessment: 'Human assessment\n<plain text>' };
+  const changes = { lay_abstract: '  A\nβ  ' };
   await saveRequestNarratives({ ...input, changes });
   getById.mockResolvedValue(row);
   expect(await readRequestNarratives(input)).toMatchObject(changes);
@@ -83,4 +83,19 @@ test('disabled impersonation cannot silently attribute a staff save to the servi
   expect(await readRequestNarratives(input)).toMatchObject({ canEdit: false });
   await expect(saveRequestNarratives(input)).rejects.toMatchObject({ httpStatus: 403 });
   expect(updateById).not.toHaveBeenCalled();
+});
+
+ test('only the enabled Executive Summary column is selected; sibling field and renamed keys cannot be written', async () => {
+  const result = await readRequestNarratives(input);
+  expect(result).not.toHaveProperty('initial_assessment');
+  expect(getById).toHaveBeenCalledWith(requestId, { select: 'akoya_requestid,_wmkf_programdirector_value,wmkf_layabstract' });
+  for (const changes of [{ initial_assessment: 'no' }, { executive_summary: 'no' }, { wmkf_layabstract: 'no' }]) {
+    await expect(saveRequestNarratives({ ...input, changes })).rejects.toMatchObject({ httpStatus: 400 });
+  }
+  expect(updateById).not.toHaveBeenCalled();
+});
+test('preserves the existing 100000-character manual editing contract', async () => {
+  const value = 'x'.repeat(100000);
+  await saveRequestNarratives({ ...input, changes: { lay_abstract: value } });
+  expect(updateById.mock.calls[0][1]).toEqual({ wmkf_layabstract: value });
 });
