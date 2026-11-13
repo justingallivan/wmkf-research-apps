@@ -91,6 +91,14 @@ body to 4 KiB and admission to one job per pilot, and returns `private, no-store
 with authenticated status location/polling interval. The status route uses the real ledger status projection; the isolated proof
 facade remains test-only.
 
+## Next planning slice
+
+The [Executive Summary and worker automation plan](PA_EXECUTIVE_SUMMARY_AND_WORKER_PLAN_2026-11-12.md)
+records the next proposed slice while Connor tests. Summary remains draft-only;
+source, exact destination, audience and initialization/refresh semantics still need
+decisions. The plan separates supervised sandbox stage advancement from eventual
+Production scheduling. It authorizes no live changes and leaves this pilot intact.
+
 ## Prompt-to-field handoff inventory
 
 The workbook requirements in the dated discovery handoff are inputs for review,
