@@ -232,6 +232,7 @@ test('a grounded allegation survives old clear wording and carries its original 
   expect(result.sources.news.summary).toContain('Reported allegation: “was accused of diverting grant funds”');
   expect(result.sources.news.summary).toContain('Identity evidence: “a materials scientist at Example University”');
   expect(mockComplete.mock.calls[0][0].system).toContain('A shared name is insufficient.');
+  expect(mockComplete.mock.calls[0][0].maxTokens).toBe(8000);
   expect(mockComplete.mock.calls[0][0].outputConfig.format).toMatchObject({
     type: 'json_schema',
     schema: { properties: { outcome: { enum: ['flag_for_review', 'clear', 'inconclusive'] } } },
@@ -408,6 +409,7 @@ describe('Production news analysis is main\'s', () => {
     });
     expect(mockComplete.mock.calls[0][0].system).toContain('You are a due diligence specialist');
     expect(mockComplete.mock.calls[0][0]).not.toHaveProperty('outputConfig');
+    expect(mockComplete.mock.calls[0][0].maxTokens).toBe(8000);
   });
 
   test('"No concerns found" clears', async () => {

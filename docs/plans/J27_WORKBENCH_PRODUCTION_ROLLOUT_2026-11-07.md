@@ -92,6 +92,12 @@ candidates whose review was already received.
   under the structured rule from their stored results (owner-run; one
   model call each). The fix (richer source text or a headline-only rule)
   is an open design decision.
+- **Integrity analysis token limit, 2026-11-13 (owner go; reaches Production
+  on merge).** The integrity analysis call (both news paths) allows 8000
+  output tokens instead of 1000 (`ANALYSIS_MAX_TOKENS`). The first replay on
+  the default Haiku (`claude-haiku-5-5`, thinking on by default) got one
+  non-JSON and one empty reply in 10 cases; thinking spending the 1000-token
+  budget is the likely cause [ASSUMED]. The model stays Haiku (owner).
 
 - **Preview walk-through and move, 2026-11-12.** The owner walked the
   Preview and Claude took a second look in Chrome. The Final Assessment
