@@ -1,164 +1,144 @@
-# Session 675 Prompt: Power Automate prompt jobs — Connor test and next activation
+# Session 676 Prompt: Await Connor — Summary offline work complete
 
-## Session 674 Summary (Codex, November 12, 2026 local)
+## Session 675 Summary (Codex, November 13, 2026)
 
-Owner: Codex. Resume branch and documentation destination:
+Owner and authorized documentation destination: Codex on
 `codex/power-automate-integration-2026-11-11`.
-Worktree recorded at stop: `/private/tmp/wmkf-pa-integration-20261111`.
-Preserve this checkout; temporary paths are not cross-machine guarantees. Session
-numbering is branch-local. Prior complete handoff is retrievable with
-`git show 23d000af0:SESSION_PROMPT.md` (verified at stop), including the older
-concurrent-stream index and its link to `33a233633:SESSION_PROMPT.md`.
-No runtime promotion to main is authorized by this handoff.
+Worktree: `/private/tmp/wmkf-pa-integration-20261111`; preserve it, but verify paths
+on another machine. Session numbering is branch-local. Prior full handoff is
+retrievable with `git show 29a61943a:SESSION_PROMPT.md` (verified at stop).
+No promotion to main or deployment is authorized by this handoff.
 
-### Completed and verified
+### What Was Completed
 
-- Expertise roster import/rehearsal and matching work progressed into the shared
-  Executor. The native-schema Sandbox recommendations trial retained validated
-  results and verified staff readback (`65726e852`). Recommendations only; assignment
-  remains a separate Connor coordination decision. See shared task interface receipts.
-- Built authenticated machine submission/status, durable generation/audit/publication
-  receipts and conditional Request writeback using migration 097. Short Title is the
-  supported machine task; this is not a general production dispatcher.
-- Prepared isolated Preview/Neon/Entra sandbox and Power Automate-only instructions.
-  Short Title live delivery and duplicate protection passed (`1e84f1fb8`). A separate
-  supervised worker trial passed on Request 1000389 (`557df880e`); no unattended
-  production schedule was enabled. Exact live evidence is in the bounded-trial plan.
-- Executive Summary reuses existing `akoya_request.wmkf_layabstract`, API key
-  `lay_abstract`. Sandbox field provisioned; protected staff editor is branch-built,
-  not deployed (`d8d100a65`). Do not create a second Executive Summary field.
-- Configurable destination support (`23d000af0`) uses the existing prompt output
-  target plus an exact server grant. Frozen jobs retain their destination; permanent
-  physical-field reservations, original ETags, protected text and unknown-outcome
-  fences prevent duplicate initialization and overwrite. Legacy scope stays compatible.
-  This extension is committed, not deployed; Summary remains excluded/gated.
-- Opus 5.5 reviewed plans/builds via OAuth. Final destination follow-up found no
-  blockers and withdrew a suspected generic-guard issue after source/test evidence.
+[VERIFIED via branch source and offline tests]
 
-### Key commits (full history remains in Git)
+1. Settled Summary source: project narrative in `Submission-Documents`; combined
+   Narrative-Bibliography PDF is for reviewer matching. Exact candidate filename
+   `Project-Narrative_{Request#}.pdf` still awaits Connor's producer confirmation.
+   Existing output remains `akoya_request.wmkf_layabstract`, API `lay_abstract`.
+2. Built disconnected narrative source adapter with pinned document/PI identity,
+   revision checks, bounded PDF preparation and sealed snapshots. No runtime wiring.
+3. Restricted initialization-reservation release to registered synthetic tasks in
+   environment `test`. Real Summary reservations survive known failures and expiry;
+   real Summary initialize admission and publication remain disabled.
+4. Built offline staff-edit command helper using synthetic DTO names. Explicit
+   save/clear sets a true marker with the original row version; baseline requires
+   blank text and an explicit false marker. No actual marker schema or writer wiring.
+5. Built composition and recovery rehearsal using real worker/store, isolated local
+   PostgreSQL, existing synthetic Summary capability and fake external adapters.
+   Covers staff edit/clear races, source drift, duplicate/replayed work, expiry,
+   audit failure/uncertainty, response reuse, lease recovery and stale workers.
+6. Owner sent Connor both the original test email and separate intake questions.
+   Await his answers/results. No live calls, deployment, schema changes or Connor
+   fixture changes during this session's offline work.
 
-- `9b1511b62` — machine authentication and admission proof.
-- `fac217568` — machine status and conditional Request delivery.
-- `23f71d2b5` — bounded Short Title pilot through shared Executor.
-- `8d9e0f32a`, `60e012b2c` — isolated sandbox and Power Automate-only access.
-- `1e84f1fb8`, `5b058ca4c` — successful live delivery and Connor submission/poll brief.
-- `7c2b0f9a8`, `84c95ae56`, `557df880e` — bounded driver, timing and live trial evidence.
-- `b1852d551`, `47ae09575` — field contract investigation and column creation census.
-- `bfa4c7781`, `d8d100a65` — narrative cherry-pick narrowed to Executive Summary reuse.
-- `23d000af0` — granted configurable machine destinations.
+### Commits
+
+- `18dc6778c` — Summary source decision and staff-edit protection plan.
+- `ca32503be` — Offline narrative source adapter and synthetic tests.
+- `e7416dd3e` — Permanent non-synthetic initialization reservations.
+- `a1e0d36bf` — Offline staff-edit commands and race tests.
+- `2d2732e2a` — Summary workflow rehearsal with isolated PostgreSQL.
+- `cb83db7e1` — Interruption recovery and stale-worker fencing tests.
 
 ## Next Items
 
-### Verified Open
+### Verified Open — Waiting for Connor
 
-Offline follow-up (November 13): Summary source adapter and permanent reservation
-retention are branch-built with synthetic/local PostgreSQL tests. Failure release
-is now synthetic/test-only; Summary admission/publication remain disabled. The
-staff-edit command builder and synthetic row-version race tests are also branch-built
-(`summary-edit-protection.js`); actual marker schema/writers and intake contracts
-remain open. The offline composition rehearsal now drives the real worker/store
-through the existing synthetic Summary capability with fake external adapters;
-107 tests passed, including 38 PostgreSQL cases. Recovery tests cover audit
-uncertainty, saved responses, lease expiry and stale workers; no process kills or
-live provider behavior are claimed. Real Summary admission/publication
-remain disabled; synthetic known-failure release is not real Summary retention.
-See the Summary worker plan's offline rehearsal evidence. No live calls or deployment.
+1. Review his completed-job POST/replay/poll results when received. Owner reports
+   they are still pending. Evidence: conversation and exact test brief
+   `docs/plans/CONNOR_POWER_AUTOMATE_SUBMIT_POLL_TEST_2026-11-12.md`.
+   This is completed-job replay, not fresh queued/running transition proof.
+2. Use his separate intake answers to prepare the remaining implementation contract.
+   Evidence: Summary worker and field plans. Offline testing is complete for the
+   agreed scope; do not automatically add more simulations while waiting.
 
-1. Await Connor's completed-job POST/replay/poll results. Owner sent the test email
-   on November 13. His earlier status check
-   reportedly passed; this later flow has not been reported complete in this chat.
-   Evidence: `docs/plans/CONNOR_POWER_AUTOMATE_SUBMIT_POLL_TEST_2026-11-12.md` and
-   owner's latest instruction to leave his test undisturbed. Inspect sanitized results,
-   then verify exact ledger/field unchanged with read-only checks. This is a replay
-   test, not proof of fresh queued/running transitions.
-2. If requested, prepare a separately bounded live trial for configurable destinations.
-   Evidence: `23d000af0`, `docs/plans/PA_CONFIGURABLE_DESTINATIONS_2026-11-13.md`.
-   Recheck actual field metadata/writers and use a separately approved scope; no live
-   grant or deployment was changed for this feature. Do not repurpose Connor's scope.
-3. Verify scoped retention cleanup due dates before touching expired payloads.
-   Evidence: shared task interface and staff trial receipts plus Atlas retention section.
-   Permanent receipts must survive. No blanket cleanup permission or fresh model run.
+### Owner Decision Needed / External Contract Pending
 
-### Owner Decision Needed
+- Exact first-intake trigger/event identity, ready-flag ordering and reset/resubmission
+  behavior. Existing readiness discovery is not an edit-permission gate.
+- Narrative producer's exact filename convention.
+- External Summary writers/editors and visibility; every manual path must participate
+  in atomic text + monotonic-marker writes, including intentional blank clears.
+- Actual marker logical name/security/provisioning, explicit-clear UI and eligible
+  new cohort. Default false is not proof that historical records were never edited.
+- Separate approval for deployment, bounded live trials and eventual scheduling.
 
-1. Executive Summary source is SETTLED (owner, November 13): project narrative
-   in Submission-Documents. Combined Narrative-Bibliography is for reviewer matching;
-   Summary neither reads nor waits for it. Dedicated summary-source.js is built
-   offline with synthetic tests; machine admission/worker wiring remains absent.
-   See the revised Summary worker/field plans.
-2. Summary automatic delivery needs the exact intake/readiness ordering, external
-   writer/visibility checks, and the proposed atomic staff-edit Boolean contract
-   (name/security/provisioning and all writers). Source and output field are settled;
-   marker implementation, new-cohort eligibility and activation are not.
-   Evidence: `docs/plans/PA_EXECUTIVE_SUMMARY_FIELD_CONTRACT_2026-11-13.md`.
-3. Production authorization, deployment and unattended scheduling require their own
-   plan/approval; the supervised driver is not a production scheduler. Evidence:
-   `docs/plans/PA_EXECUTIVE_SUMMARY_AND_WORKER_PLAN_2026-11-12.md`.
+Evidence: `docs/plans/PA_EXECUTIVE_SUMMARY_AND_WORKER_PLAN_2026-11-12.md` and
+`docs/plans/PA_EXECUTIVE_SUMMARY_FIELD_CONTRACT_2026-11-13.md`; current `worker.js`
+rejects proposal initialization and `store.js` keeps proposal admission draft-only.
 
 ### Parked
 
-- Additional automatic tasks (including Methodology/Summary delivery), multi-task
-  dispatch and prompt wording optimization. Existing staff drafts are not machine
-  delivery. Reopen incrementally after contracts and the basic PA test are settled.
-- Assignment: recommendations only until coordinated with Connor.
+- Runtime Summary admission/source/marker/publication wiring until contracts above
+  are settled; no generic mapper or duplicate provider implementation.
+- Unattended scheduling, production rollout, Methodology initialization, multi-task
+  dispatch and prompt optimization. Existing supervised driver is not a scheduler.
+- Reviewer assignment: recommendations only until separately coordinated.
 
 ### Verify Before Acting
 
-- Recheck actual branch/worktree, remote, live policy expiry, credentials and deployment
-  before resuming. Private local credentials/review packets are not in Git and will not
-  travel to another Mac. Never print, commit or resend secrets through ordinary chat.
-- Connor's immutable Preview: `dpl_EPwhUcrNtffRY3X6u7bbDrqqobGS`; job
-  `7e68cdfe-4dda-47f1-9163-7a3dc4b517f5`, Request 1000339. Use the exact brief;
-  no fresh key, source edit, output clear, worker advancement or scope mutation.
-- Trial receipts use UTC filenames (November 13); this stop is November 12 in the
-  owner's America/Mazatlan timezone. Do not rewrite evidence dates to match local date.
-- Historical other-agent branches/paths below are routing clues, not verified current
-  ownership or permission. Coordinate before editing shared surfaces.
+- Preserve Connor's immutable Preview `dpl_EPwhUcrNtffRY3X6u7bbDrqqobGS`, job
+  `7e68cdfe-4dda-47f1-9163-7a3dc4b517f5`, Request 1000339. No fresh key, source edit,
+  field clear, worker advancement or scope mutation. Read exact brief before work.
+- Recheck branch/worktree, actual grants/expiry, deployment and credentials before
+  any future authorized live action. Historic receipts are not current authority.
+- Retention cleanup is not authorized here. Verify scope/deadlines against trial
+  receipts and Atlas before any later cleanup; permanent receipts must survive.
+- Main checkout had unrelated untracked
+  `docs/plans/J27_WORKBENCH_DEVELOPMENT_BRIEF_2026-11-06.md`; owner explicitly said
+  leave untouched. No main edits or worktree disposal authorized by this stop.
 
 ### Do Not Reopen Without New Decision
 
-- One backend Executor; no duplicate Power Automate provider implementation.
-- Executive Summary uses Lay Abstract; preserve existing Staff Review Summary.
-- Existing staff content and intentional clearing survive; no automatic regeneration
-  on file replacement, prompt edit, field clear or new source-event key.
-- No current deployment changes, paid generation, production writes, new scheduler,
-  broad credential distribution, or unrelated infrastructure authorized by this stop.
+- Summary source and destination are settled; combined PDF remains reviewer input.
+- Preserve staff content and intentional clearing. No automatic regeneration on
+  file/prompt replacement, field clearing or a new source-event key.
+- Keep one shared Executor. Preserve current staff-draft semantics and Short Title
+  pilot isolation. Real Summary initialization is not enabled by these tests.
 
-## Concurrent workstream index
+## Concurrent Workstream Index
 
-| Stream | Owner / resume boundary | Read first |
+| Stream | Recorded owner / resume boundary | Owning reference |
 | --- | --- | --- |
-| PA jobs / Summary / matching integration | Codex, this branch, `23d000af0`; current handoff | PA configurable destination plan; Summary field contract; shared task interfaces |
-| Original expertise roster | Earlier Codex branch; merged/integrated state must be checked before resuming | `docs/plans/EXPERTISE_ROSTER_HANDOFF_2026-11-09.md`; shared task interfaces for later matching evidence |
-| Request narratives | Original Codex branch; cherry-picked here then narrowed to Lay Abstract | `docs/plans/REQUEST_NARRATIVES_HANDOFF_2026-11-09.md`; Summary field contract |
-| J27 / other Claude streams | Concurrent ownership not freshly audited; preserve worktrees | Exact prior handoff at `23d000af0:SESSION_PROMPT.md`, then current owning branch/plan |
+| PA / Summary | Codex, this branch, `cb83db7e1`; waiting for Connor | Summary worker plan and this handoff |
+| Expertise roster / matching | Earlier branch ownership not freshly audited | `docs/plans/EXPERTISE_ROSTER_HANDOFF_2026-11-09.md`; shared task interfaces |
+| Request narratives | Original branch cherry-picked/narrowed here; not deployed | `docs/plans/REQUEST_NARRATIVES_HANDOFF_2026-11-09.md`; Summary field contract |
+| J27 / other Claude work | Ownership not freshly audited; preserve other worktrees | Prior handoff at `29a61943a:SESSION_PROMPT.md` and owning branch plans |
 
 ## Key Files Reference
 
 | File | Purpose |
 | --- | --- |
-| `docs/plans/PA_CONFIGURABLE_DESTINATIONS_2026-11-13.md` | Latest contract, invariants, review and test evidence |
-| `docs/plans/POWER_AUTOMATE_PROMPT_HANDOFF_2026-11-11.md` | Sandbox setup and architecture history |
-| `docs/plans/CONNOR_POWER_AUTOMATE_SUBMIT_POLL_TEST_2026-11-12.md` | Exact Connor test |
-| `docs/plans/PA_BOUNDED_LIVE_TRIAL_APPROVAL_2026-11-13.md` | Separate worker trial receipts |
-| `docs/plans/PA_EXECUTIVE_SUMMARY_FIELD_CONTRACT_2026-11-13.md` | Field reuse and manual editor limits |
-| `docs/plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md` | Recommendation contract and live trials |
-| `docs/atlas/postgres-prompt-jobs.md` | Durable state/retention ownership |
-| `lib/services/prompt-jobs/machine-destination.js` | Closed target/grant contract |
+| `docs/plans/PA_EXECUTIVE_SUMMARY_AND_WORKER_PLAN_2026-11-12.md` | Source/marker decisions, remaining contracts, test evidence and limits |
+| `docs/plans/PA_EXECUTIVE_SUMMARY_FIELD_CONTRACT_2026-11-13.md` | Existing output and staff editor contract |
+| `docs/plans/CONNOR_POWER_AUTOMATE_SUBMIT_POLL_TEST_2026-11-12.md` | Exact unchanged Connor test |
+| `lib/services/prompt-jobs/summary-source.js` | Disconnected narrative adapter |
+| `lib/services/prompt-jobs/summary-edit-protection.js` | Pure synthetic-marker commands |
+| `lib/services/prompt-jobs/store.js` | Durable reservations and lease fencing |
+| `tests/integration/prompt-jobs-summary-rehearsal.pg.test.js` | Composition and recovery rehearsal |
+| `tests/integration/prompt-jobs-summary-reservations.pg.test.js` | Real Summary retention via hypothetical SQL receipts |
+| `docs/atlas/postgres-prompt-jobs.md` | Ledger ownership/retention |
 
-## Testing and close
+## Testing and Close
 
-[VERIFIED via local runs] Latest destination build: 531 tests in 19 suites, including
-real PostgreSQL worker/store/shared Executor/staff draft paths, passed. Final added
-worker assertions passed all 24 worker tests. Scoped ESLint, type check, webpack build,
-relevant API/DAL/security/document/Atlas gates and sequential self-tests passed.
-Turbopack's external node_modules symlink limitation remains; webpack was verified.
-No paid provider or live Dataverse calls in those tests. The newly created disposable
-Postgres container was removed; the pre-existing roster import container was untouched.
+[VERIFIED via local runs] Final four-suite run: 107 tests passed, including 38 real
+local PostgreSQL cases (28 rehearsal + 10 reservation) and 69 source/edit-helper
+unit cases. Earlier reservation build passed 76 PostgreSQL regressions, including
+Short Title store/worker and staff draft paths. Evidence is in the Summary plan.
+Scoped ESLint and relevant documentation gates with sequential self-tests passed.
+Independent review found no remaining material issues after fixing a test startup
+hang. Mutation checks caught removal of the staff marker and reservation guard.
 
-Opus follow-up packet SHA-256:
-`e40bc7458c28b0055f88600ee5ef85b7790e4869edf0fe0d8d826a7a0138f58e`.
-Claim-evidence report was unavailable (local state unreadable); no observation invented.
-Memory router unchanged. CLAUDE.md unchanged: existing authority pointers remain valid.
-Milestone entry added for the new durable job architecture and sandbox proof, explicitly
-not a Production rollout. No intentional uncommitted feature WIP at stop.
+Rehearsal uses synthetic capability/fake extraction, Executor, authorization, audit
+and Dataverse. It does not prove real Summary admission, live external behavior,
+provider checkpoint-binding validation or OS process-kill recovery. Synthetic known
+failures may release slots; companion tests separately prove real Summary retention.
+All session-created disposable databases/volumes were removed. The pre-existing
+roster database container was untouched. No feature WIP remains.
+
+Claim-evidence report was unavailable: local state could not be read; no observation
+row invented. Memory router and CLAUDE.md unchanged. No milestone-log entry required:
+this session delivered offline preparation/testing, not a production capability,
+cutover or new architecture. Previous milestone history remains in DEVELOPMENT_LOG.md.
