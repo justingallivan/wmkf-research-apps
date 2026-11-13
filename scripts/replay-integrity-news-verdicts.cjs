@@ -99,9 +99,11 @@ async function main() {
       const news = await IntegrityService.searchNews(row.name, row.institution || '', 'stored-results', process.env.CLAUDE_API_KEY, {});
       verdict = news.analysisOutcome;
     } catch (error) {
-      // No model answer means setup or provider trouble, not a verdict: stop.
-      if (rawText === null) throw new Error(`case ${index + 1}: the model was not reached (${error.message}); stopping.`);
-      verdict = 'rejected by the evidence check';
+      // An empty reply reaches here as "Invalid response"; anything else
+      // without a reply is setup or provider trouble, not a verdict: stop.
+      if (rawText === null && error.message === 'Invalid response from Claude API') verdict = 'empty model reply';
+      else if (rawText === null) throw new Error(`case ${index + 1}: the model was not reached (${error.message}); stopping.`);
+      else verdict = modelOutcome(rawText).startsWith('flag_for_review') ? 'rejected by the evidence check' : 'malformed model reply';
     }
     tally[verdict] = (tally[verdict] || 0) + 1;
     const screenedOn = row.screened_on instanceof Date ? row.screened_on.toISOString().slice(0, 10) : row.screened_on;
