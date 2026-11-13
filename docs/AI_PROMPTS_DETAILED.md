@@ -819,13 +819,7 @@ Source policy 3 (live via PR #607, 2026-11-02) removes the PubPeer analysis prom
 <a name="integrity-news"></a>
 ### News Analysis
 
-**[BRANCH-BUILT; outside Production only]** Production keeps the earlier
-free-text prompt (`legacyNewsAnalysis`) and its "No concerns found" rule
-until the structured rule is fixed: Google News results carry no snippet, so
-excerpts can only come from headlines (rollout plan, "Integrity news
-analysis"). The structured analysis below runs in Preview, local and test.
-
-The model classifies the supplied headlines and excerpts
+**[BRANCH-BUILT]** The model classifies the supplied headlines and excerpts
 as `flag_for_review`, `clear`, or `inconclusive`. It treats a shared name
 alone as insufficient and distinguishes allegations from official findings.
 A flag requires a numbered source and verbatim identity and conduct excerpts.

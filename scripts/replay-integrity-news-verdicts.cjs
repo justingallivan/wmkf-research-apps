@@ -69,7 +69,7 @@ function modelOutcome(text) {
 }
 
 async function main() {
-  if (process.env.VERCEL_ENV === 'production') throw new Error('Run locally: the structured rule is held in Production.');
+  if (process.env.VERCEL_ENV === 'production') throw new Error('Run locally, not inside a Production deployment.');
   if (!process.env.POSTGRES_URL) throw new Error('POSTGRES_URL is not set');
   if (!process.env.CLAUDE_API_KEY) throw new Error('CLAUDE_API_KEY is not set');
   console.log(`database host: ${new URL(process.env.POSTGRES_URL).hostname}`);

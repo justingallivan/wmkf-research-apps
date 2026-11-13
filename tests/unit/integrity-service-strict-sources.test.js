@@ -388,53 +388,20 @@ describe('whole-run corpus generation fence',()=>{
   test('metadata failure is incomplete, never a clean corpus',async()=>{managed(1,1);const impl=mockSql.getMockImplementation();mockSql.mockImplementation(parts=>parts.join('?').includes('to_regclass')?Promise.reject(new Error('offline')):impl(parts));const r=await screen();expect(r.sources.retraction_watch.error).toBeTruthy();});
 });
 
-// Production keeps main's news analysis until the structured rule is fixed
-// (integrity-service.js structuredNewsAdmitted). Each test below fails if the
-// structured path runs in Production.
-describe('Production news analysis is main\'s', () => {
+// The structured rule runs in Production too (owner, 2026-11-13, after the
+// replay of the 16 old-rule flags).
+test('Production runs the structured news rule', async () => {
   const savedEnv = process.env.VERCEL_ENV;
-  beforeEach(() => { process.env.VERCEL_ENV = 'production'; });
-  afterEach(() => { if (savedEnv === undefined) delete process.env.VERCEL_ENV; else process.env.VERCEL_ENV = savedEnv; });
-
-  const six = Array.from({ length: 6 }, (_, i) => ({ title: `Story ${i + 1}`, link: `https://example.org/story-${i}` }));
-
-  test('a free-text concern flags with the old prompt, no schema and the first five results', async () => {
-    mockNews(six);
-    mockComplete.mockResolvedValue({ text: 'Story 3 reports a misconduct inquiry at Example University.' });
-    const news = (await screen()).sources.news;
-    expect(news).toEqual({
-      searched: true, hasConcerns: true, summary: 'Story 3 reports a misconduct inquiry at Example University.',
-      rawResults: six.slice(0, 5).map(item => expect.objectContaining(item)), resultCount: 6,
-      searchStrategy: 'two_phase', resultBreakdown: { nameOnly: 0, withInstitution: 6 }, error: null,
-    });
-    expect(mockComplete.mock.calls[0][0].system).toContain('You are a due diligence specialist');
-    expect(mockComplete.mock.calls[0][0]).not.toHaveProperty('outputConfig');
+  process.env.VERCEL_ENV = 'production';
+  try {
+    mockNews([{ title: 'Routine academic news', link: 'https://example.org/routine' }]);
+    modelNews('clear');
+    const news = (await screen({})).sources.news;
+    expect(news).toMatchObject({ analysisOutcome: 'clear', hasConcerns: false, error: null });
+    expect(mockComplete.mock.calls[0][0].system).toContain('A shared name is insufficient.');
+    expect(mockComplete.mock.calls[0][0].outputConfig.format.type).toBe('json_schema');
     expect(mockComplete.mock.calls[0][0].maxTokens).toBe(8000);
-  });
-
-  test('"No concerns found" clears', async () => {
-    mockNews(six);
-    mockComplete.mockResolvedValue({ text: 'No concerns found. The search returned 6 results but none indicate professional integrity issues.' });
-    expect((await screen()).sources.news).toMatchObject({ hasConcerns: false, error: null });
-  });
-
-  test('a standalone search failure stays fail-soft and empty results carry no outcome', async () => {
-    global.fetch.mockImplementation(async (url) => (new URL(url).searchParams.get('engine') === 'google_news'
-      ? Promise.reject(new Error('offline')) : emptyResponse(url)));
-    expect((await screen({})).sources.news).toEqual({
-      searched: true, hasConcerns: false, summary: 'No relevant news found.', resultCount: 0,
-      searchStrategy: 'two_phase', error: null,
-    });
-  });
-
-  test('a failed analysis and a missing search key carry no outcome', async () => {
-    mockNews(six);
-    mockComplete.mockRejectedValue(new Error('offline'));
-    expect((await screen()).sources.news).toEqual({ searched: true, summary: null, hasConcerns: false, error: 'Search result analysis failed' });
-    let complete;
-    for await (const event of IntegrityService.screenApplicants([{ name: 'Ada Example' }], 'fixture-claude', null, null, strict)) {
-      if (event.type === 'complete') complete = event;
-    }
-    expect(complete.results[0].sources.news).toEqual({ searched: false, summary: null, error: 'SERP API key not configured' });
-  });
+  } finally {
+    if (savedEnv === undefined) delete process.env.VERCEL_ENV; else process.env.VERCEL_ENV = savedEnv;
+  }
 });

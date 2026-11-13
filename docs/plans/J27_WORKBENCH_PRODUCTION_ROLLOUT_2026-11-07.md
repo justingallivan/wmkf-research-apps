@@ -72,41 +72,31 @@ Production on merge by the owner's decision: offramp refusals (D7/D63), the
 group-review guard (D63/D64), the 2027+ Proposal-tab files and staff version
 (D59 to D61), the nav order, the Scoring card for 2027+ with an explicit
 Save outside the phase layout, and the reviewer Invite list excluding
-candidates whose review was already received.
+candidates whose review was already received, the structured integrity
+news rule, and the 8000-token integrity analysis limit (below).
 
-- **Integrity news analysis, 2026-11-13.** Production keeps main's news
-  analysis (the free-text prompt and the "no concerns found" rule);
-  the structured rule from `318f9642c` and `35a445bec` runs only outside
-  Production (`structuredNewsAdmitted` in
-  `lib/services/integrity-service.js`). It does not follow
-  `WORKBENCH_PHASE_RELEASE`; lifting the hold is a code change. Reason:
-  the structured rule flags only when both excerpts appear verbatim in a
-  result's title or snippet, and all 592 stored Google News results in
-  Production have an empty snippet [VERIFIED via
-  `scripts/probe-integrity-news-verdict-sizing.cjs`, owner-run 2026-11-13:
-  79 screenings, 129 news searches, 16 flagged under the old rule, 111
-  with more than the 5 stored results]. `main` maps the snippet the same
-  way, so live screens see headlines only. A flag would need the headline
-  to name the conduct and identify the person beyond their name.
-  `scripts/replay-integrity-news-verdicts.cjs` re-judges the 16 old flags
-  under the structured rule from their stored results (owner-run; one
-  model call each). The fix (richer source text or a headline-only rule)
-  is an open design decision.
+- **Integrity news analysis, 2026-11-13 (owner go; reaches Production on
+  merge).** The structured news rule from `318f9642c` and `35a445bec` runs
+  in every environment. It was briefly held to main's free-text analysis in
+  Production because all 592 stored Google News results in Production have
+  an empty snippet, so a flag's verbatim excerpts must come from headlines
+  [VERIFIED via `scripts/probe-integrity-news-verdict-sizing.cjs`, owner-run:
+  79 screenings, 129 news searches, 16 flagged under the old rule, 111 with
+  more than the 5 stored results]. A replay of the 16 old flags on their
+  stored results (`scripts/replay-integrity-news-verdicts.cjs`, owner-run,
+  Production's model setting `claude-haiku-5-5`) gave 6 `flag_for_review`,
+  6 `inconclusive` (shown to staff as an incomplete news screen) and 4
+  `clear`. The owner reviewed the 4 clears
+  (`scripts/show-integrity-news-flag-cases.cjs`): all were old-rule false
+  alarms, three "no concerns" summaries worded differently from "no
+  concerns found" and one failed analysis. The owner lifted the hold.
+  Limits: 16 cases, 5 stored results each, and model answers vary between
+  runs (two cases changed between replays).
 - **Integrity analysis token limit, 2026-11-13 (owner go; reaches Production
-  on merge).** The integrity analysis call (both news paths) allows 8000
-  output tokens instead of 1000 (`ANALYSIS_MAX_TOKENS`). The first replay on
-  the default Haiku (`claude-haiku-5-5`, thinking on by default) got one
-  non-JSON and one empty reply in 10 cases; thinking spending the 1000-token
-  budget is the likely cause. The model stays Haiku (owner).
-- **Replay result, 2026-11-13 (8000 tokens; Production's model setting read,
-  `claude-haiku-5-5`).** All 16 old-rule flags returned valid replies: 6
-  `flag_for_review` (each passed the verbatim headline check), 6
-  `inconclusive` (shown to staff as an incomplete news screen), 4 `clear`
-  (all four from the 2026-01-21 screening) [VERIFIED via
-  `scripts/replay-integrity-news-verdicts.cjs`, owner-run]. The earlier
-  expectation that headline-only evidence would suppress most flags did not
-  hold. Whether the 4 clears are correct needs an owner look at those
-  screenings; the hold stays until the owner decides.
+  on merge).** The integrity analysis call allows 8000 output tokens instead
+  of 1000 (`ANALYSIS_MAX_TOKENS`). At 1000 the first replay on Haiku
+  (thinking on by default) got one non-JSON and one empty reply in 10
+  cases; at 8000 all 16 replies were valid. The model stays Haiku (owner).
 
 - **Preview walk-through and move, 2026-11-12.** The owner walked the
   Preview and Claude took a second look in Chrome. The Final Assessment
