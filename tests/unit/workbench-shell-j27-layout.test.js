@@ -230,7 +230,7 @@ test('without the release, an explicit J27 Research address reads no J27 rows an
     if (String(url).startsWith('/api/workbench/dashboard') && !params.get('cycleCode')) await cyclesReady;
     return fetchMetadata(url);
   });
-  open(`/workbench?programId=${RESEARCH}&cycleCode=J27`, { phaseRelease: false });
+  open(`/workbench?programId=${RESEARCH}&cycleCode=J27`, {});
   expect(await screen.findByTestId('legacy-request-list')).toBeInTheDocument();
   expect(rowFetches()).toEqual([]);
   releaseCycles();
