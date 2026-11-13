@@ -3,7 +3,7 @@ title: "Workflow Chaining & Token Efficiency (Design Principle)"
 domain: prompt-executor
 kind: spec
 status: active
-summary: "Executor writeback is live. Short Title Preview authentication passed. Power Automate-triggered jobs and the lifecycle DAG remain pending."
+summary: "Executor writeback is live. Short Title Sandbox delivery passed. Power Automate-triggered jobs and the lifecycle DAG remain pending."
 canonical: true
 cataloged: 2026-07-02
 owner: product-engineering
@@ -184,8 +184,8 @@ The original blockers classify as follows:
 
 3. **Power Automate integration.** The July 2026 probe found no prompt-Executor
    flow in the visible production metadata. The isolated Short Title Preview
-   subsequently verified hosted authentication for the status endpoint.
-   Power Automate flow setup and live delivery remain pending. The shared
+   subsequently delivered one authorized field value. Justin reported Connor’s
+   Power Automate status check passed. Power Automate submission remains pending. The shared
    backend owns model calls, parsing, validation, and governed writeback.
 
 ## Honest caveats

@@ -245,8 +245,9 @@ than seven days after the check. The unscheduled machine drain requires
 The branch ledger gives source/response content a 24-hour expiry and result/configuration
 content seven days; receipts remain. The scoped drain can expire content under a
 valid parsed grant even after admission has stopped. The isolated Preview uses deployment-only overrides, a dedicated Entra app and
-a schema-only Neon branch. Scheduling, operational retention verification and
-a live generation trial remain pending. [Sandbox handoff](plans/POWER_AUTOMATE_PROMPT_HANDOFF_2026-11-11.md#hosted-sandbox-setup).
+a dedicated Neon branch created from schema only. The authorized hosted trial
+completed one Short Title write. Scheduling and operational retention verification
+remain pending. [Sandbox handoff](plans/POWER_AUTOMATE_PROMPT_HANDOFF_2026-11-11.md#hosted-sandbox-setup).
 
 ### Optional — Shared Executor staff draft trial
 

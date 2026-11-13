@@ -1,7 +1,7 @@
 # Shared Executor and durable prompt jobs
 
 Status: **SYNTHETIC FOUNDATION, ADMIN AUTHORING, AND DEFAULT-OFF STAFF PROPOSAL DRAFT TRIAL BUILT ON THE BRANCH.** The synthetic and Admin increments have local integration evidence. The staff trial passed local integrated verification and read-only source preparation. Two separately approved Request 1003384 trials used controlled local processes and settled at `needs_attention`. The shared typed recommendations path is verified only with offline fixtures.
-The isolated Sandbox Short Title Preview has a hosted status proof. Connor's connection, live admission and field delivery remain pending. Staff pilot HTTP activation remains pending. [Sandbox handoff](POWER_AUTOMATE_PROMPT_HANDOFF_2026-11-11.md#hosted-sandbox-setup).
+The isolated Sandbox Short Title Preview admitted and delivered one authorized job. Justin reported that Connor’s Power Automate status check passed. Power Automate submission remains pending. Staff pilot HTTP activation remains pending. [Sandbox handoff](POWER_AUTOMATE_PROMPT_HANDOFF_2026-11-11.md#hosted-sandbox-setup).
 [Shared task interfaces](SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#offline-shared-runtime-implementation).
 Owner: Justin. Design branch: `codex/coordinated-start-2026-11-10-b`.
 Evidence baseline: `a20e5f749`; source inspected on 2026-11-10 Pacific.
@@ -421,7 +421,7 @@ Settled for the synthetic pilot: Executive Summary and Methodology, staff summar
 
 The implemented local proof uses `synthetic.executive-summary` and `synthetic.methodology` in `environment:test`, mapping only to `fixture_summary` and `fixture_methodology`. Those labels are not Dataverse schema fields. The test uses the canonical Executor and real PostgreSQL, with synthetic provider, source/auth, audit and conditional writer adapters. The Admin preview route composes a sample and exposes no job admission or provider call.
 
-Remaining integration work: verify Connor's Power Automate connection against the isolated Short Title Preview, prepare the source under separate approval, and prove live admission, polling and the conditional Dataverse writer. Finalize broader source and destination mappings before expanding. Published limits, global capacity/rate bounds, scheduler and cleanup wiring, operator recovery, and separately authorized quality/cache measurements beyond the single controlled trial remain planned. The synthetic store retains uncertainty receipts and exposes bounded content expiry, but has no automatic receipt purge or operator resolution command. These are rollout requirements, not reasons to add speculative machinery to the local proof.
+Remaining integration work: configure and prove a Power Automate submission flow and decide how to schedule workers. The isolated Short Title Preview completed one separately authorized hosted admission, polling and conditional Dataverse delivery. Finalize broader source and destination mappings before expanding. Published limits, global capacity/rate bounds, scheduler and cleanup wiring, operator recovery, and separately authorized quality/cache measurements beyond the single controlled trial remain planned. The synthetic store retains uncertainty receipts and exposes bounded content expiry, but has no automatic receipt purge or operator resolution command. These are rollout requirements, not reasons to add speculative machinery to the local proof.
 
 
 ## 13. Initial verification and handoff (2026-11-10)

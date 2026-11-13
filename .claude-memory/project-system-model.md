@@ -15,7 +15,7 @@ Read this when: doing any cross-capability planning, sequencing, or resolving "p
 Do:
 - Read `docs/SYSTEM_MODEL.md` first; where it conflicts with an older doc, the model wins.
 - Keep the two axes separate — storage follows record-maturity; automate-or-not follows rote/thinking.
-- Treat the app/prompt/adapter relation as a target design. The Vercel single-prompt Executor is implemented. An isolated Short Title Preview verified hosted status authentication. Power Automate flow setup remains pending.
+- Treat the app/prompt/adapter relation as a target design. The Vercel single-prompt Executor is implemented. An isolated Short Title Preview delivered one authorized field value. Justin reported that Connor’s Power Automate status check passed. Power Automate submission remains pending.
 
 Do not:
 - Use a round "~19/~24" prompt denominator, or hardcode an app count here (it drifts). The app-definition count and the A7 input-surface registry both differ from the prompt-bearing-route count — read the live values from `docs/CANONICAL_COUNTS.md` (app-definition-count) and `docs/CLOSEABLE_CLASS_INVARIANT_MAP.md` (A7 registered surfaces), not from this file.

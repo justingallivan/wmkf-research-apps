@@ -3,7 +3,7 @@ title: Long-Term Plan: Event-Driven Backend Automation via PowerAutomate
 domain: general
 kind: plan
 status: active
-summary: "Executor is live. Short Title Preview authentication passed. Power Automate flow setup and the Grant Reporting destination remain open."
+summary: "Executor is live. Short Title Sandbox delivery passed. Power Automate submission and the Grant Reporting destination remain open."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -18,10 +18,11 @@ related:
 
 **Status:** Active roadmap. The shared prompt store and single-prompt
 Executor are shipped. The isolated Short Title Sandbox Preview has authenticated
-submit and status endpoints. The hosted status test passed. Power Automate flow
-setup and live field delivery remain pending. See the [Sandbox handoff](plans/POWER_AUTOMATE_PROMPT_HANDOFF_2026-11-11.md#hosted-sandbox-setup).
+submit and status endpoints. The authorized hosted run delivered one field value.
+Justin reported Connor’s Power Automate status check passed. Power Automate
+submission remains pending. See the [Sandbox handoff](plans/POWER_AUTOMATE_PROMPT_HANDOFF_2026-11-11.md#hosted-sandbox-setup).
 **Created:** Session 90, 2026-03-28
-**Last implementation probe:** 2026-11-12 isolated Short Title Sandbox Preview authentication. The 2026-07-27 production Power Automate metadata probe is recorded below.
+**Last implementation probe:** 2026-11-12 isolated Short Title Sandbox Preview delivery. The 2026-07-27 production Power Automate metadata probe is recorded below.
 **Stakeholders:** Justin (prompt development, Vercel app), Connor (PowerAutomate flows, Dynamics admin)
 
 ## Context
@@ -57,7 +58,7 @@ Planned inputs include a mix of applicant-submitted and assembled documents
 and PI fields sourced directly from Dataverse. The destination is eventually
 approved Request fields. A synthetic trial comes first so the flow and job
 contract can be exercised while the real field mappings are finalized.
-The synthetic profile and job service are implemented. The first hosted Power Automate-facing slice is the isolated Short Title Preview. Proposal draft destinations and Power Automate flow setup remain pending. The [historical proposal-context extraction design](PROPOSAL_CONTEXT_EXTRACTION_PLAN.md) does not gate the current pilot. J27 shared extraction remains an open product decision.
+The synthetic profile and job service are implemented. The first hosted Power Automate-facing slice is the isolated Short Title Preview. Proposal draft destinations and Power Automate submission remain pending. The [historical proposal-context extraction design](PROPOSAL_CONTEXT_EXTRACTION_PLAN.md) does not gate the current pilot. J27 shared extraction remains an open product decision.
 
 ### Historical decisions and production probe
 

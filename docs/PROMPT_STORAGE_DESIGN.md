@@ -3,7 +3,7 @@ title: "Prompt Storage — Current Boundary and Historical Design"
 domain: prompt-executor
 kind: plan
 status: active
-summary: "Dataverse prompts, Executor and audit are live. Short Title Preview authentication passed. Power Automate flow setup is pending."
+summary: "Dataverse prompts, Executor and audit are live. Short Title Sandbox delivery passed. Power Automate submission is pending."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -74,7 +74,7 @@ Dataverse remains the shared prompt library. The backend resolves prompts and
 approved inputs, composes and validates model calls, and owns approved
 writeback and invocation audit. See the [shared Executor job
 design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md) for the profiles and durable job service, and [Executor Contract](EXECUTOR_CONTRACT.md)
-for the shipped single-prompt interface. The isolated Short Title Preview verified hosted status authentication. Power Automate flow setup and field delivery remain pending. [Sandbox handoff](plans/POWER_AUTOMATE_PROMPT_HANDOFF_2026-11-11.md#hosted-sandbox-setup).
+for the shipped single-prompt interface. The isolated Short Title Preview delivered one authorized field value. Justin reported Connor’s Power Automate status check passed. Power Automate submission remains pending. [Sandbox handoff](plans/POWER_AUTOMATE_PROMPT_HANDOFF_2026-11-11.md#hosted-sandbox-setup).
 
 **Owner:** Justin Gallivan
 

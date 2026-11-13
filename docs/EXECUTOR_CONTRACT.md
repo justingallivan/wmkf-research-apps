@@ -30,7 +30,7 @@ Admin can author immutable profile revisions and registered text task versions
 and render a fabricated sample. [Staff trial](#staff-proposal-draft-trial),
 [typed fixture](#typed-recommendations-fixture).
 
-**Isolated Sandbox Preview, default off elsewhere:** A narrow Sandbox `preflight.short-title` machine pilot has submit/status routes, Entra app-only authorization and an unscheduled drain. Its record-only profile freezes Request title and abstract, then uses the shared Executor and conditional Request-field delivery. The hosted status check exercises app authorization and the pinned ledger. Connor's connection, live admission, generation and delivery remain unproven. See the [Sandbox handoff](plans/POWER_AUTOMATE_PROMPT_HANDOFF_2026-11-11.md#hosted-sandbox-setup).
+**Isolated Sandbox Preview, default off elsewhere:** A narrow Sandbox `preflight.short-title` machine pilot has submit/status routes, Entra app-only authorization and an unscheduled drain. Its record-only profile freezes Request title and abstract, then uses the shared Executor and conditional Request-field delivery. The authorized hosted trial admitted one job and delivered one Sandbox field value. Justin reported that Connor’s Power Automate status check returned the expected 404. A Power Automate submission flow remains pending. See the [Sandbox handoff](plans/POWER_AUTOMATE_PROMPT_HANDOFF_2026-11-11.md#hosted-sandbox-setup).
 See the [shared Executor job design](plans/SHARED_EXECUTOR_JOB_ARCHITECTURE_2026-11-10.md).
 
 **Created:** 2026-04-24 (Session 109, reconciliation pass)
@@ -54,7 +54,7 @@ The shipped path covers **Pattern A, dual-caller prompts, and Pattern B/C Vercel
 
 **In scope:**
 - Single-shot Anthropic prompts and explicitly allowed OpenAI prompt snapshots (system + user, no multi-turn)
-- Server-side callers, including user-triggered Vercel routes. The isolated Sandbox Preview exposes the Short Title status endpoint through the job service. Power Automate flow setup is pending.
+- Server-side callers, including user-triggered Vercel routes. The isolated Sandbox Preview exposes the Short Title status endpoint through the job service. Justin reported a successful Power Automate authentication check. Submission flow setup remains pending.
 - Summarization, classification, multi-output extraction
 - Prompts that mix Dynamics-sourced inputs, SharePoint file inputs, and caller-supplied overrides
 - Individual invocations within caller-orchestrated sequences. Callers can use persisted Dynamics outputs or pass approved shared inputs to multiple calls.
@@ -678,7 +678,7 @@ metadata without proof/result payloads or freshness observations. A
 separate default-off GET branch reads only compatible Sandbox recommendation
 receipts after exact staff authorization and same-target freshness checks.
 The local operator trial below is the only Sandbox admission path.
-Production delivery remains planned. The isolated Sandbox Short Title Preview verified machine status authentication. Power Automate flow setup and live delivery remain pending.
+Production delivery remains planned. The isolated Sandbox Short Title Preview delivered one field value through a manually advanced hosted job. Power Automate submission flow setup remains pending.
 [Sandbox read contract](plans/SHARED_EXECUTOR_TASK_INTERFACES_2026-11-11.md#sandbox-recommendations-read).
 
 ### Local Sandbox recommendations trial
@@ -815,7 +815,7 @@ npx jest tests/unit/prompt-jobs-worker.test.js --runInBand
 - First prompt row: `phase-i.summary` (system/body split, single raw-text output to `wmkf_ai_summary`, `guard: "skip-if-populated"`)
 
 **Still deferred (post-May 1 status — re-verify before consuming):**
-- Production Power Automate operation, broader machine authorization and destination enablement. The isolated Short Title Preview has a hosted status proof. Connor's connection and end-to-end Dataverse delivery remain pending. See the [Sandbox handoff](plans/POWER_AUTOMATE_PROMPT_HANDOFF_2026-11-11.md#hosted-sandbox-setup).
+- Production Power Automate operation, broader machine authorization and destination enablement. The isolated Short Title Preview completed one hosted field delivery. Justin reported Connor’s Power Automate status check passed. Power Automate submission and scheduling remain pending. See the [Sandbox handoff](plans/POWER_AUTOMATE_PROMPT_HANDOFF_2026-11-11.md#hosted-sandbox-setup).
 - `prior_output` source kind
 - `overridePromptBody` input
 - Streaming Executor variant

@@ -38,7 +38,7 @@ Audit exceptions are unknown unless the adapter explicitly proves a definitive r
 
 ## Default-off machine Short Title pilot
 
-[VERIFIED via source and isolated Preview status probe] `admitMachineTitle` reuses
+[VERIFIED via source and authorized isolated Preview trial] `admitMachineTitle` reuses
 migration 097 for one `preflight.short-title` initialization job per pinned pilot.
 The sole destination is `wmkf_wmkfprojectdescription`. Generic admission rejects
 this task. Two pinned transactions surround external source/prompt loading: exact
@@ -60,8 +60,11 @@ and response retention is 24 hours, other content seven days; receipts remain.
 
 The isolated Preview pins a schema-only Neon branch with all six ledger tables
 empty at setup. The content-free status probe exercises app authorization and
-the runtime database pin. The worker is unscheduled. Live admission and delivery
-are pending. [Activation and handoff](../plans/POWER_AUTOMATE_PROMPT_HANDOFF_2026-11-11.md#hosted-sandbox-setup).
+the runtime database pin. The authorized hosted trial admitted one job, retained
+one provider attempt and delivered one audit and conditional field publication.
+Same-key replay reused the receipt and a different key received 429. The final
+ledger read counted one job, one attempt and one applied publication. The worker
+is unscheduled. [Activation and handoff](../plans/POWER_AUTOMATE_PROMPT_HANDOFF_2026-11-11.md#hosted-sandbox-setup).
 
 ## Typed recommendations fixture
 

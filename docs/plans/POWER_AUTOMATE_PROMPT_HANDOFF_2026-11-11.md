@@ -1,7 +1,7 @@
 # Power Automate prompt delivery: implementation and Connor handoff
 
 Owner: Codex in `codex/power-automate-integration-2026-11-11`.
-Status: isolated Short Title Sandbox Preview deployed. Hosted read-only authentication verified. Connor's Power Automate connection and generation are pending.
+Status: isolated Short Title Sandbox Preview completed one authorized generation and field delivery. Justin reported that Connor’s Power Automate status check returned the expected 404. A Power Automate submission flow remains pending.
 Last verified: 2026-11-12 (Arizona) via hosted Preview, Entra token issuance, Neon and Sandbox Dataverse readbacks.
 
 ## Outcome
@@ -80,8 +80,7 @@ Raw storage diagnostics are replaced by a safe 503. No provider or cron-secret f
 ## Prerequisites for a real Power Automate connection
 
 The dedicated Sandbox app issues v2 client-credentials tokens with `idtyp=app`
-and the pinned application role. Connor still needs to prove token acquisition
-and protected Preview access from the actual Power Automate action. Custom token signing keys are outside this initial
+and the pinned application role. Justin reported that Connor’s Power Automate action reached the protected Preview and returned the expected 404 `machine_job_not_found`. Custom token signing keys are outside this initial
 contract. The actual connection/action must obtain app-only tokens; the presence
 of an HTTP-with-Entra connector is not proof. Microsoft's
 [claims-validation guidance](https://learn.microsoft.com/en-us/entra/identity-platform/claims-validation)
@@ -89,8 +88,7 @@ requires `idtyp=app` when authorizing an application through `azp`.
 
 The Sandbox Preview HTTP pilot registers exact routes and guards, bounds the submit
 body to 4 KiB and admission to one job per pilot, and returns `private, no-store`
-with authenticated status location/polling interval. Real connector issuance is
-still unproven. It uses the real ledger status projection; the isolated proof
+with authenticated status location/polling interval. The status route uses the real ledger status projection; the isolated proof
 facade remains test-only.
 
 ## Prompt-to-field handoff inventory
@@ -113,7 +111,7 @@ proposal capabilities deliberately have `destinationField: null`.
 | Expertise | `expertise.recommendations` | Fourth native-schema trial completed; source/docs integrated from the now-archived other session. Recommendations only; assignment still requires Connor coordination. |
 
 All exact mappings need source/metadata and current consumer verification. Similar
-field labels do not establish equivalent semantics. The Sandbox setup authorized the specific Short Title profile and prompt publication. Live output writes and broader mappings still require approval.
+field labels do not establish equivalent semantics. The Sandbox setup authorized the specific Short Title profile and prompt publication. Justin separately approved one live Short Title output write on the pinned Sandbox Request. Broader mappings and writes still require approval.
 
 ## First concrete handoff row: Short Title
 
@@ -130,7 +128,7 @@ field labels do not establish equivalent semantics. The Sandbox setup authorized
 | Approved destination | `akoya_request.wmkf_wmkfprojectdescription` |
 | Existing writer semantics | Invited-research cron writes when blank; this is not the new intake trigger |
 | Intake delivery policy | Pilot permits initialization only, one retained job per pilot; no replacement/retry API |
-| Automation state | Isolated Preview routes deployed. Hosted read-only status verified. Power Automate connection and field delivery pending |
+| Automation state | Power Automate status authentication reported by Justin. The separately authorized hosted operator run delivered one Sandbox field value |
 
 Sources: [prompt definition](../../shared/config/prompts/grantee-title.js),
 [title service](../../lib/services/grantee-title-service.js),
@@ -286,11 +284,15 @@ Sandbox Dataverse readback, Entra token issuance and hosted HTTP requests]
 - The policy pins pilot `2c082c6e-d40a-48f3-9a5d-07f9a5ee2437`, Request
   `63dab4af-178f-4bbc-b24d-3ccbaf74cbfc` (Sandbox 1000339) and source event
   `3c745b72-300d-4a0c-83c3-d45d355679e4`. It expires at
-  `2026-11-18T19:32:31.511Z`. The Request has a title and blank destination.
-  It is missing the required abstract. The app secret expires November 19 UTC.
+  `2026-11-18T19:32:31.511Z`. At setup the Request had a title, a blank destination
+  and no abstract. The authorized trial below supplied fabricated source text.
+  The app secret expires November 19 UTC.
   The deployment-specific share link lasts six days.
 
 ### Connor's read-only authentication test
+
+Justin reported that Connor completed this test and got HTTP 404
+`machine_job_not_found`. The instructions used for the test follow.
 
 Connor, please run one manual status check in Power Automate before we connect
 Short Title to a workflow. The test runs entirely in Power Automate and uses
@@ -349,25 +351,52 @@ hosted GET with the cookie and no token returned 401
 `{"error":"machine_auth_invalid"}`. With both credentials it returned 404
 `{"error":"machine_job_not_found"}`. Both used `Cache-Control: private, no-store`
 and returned no `Set-Cookie` header. The 404 proves the protected route accepted
-the app token and reached the pinned ledger. Connor's run is the first test of
-the actual Power Automate action.
+the app token and reached the pinned ledger. [VERIFIED via Justin’s report]
+Connor’s Power Automate run returned HTTP 404 `machine_job_not_found`.
 
 The cookie expires at `2026-11-18T19:35:34Z`, shortly after the Sandbox policy.
 The test authorizes GET only. The app's `PromptJobs.Invoke` role also permits
-POST within the pilot policy. The secure credential handoff is pending and
-nothing has been sent to Connor. The
+POST within the pilot policy. The
 [Node helper](../../scripts/test-pa-sandbox-auth.cjs) remains available to
 operators diagnosing the Preview separately.
 
-### Full submit and delivery test
+### Authorized hosted submit and delivery trial
 
-After separate authorization, prepare a suitable abstract on the pinned Request.
-A bounded live test then needs explicit approval for the model call, audit, worker
-ticks and conditional field write. Use the exact Request/event above and a stable
-UUID `Idempotency-Key` for POST. Poll the returned status location. Confirm the
-first fill of `wmkf_wmkfprojectdescription`, same-key replay and original-ETag
-protection before enabling any flow. The worker remains unscheduled. Expansion
-to additional tasks needs agreed source, destination and write policies.
+[VERIFIED via hosted route responses and Sandbox Dataverse readback] Justin
+approved one model call and the bounded Sandbox writes for Request 1000339.
+An ETag-conditional source preparation set only `wmkf_abstract` to fabricated
+test content (536 characters). The first response timed out. Readback
+confirmed the committed abstract and the retry guard stopped before sending
+a second PATCH. The original title remained unchanged.
+
+The hosted submit route admitted job `7e68cdfe-4dda-47f1-9163-7a3dc4b517f5`.
+Same-key replay returned HTTP 202 with the same job at version 1 before
+processing. Five manual hosted worker ticks returned `snapshot_saved`,
+`target_captured`, `validated`, `audit_delivered` and `published`. The single
+`claude-sonnet-5-5` attempt `8476bf3e-7be5-467f-930c-cbafebfb0f4b` reported
+complete usage (1,053 input, 30 output, 1,279 cache creation and zero cache-read
+tokens). Dataverse audit `f9ac896c-3495-4b45-a858-59493459aeff` was delivered and
+read back with success status `682090000`, model `claude-sonnet-5-5` and
+prompt version 1.
+
+The status route returned HTTP 200 with `succeeded` at version 16. Completed
+same-key replay returned HTTP 200 with the same job and version. The worker
+captured Request ETag `61847861` before publishing. Dataverse readback at ETag
+`61847906` returned the exact destination value:
+
+> To develop an optical imaging method for observing changes in living cells with improved temporal resolution
+
+A different idempotency key returned HTTP 429 `prompt_job_trial_limit`.
+One extra worker tick returned HTTP 200 with stage `succeeded` and did no work.
+Final readback found exactly one job, one attempt and one applied publication
+bound to ETag `61847861`. The selected Request fields and ETag matched the
+pre-replay readback, and the destination matched the retained ledger result.
+
+The live run exercised successful ETag-conditional delivery. A conflicting
+edit was exercised in the offline suite. The worker remains unscheduled.
+Power Automate status authentication was reported separately. Submission from
+a Power Automate flow and worker scheduling remain pending, as do approved
+source and destination contracts for additional tasks.
 
 The Neon branch has no automatic deletion so it can retain trial receipts.
 No cleanup is scheduled. The sandbox owner should retire the setup after the
@@ -378,8 +407,8 @@ trial or deliberately renew access if another test is approved.
 ### Hosted Sandbox readiness review (November 12)
 
 The authorized Opus 5.5 OAuth review ran with tools disabled. It found no
-blockers for the read-only authentication check. Generation and the actual
-Power Automate integration remain pending. The helper now distinguishes
+blockers for the read-only authentication check. That review preceded the
+authorized hosted generation trial and Connor’s reported status check. The helper now distinguishes
 credential-file failures from token failures, explicitly selects the Vercel
 protection cookie, and describes the result as acceptance by the Sandbox
 status route. Reviewed packet SHA-256
@@ -390,7 +419,7 @@ after clarifying temporary-flow cleanup and credential revocation,
 pre-request error handling, and the shared client ID in the hosted proof.
 The instructions above incorporate all three changes. Reviewed packet SHA-256
 `31067f0e5e62a2683062be12718a85bf10fca094e364d94b3593e0a8123aae39`.
-Connor's actual flow run is pending.
+Justin subsequently reported that Connor’s Power Automate status check returned the expected 404 `machine_job_not_found`.
 
 ### Short Title machine integration (November 12)
 
@@ -477,7 +506,7 @@ bounded changes. Final combined verification passed 218 tests: 62 authentication
 gates with sequential self-tests, and documentation gates passed. The isolated
 `wmkf-pa-delivery-20261111` PostgreSQL container was removed after its unique test
 schemas were confirmed absent. This historical slice did not include routes or source wiring. The current
-hosted pilot above still requires Connor’s connector proof and an approved generation test.
+hosted trial and Connor’s reported status check are recorded above.
 
 ### Earlier authentication/admission slice
 
