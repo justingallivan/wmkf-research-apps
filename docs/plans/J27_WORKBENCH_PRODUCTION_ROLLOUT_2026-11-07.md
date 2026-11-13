@@ -199,8 +199,16 @@ news rule, and the 8000-token integrity analysis limit (below).
   chunk. The J27 list reads now run four chunks at a time
   (`J27_READ_CONCURRENCY`, `lib/services/workbench/j27-later-facts.js`), so
   at most 20 Dataverse queries are in flight across the five reads; other
-  callers of the three adapters stay sequential. Still not measured on a
-  large cycle.)*
+  callers of the three adapters stay sequential.)* *(2026-11-13, measured
+  [VERIFIED via `scripts/time-j27-large-reads.cjs`, owner-run against
+  Production, 300 Research requests from J26/D26, three rounds]: each J27
+  read is 12 calls; alone it takes about 1.5 s sequential, 0.45 s at 4
+  chunks and 0.27 s at 8. Run together with today's reviewer rollup, the
+  whole set takes 1.47 to 1.69 s at every level, because the rollup
+  (sequential on `main`, 1.6 to 2.0 s) is the slowest read. No read failed
+  or came back capped, and 8 chunks drew no throttling. The J27 reads
+  therefore add almost nothing to a 300-request page at 4; the request-list
+  read itself was not measured.)*
 - **Preview needs `FINAL_WRITEUP_SCHEMA_READY=on`** for its branch to show
   the review stages (group and leadership review) and to rehearse the Final
   Assessment list's standing chips. It is set for Production and another
