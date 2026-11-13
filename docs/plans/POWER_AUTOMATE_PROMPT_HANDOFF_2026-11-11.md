@@ -97,7 +97,8 @@ The [Executive Summary and worker automation plan](PA_EXECUTIVE_SUMMARY_AND_WORK
 records the next proposed slice while Connor tests. Summary remains draft-only;
 source, exact destination, audience and initialization/refresh semantics still need
 decisions. The plan separates supervised sandbox stage advancement from eventual
-Production scheduling. It authorizes no live changes and leaves this pilot intact.
+Production scheduling. Its bounded operator driver is built and tested offline;
+it has not been run live. This leaves the pilot intact and does not activate a schedule.
 
 ## Prompt-to-field handoff inventory
 

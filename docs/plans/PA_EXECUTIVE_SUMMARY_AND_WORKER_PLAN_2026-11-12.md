@@ -1,8 +1,9 @@
 # Next Power Automate slice: Executive Summary and worker automation
 
 Owner: Codex; branch `codex/power-automate-integration-2026-11-11`.
-Status: proposed design, not activation approval. No runtime, schema, credentials,
-schedules, deployed configuration or sandbox records changed in this planning slice.
+Status: proposed design plus an offline-tested bounded operator driver; not activation
+approval. No runtime routes, schema, credentials, schedules, deployed configuration
+or sandbox records changed.
 Connor’s existing Short Title replay test remains isolated and unchanged.
 
 ## Recommendation
@@ -123,7 +124,8 @@ Its HTTP timeout must exceed the verified server budget plus network margin; nev
 start another tick while the prior one may still be running. Read-only diagnosis and
 lease reconciliation must establish the outcome before any operator-directed resume.
 This is supervised trial automation, not a durable production scheduler. It may run on the operator’s
-machine; Connor still needs only Power Automate. Do not build or run it in this slice.
+machine; Connor still needs only Power Automate. The subsequent authorized offline
+build is recorded below; live execution remains unapproved.
 No new scheduler service/project or broad cron-secret sharing is justified for a
 single sandbox trial. A durable unattended Preview requirement would need a separate
 hosting decision; do not promote the existing sandbox to Production to get a timer.
@@ -192,8 +194,9 @@ claimed from that driver. Existing paid runtime approval does not authorize a ne
    and refresh semantics, plus read-only schema/consumer checks. Machine admission
    and any Summary trial additionally wait for source selection with the caching work.
    Neither is Summary-ready while its prerequisites remain open.
-3. Prepare the bounded worker-driver and scheduler contract tests offline after plan
-   acceptance. Review implementation with Opus 5.5 before deployment or activation.
+3. The bounded driver now has offline tests (below). Scheduler implementation and
+   deployed budget verification remain pending. Review any scheduler implementation
+   with Opus 5.5 before deployment or activation.
 4. Build only the selected Summary mode once the source/destination contract is final;
    then request one bounded end-to-end trial. Leave broader prompts and multi-task
    dispatch to later slices using the same contracts.
@@ -220,3 +223,70 @@ remain the execution contract; authorization/source freshness checks remain requ
 These are closed plan edits, not implementation or deployment evidence. Documentation
 and fact gates passed. Existing current-state restatements remain accurate: machine
 Summary and scheduling are still unbuilt; the pilot stays unchanged.
+
+## Bounded operator driver: offline build
+
+`../../scripts/run-pa-sandbox-worker.cjs` is a standalone Node operator utility,
+not a Power Automate action or deployed worker. It does not submit jobs, issue
+credentials, change policy, or implement Summary. The current exact Preview/job
+pins mean a normal run against the completed fixture would GET status and send
+zero worker POSTs. A fresh trial requires reviewed pin changes and separate approval.
+
+Default invocation is a network-free dry run. `--help` explains arguments; `--execute`
+is the only CLI execution switch. No live invocation was performed. Do not execute
+merely to test the completed fixture while Connor is using it.
+
+A private regular file owned by the operator, mode 0600, supplies `baseUrl`, `jobId`,
+`serverBudgetMs`, `budgetVerified: true`, `cronSecret`, `statusToken` and `cookie`.
+Use the pinned Preview base URL and existing completed job ID from the handoff.
+The status token is a short-lived Entra app bearer token acquired by the operator;
+it is not the app client secret. The cookie is the single `_vercel_jwt=…` pair.
+The cron secret stays operator-only. Do not put any of these in CLI arguments,
+logs, commits, flow exports or messages. No credential file was created for this build.
+
+Before live approval, verify effective deployed function duration and the provider/
+lease/checkpoint invariant above. `budgetVerified` is an operator attestation, not
+an automatic Vercel configuration probe. A value of true does not establish approval.
+The client timeout is the supplied function budget plus 10 seconds. The driver
+reserves that full interval before each call and caps its run at 10 minutes, eight
+worker POSTs and the November 18 19:30 UTC cutoff. It may stop early with unused ticks
+because the remaining wall time cannot accommodate another full request budget.
+
+It GETs the exact job before each POST, requires the expected single Short Title task,
+and stops on any attention/unknown/failed state or unexpected response. Only enumerated
+progress stages permit another status check. `published` alone never means success:
+GET must confirm succeeded + validated + applied + no error. Requests are awaited,
+redirects disabled, and failures never retried. Five seconds separate successful ticks.
+
+An exclusive retained receipt at `~/.wmkf-pa-worker-n7hku44p8.receipt` prevents
+cooperating drivers in the same user account from overlapping or restarting blindly. Tick
+intent is flushed before POST. The script never removes this receipt, including on
+success. `--help` prints its exact path. After a crash/timeout, an operator must inspect
+server status/lease and outcomes before removing it for a separately authorized run.
+A different user account, machine or manual POST can bypass the local guard: database leases and
+side-effect fences remain the authority. This is not a distributed lock or scheduler.
+Only safe codes, timestamps, job ID and tick count are recorded, never raw transport
+errors, response bodies, headers or secrets.
+
+Verification: `tests/unit/pa-sandbox-worker-driver.test.js` exercises fake HTTP and
+real temporary receipt files, including completion with zero POSTs, sequential ticks,
+concurrent local exclusion, retained crash guard, transport/non-200/JSON uncertainty,
+wrong job/status, false success, cutoff/time/tick bounds and configuration rejection.
+No provider, Dataverse, Vercel or Entra endpoint is used by these tests. Scheduler GET
+routing, Production policy, deployed budget, multi-scope fairness and live automatic
+progression remain unbuilt/unverified, as applicable.
+
+Build review: Opus 5.5 via OAuth, tools disabled, verdict GO with fresh-trial
+conditions. Packet SHA-256
+`9d39e7670cdae517040d4fdc7a6203e5af620dfa8ff2ab054b51564044bc3b8d`.
+Root applied the receipt-location recommendation now: fixed home-directory file,
+mode 0600, per-user rather than per-host, outside OS temporary-file cleanup.
+No receipt was created by this offline build. Before re-pinning or live execution,
+verify the server’s exact policy/database/single-job selector: the POST accepts no
+job ID and returns only a stage, so client GET pins alone cannot prove which job the
+server advances. Current source selects only the pinned scope, but that must be
+reconfirmed for a new deployment/trial. Local exclusion supplements, never replaces,
+server lease and side-effect fencing. Review did not verify live duration or database
+state. Optional config-file TOCTOU hardening was not required for this operator-owned
+file and is not represented as implemented. Twenty offline tests and scoped ESLint
+passed; scheduler implementation remains outside this build.
