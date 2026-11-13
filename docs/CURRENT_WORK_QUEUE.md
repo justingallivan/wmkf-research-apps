@@ -243,6 +243,19 @@ sequence.
   closed; a fresh hosted Zoom lookup / staff-acceptance check was not performed.
   Contract and evidence limits: `docs/plans/ZOOM_SPEAKER_PICKER_2026-10-19.md`.
 
+- **Program Coordinator support in the Workbench (owner, 2026-11-09; not
+  urgent, no priority change).** [NOT BUILT; NOT PLANNED] The J27 stage
+  model's tasks belong to the lead Program Director; scheduling a
+  presentation, presentation materials and the invitation email are outside
+  it, and the Workbench's "Assigned to me" means lead Program Director. The
+  owner wants the infrastructure for the Program Coordinator built later:
+  coordinator tasks, a coordinator's own request scope, and coordinator next
+  steps on the cycle lists. The owner adds that the coordinator works
+  mainly in Meeting Tracker, which feeds the Workbench, and uses the
+  Workbench little; set the scope when the work is taken up. Interim cover and the finding behind it:
+  `docs/plans/J27_CYCLE_PAGE_REDESIGN_PLAN_2026-11-09.md` (section 9) and
+  `docs/plans/J27_STAFF_FLOW_AUDIT_2026-11-09.md` (findings 11 to 14).
+
 ## Product follow-ups — source-audited 2026-10-31, no priority change
 
 These are bounded findings, not new build authorization. Full evidence and

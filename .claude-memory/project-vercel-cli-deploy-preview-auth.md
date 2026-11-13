@@ -105,4 +105,38 @@ set for Preview; the integrity read failure seen on that run was not diagnosed. 
 `dpl_5wQcfshKGG4z8cyeTueXkt9L4sve` and re-inspected. Remove the branch-scoped
 `DYNAMICS_URL` when the branch retires. Evidence: plan §9 I8.
 
+**HAZARD, 2026-11-11 (Session 673): `vercel env run` can deploy instead of run.**
+With Vercel CLI 65.14, `vercel env run --environment production -- node <path-to-script>`
+did not run the script: it created a new Vercel project named after the file and
+deployed that file, once to Production and once to Preview. Deleted the same day
+with owner approval (`vercel project delete <name> --confirm-name <name> --scope
+justin-gallivans-projects`). Do not use `vercel env run` to read a value. To copy
+one Config value, `vercel env pull <scratch-file> --environment <env>
+[--git-branch <branch>] --yes`, extract the one key, delete the file at once.
+Add branch-scoped Preview settings with `vercel env add <NAME> --environment
+preview --git-branch <branch> --value <v> --no-sensitive --yes` (or stdin for a
+JSON value) so they stay readable as Config.
+
+**VERIFIED 2026-11-11:** the J27 Preview was moved by fast-forwarding
+`claude/j27-read-model` to `01a798524`; deployment
+`dpl_EQFqtn7LtKy9G3XyNuspzzquvo6z` was attested (branch, commit, Ready) through
+`vercel api /v13/deployments/<id>` meta, and the stable alias was moved to it
+from `dpl_2GaUBQnXmXsYd2WdYEnxAKfppSxV`. The branch's code accepts the alias as a
+CSRF origin and the alias callback was already in Entra, so no URI change.
+
+**Script gotcha, 2026-11-11:** `vercel inspect` prints its details (the `id`
+line) on stderr. A polling loop that runs `vercel inspect <url> 2>/dev/null`
+gets no id and never matches, so it waits forever on a build that finished in
+under a minute. Capture with `2>&1` and parse `awk '$1=="id"{print $2}'`, then
+attest branch and commit through `vercel api /v13/deployments/<id>` meta.
+
+**VERIFIED 2026-11-12 (Session 674), Vercel CLI 65.14:** a new branch-scoped
+setting reaches a Preview only on a rebuild; `vercel redeploy <deployment-url>
+--target preview` rebuilt the same commit with it (about 2 minutes). To find
+the build a push made, `vercel ls --meta githubCommitSha=<full sha>` lists it
+with its Ready state. Run `vercel env ls` / `env add` from the main checkout
+(linked); a worktree without `.vercel` reports "isn't linked to a project".
+The positional `vercel env ls preview <branch>` form is deprecated; use
+`--environment preview --git-branch <branch>`.
+
 Related: [[project-vercel-sensitive-env-pull-empty]], [[project-dev-environment]], [[project-local-dev-auth-setup]], [[project-branded-domains]].
