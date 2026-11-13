@@ -56,7 +56,11 @@ retention are branch-built with synthetic/local PostgreSQL tests. Failure releas
 is now synthetic/test-only; Summary admission/publication remain disabled. The
 staff-edit command builder and synthetic row-version race tests are also branch-built
 (`summary-edit-protection.js`); actual marker schema/writers and intake contracts
-remain open. No live calls or deployment.
+remain open. The offline composition rehearsal now drives the real worker/store
+through the existing synthetic Summary capability with fake external adapters;
+96 tests passed, including 27 PostgreSQL cases. Real Summary admission/publication
+remain disabled; synthetic known-failure release is not real Summary retention.
+See the Summary worker plan's offline rehearsal evidence. No live calls or deployment.
 
 1. Await Connor's completed-job POST/replay/poll results. Owner sent the test email
    on November 13. His earlier status check

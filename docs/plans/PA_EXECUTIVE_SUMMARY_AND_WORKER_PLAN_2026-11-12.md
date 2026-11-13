@@ -512,5 +512,58 @@ Summary source suites passed, including 32 new synthetic protection cases. Scope
 ESLint and documentation currency/catalog/symbol gates plus available sequential
 self-tests passed. Independent read-only review found no material issues, while
 explicitly limiting the evidence to command formation and a synthetic atomic-write
-model. Runtime references to the new exports are absent; only the unit suite imports
+model. Runtime references to the new exports are absent; only test suites import
 them. The existing runtime marker/integration requirements above remain open.
+
+
+## Offline workflow composition rehearsal (2026-11-13)
+
+[VERIFIED via `tests/integration/prompt-jobs-summary-rehearsal.pg.test.js` and local
+PostgreSQL] The rehearsal composes `createSummarySource`, the edit-protection helper,
+`advanceJob` and `createPromptJobStore`. Migration 097 is applied unchanged to a
+randomized schema in a disposable loopback PostgreSQL database. The existing
+`synthetic.executive-summary` capability writes only the fake `fixture_summary`
+destination. No production capability, admission rule, worker or schema is changed.
+
+Trace: synthetic admission → real narrative adapter/sealed snapshot → marker-aware
+fake target capture → fake Executor dispatch/response hooks → real validation and
+SQL checkpoints → fake successful audit → real frozen publication → fake conditional
+record write → durable readback/replay. The fake record models atomic text/marker
+saves. Exact source naming remains a candidate convention awaiting the intake
+producer; the test does not settle it. No ready flag or actual marker column exists
+in this fixture. Test authorization checks fixture identity, not live staff policy.
+
+| Invariant | Evidence |
+| --- | --- |
+| Narrative reaches generation | Fake Executor verifies sealed snapshot, narrative text and authoritative synthetic PI; combined PDF and applicant abstract are present but excluded |
+| Early staff intent survives | Edit-clear, blank clear, whitespace and unreadable marker block dispatch |
+| Later edits survive | Edits/clears during generation cause original-ETag publication conflict; no retry |
+| Source drift prevents work | Changed source before dispatch and before publication blocks the corresponding side effect; missing narrative does not fall back |
+| Duplicates stay bounded | Concurrent admission and overlapping ticks yield one generation/audit/publication; successful replay after staff clear and content expiry preserves the clear and reservation |
+| Uncertain outcomes stay fenced | Lost generation response and lost publication acknowledgement, with and without an applied fake write, never cause automatic retry |
+| Real Summary remains disabled | Generic and machine admission reject `proposal.executive-summary` initialization |
+
+Important separation: synthetic known pre-dispatch failures may release their slot.
+The companion `prompt-jobs-summary-reservations.pg.test.js` separately proves real
+Summary receipt retention through failures/expiry using hypothetical SQL receipts.
+Neither suite claims an admitted real Summary end-to-end path. No capability mock,
+production guard removal or runtime admission bypass was introduced for the rehearsal.
+
+Verification: 96 tests across four suites passed, including 17 new rehearsal cases,
+10 companion reservation cases and 69 source/edit-helper unit cases. Temporarily
+removing the helper's marker guard made three rehearsal tests fail; the original
+helper was restored. Independent read-only review found no material issues. Tests
+use fake PDF extraction, Executor, authorization, audit and Dataverse behavior;
+there is no live evidence for those systems. Audit failure, process interruption
+and lease expiry are not exercised by this new composition suite. The real worker's
+unmapped Summary-source preparation error propagates safely in the missing-source
+case; future integration still needs explicit error/status semantics.
+
+Only tests and branch documentation changed. Intake decisions, external-writer
+coverage, Dataverse schema/security, Summary activation and Connor's existing test
+remain untouched. No provider, Graph, Dataverse, cloud database or deployment calls.
+
+Scoped ESLint, documentation currency/catalog/symbol gates and sequential available
+self-tests passed. The restored-marker rehearsal passed all 17 cases again. The
+new disposable PostgreSQL container and its volume were removed after verification;
+the pre-existing roster database container was left untouched.
