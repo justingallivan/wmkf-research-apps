@@ -1,9 +1,16 @@
 # Bounded automatic Short Title trial — approval packet
 
-Status: APPROVED by Justin, then STOPPED at the sole Factory Request create attempt
-on 2026-11-13 UTC. No new Request survived; no deployment or AI call occurred.
-Connor’s existing deployment/job/credentials remain unchanged. The approved plan
-below is retained for evidence; its stop conditions prohibit blindly resuming.
+Status: REQUEST-CREATION BLOCKER RECOVERED on 2026-11-13 UTC after Justin
+explicitly approved the Opus-reviewed, one-create sandbox GoVerify workaround.
+Request **1000389** now exists and Factory verification passed. GoVerify was restored
+and independently verified active with exactly one active activation. Connor’s
+Request and ledger receipts remain unchanged. No new deployment or AI call has run.
+Next: continue the already-approved abstract seed and isolated Preview/worker trial
+against this existing new Request; never repeat Factory create.
+
+The original no-bypass approval and failed attempt below are historical evidence.
+Justin’s subsequent explicit approval superseded only that restriction for the
+single recovery attempt documented at the end. All other trial bounds remain.
 
 ## Timing evidence
 
@@ -33,7 +40,7 @@ may set `serverBudgetMs: 300000`, `budgetVerified: true`. The client timeout bec
 stop before the next tick. Never extend the budget or retry within this approval.
 The five-stage previous success is a planning observation, not a promise.
 
-## Exact proposed effects
+## Original approved effects (before the recovery amendment)
 
 1. Create **one new Sandbox Test Request** through the existing basic Factory recipe,
    attached to the existing W. M. Keck Foundation test account. No people or roles
@@ -157,7 +164,8 @@ DYNAMICS_SANDBOX_URL=https://orgd9e66399.crm.dynamics.com DYNAMICS_URL=https://o
 The committed resolution-only loader has been checked with the actual Factory CLI
 `--help`; it changes neither authorization nor HTTP behavior. The earlier read-only
 fetch guard is not the execution loader. A fresh execute receipt must not exist.
-No `--bypass-goverify` flag is permitted. Refresh an expired manifest using the
+The original execution excluded `--bypass-goverify`; the one recovery exception is
+recorded below and has been consumed. Refresh an expired manifest using the
 existing `buildCloneManifest` API with the same `ids` and values after fresh preflight;
 its standard one-hour lifetime must be recomputed by the builder, not hand-edited.
 
@@ -336,11 +344,58 @@ version 16, one attempt, one applied publication and the same validated result.
 The database still has one job/attempt/publication in total. No new runtime deployment
 or remote credentials were created; unused deployment-only secret values were prepared
 locally in a private file only. Keep the rejected-create receipt; do not remove it to
-rerun. Repair/authorization of sandbox create automation, followed by a new bounded
-execution decision, is needed before this fresh-Request trial can resume.
+rerun. At that stop, repair/authorization of sandbox create automation and a new bounded
+execution decision were required; the subsequent recovery below resolved that blocker.
 
 Supplementary local receipts: `/private/tmp/wmkf-pa-auto-trial-factory-receipt-20261113.json`,
 `/private/tmp/wmkf-pa-auto-trial-inspect-20261113.log`, and
 `/private/tmp/wmkf-pa-auto-trial-create-diagnostic-20261113.log`. The durable facts
 above are retained independently of those temporary files. Approval did not authorize
 workflow bypass, fixing live workflow configuration, or substituting an existing Request.
+
+## Approved recovery — one Request created, workflow restored
+
+[VERIFIED 2026-11-13 UTC via live workflow XAML/plug-in metadata and Factory receipt]
+The payee-copy workflow updates only `akoya_request.akoya_payee`. The Request
+GoVerify workflow checks payee Tax ID, stale/missing verification date and exemption,
+then updates `account.akoya_goverifytrigger`. Enabled synchronous AkoyaGo account
+plug-ins run on that path. Both failed process sessions report the propagated HTTP
+500. The actual external endpoint/service defect remains unknown; no vendor repair
+is claimed. No account exemptions, verification dates, plug-ins or XAML were edited.
+
+Justin approved the exact private review packet and the temporary sandbox workaround
+in chat. Opus 5.5 reviewed through OAuth with tools disabled (packet SHA-256
+`f18d8379cdae84f75135778c7bbe96e57e2363097a734749749368a70bc28f50`).
+Review checks closed by reading the payee-copy XAML and both failure messages,
+checking prior successful Factory bypass history, and confirming the normal restore
+helper checks definition state plus exactly one active activation. The review noted
+an already-active restore branch lacks that activation check; this run used the
+normal restoration PATCH, and an independent post-run activation query also passed.
+The Short Title trial does not consume payee verification data.
+
+Fresh read-only preflight rebuilt the manifest through `buildCloneManifest`, using
+the same preallocated IDs and exact original create-body hash. The GUID was absent.
+The failed receipt was retained and the recovery used a separate exclusive receipt.
+One Request POST returned 201; no retry was made. The workflow deactivation began
+03:42:59.970Z, inactive state was verified 03:43:15.682Z, and restoration was verified
+03:43:30.681Z before meeting-date correction or folder provisioning. Definition
+ETag became `61850223`. Independent readback found exactly one active activation,
+`f585425e-14df-f111-84ea-70a8a5b1c1c6`, with state/status 1/2.
+
+Factory completed at 03:44:35.942Z with `verification.ok:true`, zero failures and no
+account/contact changes. Request **1000389**, GUID
+`a92c0f69-90ec-4c24-bc19-f26a0bfc18b6`, retains the approved TEST title, marker/run,
+app ownership and corrected December 2099 meeting date. The new empty SharePoint
+folder is `1000389_A92C0F6990EC4C24BC19F26A0BFC18B6`; its Dataverse location is
+`421617a8-a823-491c-aab7-165b21bf92bd`. No payment/email effects were reported.
+Connor’s selected source fields/ETag and complete scoped ledger proof compare equal
+to the pretrial baseline; total jobs/attempts/publications remain one/one/one.
+No abstract seed, new Preview, admission, worker tick or model call occurred here.
+
+Recovery used the original Factory execute command with the refreshed
+`wmkf-pa-auto-trial-recovery-manifest-20261113.json`, separate
+`wmkf-pa-auto-trial-recovery-receipt-20261113.json`, and the explicitly approved
+`--bypass-goverify` flag. Both files reside in `/private/tmp`. The independent
+activation receipt is `/private/tmp/wmkf-goverify-restore-check.log`.
+This consumed the one-create workaround authorization. Do not deactivate again or
+recreate this Request. Continue the remaining approved trial using its existing GUID.
