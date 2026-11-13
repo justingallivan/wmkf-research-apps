@@ -99,7 +99,9 @@ async function main() {
       const news = await IntegrityService.searchNews(row.name, row.institution || '', 'stored-results', process.env.CLAUDE_API_KEY, {});
       verdict = news.analysisOutcome;
     } catch (error) {
-      verdict = rawText === null ? `failed: ${error.message}` : 'rejected by the evidence check';
+      // No model answer means setup or provider trouble, not a verdict: stop.
+      if (rawText === null) throw new Error(`case ${index + 1}: the model was not reached (${error.message}); stopping.`);
+      verdict = 'rejected by the evidence check';
     }
     tally[verdict] = (tally[verdict] || 0) + 1;
     const screenedOn = row.screened_on instanceof Date ? row.screened_on.toISOString().slice(0, 10) : row.screened_on;
