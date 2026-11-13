@@ -67,8 +67,19 @@ these changes:
   targets the same day: `dpl_THWVcsoBdLRjDACMEukwuUE69VgT` (redeploy of
   `5f81733db` with the new setting) and before it
   `dpl_HfWztktsLVVAXXAYLS26kgbFfMkE`. Six branch-scoped Config settings now;
-  remove all six at promotion or retirement. Not exercised: any request in
-  Deliberations (the sandbox has none), live writes.
+  remove all six at promotion or retirement.
+- **Deliberations fixture, 2026-11-12 (owner go).** The sandbox had no
+  request in Deliberations. One presentation record was added to #1000383
+  (`wmkf_sitevisits` `f127beed-18df-f111-84ea-70a8a59af221`, subject "TEST:
+  J27 Deliberations walk-through (no meeting)", 2027-03-15 17:00 to 17:30 UTC,
+  state 0 / status 1, no attendees, nothing sent) by a one-off script pinned
+  to the sandbox host; the interlock reported `target=sandbox` and the record
+  was read back. The Preview then showed #1000383 as the one Deliberations
+  row, "Before presentation" with no line, and its request page strip read
+  "Deliberations" with no next step: the page matches the list before the
+  presentation ends `[VERIFIED via signed-in Preview, 2026-11-12]`. The
+  Meeting Tracker, the normal way to add one, is not enabled on this
+  Preview. To restore #1000383 as a plain Scored fixture, delete that record.
 - **Preview moved, 2026-11-11.** `claude/j27-read-model` fast-forwarded to
   `01a798524` and deployed as `dpl_EQFqtn7LtKy9G3XyNuspzzquvo6z`; the stable
   alias points at it (previous target `dpl_2GaUBQnXmXsYd2WdYEnxAKfppSxV`).
