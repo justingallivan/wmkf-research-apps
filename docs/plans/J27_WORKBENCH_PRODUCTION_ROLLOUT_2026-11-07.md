@@ -52,6 +52,23 @@ these changes:
 | `AUTOMATIC_INTEGRITY_SCREENING` (`on`, `off`, `simulate`) | Integrity screening after a recommendation | Delete once screening is always on |
 | `CHAIRS_RECOMMENDATION_REHEARSAL_REQUEST_ID`, `INTEGRITY_SIMULATION_REQUEST_IDS`, `INTEGRITY_SIMULATION_DB_URL` | Preview rehearsal only | Delete |
 
+- **Preview walk-through and move, 2026-11-12.** The owner walked the
+  Preview and Claude took a second look in Chrome. The Final Assessment
+  tab's Writeup review section failed with "Final writeup review tracking
+  is unavailable": it needs `FINAL_WRITEUP_ACKNOWLEDGEMENT_SCHEMA_READY`,
+  which Production has and the Preview branch did not. The sandbox's
+  acknowledgement schema is exact and its key Active `[VERIFIED via
+  scripts/preflight-final-writeup-review-acknowledgement-schema.mjs
+  --target=sandbox, read-only, 11 exact, 2026-11-12]`, so the setting was
+  added `on`, scoped to `claude/j27-read-model`, and read back. The branch
+  was then fast-forwarded to `cc603be5e` (reviewer counts on any tab, read-model
+  plan C7 amendment) and deployed as `dpl_ARxww8Gb6byXvihGmTWzGPC1Lorv`
+  (attested: branch, commit, Ready); the stable alias points at it. Previous
+  targets the same day: `dpl_THWVcsoBdLRjDACMEukwuUE69VgT` (redeploy of
+  `5f81733db` with the new setting) and before it
+  `dpl_HfWztktsLVVAXXAYLS26kgbFfMkE`. Six branch-scoped Config settings now;
+  remove all six at promotion or retirement. Not exercised: any request in
+  Deliberations (the sandbox has none), live writes.
 - **Preview moved, 2026-11-11.** `claude/j27-read-model` fast-forwarded to
   `01a798524` and deployed as `dpl_EQFqtn7LtKy9G3XyNuspzzquvo6z`; the stable
   alias points at it (previous target `dpl_2GaUBQnXmXsYd2WdYEnxAKfppSxV`).
@@ -91,8 +108,11 @@ these changes:
 - **Preview needs `FINAL_WRITEUP_SCHEMA_READY=on`** for its branch to show
   the review stages (group and leadership review) and to rehearse the Final
   Assessment list's standing chips. It is set for Production and another
-  rehearsal branch only `[VERIFIED via vercel env ls, 2026-11-11]`, which
-  is why the Preview reported Final writeup review tracking as unavailable.
+  rehearsal branch only `[VERIFIED via vercel env ls, 2026-11-11]`. Set for
+  the Preview branch 2026-11-11. *(Corrected 2026-11-12: the "Final writeup
+  review tracking is unavailable" message comes from the separate
+  `FINAL_WRITEUP_ACKNOWLEDGEMENT_SCHEMA_READY`, added for the Preview branch
+  2026-11-12; see the first bullet.)*
 - **Preview needs a fourth setting to rehearse group review:**
   `STAFF_DELIBERATIONS_SITE_VISIT_STATE_STATUS_PAIRS` is set for Production
   only. Without it on the Preview a presentation's end reads unknown and,
