@@ -1,0 +1,204 @@
+{
+  "windowStart": "2026-10-12T07:00:00Z",
+  "dateTimezone": "America/Mazatlan",
+  "scope": [
+    "akoya_request",
+    "wmkf_requestdocument"
+  ],
+  "environments": {
+    "production": {
+      "at": "2026-11-13T04:15:30.632Z",
+      "origin": "https://wmkf.crm.dynamics.com",
+      "entities": {
+        "akoya_request": {
+          "scanned": 630,
+          "missingCreationDate": 0,
+          "newColumns": [
+            {
+              "field": "wmkf_ai_injectionflag",
+              "label": "AI Injection Flag",
+              "type": "Boolean",
+              "created": "2026-11-12T18:44:42Z",
+              "custom": true,
+              "attributeOf": null
+            },
+            {
+              "field": "wmkf_ai_injectionnotes",
+              "label": "AI Injection Notes",
+              "type": "Memo",
+              "created": "2026-11-12T18:46:14Z",
+              "custom": true,
+              "attributeOf": null
+            },
+            {
+              "field": "wmkf_iacucanimalmodels",
+              "label": "IACUC Animal Models",
+              "type": "Memo",
+              "created": "2026-10-22T16:44:37Z",
+              "custom": true,
+              "attributeOf": null
+            },
+            {
+              "field": "wmkf_initialassessment",
+              "label": "Initial Assessment",
+              "type": "Memo",
+              "created": "2026-11-10T04:11:28Z",
+              "custom": true,
+              "attributeOf": null
+            },
+            {
+              "field": "wmkf_layabstract",
+              "label": "Lay Abstract",
+              "type": "Memo",
+              "created": "2026-11-10T04:11:00Z",
+              "custom": true,
+              "attributeOf": null
+            },
+            {
+              "field": "wmkf_pipublications",
+              "label": "PI Publications",
+              "type": "Memo",
+              "created": "2026-10-22T16:47:36Z",
+              "custom": true,
+              "attributeOf": null
+            },
+            {
+              "field": "wmkf_summaryaiuse",
+              "label": "AI Use",
+              "type": "Memo",
+              "created": "2026-10-22T16:54:19Z",
+              "custom": true,
+              "attributeOf": null
+            },
+            {
+              "field": "wmkf_summaryenablingadvances",
+              "label": "Enabling Advances",
+              "type": "Memo",
+              "created": "2026-10-22T16:52:19Z",
+              "custom": true,
+              "attributeOf": null
+            },
+            {
+              "field": "wmkf_summarynewarea",
+              "label": "New Area",
+              "type": "Memo",
+              "created": "2026-10-22T16:52:52Z",
+              "custom": true,
+              "attributeOf": null
+            },
+            {
+              "field": "wmkf_summarypeergroups",
+              "label": "Peer Groups",
+              "type": "Memo",
+              "created": "2026-10-22T16:53:17Z",
+              "custom": true,
+              "attributeOf": null
+            },
+            {
+              "field": "wmkf_summarypotentialimpact",
+              "label": "Potential Impact",
+              "type": "Memo",
+              "created": "2026-10-22T16:50:05Z",
+              "custom": true,
+              "attributeOf": null
+            },
+            {
+              "field": "wmkf_summarypriorsupport",
+              "label": "Prior Support",
+              "type": "Memo",
+              "created": "2026-10-22T16:53:48Z",
+              "custom": true,
+              "attributeOf": null
+            },
+            {
+              "field": "wmkf_summaryrisks",
+              "label": "Risks",
+              "type": "Memo",
+              "created": "2026-10-22T16:50:52Z",
+              "custom": true,
+              "attributeOf": null
+            },
+            {
+              "field": "wmkf_summaryscientificquestion",
+              "label": "Scientific Question",
+              "type": "Memo",
+              "created": "2026-10-22T16:49:15Z",
+              "custom": true,
+              "attributeOf": null
+            }
+          ]
+        },
+        "wmkf_requestdocument": {
+          "scanned": 105,
+          "missingCreationDate": 0,
+          "newColumns": []
+        }
+      }
+    },
+    "sandbox": {
+      "at": "2026-11-13T04:15:39.633Z",
+      "origin": "https://orgd9e66399.crm.dynamics.com",
+      "entities": {
+        "akoya_request": {
+          "scanned": 606,
+          "missingCreationDate": 0,
+          "newColumns": [
+            {
+              "field": "wmkf_confirmedmeetingroster",
+              "label": "Confirmed Meeting Roster",
+              "type": "Memo",
+              "created": "2026-11-07T00:51:57Z",
+              "custom": true,
+              "attributeOf": null
+            },
+            {
+              "field": "wmkf_initialassessmentrationale",
+              "label": "Initial Assessment Rationale",
+              "type": "Memo",
+              "created": "2026-11-07T04:56:45Z",
+              "custom": true,
+              "attributeOf": null
+            },
+            {
+              "field": "wmkf_j27intakefitcomparison",
+              "label": "J27 Intake Fit Comparison",
+              "type": "Memo",
+              "created": "2026-11-08T02:07:34Z",
+              "custom": true,
+              "attributeOf": null
+            },
+            {
+              "field": "wmkf_staffreviewevidencehash",
+              "label": "Staff Review Evidence Hash",
+              "type": "String",
+              "created": "2026-11-07T00:03:16Z",
+              "custom": true,
+              "attributeOf": null
+            },
+            {
+              "field": "wmkf_staffreviewsummary",
+              "label": "Staff Review Summary",
+              "type": "Memo",
+              "created": "2026-11-07T00:02:59Z",
+              "custom": true,
+              "attributeOf": null
+            },
+            {
+              "field": "wmkf_staffvisitassessment",
+              "label": "Staff Visit Assessment",
+              "type": "Memo",
+              "created": "2026-11-07T00:27:56Z",
+              "custom": true,
+              "attributeOf": null
+            }
+          ]
+        },
+        "wmkf_requestdocument": {
+          "scanned": 105,
+          "missingCreationDate": 0,
+          "newColumns": []
+        }
+      }
+    }
+  }
+}
