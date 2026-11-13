@@ -97,7 +97,16 @@ candidates whose review was already received.
   output tokens instead of 1000 (`ANALYSIS_MAX_TOKENS`). The first replay on
   the default Haiku (`claude-haiku-5-5`, thinking on by default) got one
   non-JSON and one empty reply in 10 cases; thinking spending the 1000-token
-  budget is the likely cause [ASSUMED]. The model stays Haiku (owner).
+  budget is the likely cause. The model stays Haiku (owner).
+- **Replay result, 2026-11-13 (8000 tokens; Production's model setting read,
+  `claude-haiku-5-5`).** All 16 old-rule flags returned valid replies: 6
+  `flag_for_review` (each passed the verbatim headline check), 6
+  `inconclusive` (shown to staff as an incomplete news screen), 4 `clear`
+  (all four from the 2026-01-21 screening) [VERIFIED via
+  `scripts/replay-integrity-news-verdicts.cjs`, owner-run]. The earlier
+  expectation that headline-only evidence would suppress most flags did not
+  hold. Whether the 4 clears are correct needs an owner look at those
+  screenings; the hold stays until the owner decides.
 
 - **Preview walk-through and move, 2026-11-12.** The owner walked the
   Preview and Claude took a second look in Chrome. The Final Assessment
