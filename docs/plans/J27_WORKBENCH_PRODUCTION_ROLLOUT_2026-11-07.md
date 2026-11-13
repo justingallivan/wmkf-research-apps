@@ -121,7 +121,20 @@ these changes:
   Since `91fc83581` the group-review start guard grants the earlier-cycle
   exception only when the request's linked Grant Cycle resolves to a cycle
   before 2027. Confirm that every D26 request still to start group review
-  has that link; an unlinked one would be refused.
+  has that link; an unlinked one would be refused. Command (2026-11-12):
+  `DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-group-review-cycle-links.cjs`
+  lists every request with a current Draft Writeup and no Final Writeup,
+  its linked and document cycle codes and presentation count, and flags
+  the ones the guard would refuse. Dry run on the sandbox: two requests,
+  none refused. Not yet run on Production.
+- **Before promotion: the J27 list's cost at volume (owner-run Production
+  read).** `DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-workbench-load-timing.js
+  --email=<staff email> --profile-id=<id> --cycle=D26 --scope=all --later-facts=yes`
+  times the cycle's request list twice and, with `--later-facts=yes`, the
+  three batched later-phase reads over the same request ids (the list runs
+  them only for 2027-or-later rows, so D26 gives the volume). Prints timings
+  and counts only. The script was extended 2026-11-12 to pass the cycle;
+  before, it timed only the cycle picker. Not yet run.
 - **Preview needs `FINAL_WRITEUP_SCHEMA_READY=on`** for its branch to show
   the review stages (group and leadership review) and to rehearse the Final
   Assessment list's standing chips. It is set for Production and another

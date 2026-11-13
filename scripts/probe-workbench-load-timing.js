@@ -3,7 +3,7 @@
  * Read-only probe. Bundles the real services with Next-compatible CommonJS
  * interop (raw Node ESM cannot load the app's NextAuth provider imports).
  * DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-workbench-load-timing.js \
- *   --email=<staff-email> --profile-id=<id> --cycle=D26
+ *   --email=<staff-email> --profile-id=<id> --cycle=D26 [--scope=my|all] [--later-facts=yes]
  * No HTTP auth simulation; application credentials read data under the local
  * write-blocking Dataverse interlock. Output: timings/counts/digest only.
  */
