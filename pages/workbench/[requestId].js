@@ -436,6 +436,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
               canManage={canManage && !previewReadOnly}
               previewReadOnly={previewReadOnly}
               refresh={refreshPhaseIStatus}
+              explicitSave={!phaseLayout}
             />
           )}
           {showChairsRecommendation && isChairsRecommendationEditable(visibleContext.phaseIStatus) && (

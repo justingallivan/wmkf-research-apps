@@ -121,7 +121,7 @@ test('hides the governed transition from a staff member who is not authorized', 
 test('offers the authorized Word draft before group review even when the viewer cannot start review', async () => {
   const webUrl = 'https://sharepoint.test/draft.docx';
   global.fetch.mockResolvedValueOnce(response({ ...readyStatus(false), sourceFile: { name: 'Draft.docx', webUrl } }));
-  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+  render(<FinalWriteupTab requestId={REQUEST_ID} renderBoardDraft={() => null} />);
 
   const link = await screen.findByRole('link', { name: 'Open draft in Word' });
   expect(link).toHaveAttribute('href', webUrl);
@@ -131,11 +131,20 @@ test('offers the authorized Word draft before group review even when the viewer 
   expect(global.fetch.mock.calls[0][1]?.method).toBe('GET');
 });
 
-test('keeps the Word draft link hidden when the status marks the draft private', async () => {
-  global.fetch.mockResolvedValueOnce(response({ ...readyStatus(false), sourceFileHidden: true, sourceFile: null }));
+test('outside the J27 layout, the pre-review Word draft link is not offered', async () => {
+  const webUrl = 'https://sharepoint.test/draft.docx';
+  global.fetch.mockResolvedValueOnce(response({ ...readyStatus(true), sourceFile: { name: 'Draft.docx', webUrl } }));
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
 
-  expect(await screen.findByText(/Only the lead Program Director or a superuser/i)).toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: 'Ready for group review' })).toBeEnabled();
+  expect(screen.queryByRole('link', { name: 'Open draft in Word' })).toBeNull();
+});
+
+test('keeps the Word draft link hidden when the status marks the draft private', async () => {
+  global.fetch.mockResolvedValueOnce(response({ ...readyStatus(false), sourceFileHidden: true, sourceFile: null }));
+  render(<FinalWriteupTab requestId={REQUEST_ID} renderBoardDraft={() => null} />);
+
+  expect(await screen.findByText('The draft is unavailable to you.')).toBeInTheDocument();
   expect(screen.queryByRole('link', { name: 'Open draft in Word' })).toBeNull();
 });
 

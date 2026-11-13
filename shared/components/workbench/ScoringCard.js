@@ -1,9 +1,14 @@
 import { useRef, useState } from 'react';
-import { Card } from '../Layout';
+import { Button, Card } from '../Layout';
 import { SCORING_STATUS, isScoringEditable, hasChairsRecommendation, CHAIRS_RECOMMENDATION_STATUS, isChairsRecommendationEditable } from '../../config/j27Scoring';
 import { requestJson } from '../../utils/api-request';
 
-export default function ScoringCard({ context, canManage, refresh, chairsRecommendation = false, automaticIntegrityEnabled = false, previewReadOnly = false }) {
+/**
+ * `explicitSave`: outside the J27 phase layout the choice is saved only by the
+ * Save button, as before the redesign (rollout plan, "Admission to implement").
+ */
+export default function ScoringCard({ context, canManage, refresh, chairsRecommendation = false, automaticIntegrityEnabled = false, previewReadOnly = false, explicitSave = false }) {
+  const [draftDecision, setDraftDecision] = useState('');
   const [pendingDecision, setPendingDecision] = useState('');
   const saveInFlight = useRef(false);
   const [saving, setSaving] = useState(false);
@@ -46,6 +51,7 @@ export default function ScoringCard({ context, canManage, refresh, chairsRecomme
         await refresh();
       } finally {
         setPendingDecision('');
+        setDraftDecision('');
         setSaving(false);
         saveInFlight.current = false;
       }
@@ -64,19 +70,34 @@ export default function ScoringCard({ context, canManage, refresh, chairsRecomme
         <p className="mt-1 text-sm text-gray-600">Saving Recommended Invite schedules an Integrity Screen in the background.</p>
       )}
       {canManage && editable && requestVersion ? (
-        <label className="mt-3 flex w-fit flex-col gap-1 text-sm font-medium text-gray-900">
-          {chairsRecommendation ? 'Recommendation' : 'Scoring decision'}
-          <select
-            className="min-h-10 rounded-lg border border-gray-300 bg-white px-3"
-            value={pendingDecision || current}
-            disabled={saving}
-            onChange={(event) => save(event.target.value)}
-          >
-            <option value="" disabled>Select a decision</option>
-            <option value="yes">{chairsRecommendation ? 'Recommended Invite' : 'Scored'}</option>
-            <option value="no">{chairsRecommendation ? 'Recommended Do Not Invite' : 'Not Scored'}</option>
-          </select>
-        </label>
+        <form
+          className="mt-3 flex flex-wrap items-end gap-3"
+          onSubmit={(event) => { event.preventDefault(); if (explicitSave) save(draftDecision); }}
+        >
+          <label className="flex w-fit flex-col gap-1 text-sm font-medium text-gray-900">
+            {chairsRecommendation ? 'Recommendation' : 'Scoring decision'}
+            <select
+              className="min-h-10 rounded-lg border border-gray-300 bg-white px-3"
+              value={pendingDecision || draftDecision || current}
+              disabled={saving}
+              onChange={(event) => {
+                if (!explicitSave) { save(event.target.value); return; }
+                setDraftDecision(event.target.value);
+                setSaved(false);
+                setError('');
+              }}
+            >
+              <option value="" disabled>Select a decision</option>
+              <option value="yes">{chairsRecommendation ? 'Recommended Invite' : 'Scored'}</option>
+              <option value="no">{chairsRecommendation ? 'Recommended Do Not Invite' : 'Not Scored'}</option>
+            </select>
+          </label>
+          {explicitSave && (
+            <Button type="submit" size="sm" loading={saving} disabled={!draftDecision || draftDecision === current}>
+              Save {title}
+            </Button>
+          )}
+        </form>
       ) : !recommendationRecorded && (
         <p className="mt-2 text-sm text-gray-600">
           {chairsRecommendation ? (current === 'yes' ? 'Recommended Invite' : current === 'no' ? 'Recommended Do Not Invite' : 'Decision pending') : previewReadOnly ? 'Scoring is read-only on Preview.'

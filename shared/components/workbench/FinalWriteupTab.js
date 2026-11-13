@@ -814,9 +814,10 @@ export default function FinalWriteupTab({ requestId, renderBoardDraft = null, on
                 </>
               )}
             </div>
-            {(status.canStart || (status.sourceFileHidden !== true && status.sourceFile?.webUrl)) && (
+            {/* The pre-review Word link belongs to the J27 layout only (rollout plan, "Admission to implement"). */}
+            {(status.canStart || (boardDraftAvailable && draftVisible)) && (
               <div className="flex flex-wrap items-center gap-3 sm:max-w-xs">
-                {status.sourceFileHidden !== true && status.sourceFile?.webUrl && (
+                {boardDraftAvailable && draftVisible && (
                   <a
                     href={status.sourceFile.webUrl}
                     target="_blank"

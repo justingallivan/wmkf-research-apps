@@ -6,7 +6,10 @@ import { SCORING_STATUS } from '../../shared/config/j27Scoring';
 import { requestJson } from '../../shared/utils/api-request';
 
 jest.mock('../../shared/utils/api-request', () => ({ requestJson: jest.fn() }));
-jest.mock('../../shared/components/Layout', () => ({ Card: ({ children }) => <div>{children}</div> }));
+jest.mock('../../shared/components/Layout', () => ({
+  Card: ({ children }) => <div>{children}</div>,
+  Button: ({ children, loading, size, ...props }) => <button {...props}>{children}</button>,
+}));
 
 const context = {
   requestId: '11111111-1111-4111-8111-111111111111',
@@ -86,4 +89,38 @@ test('a read-only card says why only when authority is what is missing', () => {
   // The lead with no request version cannot save either; that is not an authority problem.
   view.rerender(<ScoringCard context={{ ...context, requestVersion: null }} canManage refresh={jest.fn()} />);
   expect(screen.getByText('Scoring is read-only.')).toBeInTheDocument();
+});
+
+test('outside the J27 layout, choosing does not save; only the Save button does', async () => {
+  requestJson.mockResolvedValue({ success: true });
+  const refresh = jest.fn().mockResolvedValue(undefined);
+  render(<ScoringCard context={context} canManage refresh={refresh} explicitSave />);
+  const select = screen.getByRole('combobox', { name: 'Scoring decision' });
+  const button = screen.getByRole('button', { name: 'Save Scoring' });
+
+  expect(button).toBeDisabled();
+  fireEvent.change(select, { target: { value: 'no' } });
+  expect(requestJson).not.toHaveBeenCalled();
+  expect(select).toHaveValue('no');
+  expect(button).toBeEnabled();
+
+  await act(async () => { fireEvent.click(button); });
+  expect(requestJson).toHaveBeenCalledTimes(1);
+  expect(requestJson).toHaveBeenCalledWith('/api/workbench/scoring', expect.objectContaining({
+    method: 'POST',
+    body: { requestId: context.requestId, decision: 'no', version: context.requestVersion },
+  }));
+  expect(refresh).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole('status')).toHaveTextContent('Scoring saved.');
+});
+
+test('outside the J27 layout, a failed save returns the selector to the saved choice', async () => {
+  requestJson.mockRejectedValue(Object.assign(new Error('Changed'), { status: 409 }));
+  render(<ScoringCard context={context} canManage refresh={jest.fn().mockResolvedValue(undefined)} explicitSave />);
+  const select = screen.getByRole('combobox', { name: 'Scoring decision' });
+  fireEvent.change(select, { target: { value: 'no' } });
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save Scoring' })); });
+  expect(requestJson).toHaveBeenCalledTimes(1);
+  expect(select).toHaveValue('yes');
+  expect(screen.getByRole('alert')).toHaveTextContent('The request changed');
 });
