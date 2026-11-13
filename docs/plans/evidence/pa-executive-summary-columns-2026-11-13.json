@@ -1,0 +1,462 @@
+{
+  "sandbox": {
+    "at": "2026-11-13T04:04:44.388Z",
+    "origin": "https://orgd9e66399.crm.dynamics.com",
+    "entities": {
+      "akoya_request": [
+        {
+          "field": "akoya_boardsummarynotes",
+          "label": "Board Summary Notes",
+          "type": "String",
+          "maxLength": 100,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf__ai_summary",
+          "label": "TRASH",
+          "type": "Memo",
+          "maxLength": 1000000,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_abstract",
+          "label": "Abstract",
+          "type": "Memo",
+          "maxLength": 2000,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_abstractapproved",
+          "label": "Abstract (Grantee Approved)",
+          "type": "Memo",
+          "maxLength": 32000,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_abstractformatted",
+          "label": "Abstract (Formatted)",
+          "type": "Memo",
+          "maxLength": 32000,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_ai_budgetsummary",
+          "label": "AI Budget Summary",
+          "type": "Memo",
+          "maxLength": 8000,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_ai_compliancesummary",
+          "label": "AI Check-in Summary",
+          "type": "Memo",
+          "maxLength": 1000000,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_ai_reportoutcomesummary",
+          "label": "Report - Outcome Summary",
+          "type": "Memo",
+          "maxLength": 8000,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_ai_reportpub1abstract",
+          "label": "Report - Publication 1 Abstract",
+          "type": "Memo",
+          "maxLength": 8000,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_ai_reportpub2abstract",
+          "label": "Report - Publication 2 Abstract",
+          "type": "Memo",
+          "maxLength": 8000,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_ai_summary",
+          "label": "AI Summary",
+          "type": "Memo",
+          "maxLength": 1000000,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_currentinitialassessment",
+          "label": "Current Initial Assessment",
+          "type": "Lookup",
+          "maxLength": null,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": false
+        },
+        {
+          "field": "wmkf_currentinitialassessmentname",
+          "label": null,
+          "type": "String",
+          "maxLength": 200,
+          "secured": false,
+          "updateable": false,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_initialassessmentrationale",
+          "label": "Initial Assessment Rationale",
+          "type": "Memo",
+          "maxLength": 10000,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_rationalesummarycompleted",
+          "label": "Rationale & Summary Completed",
+          "type": "Boolean",
+          "maxLength": null,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_rationalesummarycompletedname",
+          "label": null,
+          "type": "Virtual",
+          "maxLength": null,
+          "secured": false,
+          "updateable": false,
+          "required": "None",
+          "audited": false
+        },
+        {
+          "field": "wmkf_staffreviewsummary",
+          "label": "Staff Review Summary",
+          "type": "Memo",
+          "maxLength": 10000,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        }
+      ],
+      "wmkf_requestdocument": [
+        {
+          "field": "wmkf_presiteexecutivesummary",
+          "label": "Pre-Site Executive Summary",
+          "type": "Memo",
+          "maxLength": 32000,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        }
+      ]
+    }
+  },
+  "production": {
+    "at": "2026-11-13T04:05:15.805Z",
+    "origin": "https://wmkf.crm.dynamics.com",
+    "entities": {
+      "akoya_request": [
+        {
+          "field": "akoya_boardsummarynotes",
+          "label": "Board Summary Notes",
+          "type": "String",
+          "maxLength": 100,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_abstract",
+          "label": "Abstract",
+          "type": "Memo",
+          "maxLength": 5000,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_abstractapproved",
+          "label": "Abstract (Grantee Approved)",
+          "type": "Memo",
+          "maxLength": 32000,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_abstractformatted",
+          "label": "Abstract (Formatted)",
+          "type": "Memo",
+          "maxLength": 32000,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_ai_budgetsummary",
+          "label": "AI Budget Summary",
+          "type": "Memo",
+          "maxLength": 8000,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_ai_compliancesummary",
+          "label": "AI Check-in Summary",
+          "type": "Memo",
+          "maxLength": 1000000,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_ai_reportoutcomesummary",
+          "label": "Report - Outcome Summary",
+          "type": "Memo",
+          "maxLength": 8000,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_ai_reportpub1abstract",
+          "label": "Report - Publication 1 Abstract",
+          "type": "Memo",
+          "maxLength": 8000,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_ai_reportpub2abstract",
+          "label": "Report - Publication 2 Abstract",
+          "type": "Memo",
+          "maxLength": 8000,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_ai_summary",
+          "label": "AI Summary",
+          "type": "Memo",
+          "maxLength": 1000000,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_currentinitialassessment",
+          "label": "Current Initial Assessment",
+          "type": "Lookup",
+          "maxLength": null,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": false
+        },
+        {
+          "field": "wmkf_currentinitialassessmentname",
+          "label": null,
+          "type": "String",
+          "maxLength": 200,
+          "secured": false,
+          "updateable": false,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_granteeimagecaption",
+          "label": "Graphical Abstract Caption",
+          "type": "Memo",
+          "maxLength": 4000,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_initialassessment",
+          "label": "Initial Assessment",
+          "type": "Memo",
+          "maxLength": 100000,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_layabstract",
+          "label": "Lay Abstract",
+          "type": "Memo",
+          "maxLength": 100000,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_rationalesummarycompleted",
+          "label": "Rationale & Summary Completed",
+          "type": "Boolean",
+          "maxLength": null,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_rationalesummarycompletedname",
+          "label": null,
+          "type": "Virtual",
+          "maxLength": null,
+          "secured": false,
+          "updateable": false,
+          "required": "None",
+          "audited": false
+        },
+        {
+          "field": "wmkf_summaryaiuse",
+          "label": "AI Use",
+          "type": "Memo",
+          "maxLength": 2500,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_summaryenablingadvances",
+          "label": "Enabling Advances",
+          "type": "Memo",
+          "maxLength": 2500,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_summarynewarea",
+          "label": "New Area",
+          "type": "Memo",
+          "maxLength": 2500,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_summarypeergroups",
+          "label": "Peer Groups",
+          "type": "Memo",
+          "maxLength": 2500,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_summarypotentialimpact",
+          "label": "Potential Impact",
+          "type": "Memo",
+          "maxLength": 2500,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_summarypriorsupport",
+          "label": "Prior Support",
+          "type": "Memo",
+          "maxLength": 2500,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_summaryrisks",
+          "label": "Risks",
+          "type": "Memo",
+          "maxLength": 2500,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        },
+        {
+          "field": "wmkf_summaryscientificquestion",
+          "label": "Scientific Question",
+          "type": "Memo",
+          "maxLength": 2500,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        }
+      ],
+      "wmkf_requestdocument": [
+        {
+          "field": "wmkf_presiteexecutivesummary",
+          "label": "Pre-Site Executive Summary",
+          "type": "Memo",
+          "maxLength": 32000,
+          "secured": false,
+          "updateable": true,
+          "required": "None",
+          "audited": true
+        }
+      ]
+    }
+  }
+}

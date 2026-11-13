@@ -37,6 +37,11 @@ until an exact destination is chosen and read-only metadata/consumer probes run.
 
 ## Executive Summary contract to approve
 
+The [field contract and live column inventory](PA_EXECUTIVE_SUMMARY_FIELD_CONTRACT_2026-11-13.md)
+propose a dedicated Request field after read-only Sandbox/Production metadata and
+source-consumer inspection. Field, audience and event semantics remain unapproved;
+document selection remains open.
+
 | Contract | Proposed value / decision boundary |
 | --- | --- |
 | Task | Reuse `proposal.executive-summary`; preserve existing staff draft semantics |
@@ -46,7 +51,7 @@ until an exact destination is chosen and read-only metadata/consumer probes run.
 | Document | Server-selected full-proposal source under one versioned policy; exact folder/file composition remains OPEN |
 | Output | Validated nonblank `summary` text under existing profile bounds; JSON/profile envelope remains the existing Executor contract |
 | Immediate persistence | Retained validated draft in existing ledger; bounded expiry, not permanent output storage |
-| Final destination | UNDECIDED. Recommend a dedicated Request Executive Summary column if no semantically correct existing column is approved. Do not invent/provision a logical name yet |
+| Final destination | UNDECIDED. Recommend a dedicated Request Executive Summary column if no semantically correct existing column is approved. Candidate `wmkf_executivesummary` is now documented in the field-contract proposal; do not provision without approval |
 | Excluded automatic mappings | `wmkf_ai_summary`, Lay Abstract, Initial Assessment and Pre-Site document sections are not approved substitutes |
 | Delivery proposal | One-time initialization only, never automatic replacement; this is a proposal, not an owner-approved refresh policy |
 | Audience | Staff review initially proposed. Chairs distribution remains OPEN; storing in Dataverse alone does not enforce an audience |

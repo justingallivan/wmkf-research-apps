@@ -114,7 +114,7 @@ proposal capabilities deliberately have `destinationField: null`.
 | Desired output | Existing key or implementation | Required handoff work |
 | --- | --- | --- |
 | Short title/objective | New `preflight.short-title`; legacy `grantee-title.generate` preserved | D37 approves `akoya_request.wmkf_wmkfprojectdescription`. Pilot initializes once with original ETag. The isolated Preview pins the published Sandbox v1 definition. |
-| Executive summary | `proposal.executive-summary`; 200-word draft capability | Approve exact destination and audience; do not silently reuse legacy `wmkf_ai_summary` or document-section fields. |
+| Executive summary | `proposal.executive-summary`; 200-word draft capability | Review the [proposed dedicated field contract](PA_EXECUTIVE_SUMMARY_FIELD_CONTRACT_2026-11-13.md); destination/audience/event remain unapproved and document selection stays open. |
 | Methodology | `proposal.methodology`; draft capability | Approve the destination and write policy; wording/length optimization is deferred. |
 | Personnel | Workbook P4, existing analog discovery | Approve task instructions, output shape and exact destination. |
 | Intake rationale | Workbook P5 | Define versioned storage/write contract, not an unconditional overwrite. |
