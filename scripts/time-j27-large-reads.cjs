@@ -192,7 +192,9 @@ async function main() {
           return timing.value?.proposals;
         });
         if (timing) {
-          const before = timing.steps.reduce((total, step) => total + step.milliseconds, 0);
+          // program_catalog and program_assignments run inside program_scope.
+          const before = timing.steps.filter((step) => ['pd_resolution', 'role', 'program_scope'].includes(step.name))
+            .reduce((total, step) => total + step.milliseconds, 0);
           print(`    ${timing.steps.map((step) => `${step.name} ${Math.round(step.milliseconds)}`).join(', ')}, request list with reads beside it ${Math.round(timing.milliseconds - before)} (ms)`);
         }
       }

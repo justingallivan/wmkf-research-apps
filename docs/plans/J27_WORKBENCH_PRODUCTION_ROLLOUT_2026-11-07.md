@@ -214,7 +214,16 @@ rollup reading four chunks at a time (below).
   (`ROLLUP_READ_CONCURRENCY`), counting in chunk order; a failed chunk still
   fails the rollup. `scripts/time-j27-large-reads.cjs --email=…` also times
   the whole cycle-page server read (`loadDashboard`) per cycle, request list
-  included; not yet run.)*
+  included.)* *(2026-11-13, measured again [VERIFIED via the same script,
+  owner-run, 300 requests, three rounds]: with the rollup at 4 the whole set
+  of list reads takes 0.42 to 0.54 s (1.54 to 1.62 s with everything
+  sequential; 0.29 to 0.32 s at 8). Staying at 4 keeps about 20 queries in
+  flight per page; every page shares the app's Dataverse identity and its
+  concurrent-request limit [ASSUMED from Microsoft's service protection
+  limits, not checked here]. The whole-page read could not be measured at
+  300 rows: past cycles show 1 (J26) and 25 (D26) rows to Research staff,
+  because decided requests drop out of the list. On those, program scope
+  took 0.2 to 0.5 s and the request list with its reads 0.2 to 0.6 s.)*
 - **Preview needs `FINAL_WRITEUP_SCHEMA_READY=on`** for its branch to show
   the review stages (group and leadership review) and to rehearse the Final
   Assessment list's standing chips. It is set for Production and another
