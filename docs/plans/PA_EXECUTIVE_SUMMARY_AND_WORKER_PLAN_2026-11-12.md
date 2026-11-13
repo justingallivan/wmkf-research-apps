@@ -81,7 +81,9 @@ cache reuse or add an extraction framework for this slice.
 
 [PLANNED, owner requested inclusion 2026-11-13] Add one monotonic Request Boolean
 meaning “staff edited Summary”; its logical name, security and provisioning are
-not yet settled. It is not an existing field or an implemented guarantee.
+not yet settled. It is not an existing field or an implemented runtime guarantee.
+A disconnected command builder now exercises the contract with a synthetic marker
+and versioned fake rows; see the offline protection evidence below.
 
 - Every deliberate staff Summary save or clear sets the marker true in the same
   concrete-ETag PATCH as `wmkf_layabstract`. An explicit clear of an already blank
@@ -476,3 +478,39 @@ Changed-fact reconciliation updated this plan, architecture, Atlas, service cata
 and branch handoff; repeat searches found no remaining Short-Title-only retention
 claim in the scoped current docs. Both newly created disposable containers were
 removed after testing; the pre-existing roster container was untouched.
+
+
+## Offline staff-edit protection (2026-11-13)
+
+[VERIFIED via source and synthetic unit tests] `summary-edit-protection.js` is a
+pure, disconnected command builder. `prepareSummaryStaffEdit` emits immutable
+text + true-marker intent with a concrete original version, even for unchanged or
+already blank text. `captureSummaryBaseline` returns only that original version
+when text is null/empty and the marker is exactly false. Missing, malformed, true
+markers, invalid versions and nonblank/whitespace text fail closed.
+
+The neutral DTO keys `text`, `staffEdited` and `version` are synthetic contract
+names, not proposed Dataverse logical columns. The helper performs no reads or
+writes and grants no authorization or cohort eligibility. Tests apply its commands
+to a versioned in-memory fake with atomic conditional writes. They cover edit then
+clear before capture, deliberate blank clear, post-capture edits/clears, machine-first
+ordering and stale staff-save failure without partial marker/text mutation. Frozen
+commands preserve the observed version if input objects later change.
+
+Contract trace: synthetic caller → pure helper → fake conditional row write →
+asserted readback. Runtime UI/routes, production persistence, batching and async
+execution are N/A in this slice. Future adapters must apply the two fields in ONE
+conditional PATCH, preserve authorization and original-version checks, and never
+retry with a refreshed ETag. The helper does not establish this external guarantee.
+All manual writers, explicit-clear UI, actual marker schema/security, new-cohort
+eligibility, intake event/readiness ordering and Summary admission/publication remain
+unimplemented or unsettled. No intake decision, Dataverse schema, runtime route,
+Connor test or deployment changed. Source remains Submission-Documents narrative.
+
+Verification: 94 tests across the new protection, existing narrative service and
+Summary source suites passed, including 32 new synthetic protection cases. Scoped
+ESLint and documentation currency/catalog/symbol gates plus available sequential
+self-tests passed. Independent read-only review found no material issues, while
+explicitly limiting the evidence to command formation and a synthetic atomic-write
+model. Runtime references to the new exports are absent; only the unit suite imports
+them. The existing runtime marker/integration requirements above remain open.

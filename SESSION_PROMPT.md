@@ -54,7 +54,9 @@ No runtime promotion to main is authorized by this handoff.
 Offline follow-up (November 13): Summary source adapter and permanent reservation
 retention are branch-built with synthetic/local PostgreSQL tests. Failure release
 is now synthetic/test-only; Summary admission/publication remain disabled. The
-staff-edit marker and intake contracts remain open. No live calls or deployment.
+staff-edit command builder and synthetic row-version race tests are also branch-built
+(`summary-edit-protection.js`); actual marker schema/writers and intake contracts
+remain open. No live calls or deployment.
 
 1. Await Connor's completed-job POST/replay/poll results. Owner sent the test email
    on November 13. His earlier status check
