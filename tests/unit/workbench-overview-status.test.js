@@ -130,3 +130,17 @@ describe('OverviewTab', () => {
     expect(screen.queryByText('Loading overview…')).not.toBeInTheDocument();
   });
 });
+
+// C7 amendment (2026-11-12): a 2027-or-later request page loads the rollup itself and
+// passes it down; the Overview then neither fetches it again nor reports it a second time.
+describe('OverviewTab with the page-loaded reviewer rollup', () => {
+  it('shows the page state, makes no rollup read, and leaves reporting to the page', async () => {
+    const fetchSpy = mockRollup();
+    const onJ27Facts = jest.fn();
+    const pageProgress = { status: 'ready', data: { counts: { candidates: 4, invited: 1, accepted: 0, completed: 0 }, needed: 3, hint: null } };
+    render(<OverviewTab context={baseCtx} requestId="r1" onSelectTab={() => {}} onJ27Facts={onJ27Facts} reviewerProgress={pageProgress} />);
+    expect(await screen.findByText('4')).toBeInTheDocument();
+    expect(fetchSpy.mock.calls.filter(([url]) => String(url).includes('reviewer-rollup'))).toHaveLength(0);
+    expect(onJ27Facts.mock.calls.filter(([, patch]) => 'progress' in (patch || {}))).toHaveLength(0);
+  });
+});

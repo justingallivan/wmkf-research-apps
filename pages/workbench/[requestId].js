@@ -21,6 +21,7 @@ import Layout, { Card } from '../../shared/components/Layout';
 import RequireAppAccess from '../../shared/components/RequireAppAccess';
 import TestRequestBadge from '../../shared/components/TestRequestBadge';
 import J27StageStrip from '../../shared/components/workbench/J27StageStrip';
+import useReviewerProgress from '../../shared/components/workbench/useReviewerProgress';
 import { deriveJ27PageStage } from '../../shared/utils/j27PageStage';
 import { isJ27ScopeCycle } from '../../lib/services/workbench/j27-read-model';
 import { useAppAccess } from '../../shared/context/AppAccessContext';
@@ -123,6 +124,15 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
     && typeof ctx?.requestId === 'string'
     && ctx.requestId.toLowerCase() === routeRequestId.toLowerCase();
   const visibleContext = contextMatchesRoute && ctxOwnerGeneration === routeGeneration ? ctx : null;
+  // The strip needs reviewer counts on whichever tab the request opens on (a Peer
+  // Review list row links to the Peer Review tab), so a 2027-or-later page loads the
+  // rollup here and the Overview reads this state (C7 amendment, 2026-11-12).
+  const j27ReviewerProgress = useReviewerProgress(visibleContext?.j27 ? routeRequestId : null);
+  useEffect(() => {
+    if (visibleContext?.j27 && routeRequestId && j27ReviewerProgress.status !== 'loading') {
+      reportJ27Facts(routeRequestId, { progress: j27ReviewerProgress });
+    }
+  }, [visibleContext, routeRequestId, j27ReviewerProgress, reportJ27Facts]);
   const j27Stage = useMemo(() => (visibleContext?.j27?.input
     ? deriveJ27PageStage(visibleContext.j27.input, j27Facts.requestId === routeKey ? j27Facts : {})
     : null), [visibleContext, j27Facts, routeKey]);
@@ -387,6 +397,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
           chairsRecommendationEnabled={showChairsRecommendation}
           meetingRosterEnabled={meetingRosterEnabled}
           onJ27Facts={visibleContext?.j27 ? reportJ27Facts : null}
+          reviewerProgress={visibleContext?.j27 ? j27ReviewerProgress : null}
         />
       ) : activeTab === 'reviewers' ? (
         <ReviewersTab

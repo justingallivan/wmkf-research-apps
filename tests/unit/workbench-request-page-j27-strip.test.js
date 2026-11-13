@@ -8,10 +8,12 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 
 let routeId = 'request-a';
+let routeTab = 'overview';
+let routeSection;
 const pending = new Map();
 let overviewFacts = null;
 
-jest.mock('next/router', () => ({ useRouter: () => ({ query: { requestId: routeId, tab: 'overview' }, push: jest.fn() }) }));
+jest.mock('next/router', () => ({ useRouter: () => ({ query: { requestId: routeId, tab: routeTab, ...(routeSection ? { section: routeSection } : {}) }, push: jest.fn() }) }));
 jest.mock('next-auth/react', () => ({ useSession: () => ({ data: { user: { profileName: 'Test User', dynamicsSystemuserId: 'user-1' } } }) }));
 jest.mock('next/link', () => function LinkStub({ children }) { return <a href="#">{children}</a>; });
 jest.mock('../../shared/components/Layout', () => ({ __esModule: true, default: ({ children }) => <div>{children}</div>, Card: ({ children }) => <div>{children}</div>, Button: ({ children }) => <button type="button">{children}</button> }));
@@ -50,7 +52,7 @@ const invitedInput = { ...input, request: { ...input.request, requestStatus: 'Ph
 const resolved = (id, j27 = true, stageInput = invitedInput) => ({ ok: true, json: async () => ({ success: true, requestId: id, requestNumber: '1000384', cycleCode: 'J27', ...(j27 ? { j27: { phase: 'initial-assessment', input: stageInput } } : {}) }) });
 
 beforeEach(() => {
-  routeId = 'request-a'; pending.clear(); overviewFacts = null;
+  routeId = 'request-a'; routeTab = 'overview'; routeSection = undefined; pending.clear(); overviewFacts = null;
   global.fetch = jest.fn((url) => new Promise((resolve) => pending.set(String(url), resolve)));
 });
 
@@ -77,6 +79,33 @@ test('a request recommended to the Chairs reads as a wait, before and after its 
   await act(async () => { overviewFacts({ progress: { status: 'ready', data: { counts: { candidates: 2, received: 0 } } } }); });
   expect(screen.getByLabelText('Where this request stands')).toHaveTextContent('Awaiting the Chairs’ outcome');
   expect(screen.getByLabelText('Where this request stands')).not.toHaveTextContent('Identify reviewers');
+});
+
+// Preview walk-through, 2026-11-12: a Peer Review list row opens the request on its
+// Peer Review tab, where no Overview mounts. The page loads the reviewer counts
+// itself so the strip names the same next step as the row.
+test('opened on Peer Review, the page loads the reviewer counts itself and the strip matches the list row', async () => {
+  routeTab = 'peer-review'; routeSection = 'reports';
+  const awaitingPhaseII = { ...invitedInput, request: { ...invitedInput.request, requestStatus: 'Proposal Invited' } };
+  render(<WorkbenchRequest staffReviewSummary />);
+  await act(async () => { pending.get('/api/workbench/resolve-request?requestId=request-a')(resolved('request-a', true, awaitingPhaseII)); });
+  const strip = await screen.findByLabelText('Where this request stands');
+  expect(screen.queryByTestId('overview')).toBeNull();
+  const rollupUrl = '/api/workbench/reviewer-rollup?requestId=request-a';
+  await waitFor(() => expect(pending.has(rollupUrl)).toBe(true));
+  const body = { success: true, counts: { candidates: 2, invited: 0, accepted: 0, completed: 0, received: 0 }, needed: 3 };
+  await act(async () => { pending.get(rollupUrl)({ ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) }); });
+  await waitFor(() => expect(screen.getByLabelText('Where this request stands')).toHaveTextContent('Next: Identify reviewers'));
+  // Only the counts moved; the other facts still load as their tabs open (C7).
+  expect(strip).toHaveTextContent('Some facts load as you open tabs.');
+  expect(global.fetch.mock.calls.filter(([url]) => String(url).startsWith('/api/workbench/reviewer-rollup'))).toHaveLength(1);
+});
+
+test('a pre-2027 request makes no page-level reviewer counts read', async () => {
+  render(<WorkbenchRequest />);
+  await act(async () => { pending.get('/api/workbench/resolve-request?requestId=request-a')(resolved('request-a', false)); });
+  await waitFor(() => expect(screen.getByTestId('overview')).toBeInTheDocument());
+  expect(global.fetch.mock.calls.filter(([url]) => String(url).startsWith('/api/workbench/reviewer-rollup'))).toHaveLength(0);
 });
 
 test('facts reported for one request never shape another request\'s strip', async () => {

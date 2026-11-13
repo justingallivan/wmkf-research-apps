@@ -4,11 +4,11 @@
  * reviewer rollup are still available below it.
  */
 
-import { useState, useEffect, useRef } from 'react';
-import { requestEnvelope } from '../../utils/api-request';
+import { useEffect } from 'react';
 import { Card } from '../Layout';
 import { StatusBadge } from './StatusTab';
 import J27Overview from './J27Overview';
+import useReviewerProgress from './useReviewerProgress';
 
 const USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 const money = (n) => (typeof n === 'number' && Number.isFinite(n) ? USD.format(n) : '—');
@@ -65,34 +65,6 @@ function aiArtifacts(ai = {}) {
   ].map(([label, v]) => ({ label, present: !!v }));
 }
 
-function useReviewerProgress(requestId) {
-  const requestKey = String(requestId || '').toLowerCase();
-  const [state, setState] = useState({ status: 'loading', data: null, requestKey: '' });
-  const reqRef = useRef(0);
-
-  useEffect(() => {
-    if (!requestId) return undefined;
-    const token = (reqRef.current += 1);
-    let cancelled = false;
-    setState({ status: 'loading', data: null, requestKey });
-    // Lightweight per-request rollup (counts only, no person/researcher fan-out —
-    // Codex S260). Returns { counts, needed, workRemaining, hint }.
-    requestEnvelope(`/api/workbench/reviewer-rollup?requestId=${encodeURIComponent(requestId)}`, { tolerantBody: true })
-      .then(({ ok: resOk, status: resStatus, data: body }) => {
-        if (cancelled || token !== reqRef.current) return;
-        if (!resOk || !body.success) throw new Error(body.error || `Failed (${resStatus})`);
-        const counts = body.counts && typeof body.counts === 'object' ? body.counts : {};
-        setState({ status: 'ready', data: { counts, needed: body.needed, hint: body.hint }, requestKey });
-      })
-      .catch(() => {
-        if (!cancelled && token === reqRef.current) setState({ status: 'error', data: null, requestKey });
-      });
-    return () => { cancelled = true; };
-  }, [requestId, requestKey]);
-
-  return state.requestKey === requestKey ? state : { status: 'loading', data: null };
-}
-
 function ReviewerProgress({ state, showHint }) {
   if (state.status === 'loading') return <p className="text-sm text-gray-500">Loading reviewer progress…</p>;
   if (state.status === 'error') return <p className="text-sm text-amber-600">Couldn’t load reviewer progress.</p>;
@@ -113,12 +85,15 @@ function ReviewerProgress({ state, showHint }) {
   );
 }
 
-export default function OverviewTab({ context, requestId, onSelectTab, j27Handoffs, initialRationaleEnabled, chairsRecommendationEnabled, meetingRosterEnabled, onJ27Facts = null }) {
-  const reviewerProgress = useReviewerProgress(requestId);
+export default function OverviewTab({ context, requestId, onSelectTab, j27Handoffs, initialRationaleEnabled, chairsRecommendationEnabled, meetingRosterEnabled, onJ27Facts = null, reviewerProgress: pageProgress = null }) {
+  // A 2027-or-later request page loads the rollup itself and reports it to the
+  // strip (C7 amendment, 2026-11-12); this tab then reads that state and fetches nothing.
+  const ownProgress = useReviewerProgress(pageProgress ? null : requestId);
+  const reviewerProgress = pageProgress || ownProgress;
   // Step E: the page recomputes the J27 stage once the rollup settles (plan C7).
   useEffect(() => {
-    if (onJ27Facts && requestId && reviewerProgress.status !== 'loading') onJ27Facts(requestId, { progress: reviewerProgress });
-  }, [onJ27Facts, requestId, reviewerProgress]);
+    if (!pageProgress && onJ27Facts && requestId && reviewerProgress.status !== 'loading') onJ27Facts(requestId, { progress: reviewerProgress });
+  }, [pageProgress, onJ27Facts, requestId, reviewerProgress]);
   const info = context?.proposalInfo || {};
   const coPIs = Array.isArray(info.coPIs) ? info.coPIs : [];
   const artifacts = aiArtifacts(context?.aiContent);
