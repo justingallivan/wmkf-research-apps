@@ -1,12 +1,11 @@
 # Bounded automatic Short Title trial — approval packet
 
-Status: REQUEST-CREATION BLOCKER RECOVERED on 2026-11-13 UTC after Justin
-explicitly approved the Opus-reviewed, one-create sandbox GoVerify workaround.
-Request **1000389** now exists and Factory verification passed. GoVerify was restored
-and independently verified active with exactly one active activation. Connor’s
-Request and ledger receipts remain unchanged. No new deployment or AI call has run.
-Next: continue the already-approved abstract seed and isolated Preview/worker trial
-against this existing new Request; never repeat Factory create.
+Status: PASSED on 2026-11-13 UTC. The approved recovery created Request 1000389;
+the separate immutable Preview then completed one automatic five-tick Short Title
+run. The output and audit were read back from Sandbox Dataverse. Same-key replay
+returned the identical succeeded job/version without changing the Request ETag,
+attempt or publication counts. Connor’s original scoped ledger and Request remain
+unchanged. No schedule is installed and no further paid call is authorized by this trial.
 
 The original no-bypass approval and failed attempt below are historical evidence.
 Justin’s subsequent explicit approval superseded only that restriction for the
@@ -398,4 +397,65 @@ Recovery used the original Factory execute command with the refreshed
 `--bypass-goverify` flag. Both files reside in `/private/tmp`. The independent
 activation receipt is `/private/tmp/wmkf-goverify-restore-check.log`.
 This consumed the one-create workaround authorization. Do not deactivate again or
-recreate this Request. Continue the remaining approved trial using its existing GUID.
+recreate this Request. The subsequent worker trial below used its existing GUID.
+
+## Automatic worker trial — passed
+
+[VERIFIED 2026-11-13 UTC via hosted HTTP, driver receipt, PostgreSQL and Dataverse]
+Justin explicitly instructed continuation using Request 1000389. The exact approved
+536-character synthetic abstract was set once with If-Match; two subsequent source
+reads retained identical fields and ETag `61850420`, with blank destination.
+
+The clean export of runtime commit `23f71d2b54bb325f61626aa9f8dc1e402011ecf0` produced
+READY Preview `dpl_8fqpXo3nUwutCBNzFd1RiaBxCVYg`, with no alias:
+`https://wmkfresearchapps-nplsf4137-justin-gallivans-projects.vercel.app`.
+Its Resources table independently showed the drain route in IAD1, Node.js 22.x,
+48.4 MB and Max Duration ≤300 seconds. Deployment-only overrides came from the
+approved private pins; successful server admission and the persisted job confirmed
+`preview-sandbox`, the intended Entra principal, Request and
+`pa-short-title:d43a9644-3d09-40cb-b9ec-3d264b8c51c9` scope in the verified database.
+The API lists environment names, not their values; it is not independent readback
+of secret values. A separate deployment-specific protection cookie was created
+with a five-day share-link lifetime. No project-wide environment, alias, app grant,
+Connor credential or schedule changed.
+
+Admission returned HTTP 202, queued/version 1, job
+`d1008831-4266-4047-a25a-41178a631ebe`, using key
+`e0e068e8-e480-4fa6-880d-1c4ad1213acb`. The only driver edits were the approved
+BASE/JOB/LOCK substitutions. All 20 fake-HTTP tests and dry run passed. The reviewed
+driver ran once from 03:51:08.165Z to 03:52:07.192Z, with five sequential ticks:
+`snapshot_saved`, `target_captured`, `validated`, `audit_delivered`, `published`,
+followed by a succeeded status GET. It stopped without extra worker calls.
+The exclusive receipt remains `~/.wmkf-pa-worker-nplsf4137.receipt`; never clear it
+or restart this completed trial. No new runtime implementation was needed.
+
+Exactly one attempt `a5c2f50e-492e-4648-b3e3-0b2483f02c46` used
+`claude-sonnet-5-5`: 1,028 input, 28 output, 1,271 cache-creation and zero cache-read
+tokens, with complete usage. Audit `9eb80391-601c-4ae6-8f2b-6a4c054c1f85` read back
+with success status 682090000, the same model and prompt version 1. Publication
+`f44a63e6-4ec8-48d8-9918-99bfed30fac2` is applied against original ETag `61850420`.
+Dataverse output at ETag `61850430` exactly equals the retained validated result:
+
+> To develop an imaging method that observes changes in living cells with improved temporal resolution
+
+Completed same-key POST replay and subsequent GET both returned HTTP 200,
+`succeeded`, version 16, null polling hint, validated/applied and no error.
+Before/after replay comparisons found identical scoped ledger proof and selected
+Request fields/ETag. There is one attempt and one applied publication for this job;
+global totals are two jobs/two attempts/two publications, including Connor’s prior
+one/one/one. Connor’s scoped ledger (excluding intentionally changed global totals)
+and selected Request fields/ETag compare exactly equal to the original baseline.
+No different-key admission or post-success worker tick was needed for this trial.
+This proves same-key duplicate protection and supervised automatic stage advancement,
+not an unattended scheduler or Connor’s pending Power Automate submit/poll test.
+
+Supplementary private receipts: `/private/tmp/wmkf-pa-auto-title-job-state-20261112.json`,
+`/private/tmp/wmkf-pa-auto-title-ledger-proof-20261112.json`,
+`/private/tmp/wmkf-pa-auto-title-source-latest-20261112.json` and
+`/private/tmp/wmkf-pa-auto-title-audit-proof-20261112.json`. The filename date is inherited
+from the operator helpers; the run timestamps above are authoritative. Retain the
+Request, folder, location and ledger under the existing trial retention; no deletion
+or additional infrastructure was introduced. Summary source/destination and Production
+scheduling decisions remain open. Existing Opus plan/build reviews cover the unchanged
+driver logic; the mechanical pin substitutions and 20-test rerun are the approved
+post-admission checkpoint, not a new architecture review.

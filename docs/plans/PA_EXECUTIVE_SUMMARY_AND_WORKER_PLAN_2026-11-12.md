@@ -1,10 +1,10 @@
 # Next Power Automate slice: Executive Summary and worker automation
 
 Owner: Codex; branch `codex/power-automate-integration-2026-11-11`.
-Status: proposed design plus an offline-tested bounded operator driver; not activation
-approval. No runtime routes, schema, credentials, schedules, deployed configuration
-or sandbox records changed.
-Connor’s existing Short Title replay test remains isolated and unchanged.
+Status: supervised Short Title worker trial passed on isolated Request 1000389.
+Executive Summary and unattended scheduling remain proposed and unactivated.
+Connor’s original Short Title deployment, Request and scoped ledger are unchanged.
+See the [trial receipt](PA_BOUNDED_LIVE_TRIAL_APPROVAL_2026-11-13.md#automatic-worker-trial--passed).
 
 ## Recommendation
 
@@ -116,16 +116,15 @@ must acquire the existing lease and cannot repeat dispatch or publish.
 
 ### Immediate sandbox path
 
-The completed Short Title fixture needs no worker tick. While Connor tests, make no
-sandbox change. For a future approved fresh trial, an operator-owned bounded driver
-can call the current POST drain sequentially, inspect every response, and stop at
+Connor’s completed Short Title fixture needs no worker tick. The separately approved
+Request 1000389 trial used an operator-owned bounded driver to call the current POST drain sequentially, inspect every response, and stop at
 completion, error, uncertainty, expiry or a fixed tick/time budget. A client timeout, network error or non-200 response stops the driver without retry.
 Its HTTP timeout must exceed the verified server budget plus network margin; never
 start another tick while the prior one may still be running. Read-only diagnosis and
 lease reconciliation must establish the outcome before any operator-directed resume.
 This is supervised trial automation, not a durable production scheduler. It may run on the operator’s
 machine; Connor still needs only Power Automate. The subsequent authorized offline
-build is recorded below; live execution remains unapproved.
+build is recorded below; its separate approved live execution passed on Request 1000389.
 No new scheduler service/project or broad cron-secret sharing is justified for a
 single sandbox trial. A durable unattended Preview requirement would need a separate
 hosting decision; do not promote the existing sandbox to Production to get a timer.
@@ -195,7 +194,8 @@ claimed from that driver. Existing paid runtime approval does not authorize a ne
    and any Summary trial additionally wait for source selection with the caching work.
    Neither is Summary-ready while its prerequisites remain open.
 3. The bounded driver now has offline tests (below). Scheduler implementation and
-   deployed budget verification remain pending. Review any scheduler implementation
+   future scheduler budget verification remain pending. The supervised driver trial
+   and its Preview duration verification passed. Review any scheduler implementation
    with Opus 5.5 before deployment or activation.
 4. Build only the selected Summary mode once the source/destination contract is final;
    then request one bounded end-to-end trial. Leave broader prompts and multi-task
@@ -224,25 +224,25 @@ These are closed plan edits, not implementation or deployment evidence. Document
 and fact gates passed. Existing current-state restatements remain accurate: machine
 Summary and scheduling are still unbuilt; the pilot stays unchanged.
 
-## Bounded operator driver: offline build
+## Bounded operator driver: implementation and live use
 
 `../../scripts/run-pa-sandbox-worker.cjs` is a standalone Node operator utility,
 not a Power Automate action or deployed worker. It does not submit jobs, issue
 credentials, change policy, or implement Summary. The current exact Preview/job
-pins mean a normal run against the completed fixture would GET status and send
-zero worker POSTs. A fresh trial requires reviewed pin changes and separate approval.
+pins name the completed Request 1000389 trial. Its retained receipt prevents another
+execution. The original offline build was followed by the separately approved live
+trial; Connor’s fixture was never advanced by this driver.
 
 Default invocation is a network-free dry run. `--help` explains arguments; `--execute`
-is the only CLI execution switch. No live invocation was performed. Do not execute
-merely to test the completed fixture while Connor is using it.
+is the only CLI execution switch. Do not run the completed trial again.
 
 A private regular file owned by the operator, mode 0600, supplies `baseUrl`, `jobId`,
 `serverBudgetMs`, `budgetVerified: true`, `cronSecret`, `statusToken` and `cookie`.
-Use the pinned Preview base URL and existing completed job ID from the handoff.
+Use only the exact Preview and job pins recorded in the live-trial receipt.
 The status token is a short-lived Entra app bearer token acquired by the operator;
 it is not the app client secret. The cookie is the single `_vercel_jwt=…` pair.
 The cron secret stays operator-only. Do not put any of these in CLI arguments,
-logs, commits, flow exports or messages. No credential file was created for this build.
+logs, commits, flow exports or messages. A private credential file was created for the approved live trial.
 
 Before live approval, verify effective deployed function duration and the provider/
 lease/checkpoint invariant above. `budgetVerified` is an operator attestation, not
@@ -258,7 +258,7 @@ progress stages permit another status check. `published` alone never means succe
 GET must confirm succeeded + validated + applied + no error. Requests are awaited,
 redirects disabled, and failures never retried. Five seconds separate successful ticks.
 
-An exclusive retained receipt at `~/.wmkf-pa-worker-n7hku44p8.receipt` prevents
+An exclusive retained receipt at `~/.wmkf-pa-worker-nplsf4137.receipt` prevents
 cooperating drivers in the same user account from overlapping or restarting blindly. Tick
 intent is flushed before POST. The script never removes this receipt, including on
 success. `--help` prints its exact path. After a crash/timeout, an operator must inspect
@@ -273,8 +273,8 @@ real temporary receipt files, including completion with zero POSTs, sequential t
 concurrent local exclusion, retained crash guard, transport/non-200/JSON uncertainty,
 wrong job/status, false success, cutoff/time/tick bounds and configuration rejection.
 No provider, Dataverse, Vercel or Entra endpoint is used by these tests. Scheduler GET
-routing, Production policy, deployed budget, multi-scope fairness and live automatic
-progression remain unbuilt/unverified, as applicable.
+routing, Production policy and multi-scope fairness remain unbuilt. The separate
+live trial verified its deployed budget and supervised automatic progression.
 
 Build review: Opus 5.5 via OAuth, tools disabled, verdict GO with fresh-trial
 conditions. Packet SHA-256
@@ -291,17 +291,17 @@ state. Optional config-file TOCTOU hardening was not required for this operator-
 file and is not represented as implemented. Twenty offline tests and scoped ESLint
 passed; scheduler implementation remains outside this build.
 
-## Deployment timing and proposed live trial
+## Deployment timing and completed live trial
 
-[VERIFIED 2026-11-13 UTC via the pinned deployment’s Vercel Resources table]
-The current worker function has Max Duration ≤300 seconds. This resolves the
-120-second wildcard versus 300-second route ambiguity for that deployment, not
-for a future one. No timeout call was performed. The existing 240-second lease
-and lease-end-minus-five-second provider deadline remain source-verified; this
-is not a wall-clock performance guarantee. The [bounded live-trial approval packet](PA_BOUNDED_LIVE_TRIAL_APPROVAL_2026-11-13.md)
-records the evidence, preallocated synthetic Request, proposed separate Preview/scope,
-side effects and stop conditions. Justin approved execution, but the sole Factory
-Request create was rejected with HTTP 400 / downstream 500. Read-only recovery
-confirmed the Request absent. No deployment, worker/model call or grant was created;
-Connor’s Request and ledger remained unchanged. The trial is stopped under its
-no-retry/no-bypass conditions, pending resolution of sandbox create automation.
+[VERIFIED 2026-11-13 UTC via both Preview Resources tables and live receipts]
+The original and new isolated Preview drain functions each showed Max Duration
+≤300 seconds. No forced timeout was tested. The 240-second lease and provider
+deadline remain unchanged. The first ordinary create failed in GoVerify; Justin
+then approved one temporary bypass, which created Request 1000389 and restored
+the workflow before subsequent work. The separate Preview completed five automatic
+worker stages in about 59 seconds, with one generation/audit/publication. Same-key
+replay left the output, ETag and scoped ledger unchanged; Connor’s original Request
+and scoped ledger also remained unchanged. The
+[trial receipt](PA_BOUNDED_LIVE_TRIAL_APPROVAL_2026-11-13.md#automatic-worker-trial--passed)
+records exact pins and evidence. This is supervised operator automation, not an
+unattended Production scheduler. No schedule is active.

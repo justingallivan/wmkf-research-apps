@@ -1,8 +1,8 @@
 # Power Automate prompt delivery: implementation and Connor handoff
 
 Owner: Codex in `codex/power-automate-integration-2026-11-11`.
-Status: isolated Short Title Sandbox Preview completed one authorized generation and field delivery. Justin reported that Connor’s Power Automate status check returned the expected 404. A Power Automate submission flow remains pending.
-Last verified: 2026-11-12 (Arizona) via hosted Preview, Entra token issuance, Neon and Sandbox Dataverse readbacks.
+Status: two isolated Short Title Sandbox trials completed authorized generation and field delivery, including one automatic bounded-driver run. Justin reported that Connor’s Power Automate status check returned the expected 404. A Power Automate submission flow remains pending.
+Last verified: 2026-11-13 UTC via hosted Preview, Entra token issuance, Neon and Sandbox Dataverse readbacks.
 
 ## Outcome
 
@@ -97,12 +97,13 @@ The [Executive Summary and worker automation plan](PA_EXECUTIVE_SUMMARY_AND_WORK
 records the next proposed slice while Connor tests. Summary remains draft-only;
 source, exact destination, audience and initialization/refresh semantics still need
 decisions. The plan separates supervised sandbox stage advancement from eventual
-Production scheduling. Its bounded operator driver is built and tested offline;
-it has not been run live. A [separate bounded trial was approved but stopped at Request creation](PA_BOUNDED_LIVE_TRIAL_APPROVAL_2026-11-13.md#execution-outcome--stopped-before-deployment-or-generation).
-Dataverse rejected the sole create attempt; read-only recovery found the Request
-absent. No new deployment or model call occurred, and Connor’s source and ledger
-are unchanged. The current deployment’s 300-second worker duration was verified
-read-only. No schedule is active.
+Production scheduling. Its bounded operator driver passed a
+[separate live trial on Request 1000389](PA_BOUNDED_LIVE_TRIAL_APPROVAL_2026-11-13.md#automatic-worker-trial--passed):
+five sequential ticks, one generation/audit/publication, exact output readback and
+same-key replay without another write. The new Preview has its own scope and
+operator credentials; Connor’s original Request, job, deployment and credentials
+are unchanged. Both deployed worker durations were verified as ≤300 seconds.
+No unattended schedule is active; Connor’s Power Automate submit/poll result remains pending.
 
 ## Prompt-to-field handoff inventory
 

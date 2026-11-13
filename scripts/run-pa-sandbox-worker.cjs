@@ -6,11 +6,11 @@
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const BASE = 'https://wmkfresearchapps-n7hku44p8-justin-gallivans-projects.vercel.app';
-const JOB = '7e68cdfe-4dda-47f1-9163-7a3dc4b517f5';
+const BASE = 'https://wmkfresearchapps-nplsf4137-justin-gallivans-projects.vercel.app';
+const JOB = 'd1008831-4266-4047-a25a-41178a631ebe';
 const CUTOFF = Date.parse('2026-11-18T19:30:00Z');
 const PROGRESS = new Set(['snapshot_saved', 'target_captured', 'validated', 'audit_delivered', 'published', 'succeeded']);
-const LOCK = path.join(os.homedir(), '.wmkf-pa-worker-n7hku44p8.receipt');
+const LOCK = path.join(os.homedir(), '.wmkf-pa-worker-nplsf4137.receipt');
 function fail(code) { throw new Error(code); }
 function validate(config) {
   if (!config || config.baseUrl !== BASE || config.jobId !== JOB
