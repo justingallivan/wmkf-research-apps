@@ -73,7 +73,8 @@ group-review guard (D63/D64), the 2027+ Proposal-tab files and staff version
 (D59 to D61), the nav order, the Scoring card for 2027+ with an explicit
 Save outside the phase layout, and the reviewer Invite list excluding
 candidates whose review was already received, the structured integrity
-news rule, and the 8000-token integrity analysis limit (below).
+news rule, the 8000-token integrity analysis limit, and the reviewer
+rollup reading four chunks at a time (below).
 
 - **Integrity news analysis, 2026-11-13 (owner go; reaches Production on
   merge).** The structured news rule from `318f9642c` and `35a445bec` runs
@@ -207,8 +208,13 @@ news rule, and the 8000-token integrity analysis limit (below).
   whole set takes 1.47 to 1.69 s at every level, because the rollup
   (sequential on `main`, 1.6 to 2.0 s) is the slowest read. No read failed
   or came back capped, and 8 chunks drew no throttling. The J27 reads
-  therefore add almost nothing to a 300-request page at 4; the request-list
-  read itself was not measured.)*
+  therefore add almost nothing to a 300-request page at 4.)* *(2026-11-13,
+  owner go; reaches Production on merge for every cycle: the reviewer
+  rollup (`fetchReviewerRollup`) now reads four chunks at a time
+  (`ROLLUP_READ_CONCURRENCY`), counting in chunk order; a failed chunk still
+  fails the rollup. `scripts/time-j27-large-reads.cjs --email=…` also times
+  the whole cycle-page server read (`loadDashboard`) per cycle, request list
+  included; not yet run.)*
 - **Preview needs `FINAL_WRITEUP_SCHEMA_READY=on`** for its branch to show
   the review stages (group and leadership review) and to rehearse the Final
   Assessment list's standing chips. It is set for Production and another
