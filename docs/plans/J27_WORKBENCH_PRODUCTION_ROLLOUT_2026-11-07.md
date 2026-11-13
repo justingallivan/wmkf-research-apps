@@ -51,6 +51,25 @@ these changes:
 | `CHAIRS_RECOMMENDATION_ENABLED` | Recommendation to Chairs step | Delete: the step is part of the flow |
 | `AUTOMATIC_INTEGRITY_SCREENING` (`on`, `off`, `simulate`) | Integrity screening after a recommendation | Delete once screening is always on |
 | `CHAIRS_RECOMMENDATION_REHEARSAL_REQUEST_ID`, `INTEGRITY_SIMULATION_REQUEST_IDS`, `INTEGRITY_SIMULATION_DB_URL` | Preview rehearsal only | Delete |
+| `WORKBENCH_PHASE_RELEASE` (added 2026-11-13) | Merge-dark gate (`lib/utils/workbench-phase-release.js`): the cycle page's phase lists, the request page's stage strip and J27 reads, readiness-only discovery (D1), the dashboard's J27 fact reads and the Final Writeup stage facts. Off in a Production deployment unless literal `on`; admitted in Preview, local and test | Delete once the release is live everywhere |
+
+**Merge-dark (2026-11-13, owner go).** An audit of the branch found that a
+merge alone would have shown Production staff the J27 cycle page, the
+request-page strip and readiness-only discovery, and would have run the J27
+reads (including the integrity join on `j27_integrity_jobs`, which needs
+migration 096). `WORKBENCH_PHASE_RELEASE` now gates all of these; unset in
+Production, every discovery consumer builds `main`'s filter and the old
+request list keeps Advancing / Set aside (restored for 2027-or-later rows,
+owner 2026-11-13). Setting it `on` is **not** the release by itself: the
+request page's phase layout and new fields still refuse Production
+(`pages/workbench/[requestId].js`, the rationale and roster readiness
+checks), and migration 096 must be applied first. Changes that reach
+Production on merge by the owner's decision: offramp refusals (D7/D63), the
+group-review guard (D63/D64), the 2027+ Proposal-tab files and staff version
+(D59 to D61), the nav order, the Scoring card for 2027+ with an explicit
+Save outside the phase layout, and the reviewer Invite list excluding
+candidates whose review was already received. The integrity news-analysis
+change (`318f9642c`, `35a445bec`) is not gated and awaits a comparison.
 
 - **Preview walk-through and move, 2026-11-12.** The owner walked the
   Preview and Claude took a second look in Chrome. The Final Assessment

@@ -218,6 +218,23 @@ describe('J27 read model (plan C7)', () => {
     expect(body.success).toBe(true);
     expect(body).not.toHaveProperty('j27');
   });
+  test('merge-dark: in a Production deployment without WORKBENCH_PHASE_RELEASE=on a J27 row gets no read model and none of the new reads', async () => {
+    const env = jest.replaceProperty(process, 'env', { ...process.env, VERCEL_ENV: 'production' });
+    try {
+      getById.mockResolvedValue(j27Row());
+      const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
+      expect(body.success).toBe(true);
+      expect(body).not.toHaveProperty('j27');
+      expect(existsAnySuggestionForRequests).not.toHaveBeenCalled();
+      expect(readLatestIntegrityStates).not.toHaveBeenCalled();
+      expect(loadJ27LaterFacts).not.toHaveBeenCalled();
+      expect(require('../../lib/services/workbench/program-scope-service').resolveDiscoveryScope).not.toHaveBeenCalled();
+      process.env.WORKBENCH_PHASE_RELEASE = 'on';
+      expect(await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' })).toHaveProperty('j27');
+    } finally {
+      env.restore();
+    }
+  });
   test('a pre-2027 row carries no read model and makes neither new read', async () => {
     const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
     expect(body).not.toHaveProperty('j27');

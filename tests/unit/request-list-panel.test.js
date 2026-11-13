@@ -64,7 +64,9 @@ beforeEach(() => {
   global.fetch = jest.fn();
 });
 
-test.each(['J27', 'D27'])('shows %s requests without the legacy Advancing controls', async (cycleCode) => {
+// This list renders only outside the J27 stage layout (WorkbenchShell), e.g. a
+// 2027 cycle before the release is admitted, so its rows keep triage (owner, 2026-11-13).
+test.each(['J27', 'D27', 'D26'])('%s requests keep the Advancing badge and triage control', async (cycleCode) => {
   global.fetch.mockResolvedValueOnce(response({
     cycleCode,
     proposals: [row({ advancing: true })],
@@ -74,8 +76,8 @@ test.each(['J27', 'D27'])('shows %s requests without the legacy Advancing contro
   renderPanel({ cycleCode });
 
   expect(await screen.findByRole('link', { name: '#1001' })).toBeInTheDocument();
-  expect(screen.queryByRole('combobox', { name: 'Triage status for request 1001' })).not.toBeInTheDocument();
-  expect(screen.queryByText('Advancing')).not.toBeInTheDocument();
+  expect(screen.getByTitle('Set triage status')).toHaveValue('advancing');
+  expect(screen.getAllByText('Advancing').some((node) => node.tagName === 'SPAN')).toBe(true);
 });
 
 test('retains same-key rows while triage refresh is held, then accepts a successful empty response', async () => {

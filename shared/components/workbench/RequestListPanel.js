@@ -19,7 +19,6 @@ import { TOOLBAR_CONTROL_HEIGHT_CLASS } from '../ToolbarSelect';
 import ScopeSegment from './ScopeSegment';
 import { TRIAGE_STATUS } from '../../config/triageStatus';
 import TestRequestBadge from '../TestRequestBadge';
-import { isJ27ScopeCycle } from '../../../lib/services/workbench/j27-read-model';
 
 // `done` means the request has enough completed reviews (REVIEWERS_NEEDED in
 // lib/services/reviewer-rollup.js), not that every accepted reviewer has
@@ -222,7 +221,6 @@ export default function RequestListPanel({
   const visibleProposals = hasCurrentSnapshot ? proposals : [];
   const visibleRollup = hasCurrentSnapshot ? rollup : null;
   const visibleError = errorKey === currentKey ? error : null;
-  const showLegacyTriage = !isJ27ScopeCycle(cycleCode);
 
   // Flip a request's triage status, then refetch (a row may drop out of the
   // default view once Set aside). The server enforces the hard manage gate.
@@ -331,9 +329,7 @@ export default function RequestListPanel({
             return (
               <li
                 key={p.requestId}
-                className={`relative grid grid-cols-1 gap-x-6 gap-y-2 px-4 py-3 transition-colors hover:bg-gray-50 focus-within:bg-gray-50 lg:items-center ${
-                  showLegacyTriage ? 'lg:grid-cols-[minmax(14rem,1fr)_10rem_16rem_9rem]' : 'lg:grid-cols-[minmax(14rem,1fr)_10rem_16rem]'
-                }`}
+                className="relative grid grid-cols-1 gap-x-6 gap-y-2 px-4 py-3 transition-colors hover:bg-gray-50 focus-within:bg-gray-50 lg:grid-cols-[minmax(14rem,1fr)_10rem_16rem_9rem] lg:items-center"
               >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -347,7 +343,7 @@ export default function RequestListPanel({
                     </Link>
                     <TestRequestBadge isTestRequest={p.isTestRequest} />
                     {p.institution && <span className="min-w-0 truncate text-sm text-gray-900">{p.institution}</span>}
-                    {showLegacyTriage && p.advancing && (
+                    {p.advancing && (
                       <span className="inline-flex items-center rounded-full bg-purple-50 px-2 py-0.5 text-xs font-semibold text-purple-800">
                         Advancing
                       </span>
@@ -366,13 +362,11 @@ export default function RequestListPanel({
                 <div className="lg:[&>div]:items-end">
                   <ReviewerStatusIndicator reviewers={p.reviewers} />
                 </div>
-                {showLegacyTriage && (
-                  <div>
-                    {cycleMetadataReady && p.canManage && (
-                      <TriageControl proposal={p} busy={savingIds.has(p.requestId)} onSet={setTriage} />
-                    )}
-                  </div>
-                )}
+                <div>
+                  {cycleMetadataReady && p.canManage && (
+                    <TriageControl proposal={p} busy={savingIds.has(p.requestId)} onSet={setTriage} />
+                  )}
+                </div>
               </li>
             );
           })}

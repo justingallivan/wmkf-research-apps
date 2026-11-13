@@ -521,6 +521,19 @@ describe('J27 read model on the proposal list (plan C7)', () => {
     expect(byNumber['1000385'].j27).not.toHaveProperty('input');
     expect(byNumber['1000385'].reviewers.candidates).toBe(1);
   });
+  test('merge-dark: a Production deployment without WORKBENCH_PHASE_RELEASE=on makes none of the J27 reads', async () => {
+    const env = jest.replaceProperty(process, 'env', { ...process.env, VERCEL_ENV: 'production' });
+    try {
+      queryAllRequests.mockResolvedValue({ capped: false, records: [j27(80), j27(85, { wmkf_phaseistatus: 707510005 })] });
+      const body = await loadDashboard(args({ cycleCode: 'J27', scope: 'all' }));
+      expect(existsAnySuggestionForRequests).not.toHaveBeenCalled();
+      expect(readLatestIntegrityStates).not.toHaveBeenCalled();
+      expect(loadJ27LaterFacts).not.toHaveBeenCalled();
+      expect(body.proposals.every((p) => !('j27' in p))).toBe(true);
+    } finally {
+      env.restore();
+    }
+  });
   test('later-phase facts load once per list, for 2027-or-later Research rows only', async () => {
     const d26 = { akoya_requestid: 'r-d26', akoya_requestnum: '1002836', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, akoya_requeststatus: 'Phase II Pending', wmkf_triagestatus: 100000000, _wmkf_grantprogram_value: '94cab30b-958f-ee11-8179-000d3a341e8f', _wmkf_programdirector_value: 'pd-1' };
     const socal = j27(82, { akoya_requeststatus: 'Phase II Pending', _wmkf_grantprogram_value: '8dcab30b-958f-ee11-8179-000d3a341e8f' });

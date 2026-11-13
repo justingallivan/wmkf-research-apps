@@ -483,12 +483,9 @@ test.each([true, false])('status projects the exact pending Final from populated
         failedAt: '2026-08-30T19:07:00Z',
       },
     },
-    stageFacts: {
-      presentation: { status: 'present', exists: true, id: null, ended: true, legacyException: false },
-      boardDraft: { status: 'present', exists: true },
-      transition: { status: 'present', phase: null },
-    },
   });
+  // A D26 request: stage facts are for the J27 request page only (no extra presentation read).
+  expect(result.stageFacts).toBeUndefined();
   expectFinalStatusReadPure(harness.dependencies, purityNames);
 });
 
@@ -542,12 +539,9 @@ test('status ignores pending rows after a valid committed Final pointer and rema
       lastError: null,
     },
     pendingArtifact: null,
-    stageFacts: {
-      presentation: { status: 'present', exists: true, id: null, ended: true, legacyException: false },
-      boardDraft: { status: 'present', exists: true },
-      transition: { status: 'present', phase: 'group-review' },
-    },
   });
+  // A D26 request: stage facts are for the J27 request page only (no extra presentation read).
+  expect(result.stageFacts).toBeUndefined();
   expectFinalStatusReadPure(harness.dependencies, forbidden);
 });
 
@@ -1037,7 +1031,26 @@ test('every default transition request read selects Phase II status and expands 
   });
 });
 
+const createHarnessBase = createHarness;
+
 describe('status stageFacts (request page stage model, every viewer)', () => {
+  test('merge-dark: a Production deployment without WORKBENCH_PHASE_RELEASE=on reads no stage facts', async () => {
+    const env = jest.replaceProperty(process, 'env', { ...process.env, VERCEL_ENV: 'production' });
+    try {
+      const h = createHarness();
+      const status = await getFinalWriteupStatus({ requestId: REQUEST_ID, isSuperuser: false, actingUserSystemId: OTHER_USER_ID }, h.dependencies);
+      expect(status.stageFacts).toBeUndefined();
+      expect(h.dependencies.findSiteVisits).not.toHaveBeenCalled();
+    } finally {
+      env.restore();
+    }
+  });
+  // Stage facts are read only for a 2027-or-later request (the J27 request page).
+  const createHarness = (...args) => {
+    const h = createHarnessBase(...args);
+    h.request.wmkf_GrantCycle = { wmkf_cyclecode: 'D27' };
+    return h;
+  };
   const ENDED_PRESENTATION = { status: 'present', exists: true, id: null, ended: true, legacyException: false };
 
   test('stage facts do not depend on who may start: a non-starting viewer sees the same ended presentation', async () => {
