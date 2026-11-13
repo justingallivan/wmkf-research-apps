@@ -224,6 +224,16 @@ rollup reading four chunks at a time (below).
   300 rows: past cycles show 1 (J26) and 25 (D26) rows to Research staff,
   because decided requests drop out of the list. On those, program scope
   took 0.2 to 0.5 s and the request list with its reads 0.2 to 0.6 s.)*
+  *(2026-11-13, third run [VERIFIED via the same script, owner-run]: the
+  request-list query with the page's columns over every Research request
+  in the cycle (400 in J26, 367 in D26) is one Dataverse call, 1.3 to 1.4 s
+  in the first round and 0.4 to 0.75 s after. The list reads need the
+  list's ids, so a 300-row page's server read is about program scope (0.2
+  to 0.26 s) + the list (0.4 to 1.4 s) + the list reads at 4 (0.45 to 0.7
+  s): roughly 1 to 2.3 s. At 8 chunks one read failed in round 1 ("fetch
+  failed", 7 of 9 calls), which the page would show as unavailable facts on
+  every row; nothing failed at 4 or 1 in three runs. Concurrency stays at
+  4.)*
 - **Preview needs `FINAL_WRITEUP_SCHEMA_READY=on`** for its branch to show
   the review stages (group and leadership review) and to rehearse the Final
   Assessment list's standing chips. It is set for Production and another
