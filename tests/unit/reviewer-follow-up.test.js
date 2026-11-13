@@ -27,7 +27,7 @@ function resetFollowUpRoute(extraQuery = {}) {
   routerState.query = { view: 'reviewer-follow-up', ...extraQuery };
   routerState.asPath = `/workbench?${new URLSearchParams(routerState.query).toString()}`;
 }
-const ReviewerFollowUpDashboard = WorkbenchShell;
+const ReviewerFollowUpDashboard = (props) => <WorkbenchShell phaseRelease {...props} />;
 
 jest.mock('../../shared/components/Layout', () => {
   const React = require('react');
@@ -784,7 +784,7 @@ describe('reviewer follow-up preview safety', () => {
     process.env.DYNAMICS_URL = `https://${PRODUCTION_HOSTS[0]}`;
 
     await expect(getServerSideProps()).resolves.toEqual({
-      props: { previewReadOnly: true, j27IntegrityEnabled: false },
+      props: { previewReadOnly: true, j27IntegrityEnabled: false, phaseRelease: true },
     });
   });
 
@@ -792,13 +792,13 @@ describe('reviewer follow-up preview safety', () => {
     process.env.VERCEL_ENV = 'preview';
     process.env.DYNAMICS_URL = `https://${SANDBOX_HOSTS[0]}`;
     await expect(getServerSideProps()).resolves.toEqual({
-      props: { previewReadOnly: false, j27IntegrityEnabled: false },
+      props: { previewReadOnly: false, j27IntegrityEnabled: false, phaseRelease: true },
     });
 
     process.env.VERCEL_ENV = 'production';
     process.env.DYNAMICS_URL = `https://${PRODUCTION_HOSTS[0]}`;
     await expect(getServerSideProps()).resolves.toEqual({
-      props: { previewReadOnly: false, j27IntegrityEnabled: false },
+      props: { previewReadOnly: false, j27IntegrityEnabled: false, phaseRelease: false },
     });
   });
 
@@ -816,7 +816,7 @@ describe('reviewer follow-up preview safety', () => {
     process.env.DYNAMICS_URL = 'https://unregistered-target.example';
 
     await expect(getServerSideProps()).resolves.toEqual({
-      props: { previewReadOnly: true, j27IntegrityEnabled: false },
+      props: { previewReadOnly: true, j27IntegrityEnabled: false, phaseRelease: true },
     });
   });
 });

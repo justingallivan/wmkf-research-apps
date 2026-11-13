@@ -74,7 +74,10 @@ import { TOOLBAR_CONTROL_HEIGHT_CLASS } from '../ToolbarSelect';
 
 const sameLocation = (a, b) => WORKBENCH_LOCATION_KEYS.every((key) => a[key] === b[key]);
 
-export function WorkbenchShell({ previewReadOnly = false, j27IntegrityEnabled = false }) {
+// `phaseRelease`: the server's merge-dark admission
+// (lib/utils/workbench-phase-release.js). Without it the shell never chooses
+// or anticipates the J27 layout, so it never reads J27 rows.
+export function WorkbenchShell({ previewReadOnly = false, j27IntegrityEnabled = false, phaseRelease = false }) {
   const router = useRouter();
 
   // URL-mirrored state. Local state is the render source; every change is
@@ -218,8 +221,8 @@ export function WorkbenchShell({ previewReadOnly = false, j27IntegrityEnabled = 
   // Layout. Known once the cycle list has loaded; until then a 2027-or-later
   // (or not yet resolved) cycle is "pending", so the tabs never flash from one
   // set to the other and an old link is not mapped before the program is known.
-  const stageLayout = cyclesReady && isStageLayout({ cycleCode, programId, stageProgramIds });
-  const layoutPending = !cyclesReady && !cyclesError && (!urlCycleCode || isStageLayoutCycle(urlCycleCode));
+  const stageLayout = phaseRelease && cyclesReady && isStageLayout({ cycleCode, programId, stageProgramIds });
+  const layoutPending = phaseRelease && !cyclesReady && !cyclesError && (!urlCycleCode || isStageLayoutCycle(urlCycleCode));
   const { view, section } = resolveWorkbenchView(location, stageLayout);
   const selectedCycle = visibleCycles.find((cycle) => cycle.code === cycleCode);
   const myCount = cyclesReady ? Math.max(0, Number(selectedCycle?.myCount) || 0) : undefined;

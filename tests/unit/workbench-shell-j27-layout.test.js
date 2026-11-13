@@ -85,7 +85,7 @@ function mockFetch({ myCount = 3, stageProgramIds = [RESEARCH], defaultCycleCode
   });
 }
 
-const open = (href) => { applyHref(href); return render(<WorkbenchShell />); };
+const open = (href, props = { phaseRelease: true }) => { applyHref(href); return render(<WorkbenchShell {...props} />); };
 const rowFetches = () => global.fetch.mock.calls.map(([u]) => String(u)).filter((u) => u.includes('cycleCode='));
 const tabNames = () => within(screen.getByRole('navigation', { name: 'Workbench views' })).getAllByRole('link').map((link) => link.textContent.replace(/\d+$/, ''));
 
@@ -219,6 +219,24 @@ test('someone who leads no requests opens on All in program; an explicit Assigne
   open('/workbench');
   await screen.findByText('Mapping signalling lipids');
   expect(rowFetches()).toEqual([`/api/workbench/dashboard?cycleCode=J27&scope=my&programId=${RESEARCH}`]);
+});
+
+test('without the release, an explicit J27 Research address reads no J27 rows and keeps today’s tabs, even while metadata is held', async () => {
+  const fetchMetadata = (mockFetch(), global.fetch);
+  let releaseCycles;
+  const cyclesReady = new Promise((resolve) => { releaseCycles = resolve; });
+  global.fetch = jest.fn(async (url) => {
+    const params = new URL(String(url), 'http://localhost').searchParams;
+    if (String(url).startsWith('/api/workbench/dashboard') && !params.get('cycleCode')) await cyclesReady;
+    return fetchMetadata(url);
+  });
+  open(`/workbench?programId=${RESEARCH}&cycleCode=J27`, { phaseRelease: false });
+  expect(await screen.findByTestId('legacy-request-list')).toBeInTheDocument();
+  expect(rowFetches()).toEqual([]);
+  releaseCycles();
+  await waitFor(() => expect(tabNames()).toEqual(['Request list', 'Reviewer follow-up', 'Staff deliberations', 'Final writeups', 'Awardees']));
+  expect(screen.getByTestId('legacy-request-list')).toBeInTheDocument();
+  expect(rowFetches()).toEqual([]);
 });
 
 test('an earlier cycle and another program keep today’s tabs, and a new link maps back', async () => {
