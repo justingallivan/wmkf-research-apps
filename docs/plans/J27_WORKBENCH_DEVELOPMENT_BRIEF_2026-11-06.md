@@ -2,11 +2,12 @@
 title: J27 Workbench development branch brief
 domain: workbench
 kind: plan
-status: draft
-summary: First J27 Workbench development slice for Reports, Deliberations, Final Assessment and Overview, with preserved reviewer operations and separate read-only and sandbox validation.
+status: superseded
+summary: Superseded 2026-11-13. Historical design brief for the first J27 Workbench slice (Reports, Deliberations, Final Assessment, Overview); the slice was built on the J27 line and the production rollout plan now holds its current state.
 canonical: false
 owner: product-engineering
 related:
+  - docs/plans/J27_WORKBENCH_PRODUCTION_ROLLOUT_2026-11-07.md
   - docs/plans/WORKBENCH_SINGLE_SUBMISSION_STRATEGY_BRIEF_2026-11-04.md
   - docs/plans/J27_CYCLE_INFORMATION_PLAN_2026-11-04.md
   - docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md
@@ -14,7 +15,28 @@ related:
 
 # J27 Workbench development branch brief
 
-**Status [PLANNED].** Design and review only. Build later in a separate
+> **Superseded (2026-11-13).** Kept as the historical design record. The
+> slice described here was built on the J27 line and rehearsed on the
+> sandbox Preview. For current state, read
+> `docs/plans/J27_WORKBENCH_PRODUCTION_ROLLOUT_2026-11-07.md`. Later
+> decisions that override this brief:
+>
+> - Admission is any linked cycle of 2027 or later, not the literal `J27`
+>   (owner, 2026-11-10; alignment log D64).
+> - The release adds five Request fields (schema waves 37 to 40): four
+>   memos, `wmkf_staffreviewsummary`, `wmkf_staffvisitassessment`,
+>   `wmkf_confirmedmeetingroster` (on the Request, not the presentation
+>   activity) and `wmkf_initialassessmentrationale`, plus the evidence
+>   fingerprint `wmkf_staffreviewevidencehash`. No offramp-justification
+>   field is in the release, and the formal offramp outcome remains open.
+> - The Initial Assessment rationale was built in this release, not a
+>   later slice.
+> - Manual attendance is the release path; Zoom roster suggestions stay off
+>   in Production.
+>
+> The body below is unchanged from 2026-11-06.
+
+**Status at writing [PLANNED].** Design and review only. Build later in a separate
 checkout on a development branch cut from freshly verified main. The
 Semi-finalist branch at `62f007ef7` is separate and its deployment remains
 on hold. Keep the current-cycle experience available while testing J27.
