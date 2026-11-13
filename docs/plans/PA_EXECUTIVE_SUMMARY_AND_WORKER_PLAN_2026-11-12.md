@@ -290,3 +290,15 @@ server lease and side-effect fencing. Review did not verify live duration or dat
 state. Optional config-file TOCTOU hardening was not required for this operator-owned
 file and is not represented as implemented. Twenty offline tests and scoped ESLint
 passed; scheduler implementation remains outside this build.
+
+## Deployment timing and proposed live trial
+
+[VERIFIED 2026-11-13 UTC via the pinned deployment’s Vercel Resources table]
+The current worker function has Max Duration ≤300 seconds. This resolves the
+120-second wildcard versus 300-second route ambiguity for that deployment, not
+for a future one. No timeout call was performed. The existing 240-second lease
+and lease-end-minus-five-second provider deadline remain source-verified; this
+is not a wall-clock performance guarantee. The [bounded live-trial approval packet](PA_BOUNDED_LIVE_TRIAL_APPROVAL_2026-11-13.md)
+records the evidence, new preallocated synthetic Request, separate Preview/scope,
+side effects and stop conditions. Factory preparation was read-only; no new objects,
+deployments, worker calls, model calls or grants were created. Approval is pending.
