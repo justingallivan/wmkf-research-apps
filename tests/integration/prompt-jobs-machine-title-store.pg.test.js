@@ -78,6 +78,15 @@ describePg('Short Title ledger policy, replay and publication', () => {
     };
   }
 
+  test('an enabled valid Short Title policy still rejects Summary before configuration loading', async () => {
+    const f = fixture();
+    const loadConfiguration = jest.fn(async () => f.configuration);
+    await expect(f.store.admitMachineTitle({ ...f.command, tasks: [{ taskKey: 'proposal.executive-summary' }] },
+      { loadConfiguration })).rejects.toMatchObject({ code: 'invalid_prompt_job_admission' });
+    expect(loadConfiguration).not.toHaveBeenCalled();
+    expect(await f.store.listJobs(f.command)).toEqual([]);
+  });
+
   test('destination edits with stale prompt hash cannot admit even when grant is edited to match',async()=>{
     const f=fixture('wmkf_trialtitleone');const schema=JSON.parse(f.configuration.promptRow.wmkf_ai_promptoutputschema);
     schema.outputs[0].target.field='wmkf_trialtitletwo';f.configuration.promptRow.wmkf_ai_promptoutputschema=JSON.stringify(schema);

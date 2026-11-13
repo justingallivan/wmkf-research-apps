@@ -131,7 +131,7 @@ original ETag across the complete submit → generation → publication → staf
 | Summary source is Submission-Documents narrative; matching keeps combined PDF | Owner's explicit source decision in this chat | VERIFIED intent; dedicated adapter built offline, runtime wiring still required |
 | Current editor permits early saves and skips unchanged text | `lib/services/workbench/request-narratives-service.js`, `canEdit` / `saveRequestNarratives` | VERIFIED source; readiness is absent from these guards |
 | Worker captures baseline after source preparation | `lib/services/prompt-jobs/worker.js`, `advanceJob`; `store.js`, `captureTarget` | VERIFIED source; an earlier edit-and-clear defeats blankness alone |
-| Permanent Summary reservation needs explicit implementation | `store.js`, `markAttemptFailed` | VERIFIED gap: only MACHINE_TITLE_TASK is exempt from known-failure release |
+| Permanent Summary reservation retention | `store.js`, `markAttemptFailed`; offline SQL receipt tests | VERIFIED branch source/local PostgreSQL: only registered synthetic tasks in test may release; Summary admission remains disabled |
 | Proposed marker closes both edit races if all writers participate | Atomic text/marker PATCH + existing original-ETag publication | PLANNED; external writers and new marker not tested/provisioned |
 | Readiness timing and writer inventory | Branch-local readiness plan and newer J27 decision record | UNKNOWN external lifecycle; no flow or live system changed |
 
@@ -161,9 +161,10 @@ receipts as requirements. Historical Opus receipts below do not approve these ne
    existing staff callers. Make the new mode explicit in reviewed capability checks.
 4. Implement the staff-edit protection above, including whitespace and intentional clearing. Initialization
    receipt survives source/prompt changes, expiry and deployment changes in the same
-   database. Extend permanent machine reservation semantics explicitly to Summary:
-   current known-failure slot retention is Short Title-specific (`store.js`,
-   `markAttemptFailed`). Never relocate the Request into a fresh database to evade its receipt.
+   database. Permanent retention is now implemented offline: only known synthetic
+   tasks in test can release a slot (`store.js`, `markAttemptFailed`). Summary
+   admission/publication are still disabled. Never relocate the Request into a fresh
+   database to evade its receipt.
 5. Unknown provider/audit/write outcomes stay fenced; no automatic resend or new
    model generation. Retain validated output on write conflict within retention;
    any recovery requires a separately reviewed authorized operation.
@@ -430,3 +431,48 @@ Independent read-only build review found no material issues. No real PDF extract
 live source/authorization or cache savings is claimed. Staff-edit marker, event
 eligibility, grants and initialization/publication wiring remain unimplemented.
 Connor's test, deployed code and configuration remain untouched.
+
+## Offline permanent reservation safeguards (2026-11-13)
+
+[VERIFIED via branch source and isolated local PostgreSQL] Failure handling in
+`store.js` releases an initialization slot only for a registered synthetic capability
+in environment `test`, subject to the existing no-publication/protected-content guards.
+Unknown outcomes never release. Summary and unknown task types retain reservations;
+no special Summary admission hook, capability, policy, event or destination grant was
+added. Existing Short Title and staff-draft paths keep their admission contracts.
+
+The new `tests/integration/prompt-jobs-summary-reservations.pg.test.js` applies
+migration 097 to a randomized schema in a dedicated loopback scratch database.
+It creates hypothetical Summary receipt rows directly through test SQL, with
+non-executable configuration. These are not admitted jobs and cannot demonstrate a
+live Summary workflow. It exercises real claim/capture/failure/content-expiry/read
+operations and the existing physical-field unique index. No schema change is needed.
+
+| Invariant | Offline evidence |
+| --- | --- |
+| Failed Summary slot remains occupied | Pre-dispatch failure, validation failure, expiry and unknown outcomes |
+| New event/key/principal/scope cannot evade physical-field uniqueness | Competing synthetic SQL receipts conflict before and after content cleanup; concurrent reservations yield one winner |
+| Receipt reads/expiry do not reopen initialization | Repeated reads preserve receipt state; expired content is deleted while the slot remains |
+| Release exception is closed | Known synthetic/test releases; synthetic outside test and unknown task do not |
+| Admission stays disabled | Generic Summary initialize and machine entry reject; no configuration load or job row |
+| Existing callers remain compatible | Generic ledger, Short Title store and staff-draft real PostgreSQL regressions |
+
+This slice does not test Dataverse clearing, implement the staff-touch marker,
+or enable Summary same-key admission replay. Slot uniqueness is independent of
+current field text, but actual edit protection and integrated replay still require
+future source/marker/admission work. Partial-batch response changes, UI async state,
+helper extraction, new migrations and external contracts are N/A in this change.
+All test data is fabricated. No provider, Dataverse, Graph, Neon, deployment or
+Connor test call occurred. No intake decision was selected by these tests.
+
+Verification: 76 real local PostgreSQL tests across five suites passed (52 ledger/
+Summary/Short Title/staff tests and 24 actual Short Title worker tests, run with
+separate explicit scratch URLs). An enabled valid Short Title policy rejects the
+Summary task before configuration loading. Restoring the original release rule
+made six of the ten new Summary reservation tests fail; the fixed rule passes.
+Scoped ESLint, repository type checking, Atlas/fact/doc/symbol/DAL/status gates and
+sequential self-tests passed. Independent read-only review found no material issues.
+Changed-fact reconciliation updated this plan, architecture, Atlas, service catalog
+and branch handoff; repeat searches found no remaining Short-Title-only retention
+claim in the scoped current docs. Both newly created disposable containers were
+removed after testing; the pre-existing roster container was untouched.
