@@ -360,6 +360,15 @@ POST within the pilot policy. The
 [Node helper](../../scripts/test-pa-sandbox-auth.cjs) remains available to
 operators diagnosing the Preview separately.
 
+### Connor's submission and polling test
+
+The [ready-to-send submission and polling brief](CONNOR_POWER_AUTOMATE_SUBMIT_POLL_TEST_2026-11-12.md)
+uses the original idempotency key to replay the completed job and polls its returned
+ID. It requires no new AI call, field write or worker tick. Connor's execution of
+this new flow remains pending. The existing single-job cap means this test cannot
+show a fresh queued/running transition; it checks the real Power Automate POST,
+replay and status-consumer wiring. Run before November 18 at 19:30 UTC.
+
 ### Authorized hosted submit and delivery trial
 
 [VERIFIED via hosted route responses and Sandbox Dataverse readback] Justin
@@ -403,6 +412,20 @@ No cleanup is scheduled. The sandbox owner should retire the setup after the
 trial or deliberately renew access if another test is approved.
 
 ## Verification and review receipts
+
+### Connor submission/polling brief review (November 12)
+
+Opus 5.5 reviewed the exact brief and narrow source excerpts through Claude Code
+subscription OAuth with tools disabled. Packet SHA-256:
+`ab408342f2c17a0a5f44189249018c888ba86c2d271cfae5dacd1dbe3f3173b3`.
+Verdict: NAMED CHANGES, no hard blockers. All three required edits are applied:
+require Asynchronous Pattern off, explicitly enter Boolean true through the
+expression editor, and stop on every unexpected HTTP status. Optional protections
+against copying cookies from response headers or copying the flow are included.
+Root closed these bounded documentation edits without another review cycle.
+A fresh hosted GET returned HTTP 200, succeeded/version 16, validated/applied.
+The Power Automate designer and the new flow itself have not been exercised;
+Connor's run remains the acceptance test. No runtime code or live state changed.
 
 ### Hosted Sandbox readiness review (November 12)
 
