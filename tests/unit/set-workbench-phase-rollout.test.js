@@ -128,3 +128,9 @@ describe('run', () => {
     expect(d.setSettingIfUnchanged).toHaveBeenCalledWith(PHASE_ROLLOUT_KEY, '{"mode":"on"}', null, 7);
   });
 });
+
+test('the printed --execute line single-quotes the revision so it survives the shell', async () => {
+  const d = deps();
+  await runRollout({ options: parseArgs(argv('--target=prod', 'on')), env: prodEnv(), deps: d });
+  expect(d.log).toHaveBeenCalledWith(expect.stringContaining(`--expected-revision='W/"5"'`));
+});

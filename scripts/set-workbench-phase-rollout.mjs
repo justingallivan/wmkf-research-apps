@@ -106,7 +106,8 @@ export async function runRollout({ options, env, deps }) {
   const value = buildValue(options, deps.parsePhaseRollout);
   log(`New value: ${value}`);
   if (!options.execute) {
-    log(`Dry run; nothing written. To apply, add: --execute --expected-revision=${currentRevision} --actor-email=<your staff email>`);
+    // Single-quoted so the shell keeps the ETag's double quotes (an ETag never contains a single quote).
+    log(`Dry run; nothing written. To apply, add: --execute --expected-revision='${currentRevision}' --actor-email=<your staff email>`);
     return { written: false };
   }
   if (options.expectedRevision !== currentRevision) {
