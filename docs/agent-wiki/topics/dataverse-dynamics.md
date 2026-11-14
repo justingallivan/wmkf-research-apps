@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-14
+last_verified: 2026-11-14
 stale_after_days: 60
 owner: dynamics-platform
 source_files:
@@ -58,13 +58,14 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
   a trusted context under `DATAVERSE_DAL_ENFORCEMENT` — explicit `on`/`off`,
   unset = on outside production `[VERIFIED via
   lib/services/dynamics-context.js:124 isDalEnforcementOn + 8
-  assertTrustedDalContext call sites across the DynamicsService facade and its
-  write-core module — 5 entity-write + 3 email-write (the latter added S330).
-  Since S345 (Checkpoint C) the 4 entity mutators
-  (createRecord/updateRecord/deleteRecord/disassociate) live in
-  lib/services/dynamics/write-core.js; executeChangeset + the 3 email-write
-  asserts remain in lib/services/dynamics-service.js. VERIFIED S345. A 9th
-  site lives in lib/dataverse/core/changeset.js]`.
+  assertTrustedDalContext call sites across the DynamicsService facade's
+  extracted modules — 5 entity-write + 3 email-write (the latter added S330):
+  the 4 entity mutators (createRecord/updateRecord/deleteRecord/disassociate)
+  in lib/services/dynamics/write-core.js, executeChangeset in
+  lib/services/dynamics/changeset.js, and the 3 email-write asserts in
+  lib/services/dynamics/email.js; lib/services/dynamics-service.js itself holds
+  none. Re-verified 2026-11-14. A 9th site lives in
+  lib/dataverse/core/changeset.js]`.
   **Prod flipped 2026-07-04 (S330):** `DATAVERSE_DAL_ENFORCEMENT=on` set as an explicit
   Vercel production env var and redeployed (aliased `reviews.wmkeck.org`) — enforcement is
   live in ALL environments; initial runtime-log scan clean.
@@ -246,8 +247,9 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
 
 - **Data-access layer migration is COMPLETE as of Stage 8 (S329): all 9
   stages executed in one session.** `lib/dataverse/core/` (odata / entity-registry
-  / errors / changeset / context) + 21 adapter files `[VERIFIED via
-  2026-08-23 directory inventory]`. `entity-registry.js`
+  / errors / changeset / context; interlock and target-registry were added
+  later) + 21 adapter files at completion `[VERIFIED via 2026-08-23 directory
+  inventory]`; 30 adapter files in `lib/dataverse/adapters/` as of 2026-11-14. `entity-registry.js`
   `entitySet()` throws on any entity-set name outside the Stage-0 census
   (never guess names — the S328 `wmkf_prompts`/`wmkf_aiprompts` 404s are the
   motivating case); `odata.js` owns escape/eq/eqGuid filter builders;
@@ -328,7 +330,7 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
   status before retrying an ambiguous response. To/Cc are known staff/
   consultant addresses carried as `addressused`; staff entry is authoritative,
   with syntax/dedupe/To-Cc conflict validation rather than identity scoring.
-- **`wmkf_potentialreviewers.wmkf_name` whitespace is stored, not display-only; the adapter does NOT trim it.** [VERIFIED via `lib/dataverse/adapters/potential-reviewer.js:148` (create) and `:284` (update)] both write `wmkf_name = name` raw; only `splitName` (`:35`) trims the derived `wmkf_firstname`/`wmkf_lastname`. No central trim, so each caller's whitespace hygiene leaks to storage. [VERIFIED via Explorer length probe 2026-06-30] a manual-add row stored `wmkf_name = " Test 3 Reviewer "` (leading+trailing pad, len 17) while `wmkf_firstname`="Test"(4)/`wmkf_lastname`="3 Reviewer"(10) were clean; a 14-row sample showed non-uniform `nameLen−(firstLen+lastLen)` deltas (0,1,2,3) incl. double internal spaces and trailing spaces baked into `wmkf_firstname`. [VERIFIED via attribute-metadata probe 2026-06-30] `wmkf_name` is a plain WRITABLE field, NOT computed: `SourceType=0` (0=simple, 1=calculated, 2=rollup), `IsValidForCreate=true`, `IsValidForUpdate=true`, `FormulaDefinition=""`. ~~So writes stick — the padding came from write paths, not a Dynamics recompute.~~ **[STALE/CONFLICT — corrected 2026-09-26 by the Test Request Factory reviews live proof, sandbox Request 1000343]** a server-side process (a plugin or real-time workflow, not a calculated attribute — `SourceType=0` only rules out the calculated kind) REWRITES `wmkf_name` as `" <firstname> <lastname> "` on create AND on update: a POST carrying `wmkf_name: "TEST · Martha Cat"` read back as `" Martha Cat "`, and a later PATCH of `wmkf_firstname` alone re-derived `" TEST · Martha Cat "`. That derivation is the source of the uniform leading/trailing padding on all 4,368 rows; the adapter's own `wmkf_name` writes are overwritten. Consequence: never rely on a written `wmkf_name`; put anything that must persist (the factory's `TEST · ` prefix) in `wmkf_firstname` (`lib/services/reviewer-engagement/seed-synthetic-review.js` `syntheticPersonProjection`). [VERIFIED via grep] the potential-reviewer adapter is the ONLY writer of this field (discovery/save → `upsertByEmail`; no direct `wmkf_name` write to this entity elsewhere), and a full-table dry-run found 4368/4368 rows padded — i.e. the historical write path systematically stored `" first last "` (leading+trailing, plus a double space where a middle slot was empty). NOT re-verified: whether a Power Automate FLOW re-pads on write (metadata can't see flows; the write-stick test was deferred). Render-time defense exists ([VERIFIED] `ContactParser.normalizeDisplayName`, commit 3a359cc5, strips it in emails/UI). [VERIFIED — implemented] the adapter now normalizes `wmkf_name` on every write via `cleanName()` (= `normalizeDisplayName`) in `create`/`upsertByEmail`/`update` (`potential-reviewer.js`), so no NEW padding is stored. CAVEAT: `update`'s no-op guard (`fieldsEqual`, `:331`, trim+lowercase compare) treats a padded-vs-clean name as equal and SKIPS the write, so `update` does NOT self-heal already-padded rows — existing rows need a one-time cleanup that force-writes `wmkf_name` (bypassing the guard), not a plain `update()`.
+- **`wmkf_potentialreviewers.wmkf_name` whitespace is stored, not display-only; the adapter does NOT trim it.** [VERIFIED historically; the adapter's `create` and `upsertByEmail` wrote `wmkf_name = name` raw before `cleanName()` was added (see below), line refs dropped as stale 2026-11-14] both wrote `wmkf_name = name` raw; only `splitName` (`potential-reviewer.js:28`) trims the derived `wmkf_firstname`/`wmkf_lastname`. No central trim, so each caller's whitespace hygiene leaks to storage. [VERIFIED via Explorer length probe 2026-06-30] a manual-add row stored `wmkf_name = " Test 3 Reviewer "` (leading+trailing pad, len 17) while `wmkf_firstname`="Test"(4)/`wmkf_lastname`="3 Reviewer"(10) were clean; a 14-row sample showed non-uniform `nameLen−(firstLen+lastLen)` deltas (0,1,2,3) incl. double internal spaces and trailing spaces baked into `wmkf_firstname`. [VERIFIED via attribute-metadata probe 2026-06-30] `wmkf_name` is a plain WRITABLE field, NOT computed: `SourceType=0` (0=simple, 1=calculated, 2=rollup), `IsValidForCreate=true`, `IsValidForUpdate=true`, `FormulaDefinition=""`. ~~So writes stick — the padding came from write paths, not a Dynamics recompute.~~ **[STALE/CONFLICT — corrected 2026-09-26 by the Test Request Factory reviews live proof, sandbox Request 1000343]** a server-side process (a plugin or real-time workflow, not a calculated attribute — `SourceType=0` only rules out the calculated kind) REWRITES `wmkf_name` as `" <firstname> <lastname> "` on create AND on update: a POST carrying `wmkf_name: "TEST · Martha Cat"` read back as `" Martha Cat "`, and a later PATCH of `wmkf_firstname` alone re-derived `" TEST · Martha Cat "`. That derivation is the source of the uniform leading/trailing padding on all 4,368 rows; the adapter's own `wmkf_name` writes are overwritten. Consequence: never rely on a written `wmkf_name`; put anything that must persist (the factory's `TEST · ` prefix) in `wmkf_firstname` (`lib/services/reviewer-engagement/seed-synthetic-review.js` `syntheticPersonProjection`). [VERIFIED via grep] the potential-reviewer adapter is the ONLY writer of this field (discovery/save → `upsertByEmail`; no direct `wmkf_name` write to this entity elsewhere), and a full-table dry-run found 4368/4368 rows padded — i.e. the historical write path systematically stored `" first last "` (leading+trailing, plus a double space where a middle slot was empty). NOT re-verified: whether a Power Automate FLOW re-pads on write (metadata can't see flows; the write-stick test was deferred). Render-time defense exists ([VERIFIED] `ContactParser.normalizeDisplayName`, commit 3a359cc5, strips it in emails/UI). [VERIFIED — implemented] the adapter now normalizes `wmkf_name` on every write via `cleanName()` (= `normalizeDisplayName`) in `create`/`upsertByEmail`/`update` (`potential-reviewer.js`), so no NEW padding is stored. CAVEAT: `update`'s no-op guard (`fieldsEqual`, `potential-reviewer.js:517`, trim+lowercase compare) treats a padded-vs-clean name as equal and SKIPS the write, so `update` does NOT self-heal already-padded rows — existing rows need a one-time cleanup that force-writes `wmkf_name` (bypassing the guard), not a plain `update()`.
 
 ## Standard Probe
 
