@@ -8,8 +8,11 @@
 -- `Submission-Documents/Bibliography_<n>.pdf`
 -- (lib/services/test-requests/file-plan.js). This replaces the receipt
 -- validator from 058 with one that also accepts that folder and those two
--- names. It only widens what is accepted, so rows already stored still pass
--- and code from before this migration keeps working against it.
+-- names. It only widens what is accepted, so rows already stored still pass.
+-- The ledger schema guard (lib/db/ledger-guard.js) refuses a ledger whose
+-- function body differs from the checkout's tracked fingerprint, so the
+-- Factory pauses between applying this file and deploying the matching code,
+-- in either order (as with 094).
 CREATE OR REPLACE FUNCTION test_request_receipt_ok(receipt JSONB) RETURNS BOOLEAN
 LANGUAGE sql IMMUTABLE AS $receipt$
   SELECT receipt IS NULL OR (

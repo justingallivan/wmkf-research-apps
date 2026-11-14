@@ -308,6 +308,18 @@ describe('manifest target', () => {
     const prod = { ...sandbox, target: PRODUCTION_URL, targetEnvironment: 'production' };
     expect(computeRunPlanDigest({ manifest: prod })).not.toBe(computeRunPlanDigest({ manifest: sandbox }));
   });
+
+  test('the plan digest binds a single-submission layout and leaves a manifest without one unchanged', () => {
+    const base = {
+      values: { runId: RUN_ID, requestId: REQUEST_ID, locationId: REQUEST_ID, cycleCode: 'J27' }, recipe: 'basic',
+      source: { requestId: ORG_ID, revision: 'r', bundleSha256: 'b' }, copyPolicy: { digest: 'c' }, createBodySha256: 'd',
+      target: PRODUCTION_URL, targetEnvironment: 'production',
+    };
+    const withoutCycle = { ...base, values: { runId: RUN_ID, requestId: REQUEST_ID, locationId: REQUEST_ID } };
+    expect(computeRunPlanDigest({ manifest: base })).toBe(computeRunPlanDigest({ manifest: withoutCycle }));
+    const j27 = { ...base, values: { ...base.values, documentLayout: 'single-submission' } };
+    expect(computeRunPlanDigest({ manifest: j27 })).not.toBe(computeRunPlanDigest({ manifest: base }));
+  });
 });
 
 describe('clientTargetEnvironment', () => {

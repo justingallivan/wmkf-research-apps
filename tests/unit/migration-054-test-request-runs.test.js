@@ -262,10 +262,20 @@ describe('migration 054 real SQL contains the load-bearing predicates the pure-J
       expect(end).toBeGreaterThan(start);
       return sql.slice(start, end).replace(/\s+/g, ' ').trim();
     };
-    expect(fnBody(setupSql)).toBe(fnBody(migration));
     const slotMigration = fs.readFileSync(path.join(process.cwd(), 'lib/db/migrations/058_test_request_cast_slot_bindings.sql'), 'utf8');
     expect(fnBody(slotMigration)).toBe(fnBody(migration));
     expect(fnBody(migration)).not.toContain('\\');
+    // 098 (J27 file destinations) is the latest definition: it differs from
+    // 054 only by the Submission-Documents folder and the two J27 filenames,
+    // and the fresh-install mirror carries that latest body.
+    const j27Migration = fs.readFileSync(path.join(process.cwd(), 'lib/db/migrations/098_test_request_j27_file_names.sql'), 'utf8');
+    const widened = fnBody(migration)
+      .replace('(/(Phase I|AI Materials|Reviewer Materials|', '(/(Phase I|AI Materials|Submission-Documents|Reviewer Materials|')
+      .replace('|(Phase I|AI Materials|Reviewer Materials|', '|(Phase I|AI Materials|Submission-Documents|Reviewer Materials|')
+      .replace('(Proposal|ProposalNarrative|ProposalBibliography)_', '(Proposal|ProposalNarrative|ProposalBibliography|Project-Narrative|Bibliography)_');
+    expect(widened).not.toBe(fnBody(migration));
+    expect(fnBody(j27Migration)).toBe(widened);
+    expect(fnBody(setupSql)).toBe(fnBody(j27Migration));
   });
 
   it('enforces the JS text grammars in PostgreSQL (Codex round eleven): every grammar-bound column has a CHECK', () => {
