@@ -299,14 +299,12 @@ search limits: `docs/audits/product-backlog-reconciliation-2026-10-31.md`.
   not the sandbox; gaps 2 and 3 below are sandbox-only and are **parked** with
   Codex's branch unmerged. Gap 1 is narrowed to the narrative and bibliography:
   the other four J27 files stay missing on Factory requests as an accepted limit.
-  **[BRANCH-BUILT 2026-11-14, Session 677, not merged]** Gap 1 is built on
-  `claude/factory-j27-file-names` (worktree
-  `/Users/gallivan/Code/WMKF_Apps-claude-factory-j27-files`) with ledger
-  migration 098; release needs owner-run `ledger:apply` on both Factory ledgers
-  and `apply-migrations.js` on the Production app database, then the merge
-  (the branch's own runbook "Prepared J27 reviewer fixtures" and Atlas
-  `docs/atlas/postgres-test-request-runs.md` text, not yet on `main`).
-  Original entry follows.
+  **[GAP 1 MERGED 2026-11-14, Session 677, `3e382029a`]** Ledger migration 098
+  applied by the owner to both Factory ledgers and the Production app database
+  first (runbook "Prepared J27 reviewer fixtures"; Atlas
+  `docs/atlas/postgres-test-request-runs.md`). Open: one Factory run into a J27
+  cycle as the acceptance check (request page lists Project Narrative and
+  Bibliography). Original entry follows.
   The J27 Workbench is on in Production (every 2027-or-later request,
   `docs/plans/J27_WORKBENCH_PRODUCTION_ROLLOUT_2026-11-07.md`), so internal
   testing will want J27 test requests. Do before the Factory next creates them;

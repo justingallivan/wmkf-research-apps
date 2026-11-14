@@ -144,8 +144,8 @@ canonical reviewer proposal; other recognized Basic
 files are copied normally. This is a prepared reviewer package, not proof that
 intake assembly or AI processing ran. Production does not seed later recipes.
 
-**[BRANCH-BUILT 2026-11-14 on `claude/factory-j27-file-names`, not merged; needs
-ledger migration 098 first]** File destinations follow the destination cycle
+**[MERGED 2026-11-14 (`3e382029a`); ledger migration 098 applied first to both
+managed ledgers and the Production app database; no J27 Factory run yet]** File destinations follow the destination cycle
 (owner, 2026-11-14). A run reserved for a J27-or-later Grant Cycle binds
 `values.documentLayout = 'single-submission'` into its manifest
 (`buildCloneManifest`, read back by `manifestDocumentLayout`), and the copy step

@@ -3,10 +3,10 @@ title: Test Request Factory Run Ledger
 domain: test-request-factory
 kind: atlas
 status: active
-summary: "Durable test Request ledger, written by the owner-run CLI and, since 2026-10-02, by the deployed admin form in Production. Current copy: managed Neon ledgers (054 + 058 + 094 verified 2026-11-03; operational data loaded 2026-09-30) behind a tracked host registry and schema fingerprint check. Shared Production app DB has 054 + 058 + 094 tables (empty; never the ledger; 094 added 2026-11-03); Preview unverified."
+summary: "Durable test Request ledger, written by the owner-run CLI and, since 2026-10-02, by the deployed admin form in Production. Current copy: managed Neon ledgers (054 + 058 + 094 + 098 verified 2026-11-14; operational data loaded 2026-09-30) behind a tracked host registry and schema fingerprint check. Shared Production app DB has 054 + 058 + 094 tables and the 098 function (empty; never the ledger; 094 added 2026-11-03, 098 on 2026-11-14); Preview unverified."
 canonical: false
 cataloged: 2026-09-23
-last_verified: 2026-11-03
+last_verified: 2026-11-14
 owner: product-engineering
 related:
   - docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md
@@ -36,8 +36,11 @@ ledger only" header in the 094 SQL describes where its data lives, not which
 databases receive the schema. The SQL file is left unchanged because the
 ledger runner checks migration-file checksums (Codex, 2026-11-03).
 
-**[BRANCH-BUILT 2026-11-14 on `claude/factory-j27-file-names`; not applied to
-any database]** Migration 098 (`098_test_request_j27_file_names.sql`) replaces
+**[APPLIED 2026-11-14, owner-run; code merged as `3e382029a`]** [VERIFIED via
+owner-run `ledger:apply` output (`[apply ok] 098`, `1 applied`) on `ledger` and
+`ledger_prod`, owner-run `apply-migrations.js` on the Production app database
+(`1 applied, 95 skipped, 96 total`), then `check:factory-ledger`: both ledgers
+match the 054+058+094+098 fingerprint] Migration 098 (`098_test_request_j27_file_names.sql`) replaces
 `test_request_receipt_ok` so receipts also accept the `Submission-Documents`
 folder and the `Project-Narrative_<n>.pdf` and `Bibliography_<n>.pdf` names
 (J27 Factory file destinations; runbook "Prepared J27 reviewer fixtures"). It
@@ -48,10 +51,10 @@ pauses between applying 098 and deploying the matching code, in either order
 `run-ledger.js` `SUBFOLDER`/`FILENAME`; the fresh-install copy is
 `scripts/setup-database.js`. The tracked fingerprint changes only in that
 function's body hash [VERIFIED via a disposable local PostgreSQL 16 and
-`check:factory-ledger` against both managed ledgers, which still report the
-pre-098 hash `f2d697a6`]. Release order: owner-run `ledger:apply` on both
-managed ledgers and `apply-migrations.js` on the Production app database, then
-merge promptly to close the pause.
+`check:factory-ledger` against both managed ledgers before 098, which reported
+the pre-098 hash `f2d697a6`]. Release order used: owner-run `ledger:apply` on
+both managed ledgers and `apply-migrations.js` on the Production app database,
+then the merge.
 
 **Where the ledger lives (2026-09-30, S553; `docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md`).** The operational ledger for production test Requests has lived only in `ledger_prod` inside the `wmkf-ledger-pg` Docker container on the owner's home Mac (sandbox counterpart `ledger`), hand-built and never dumped [VERIFIED S553: the office Mac holds no `ledger_prod`]. Owner decision D1 moved it to Neon project `wmkf-factory-ledger` (Vercel Marketplace, connected to no Vercel project, us-east-1), databases `ledger_prod` and `ledger`, with 054 + 058 applied and the local tracker `ledger_schema_migrations` recording 054; the home-Mac operational data was loaded into both on 2026-09-30 and the managed ledger is now the current copy [VERIFIED via `docs/plans/evidence/test-request-factory/ledger-snapshot-2026-09-30.md`]. Merged in PR #374: `lib/db/ledger-registry.js` is the tracked host allowlist the CLI's `requireLedgerUrl(target)` enforces (managed host requires `ledger_prod` for `--target=production`, `ledger` otherwise; the app's `POSTGRES_URL` is always refused), `lib/db/ledger-schema.js` + `lib/db/ledger-schema-fingerprint.json` are the structural schema check every ledger-driven CLI mode runs first (`check:factory-ledger` gate, `--ledger-check`), and `scripts/apply-ledger-migrations.js` is the ledger's own migration runner. Connection strings are `.env.local` variables for the CLI; since 2026-10-02 the production URL is also a hand-set Vercel Production variable for the admin form (`docs/CREDENTIALS_RUNBOOK.md`; see *Second writer: the deployed admin form*).
 
@@ -384,7 +387,7 @@ Two tables added in place to migration 054 (and the V55 mirror) for the cast pla
   `test_request_status_changes` remain absent there; all tables are empty and
   the CLI never uses that database [VERIFIED via owner-authorized read-only
   queries, 2026-09-30/10-01]. Preview's database is unverified.
-- The current managed `ledger_prod` and `ledger` have 054+058+094 verified on 2026-11-03. Every operation still requires the tracked schema preflight; new slot writes need fresh configuration/automation assessment. Use the dedicated ledger runner for future ledger migrations, never the shared app runner. Shared Production/Preview migration consistency is not a prerequisite for the managed slot journal.
+- The current managed `ledger_prod` and `ledger` have 054+058+094 verified on 2026-11-03, and 098 on 2026-11-14. Every operation still requires the tracked schema preflight; new slot writes need fresh configuration/automation assessment. Use the dedicated ledger runner for future ledger migrations, never the shared app runner. Shared Production/Preview migration consistency is not a prerequisite for the managed slot journal.
 - The JSONB resource receipts are checked by `test_request_receipt_ok` in
   PostgreSQL and by `assertLedgerReceipt` in JavaScript. They accept only
   bounded allowlisted keys and values; a writer bypassing JavaScript still
