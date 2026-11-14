@@ -1,9 +1,9 @@
-# Session 675 Prompt: Three open streams — J27 line reviewed and walked, expertise roster, Request narratives
+# Session 676 Prompt: Three open streams — J27 live in Production (request page held), expertise roster, Request narratives
 
 ## Start here, whichever agent you are
 
-This file holds three handoffs. Stream A was worked in Session 674
-(2026-11-12, Claude). Streams B and C were not touched by Claude and are
+This file holds three handoffs. Stream A was worked in Session 675
+(2026-11-13, Claude). Streams B and C were not touched by Claude and are
 carried as their authors wrote them on 2026-11-09. **Find out which stream the
 owner wants before doing anything; if he does not say, ask.** Then read that
 stream's section and the document it names. The other two streams are not
@@ -11,7 +11,7 @@ yours to change.
 
 | Stream | Last worked by | Resume in | Read first | First step |
 |---|---|---|---|---|
-| **A. J27 cycle page and request page** | Claude, Session 674 (2026-11-12) | `/Users/gallivan/Code/WMKF_Apps-claude-j27-read-model`, on `claude/j27-cycle-page` at `3499d8730`, pushed. `claude/j27-read-model` (the sandbox Preview branch) is at `72368357e` (same code; later commits are docs and probes) and deployed; the stable alias points at it | Stream A below; `docs/plans/J27_WORKBENCH_PRODUCTION_ROLLOUT_2026-11-07.md` on the branch | Owner's promotion decision (Stream A, Verified Open 1) |
+| **A. J27 Workbench** | Claude, Session 675 (2026-11-13) | `main` (merged and live in Production). Worktree `/Users/gallivan/Code/WMKF_Apps-claude-production-admission` on `claude/workbench-production-admission` (merged, same tip as `main`'s code); `claude/j27-read-model` (sandbox Preview) at `2adc6dfb0`, alias pointed at it | Stream A below; `docs/plans/J27_WORKBENCH_PRODUCTION_ROLLOUT_2026-11-07.md` (change record above its Rollback section) | Owner: step C, pilot #1003456 (Stream A, Verified Open 1) |
 | **B. Expertise roster** | Codex, Session 670; Codex again 2026-11-10 and 2026-11-11 | **Observed 2026-11-12 by Claude, not Codex's own record:** `codex/expertise-roster-import-2026-11-10` last commit 2026-11-11 15:37 ("record reviewed native output schema build"), worktree `/Users/gallivan/Code/WMKF_Apps-codex-roster-import`. Codex's own section below still names the 2026-11-09 branch | Stream B below; `docs/plans/EXPERTISE_ROSTER_HANDOFF_2026-11-09.md`; that branch's own handoff commits | Ask Codex or the owner for the current boundary; do not resume from the 2026-11-09 text alone |
 | **C. Request narratives** | Codex, Session 669 | `codex/request-narratives-2026-11-09` at `06e1ba6a4`, pushed. Recorded worktree `/private/tmp/wmkf-request-narratives` is gone from disk | Stream C below; `docs/plans/REQUEST_NARRATIVES_HANDOFF_2026-11-09.md` | Power Automate initialization contract with Connor, then the J27 integration review |
 
@@ -32,10 +32,13 @@ Claude's to change):**
   to `lib/services/execute-prompt.js` and `lib/services/prompt-jobs/*`.
 
 **Session numbers.** 669, 670 and 671 overlapped on 2026-11-09; 672 and 673
-were Stream A on 2026-11-10 to 2026-11-11; 674 was Stream A on 2026-11-12
-(Claude; see the clash above). The next session is 675 whichever stream it
-takes. Earlier handoffs: `git show 146980bc6:SESSION_PROMPT.md` (Session 673
-close), `git show 33a233633:SESSION_PROMPT.md` (Session 672),
+were Stream A on 2026-11-10 to 2026-11-11; 674 and 675 were Stream A on
+2026-11-12 and 2026-11-13 (Claude). Codex's branch-local "674 / 675" handoff on
+`codex/coordinated-start-2026-11-10-b` is a separate numbering; it has not
+landed on `main`, so `main`'s sequence continues here. The next session is
+676 whichever stream it takes. Earlier handoffs: `git show
+20deeb251:SESSION_PROMPT.md` (Session 674 close, the J27 Preview walk-through),
+`git show 146980bc6:SESSION_PROMPT.md` (Session 673 close), `git show 33a233633:SESSION_PROMPT.md` (Session 672),
 `git show b2c271344:SESSION_PROMPT.md` (Session 671),
 `git show 7b7e483b0:SESSION_PROMPT.md` (Request narratives),
 `git show 5782bad43:SESSION_PROMPT.md` (roster).
@@ -43,18 +46,19 @@ close), `git show 33a233633:SESSION_PROMPT.md` (Session 672),
 **Where the streams meet.**
 - Stream C's Overview card must be reviewed against Stream A's J27 line
   before any runtime promotion (Stream C, Verified Open 2).
-- **Stream A changed shared files Stream B also changes:**
+- **Stream A is now on `main`**, including its change to
   `pages/api/expertise-finder/batch-match.js` (J27 staff version name, Session
-  672) and `SESSION_PROMPT.md`. Whoever merges second reconciles.
+  672) that Stream B also changes: Stream B rebases onto `main` and reconciles.
 - The Test Request Factory (Codex branch `codex/j27-factory-scenarios`) still
   writes last cycle's file layout and the retired scenario names (Stream A,
-  Verify Before Acting).
+  Verified Open 5).
 
 ## Rules for every stream
 
-1. **Nothing is promoted.** All three streams' runtime work is on feature
-   branches. `main` deploys to Production on push; only documentation lands
-   there without the owner's explicit go.
+1. **Promotion needs the owner's explicit go.** Stream A's J27 line is now
+   on `main` and live (2026-11-13, owner go at each step); Streams B and C are
+   still on feature branches. `main` deploys to Production on push; only
+   documentation lands there without the owner's go.
 2. **Worktrees under `/private/tmp` are volatile.** Several Codex ones listed
    by `git worktree list` are gone from disk (git marks them prunable; not
    pruned). If one is gone, the pushed branch is the source.
@@ -70,204 +74,151 @@ close), `git show 33a233633:SESSION_PROMPT.md` (Session 672),
    `j27-preview`). Staff sign-in works only through
    `wmkfresearchapps-preview.vercel.app`; the owner signs in and repoints that
    alias himself, or Claude does at his request. **At the close of Session
-   674 it points at `wmkfresearchapps-6dchnuvu8-justin-gallivans-projects.vercel.app`
-   (`dpl_CLcVRmYVBNEShTeszJeqH9ebheU7`, `claude/j27-read-model` at
-   `72368357e`)** `[VERIFIED via vercel inspect and the deployment's API
-   meta]`. Earlier targets the same day, to restore if needed:
+   675 it points at `wmkfresearchapps-azx58jr3q-justin-gallivans-projects.vercel.app`
+   (`dpl_8C5J3QpUy5uaPA1VLPAk12FprrRX`, `claude/j27-read-model` at
+   `2adc6dfb0`)** `[VERIFIED via vercel inspect, 2026-11-13]`; previous
+   target `dpl_CLcVRmYVBNEShTeszJeqH9ebheU7` (`72368357e`). The sandbox's
+   `workbench.phase_rollout` setting is `{"mode":"on"}` after the rehearsal.
+   Earlier targets, to restore if needed:
    `dpl_ARxww8Gb6byXvihGmTWzGPC1Lorv` (`cc603be5e`),
    `dpl_THWVcsoBdLRjDACMEukwuUE69VgT` (`5f81733db` with the new setting),
    `dpl_HfWztktsLVVAXXAYLS26kgbFfMkE` (Session 673 close).
 5. **Preserve:** sandbox fixtures 1000368 to 1000387, including the
    presentation record added to #1000383 on 2026-11-12 (Stream A item 4); the
    untracked `docs/plans/J27_WORKBENCH_DEVELOPMENT_BRIEF_2026-11-06.md` in the
-   main checkout (Codex's); the uncommitted `package-lock.json` in the J27,
-   Codex dashboards and Codex J27 Factory worktrees; every other stream's
+   main checkout (Codex's); the uncommitted `package-lock.json` in the
+   Codex dashboards and Codex J27 Factory worktrees (the J27 worktree's was
+   discarded by the owner 2026-11-13); every other stream's
    branches, worktrees and settings.
 
-## Stream A — J27 cycle page and request page (Claude, Session 674)
+## Stream A — J27 Workbench (Claude, Session 675)
 
-Session 674 took the owner's Preview walk-through ("didn't notice anything
-amiss") and a second look in Chrome, fixed what that found, had the
-unreviewed J27 commits reviewed by Codex, put a request into Deliberations on
-the sandbox, and ran the two pre-promotion Production checks with the owner.
-All on the J27 line; **not promoted.** The owner's standing go-ahead to build,
-with Codex adversarial review and Claude deciding when iteration stops
-(2026-11-10), still applies.
+Session 675 (2026-11-13) took the J27 line to Production, one owner go at a
+time, and built and rehearsed the request-page admission that keeps the new
+request page off until the owner admits requests.
 
-#### What Was Completed
+### What Was Completed
 
-1. **Writeup review on the Preview.** The Final Assessment tab's "Writeup
-   review" section failed with "Final writeup review tracking is unavailable":
-   it needs `FINAL_WRITEUP_ACKNOWLEDGEMENT_SCHEMA_READY`, which Production has
-   and the Preview branch did not (the 2026-11-11 note blamed
-   `FINAL_WRITEUP_SCHEMA_READY`; corrected in the rollout plan). The sandbox
-   schema checked exact and Active (read-only preflight, 11 exact); the
-   setting was added `on` for `claude/j27-read-model`, read back, redeployed;
-   the section now loads. **Six** branch-scoped Config settings now.
-2. **Request page agrees with the list (`cc603be5e`, `5a3acc796`).** A Peer
-   Review list row opens the request on its Peer Review tab, where the
-   Overview, the only reader of the reviewer rollup, never mounted; #1000386's
-   strip read "Reviewer invitations are not open yet" while its row read
-   "Next: Identify reviewers". A 2027-or-later request page now reads the
-   rollup itself (`shared/components/workbench/useReviewerProgress.js`),
-   reports it to the strip and passes it to `OverviewTab`, which then reads
-   nothing of its own; each return to the Overview reads it again. Earlier
-   cycles unchanged. Read-model plan C7 amended (one rollup read added for a
-   page opened on another tab).
-3. **Codex adversarial review** of `ffdeedb43` through `cc603be5e` (the
-   commits that had none): needs-attention, one medium finding, reproduced
-   (page-owned counts went stale after reviewer updates); fixed in
-   `5a3acc796`; second round **approve**, no material findings. Nothing found
-   in the D66 / D67 commits.
-4. **Deliberations fixture (owner go).** The sandbox had no request in
-   Deliberations. One presentation record on #1000383
-   (`wmkf_sitevisits` `f127beed-18df-f111-84ea-70a8a59af221`, "TEST: J27
-   Deliberations walk-through (no meeting)", 2027-03-15 17:00 to 17:30 UTC,
-   no attendees, nothing sent), by a one-off sandbox-pinned script (the
-   Meeting Tracker is off on this Preview). The Deliberations row and the
-   request strip both show no next step before the presentation ends:
-   **Verified Open 2 of Session 673 is confirmed.** Delete that record to
-   restore #1000383 as a plain Scored fixture.
-5. **#1000370's list counts vs Track** ("0/3 accepted" vs two "Review
-   Received"): rehearsal data with reports on never-invited reviewers; both
-   views read the same rows. No change.
-6. **Pre-promotion Production checks (owner-run, 2026-11-12):**
-   - `scripts/probe-group-review-cycle-links.cjs` (new): one request could
-     still start group review, #1003313 (no Grant Cycle link, document D26,
-     complete review, one presentation record); none refused. The new
-     linked-cycle rule does not touch it, because it has a presentation;
-     whether that presentation reads as ended was not checked.
-   - `scripts/probe-workbench-load-timing.js` (extended: `--cycle` now
-     reaches the request list, `--scope`, `--later-facts=yes`; bundle fixed in
-     `dabdf5378` for `createRequire(import.meta.url)`): D26, all directors, 25
-     requests. List 2.8 s cold / 0.7 s warm; the three later-phase reads 0.93 /
-     0.44 s, none unavailable; Deliberations panel 3.0 / 1.0 s.
-7. **Records:** rollout plan (Preview moves, settings, fixture, both probe
-   results), read-model plan C7 amendment, all on the branch.
+1. **Integrity news rule settled and shipped.** A replay of the 16 old-rule
+   news flags on their stored results (`scripts/replay-integrity-news-verdicts.cjs`)
+   gave 6 flag, 6 inconclusive, 4 clear; the owner reviewed the 4 clears
+   (`scripts/show-integrity-news-flag-cases.cjs`) as old-rule false alarms
+   and lifted the Production hold. Analysis output limit 8000 tokens; the
+   model stays Haiku (owner).
+2. **Cost at volume measured** (`scripts/time-j27-large-reads.cjs`, owner-run,
+   300 Research requests): the J27 reads at four chunks add little; the
+   reviewer rollup now reads four chunks at a time for every cycle page.
+3. **Merged dark and promoted.** Codex review of the later changes
+   (approve); `main` fast-forwarded to `cb26082fe` (J27 line, dark behind
+   `WORKBENCH_PHASE_RELEASE`). Owner ran migration 096 on Production and
+   schema waves 37 to 40 (dry run, then `--execute`), read back by
+   `scripts/probe-j27-request-fields.cjs`.
+4. **Request-page admission built** on `claude/workbench-production-admission`:
+   field readiness (`lib/utils/workbench-field-readiness.js`, Production via
+   `WORKBENCH_PRODUCTION_SCHEMA_READY=on`) and one per-request policy
+   (`lib/services/workbench/phase-admission.js`, Dataverse setting
+   `workbench.phase_rollout`: off / pilot GUIDs / on; unreadable or invalid =
+   off; absent = off in Production, on elsewhere). Wired into the request
+   context (`phaseLayout`), the page, the four field routes (before any read,
+   and a required `beforeWrite` re-check before the conditional write), and
+   the list's stage derivation (a non-admitted row derives without the new
+   fields). Zoom attendance suggestions are off in Production. Owner
+   decisions: setting plus owner-run script, pilot kept, the two switches
+   separate, Chairs step and automatic integrity screen out. Two Codex
+   reviews: three findings fixed, then approve.
+5. **Rehearsed on the sandbox Preview** (owner): no row, off, pilot of
+   #1000369, on, each as designed; script fix for the shell-quoted ETag.
+6. **Merged** (`e6b6e6b09`) and **step A done**: both switches set as
+   Production Config variables (read back `on`) and redeployed
+   (`dpl_7c5JCq8ow5RAP1YQwdyqW2esnsEV`). **Step B done** (owner, signed in):
+   the June 2027 cycle page shows the phase lists; its one request, test
+   #1003456, opens on the old tabs; D26 unchanged.
 
-Verification: the J27, workbench, Overview and reviewer suites pass (308
-suites, 5,754 tests) and the type check is clean at `5a3acc796`; new tests
-fail when their rule is removed; the doc and script-scanning gates pass. No
-full Jest run this session. Every `check:*` gate and self-test passed on
-`main` at session start.
-
-#### Commits
-
-J27 line (`claude/j27-cycle-page`, all pushed): `cc603be5e`, `851aaf35e`,
-`5a3acc796`, `72368357e`, `a59a8f36d`, `5cb204db9`, `dabdf5378`, `3499d8730`.
-`main`: this handoff only.
+### Commits (selection; `git log 20deeb251..1be2e229a`)
+- `cb26082fe` merge of the J27 line into `main` (dark)
+- `91f92e977` structured integrity news rule in Production; `9f71894b6` 8000 tokens
+- `e9e91c538` reviewer rollup four chunks at a time
+- `e3ce212ee`, `b7fdae25a`, `2adc6dfb0` admission, Codex fixes, script guards
+- `e6b6e6b09` admission merged; `8f06722c2` to `1be2e229a` change record and steps A and B
 
 ### Next Items
 
 #### Verified Open
 
-1. **Promotion** is the owner's decision; path in the rollout plan on the
-   branch (migration 096 on Production first; remove the six Preview Config
-   settings, the three branch-scoped connection settings and the Neon branch
-   at promotion or retirement).
-2. **Factory file plan** for J27-shaped sandbox files and scenario names, and
-   a Deliberations scenario so the #1000383 record can go: Codex's Factory
-   stream; hand over a note rather than editing it. Not sent yet.
-3. **Optional before promotion:** whether #1003313's presentation reads as
-   ended under Production's state/status pairs (extend the cycle-links probe
-   to print end, state and status; owner-run). Not a blocker: the rule there
-   is unchanged by the J27 line.
-4. **Not measured:** a 300-request cycle. D26 gave 25 rows, one batch per
-   read; 300 would need about twelve (Codex's 36 queries). Whether the
-   batches run in sequence was not checked.
+1. **Step C, pilot** (owner): `workbench.phase_rollout` = pilot of test
+   request #1003456, the only J27 request in Production. Commands are in the
+   change record (dry run, then the printed `--execute` line with
+   `DATAVERSE_PROD_WRITE_ACK` and `--actor-email`). Get #1003456's GUID from
+   its request page address. First Production write to the new fields.
+2. **Step D, on**: after the pilot; there are no real J27 requests yet, so it
+   can wait for intake. Watch cycle-page load time when the lists fill.
+3. **Clean up after the release settles** (rollout plan): the Preview's
+   branch-scoped settings, the Neon branch `j27-preview`, and the
+   `.env.local` link in the admission worktree; then retire both J27
+   worktrees (preservation preflight).
+4. **Red gate on `main`:** `check:agent-wiki`, because
+   `docs/agent-wiki/topics/dataverse-dynamics.md` passed its 60-day
+   `last_verified` on 2026-11-13. Re-verify the page, then refresh the date.
+5. **Factory file plan note** to Codex (carried; not sent).
 
 #### Owner Decision Needed
 
-1. What is prepared and shared before a J27 research presentation (carried;
-   D65 records the context). Revisits the Deliberations "Drafts" section.
-2. When Connor's J27 `AI Materials` folder arrives: if it also holds a
-   `Project-Narrative_{#}.pdf`, the AI readers see two copies and stop (D59).
-3. Carried: offramp justification location and who sets Offramped; who sets
-   the status that opens invitations; keeping the original Scoring answer;
-   AI fit-flag meaning, intake outputs, queues, Chairs materials, calendar;
-   which fields hold fuller budget information (D61).
-
-#### Waiting On Connor
-
-1. Reviewer copy flow on Recommended Invite (asked 2026-11-10).
-2. The Narrative-Bibliography file at intake (D60) and the J27 `AI Materials`
-   contents.
-
-#### Parked
-
-1. Polish pass, including the Overview tab-name links and the four Grant
-   Cycle "Semi-Finalist" date labels (owner, 2026-11-10: after the plumbing).
-2. Review-summary freshness on the list (accepted difference).
-3. The Deliberations "Drafts" section and the Peer Review "Reviewers" section
-   still list every request in the cycle (older panels kept on purpose).
-4. The request page's "Staff assessment of the presentation" box can be
-   saved before the presentation (existing tab behaviour; the strip asks for
-   it only afterwards). Seen on #1000383; not raised with the owner as a
-   change.
-5. Carried: wide gap on large screens; Program Coordinator support; SoCal
-   as a separate suite; readiness readback after December 8; Phase II, bulk
-   edits, queues and packet exports; six older sandbox rehearsal titles.
+1. Observation window before step D (one working week suggested).
+2. Whether the stage box above the request tabs should hide while a request
+   is on the old layout (it follows `WORKBENCH_PHASE_RELEASE` today).
+3. Formal offramp outcome; Zoom attendance suggestions (both kept out).
+4. Carried: what is prepared before a J27 presentation (D65); Connor's
+   `AI Materials` folder (D59); offramp justification and other D61 items.
 
 #### Verify Before Acting
 
-1. **The stage model raises "presentation end not verified" when no
-   presentation exists.** Existing reviewed tests require it; the list does
-   not show it. Do not "fix" it without rechecking those tests.
-2. **A not-yet-shared draft reads "no Board draft" on the page**, to match
-   the server.
-3. **Neon branch `j27-preview`** is a copy of Production data; treat its
-   connection string as a Production secret.
-4. **Applying a migration with a pasted connection string:** use
-   `read -s POSTGRES_URL`, export, print the host, then run
-   `node scripts/apply-migrations.js` from the J27 worktree.
-5. **#1000370's odd state is deliberate** (rollout rehearsal).
-6. **The colleague deck is out of date** (do not start from
-   https://claude.ai/artifact/Q3dicY5DA2vGBrVPA2bXwj); the mock-up
-   https://claude.ai/artifact/Fov94msvFQit3QZCzv4TZZ has invented data.
-7. **Codex sandbox and git:** a Codex build run could not write the
-   worktree's git index; Claude committed its work after review. Codex's
-   review run could not run Jest in its read-only sandbox either.
-8. **Watching a Preview build:** `vercel inspect` prints on stderr; capture
-   with `2>&1`. `vercel ls --meta githubCommitSha=<sha>` finds a branch build.
-   `vercel redeploy <url> --target preview` rebuilds with new settings.
-   Recorded in `.claude-memory/project-vercel-cli-deploy-preview-auth.md`.
-9. **The Chrome extension's first navigation in a new tab group often fails**
-   ("browser-internal URL"); navigate again. The request page refuses to be
-   framed, so read it by navigating, not with an iframe.
+1. **"Next: Identify reviewers" with reviews received** (seen on sandbox
+   #1000370 and Production test #1003456; also with the setting off, so not
+   the admission). May be the test setups; check the stage model's
+   reviewer facts before calling it a bug.
+2. **Setting script**: run from a checkout with `.env.local`; Production
+   needs `DATAVERSE_TARGET_INTERLOCK=on DATAVERSE_ALLOW_PROD_READS=yes`, and
+   `--execute` a same-UTC-day `DATAVERSE_PROD_WRITE_ACK`; quote the revision
+   as printed. For the sandbox prefix
+   `DYNAMICS_SANDBOX_URL=https://orgd9e66399.crm.dynamics.com`.
+3. **Rollback order:** setting off; then unset the two switches and
+   redeploy; last resort `dpl_4xPvaNuQMW643fxL2CmuK9RWdKob` (`31ee58f8f`).
+4. Carried from Session 674: the "presentation end not verified" blocker
+   without a presentation is required by reviewed tests; Neon `j27-preview`
+   is a Production-data copy; `vercel inspect` prints on stderr; the Chrome
+   extension's first navigation often fails.
+5. **Shell `git checkout --` restores the committed file**: a mutation test
+   this session lost uncommitted work that way (restored from a copy). Commit
+   before mutation checks.
+
+#### Parked
+
+1. Polish pass and older parked items: `git show 20deeb251:SESSION_PROMPT.md`.
 
 #### Do Not Reopen Without New Decision
 
-1. Everything in Session 672's list (tabs and order; retired terms; wording;
-   staff decisions in Phase I Status; no rerun on file replacement; J27
-   Proposal section; D7, D8): `git show 33a233633:SESSION_PROMPT.md`.
-2. Session 673's decisions (D60, D62 to D67), and the closed Overview link
-   finding: `git show 146980bc6:SESSION_PROMPT.md`.
-3. The Deliberations row and request strip show no next step before the
-   presentation ends (owner's list decision; page confirmed 2026-11-12).
+1. The four 2026-11-13 admission decisions above; structured news rule in
+   Production; Haiku with 8000 tokens; rollup concurrency 4.
+2. Session 672 to 674 decisions (see the earlier handoffs).
 
 ### Key Files Reference
 
 | File | Purpose |
 |---|---|
-| `docs/plans/J27_WORKBENCH_PRODUCTION_ROLLOUT_2026-11-07.md` (branch) | Settings, Preview moves, fixture, pre-promotion checks and results |
-| `docs/plans/J27_READ_MODEL_AND_DISCOVERY_PLAN_2026-11-08.md` (branch) | C7 read budget and its 2026-11-12 amendment |
-| `docs/plans/J27_LATER_PHASE_LISTS_PLAN_2026-11-10.md` (`main`) | The later-phase design and review record |
-| `pages/workbench/[requestId].js`, `shared/components/workbench/useReviewerProgress.js`, `OverviewTab.js` (branch) | Page-owned reviewer rollup |
-| `shared/utils/j27PageStage.js`, `j27CycleRows.js` (branch) | The page's composer; list rules |
-| `lib/services/workbench/j27-later-facts.js` (branch) | The four later-phase facts |
-| `lib/services/final-writeup/transition-schedule.js` (branch) | Group-review guard and the earlier-cycle exception |
-| `scripts/probe-group-review-cycle-links.cjs`, `scripts/probe-workbench-load-timing.js` (branch) | Owner-run pre-promotion probes |
+| `docs/plans/J27_WORKBENCH_PRODUCTION_ROLLOUT_2026-11-07.md` | Release state, rehearsal, change record, rollback |
+| `lib/services/workbench/phase-admission.js` | Per-request admission and the one-read loader |
+| `lib/utils/workbench-field-readiness.js` | Field readiness, Zoom suggestions off in Production |
+| `scripts/set-workbench-phase-rollout.mjs` | Owner-run writer of `workbench.phase_rollout` |
+| `scripts/probe-j27-request-fields.cjs`, `scripts/time-j27-large-reads.cjs` | Owner-run read-back and timing probes |
 
 ### Testing
 
 ```bash
-cd /Users/gallivan/Code/WMKF_Apps-claude-j27-read-model
-npx jest tests/unit/workbench tests/unit/j27 tests/unit/overview tests/unit/reviewer
+npx jest tests/unit/workbench-phase-admission tests/unit/workbench-field-readiness tests/unit/workbench-phase-admission-routes tests/unit/set-workbench-phase-rollout tests/unit/workbench-meeting-roster
 npm run check:types
-node scripts/probe-sandbox-j27-fields.cjs   # read-only, sandbox-pinned
 ```
 
-No DEVELOPMENT_LOG entry: nothing reached Production.
+Milestone: DEVELOPMENT_LOG entry "J27 Workbench in Production" (Session 675).
 
 ## Stream B — Expertise roster (Codex, Session 670)
 
