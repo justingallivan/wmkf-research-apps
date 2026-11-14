@@ -304,8 +304,9 @@ search limits: `docs/audits/product-backlog-reconciliation-2026-10-31.md`.
   `/Users/gallivan/Code/WMKF_Apps-claude-factory-j27-files`) with ledger
   migration 098; release needs owner-run `ledger:apply` on both Factory ledgers
   and `apply-migrations.js` on the Production app database, then the merge
-  (runbook "Prepared J27 reviewer fixtures"; Atlas
-  `docs/atlas/postgres-test-request-runs.md`). Original entry follows.
+  (the branch's own runbook "Prepared J27 reviewer fixtures" and Atlas
+  `docs/atlas/postgres-test-request-runs.md` text, not yet on `main`).
+  Original entry follows.
   The J27 Workbench is on in Production (every 2027-or-later request,
   `docs/plans/J27_WORKBENCH_PRODUCTION_ROLLOUT_2026-11-07.md`), so internal
   testing will want J27 test requests. Do before the Factory next creates them;
