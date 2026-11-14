@@ -347,7 +347,7 @@ The memo fields above stay switched off in Production after waves 37 through 40 
 - Absent: `DYNAMICS_SANDBOX_URL` (required absent or Production: field readiness and the settings store must resolve to the Production host), `WORKBENCH_PRODUCTION_SCHEMA_READY`, `WORKBENCH_PHASE_RELEASE`, `INITIAL_RATIONALE_SCHEMA_READY`, `MEETING_ROSTER_SCHEMA_READY`, `CHAIRS_RECOMMENDATION_ENABLED`, `AUTOMATIC_INTEGRITY_SCREENING`. The Chairs step and the automatic integrity screen stay off: both need the sandbox-only rationale helper.
 - **Confirmed by the owner in the Vercel dashboard, Production environment, 2026-11-13:** `DATAVERSE_TARGET_INTERLOCK=on`, `DATAVERSE_DAL_ENFORCEMENT=on`, `DYNAMICS_IMPERSONATION_ENABLED=true`, and `DYNAMICS_URL` on `wmkf.crm.dynamics.com` [VERIFIED via owner dashboard check].
 
-**People.** Owner and operator: Justin Gallivan. Backup operator: *to be named by the owner*.
+**People.** Owner and operator: Justin Gallivan. Backup operator: none (owner, 2026-11-13).
 
 **Pilot requests.** *To be chosen by the owner*: one or two real 2027-or-later Research requests (request GUIDs from the request page address). If none exists yet in Production, the release waits at step B.
 
