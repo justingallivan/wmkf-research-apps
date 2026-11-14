@@ -67,7 +67,7 @@ request list keeps Advancing / Set aside (restored for 2027-or-later rows,
 owner 2026-11-13). Setting it `on` is **not** the release by itself: the
 request page's phase layout and new fields still refuse Production
 (`pages/workbench/[requestId].js`, the rationale and roster readiness
-checks), and migration 096 must be applied first. Changes that reach
+checks). Migration 096 is applied in Production (2026-11-13). Changes that reach
 Production on merge by the owner's decision: offramp refusals (D7/D63), the
 group-review guard (D63/D64), the 2027+ Proposal-tab files and staff version
 (D59 to D61), the nav order, the Scoring card for 2027+ with an explicit
@@ -294,7 +294,9 @@ done
 
 ## Postgres preparation
 
-**[PLANNED; added 2026-11-10]** Apply migration `096_j27_integrity_jobs.sql` to the Production database with `node scripts/apply-migrations.js` before the J27 code serves there. The J27 read model reads the latest Integrity Screen for every J27 Research row through a query that joins `j27_integrity_jobs`, whether or not the automatic screen is switched on. Without the table that read fails and every J27 row shows "Some details could not be read." [VERIFIED via a throwaway local Postgres, 2026-11-10; read-model plan section 11]. The Production database does not have the table: an owner-run `apply-migrations.js` pass from the main checkout on 2026-11-10 skipped 002 through 095 and applied nothing, and the main checkout has no 096. The table is additive and empty until the automatic screen is enabled.
+**[DONE 2026-11-13]** The owner ran `node scripts/apply-migrations.js` from the main checkout after the merge: `[apply ok] 096_j27_integrity_jobs.sql`, `1 applied, 94 skipped, 95 total` [VERIFIED via owner-run command output]. The original step follows for the record.
+
+**[Added 2026-11-10]** Apply migration `096_j27_integrity_jobs.sql` to the Production database with `node scripts/apply-migrations.js` before the J27 code serves there. The J27 read model reads the latest Integrity Screen for every J27 Research row through a query that joins `j27_integrity_jobs`, whether or not the automatic screen is switched on. Without the table that read fails and every J27 row shows "Some details could not be read." [VERIFIED via a throwaway local Postgres, 2026-11-10; read-model plan section 11]. The Production database does not have the table: an owner-run `apply-migrations.js` pass from the main checkout on 2026-11-10 skipped 002 through 095 and applied nothing, and the main checkout has no 096. The table is additive and empty until the automatic screen is enabled.
 
 **Sandbox Preview database (2026-11-10).** Until this date the `claude/j27-read-model` Preview used the shared Production database, so it read (and wrote) Production Postgres and lacked the J27 table. The owner created a Neon branch `j27-preview` of the Production database (project `expert-reviewers-neon-db`, branched from `main` with data, auto-delete Never), scoped `POSTGRES_URL` and `DATABASE_URL` to Preview for the git branch `claude/j27-read-model`, and applied 096 there (`1 applied, 94 skipped, 95 total`). With that, "Some details could not be read." no longer appears on the Preview's J27 list or request pages (seen in the browser the same day), which confirms the missing table was the cause. The branch is a copy of Production data taken at that moment; treat its connection string as a Production secret. **Remove the Neon branch and the two branch-scoped variables when the J27 line is promoted or retired**, together with the branch-scoped sandbox `DYNAMICS_URL`.
 
