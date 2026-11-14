@@ -9,6 +9,12 @@
 
 const getById = jest.fn();
 const findByRequestNumber = jest.fn();
+// The admission policy itself is covered in workbench-phase-admission.test.js; here, only that the
+// context asks it with the fresh cycle and returns its answer.
+const resolvePhaseAdmission = jest.fn(async () => false);
+jest.mock('../../lib/services/workbench/phase-admission', () => ({
+  resolvePhaseAdmission: (...a) => resolvePhaseAdmission(...a),
+}));
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
   getById: (...a) => getById(...a),
   findByRequestNumber: (...a) => findByRequestNumber(...a),
@@ -297,5 +303,22 @@ describe('J27 read model (plan C7)', () => {
     expect(body.j27.input.reviewers.status).toBe('unavailable');
     expect(body.j27.input.integrity.status).toBe('unavailable');
     expect(body.j27.input.calendar.status).toBe('unavailable');
+  });
+});
+
+describe('phase layout (request page admission)', () => {
+  test('asks the shared policy with the request id and the linked cycle from this read, and returns its answer', async () => {
+    resolvePhaseAdmission.mockResolvedValueOnce(true);
+    getById.mockResolvedValue({ ...RECORD, wmkf_GrantCycle: { wmkf_cyclecode: 'J27' } });
+    const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
+    expect(resolvePhaseAdmission).toHaveBeenCalledWith({ requestId: REQ, cycleCode: 'J27' });
+    expect(body.phaseLayout).toBe(true);
+  });
+
+  test('a refusal is phaseLayout false', async () => {
+    resolvePhaseAdmission.mockResolvedValueOnce(false);
+    const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
+    expect(resolvePhaseAdmission).toHaveBeenCalledWith({ requestId: REQ, cycleCode: 'J26' });
+    expect(body.phaseLayout).toBe(false);
   });
 });
