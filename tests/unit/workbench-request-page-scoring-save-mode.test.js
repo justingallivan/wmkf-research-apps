@@ -30,9 +30,12 @@ for (const name of ['OverviewTab', 'ReviewsTab', 'ProposalTab', 'StatusTab', 'Aw
 
 import { WorkbenchRequest } from '../../pages/workbench/[requestId]';
 
-const resolved = { ok: true, json: async () => ({ success: true, requestId: 'request-a', requestNumber: '1000384', cycleCode: 'J27', requestVersion: 'W/"1"' }) };
+// phaseLayout is the server's per-request admission (phase-admission.js via resolve-request).
+const context = (phaseLayout) => ({ ok: true, json: async () => ({ success: true, requestId: 'request-a', requestNumber: '1000384', cycleCode: 'J27', requestVersion: 'W/"1"', phaseLayout }) });
+let resolved = context(true);
 
 beforeEach(() => {
+  resolved = context(true);
   pending.clear();
   global.fetch = jest.fn((url) => new Promise((resolve) => pending.set(String(url), resolve)));
 });
@@ -53,4 +56,11 @@ test('the J27 phase layout saves on change', async () => {
   routeQuery = { requestId: 'request-a', tab: 'initial-assessment', section: 'proposal' };
   const card = await renderAndResolve({ staffReviewSummary: true });
   expect(card).toHaveAttribute('data-explicit-save', 'false');
+});
+
+test('a 2027 request the server does not admit keeps the explicit Save button (rollout off)', async () => {
+  routeQuery = { requestId: 'request-a', tab: 'proposal' };
+  resolved = context(false);
+  const card = await renderAndResolve({ staffReviewSummary: true });
+  expect(card).toHaveAttribute('data-explicit-save', 'true');
 });

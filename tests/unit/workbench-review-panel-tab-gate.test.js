@@ -125,7 +125,7 @@ test('a deep-linked tab is centered in the horizontally overflowing mobile tab s
 test('sandbox shell presents five phases and preserves reviewer deep links', async () => {
   mockAccess = { isSuperuser: false, hasAccess: () => true };
   mockQuery = { requestId: 'request-1', tab: 'reviews' };
-  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, requestId: 'request-1', cycleCode: 'J27' }) }));
+  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, requestId: 'request-1', cycleCode: 'J27', phaseLayout: true }) }));
   await act(async () => { render(<WorkbenchRequest staffReviewSummary />); });
   const nav = screen.getByRole('navigation', { name: 'Request sections' });
   expect([...nav.querySelectorAll('button')].map((button) => button.textContent)).toEqual([
@@ -138,7 +138,7 @@ test('sandbox shell presents five phases and preserves reviewer deep links', asy
 test.each(['review-panel', 'integrity'])('sandbox legacy %s link cannot mount a gated surface without its grant', async (tab) => {
   mockAccess = { isSuperuser: true, hasAccess: () => false };
   mockQuery = { requestId: 'request-1', tab };
-  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, requestId: 'request-1', cycleCode: 'J27' }) }));
+  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, requestId: 'request-1', cycleCode: 'J27', phaseLayout: true }) }));
   await act(async () => { render(<WorkbenchRequest staffReviewSummary />); });
   expect(screen.queryByTestId('review-panel-tab')).toBeNull();
   expect(screen.queryByRole('button', { name: 'AI Review Panel' })).toBeNull();
@@ -148,7 +148,7 @@ test.each(['review-panel', 'integrity'])('sandbox legacy %s link cannot mount a 
 test('the existing group-review link opens the AI Review Panel with its new label', async () => {
   mockAccess = { isSuperuser: false, hasAccess: (key) => key === 'review-panel' };
   mockQuery = { requestId: 'request-1', tab: 'peer-review', section: 'group-review' };
-  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, requestId: 'request-1', cycleCode: 'J27' }) }));
+  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, requestId: 'request-1', cycleCode: 'J27', phaseLayout: true }) }));
   await act(async () => { render(<WorkbenchRequest staffReviewSummary />); });
   expect(screen.getByTestId('review-panel-tab')).toHaveAttribute('data-request-id', 'request-1');
   expect(screen.getByTestId('review-panel-tab')).toHaveAttribute('data-title', 'AI Review Panel');
@@ -163,7 +163,7 @@ test('the existing group-review link opens the AI Review Panel with its new labe
 test('phase navigation writes canonical phase and section links', async () => {
   mockAccess = { isSuperuser: false, hasAccess: () => true };
   mockQuery = { requestId: 'request-1', tab: 'peer-review', sub: 'track' };
-  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, requestId: 'request-1', cycleCode: 'J27' }) }));
+  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, requestId: 'request-1', cycleCode: 'J27', phaseLayout: true }) }));
   await act(async () => { render(<WorkbenchRequest staffReviewSummary />); });
   fireEvent.click(screen.getByRole('button', { name: 'Reports', exact: true }));
   expect(mockPush).toHaveBeenLastCalledWith(
@@ -180,7 +180,7 @@ test('phase navigation writes canonical phase and section links', async () => {
 test('sandbox requests outside J27 retain the existing navigation', async () => {
   mockAccess = { isSuperuser: false, hasAccess: () => true };
   mockQuery = { requestId: 'request-1', tab: 'reviews' };
-  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, requestId: 'request-1', cycleCode: 'D26' }) }));
+  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, requestId: 'request-1', cycleCode: 'D26', phaseLayout: false }) }));
   await act(async () => { render(<WorkbenchRequest staffReviewSummary />); });
   expect(screen.getByRole('button', { name: 'Reviews', exact: true })).toHaveAttribute('aria-current', 'page');
   expect(screen.queryByRole('button', { name: 'Peer Review', exact: true })).toBeNull();
@@ -198,7 +198,7 @@ test.each([
 ])('J27 legacy %s selects its phase and section', async (tab, phase, section) => {
   mockAccess = { isSuperuser: false, hasAccess: () => true };
   mockQuery = { requestId: 'request-1', tab };
-  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, requestId: 'request-1', cycleCode: 'J27' }) }));
+  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, requestId: 'request-1', cycleCode: 'J27', phaseLayout: true }) }));
   await act(async () => { render(<WorkbenchRequest staffReviewSummary />); });
   expect(screen.getByRole('button', { name: phase, exact: true })).toHaveAttribute('aria-current', 'page');
   if (section) expect(screen.getByRole('button', { name: section, exact: true })).toHaveAttribute('aria-current', 'page');
@@ -212,7 +212,7 @@ test.each([
   mockQuery = { requestId: 'request-1', tab, section };
   const mockRequest = (statusClass) => {
     global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({
-      success: true, requestId: 'request-1', cycleCode: 'J27', statusClass,
+      success: true, requestId: 'request-1', cycleCode: 'J27', phaseLayout: true, statusClass,
     }) }));
   };
   mockRequest('IN_FLIGHT');
@@ -239,7 +239,7 @@ test('canonical phase links wait for request context and remain retryable on fai
   expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   expect(screen.queryByTestId('overview-tab')).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
-  await act(async () => { resolve({ ok: true, json: async () => ({ success: true, requestId: 'request-1', cycleCode: 'J27' }) }); });
+  await act(async () => { resolve({ ok: true, json: async () => ({ success: true, requestId: 'request-1', cycleCode: 'J27', phaseLayout: true }) }); });
   expect(screen.getByRole('button', { name: 'Reports', exact: true })).toHaveAttribute('aria-current', 'page');
 });
 
@@ -247,7 +247,7 @@ test('Panel navigation returns to the roster and retains the Finder proposal cho
   mockAccess = { isSuperuser: false, hasAccess: () => true };
   mockQuery = { requestId: 'request-1', tab: 'peer-review', section: 'panel', sub: 'find',
     proposalFile: 'document-key', repairCandidate: 'candidate', repairSuggestion: 'suggestion' };
-  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, requestId: 'request-1', cycleCode: 'J27' }) }));
+  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, requestId: 'request-1', cycleCode: 'J27', phaseLayout: true }) }));
   await act(async () => { render(<WorkbenchRequest staffReviewSummary />); });
   fireEvent.click(screen.getByRole('button', { name: 'Reviewers', exact: true }));
   expect(mockPush).toHaveBeenLastCalledWith({ pathname: '/workbench/request-1', query: {
@@ -264,7 +264,7 @@ test.each([
   mockAccess = { isSuperuser: true, hasAccess: () => true };
   mockQuery = { requestId: 'request-1', tab: 'initial-assessment' };
   global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({
-    success: true, requestId: 'request-1', cycleCode: 'J27', isTestRequest, phaseIStatus, requestVersion: 'W/"1"',
+    success: true, requestId: 'request-1', cycleCode: 'J27', phaseLayout: true, isTestRequest, phaseIStatus, requestVersion: 'W/"1"',
   }) }));
   await act(async () => { render(<WorkbenchRequest staffReviewSummary initialRationaleEnabled chairsRecommendationEnabled />); });
   expect(Boolean(screen.queryByRole('combobox', { name: 'Recommendation' }))).toBe(visible);
@@ -273,7 +273,7 @@ test.each([
 
 test('J27 Deliberations leads with the presentation and keeps staff inputs below it', async () => {
   mockQuery = { requestId: 'request-1', tab: 'deliberations' };
-  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, requestId: 'request-1', cycleCode: 'J27' }) }));
+  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, requestId: 'request-1', cycleCode: 'J27', phaseLayout: true }) }));
   await act(async () => { render(<WorkbenchRequest staffReviewSummary meetingRosterEnabled />); });
 
   const presentation = screen.getByRole('heading', { name: 'Presentation and staff discussion' });
@@ -287,7 +287,7 @@ test('J27 Deliberations leads with the presentation and keeps staff inputs below
 
 test('J27 Final Assessment leads with the Draft Writeup and groups the three saved records', async () => {
   mockQuery = { requestId: 'request-1', tab: 'final-assessment' };
-  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, requestId: 'request-1', cycleCode: 'J27' }) }));
+  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true, requestId: 'request-1', cycleCode: 'J27', phaseLayout: true }) }));
   await act(async () => { render(<WorkbenchRequest staffReviewSummary meetingRosterEnabled />); });
 
   const recommendation = screen.getByRole('heading', { name: 'Draft Writeup' });
