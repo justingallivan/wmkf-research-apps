@@ -293,7 +293,19 @@ search limits: `docs/audits/product-backlog-reconciliation-2026-10-31.md`.
   Concept eligibility, successor Review Panel and Cycle Dossier research exist
   separately; the old staged full-proposal pipeline is not implemented.
   Re-scope from current J27 intent before any build; do not revive its old migration.
-- **Test Request Factory — not yet J27-shaped (logged 2026-11-14, no owner).**
+- **Test Request Factory — not yet J27-shaped (logged 2026-11-14; Claude owns
+  gap 1 since Session 677).** **Owner decisions, 2026-11-14:** J27 test requests
+  come from the Production Factory (the standing Production test-request venue),
+  not the sandbox; gaps 2 and 3 below are sandbox-only and are **parked** with
+  Codex's branch unmerged. Gap 1 is narrowed to the narrative and bibliography:
+  the other four J27 files stay missing on Factory requests as an accepted limit.
+  **[BRANCH-BUILT 2026-11-14, Session 677, not merged]** Gap 1 is built on
+  `claude/factory-j27-file-names` (worktree
+  `/Users/gallivan/Code/WMKF_Apps-claude-factory-j27-files`) with ledger
+  migration 098; release needs owner-run `ledger:apply` on both Factory ledgers
+  and `apply-migrations.js` on the Production app database, then the merge
+  (runbook "Prepared J27 reviewer fixtures"; Atlas
+  `docs/atlas/postgres-test-request-runs.md`). Original entry follows.
   The J27 Workbench is on in Production (every 2027-or-later request,
   `docs/plans/J27_WORKBENCH_PRODUCTION_ROLLOUT_2026-11-07.md`), so internal
   testing will want J27 test requests. Do before the Factory next creates them;
