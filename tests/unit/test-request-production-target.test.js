@@ -21,6 +21,7 @@ import {
   createRequestWithGoverifyBypass,
   validateCloneManifest,
   verifyClone,
+  manifestDocumentLayout,
 } from '../../lib/services/test-requests/basic-clone-steps.js';
 import { verifyCloneRequestReadback } from '../../lib/services/test-requests/sandbox-clone.js';
 import { assertRunTarget } from '../../lib/services/test-requests/run-runner.js';
@@ -550,4 +551,26 @@ test('readiness projection is Production-only; sandbox keeps its existing fields
     await getRequest(client,REQUEST_ID);
     expect(client.get.mock.calls[0][0].includes('wmkf_readyforreview')).toBe(expected);
   }
+});
+
+describe('manifestDocumentLayout', () => {
+  test('reads no layout from a manifest without one (D26, CLI, and runs prepared before the field existed)', () => {
+    expect(manifestDocumentLayout({ values: { cycleCode: 'D26' } })).toBeNull();
+    expect(manifestDocumentLayout({ values: { cycleCode: 'J27' } })).toBeNull();
+    expect(manifestDocumentLayout({ values: {} })).toBeNull();
+  });
+
+  test('reads the single-submission layout bound for a J27-or-later cycle', () => {
+    expect(manifestDocumentLayout({ values: { cycleCode: 'J27', documentLayout: 'single-submission' } })).toBe('single-submission');
+    expect(manifestDocumentLayout({ values: { cycleCode: 'D27', documentLayout: 'single-submission' } })).toBe('single-submission');
+  });
+
+  test.each([
+    [{ cycleCode: 'D26', documentLayout: 'single-submission' }],
+    [{ cycleCode: 'J27', documentLayout: 'other' }],
+    [{ cycleCode: 'J27', documentLayout: null }],
+    [{ documentLayout: 'single-submission' }],
+  ])('refuses an inconsistent layout %o', (values) => {
+    expect(() => manifestDocumentLayout({ values })).toThrow(/Invalid manifest document layout/);
+  });
 });

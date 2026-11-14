@@ -12,6 +12,7 @@ related:
   - docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md
   - lib/db/migrations/054_test_request_runs.sql
   - lib/db/migrations/058_test_request_cast_slot_bindings.sql
+  - lib/db/migrations/098_test_request_j27_file_names.sql
   - lib/services/test-requests/foundation-transition.js
   - docs/plans/TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md
 ---
@@ -34,6 +35,21 @@ numbered migration, ledger-only ones included; the "Operational Factory
 ledger only" header in the 094 SQL describes where its data lives, not which
 databases receive the schema. The SQL file is left unchanged because the
 ledger runner checks migration-file checksums (Codex, 2026-11-03).
+
+**[BRANCH-BUILT 2026-11-14 on `claude/factory-j27-file-names`; not applied to
+any database]** Migration 098 (`098_test_request_j27_file_names.sql`) replaces
+`test_request_receipt_ok` so receipts also accept the `Submission-Documents`
+folder and the `Project-Narrative_<n>.pdf` and `Bibliography_<n>.pdf` names
+(J27 Factory file destinations; runbook "Prepared J27 reviewer fixtures"). It
+only widens the validator: stored rows still pass and code from before it keeps
+working, so it can be applied before the code merges. The JS mirror is
+`run-ledger.js` `SUBFOLDER`/`FILENAME`; the fresh-install copy is
+`scripts/setup-database.js`. The tracked fingerprint changes only in that
+function's body hash [VERIFIED via a disposable local PostgreSQL 16 and
+`check:factory-ledger` against both managed ledgers, which still report the
+pre-098 hash `f2d697a6`]. Release order: owner-run `ledger:apply` on both
+managed ledgers and `apply-migrations.js` on the Production app database, then
+merge.
 
 **Where the ledger lives (2026-09-30, S553; `docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md`).** The operational ledger for production test Requests has lived only in `ledger_prod` inside the `wmkf-ledger-pg` Docker container on the owner's home Mac (sandbox counterpart `ledger`), hand-built and never dumped [VERIFIED S553: the office Mac holds no `ledger_prod`]. Owner decision D1 moved it to Neon project `wmkf-factory-ledger` (Vercel Marketplace, connected to no Vercel project, us-east-1), databases `ledger_prod` and `ledger`, with 054 + 058 applied and the local tracker `ledger_schema_migrations` recording 054; the home-Mac operational data was loaded into both on 2026-09-30 and the managed ledger is now the current copy [VERIFIED via `docs/plans/evidence/test-request-factory/ledger-snapshot-2026-09-30.md`]. Merged in PR #374: `lib/db/ledger-registry.js` is the tracked host allowlist the CLI's `requireLedgerUrl(target)` enforces (managed host requires `ledger_prod` for `--target=production`, `ledger` otherwise; the app's `POSTGRES_URL` is always refused), `lib/db/ledger-schema.js` + `lib/db/ledger-schema-fingerprint.json` are the structural schema check every ledger-driven CLI mode runs first (`check:factory-ledger` gate, `--ledger-check`), and `scripts/apply-ledger-migrations.js` is the ledger's own migration runner. Connection strings are `.env.local` variables for the CLI; since 2026-10-02 the production URL is also a hand-set Vercel Production variable for the admin form (`docs/CREDENTIALS_RUNBOOK.md`; see *Second writer: the deployed admin form*).
 

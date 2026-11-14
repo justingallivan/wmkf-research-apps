@@ -15,6 +15,7 @@ import {
   verifyCopiedFiles,
 } from '../../lib/services/test-requests/bundle-file-copy.js';
 import { TEST_REQUEST_PREVIEW_READ_LIMITS } from '../../lib/services/test-requests/admin-preview-service.js';
+import { assertLedgerReceipt } from '../../lib/services/test-requests/run-ledger.js';
 import { renderInitialAssessmentDocx } from '../../lib/services/initial-assessment/template.js';
 import { SYNTHETIC_GENERATED } from '../../lib/services/test-requests/fixtures/initial-assessment-synthetic.js';
 import { XLSX_MIME, buildMinimalXlsx, buildXlsxCopyFixtures, customProperty, customPropertiesXml } from '../helpers/minimal-xlsx-package.js';
@@ -121,6 +122,22 @@ describe('planBundleFileCopies', () => {
   test('refuses a document whose name does not match its kind', () => {
     expect(() => planBundleFileCopies(bundle([doc({ name: 'Other.pdf' })]))).toThrow(/blocked/);
   });
+
+  test('sends the narrative to Submission-Documents under its J27 name for the single-submission layout', () => {
+    expect(planBundleFileCopies(bundle(), { destinationLayout: 'single-submission' }).map((file) => file.destination)).toEqual([
+      { library: 'akoya_request', folder: 'Submission-Documents', filename: null, filenameTemplate: 'Project-Narrative_{new-request-number}.pdf' },
+      { library: 'akoya_request', folder: 'Reviewer Materials', filename: null, filenameTemplate: 'Proposal_{new-request-number}.pdf' },
+    ]);
+    expect(planBundleFileCopies(bundle(), { destinationRequestNumber: '1000400', destinationLayout: 'single-submission' })
+      .map((file) => [file.destination.folder, file.destination.filename])).toEqual([
+      ['Submission-Documents', 'Project-Narrative_1000400.pdf'],
+      ['Reviewer Materials', 'Proposal_1000400.pdf'],
+    ]);
+  });
+
+  test('refuses an unknown destination layout', () => {
+    expect(() => planBundleFileCopies(bundle(), { destinationLayout: 'j27' })).toThrow(/DESTINATION_LAYOUT_INVALID/);
+  });
 });
 
 describe('sandbox rehearsal copy policy and bundle freshness', () => {
@@ -175,6 +192,21 @@ describe('classifyUploadError', () => {
 });
 
 describe('copyBundleFiles', () => {
+  test('copies the single-submission layout into Submission-Documents and journals receipts the ledger accepts', async () => {
+    const { deps, calls } = fakeDependencies();
+    const journal = jest.fn(async () => {});
+    const plan = planBundleFileCopies(bundle(), { destinationRequestNumber: '1000400', destinationLayout: 'single-submission' });
+    const copies = await copyBundleFiles(params(plan), deps, journal);
+    expect(copies.map((c) => [c.status, c.destination.folder, c.destination.filename])).toEqual([
+      ['verified', `${REQUEST_FOLDER}/Submission-Documents`, 'Project-Narrative_1000400.pdf'],
+      ['verified', `${REQUEST_FOLDER}/Reviewer Materials`, 'Proposal_1000400.pdf'],
+    ]);
+    expect(calls).toContain(`folder:${REQUEST_FOLDER}/Submission-Documents`);
+    for (const copy of copies) {
+      expect(() => assertLedgerReceipt({ folder: copy.destination.folder, filename: copy.destination.filename }, 'readback')).not.toThrow();
+    }
+  });
+
   test('copies each file create-only after journaling, re-resolving drives and verifying bytes', async () => {
     const { deps, calls } = fakeDependencies();
     const journal = jest.fn(async (copies) => calls.push(`journal:${copies.map((c) => `${c.status}:${c.outcome ?? '-'}:${c.uploadAttempted ? 'u' : ''}`).join(',')}`));
