@@ -270,7 +270,9 @@ Apply the same effective admission to the five-phase layout, Overview, Reports s
 
 ## Production schema preparation
 
-**[PLANNED]** Add optional fields to `akoya_request` using the reviewed schema waves. There is no new data backfill, data copying from rehearsal, or retirement of the existing Word assessment in this release.
+**[DONE 2026-11-13]** Schema ready in Production. The owner dry-ran waves 37 to 40 against `wmkf.crm.dynamics.com` (all five fields absent, each "would create", no conflicts; types and limits in the wave files match the table below), then applied them with `--target=prod --execute` and a same-day write acknowledgement: each wave reported its fields created [VERIFIED via owner-run command output]. `scripts/probe-j27-request-fields.cjs` (read-only, owner-run) then read back each field's type, limit, required level `None` and read/update validity, all as expected, and a real `akoya_requests` read selecting all five fields returned 5 rows with no values [VERIFIED via owner-run probe output]. No entity publish was needed. Access stays off (see Postgres preparation, last paragraph).
+
+**[Original step]** Add optional fields to `akoya_request` using the reviewed schema waves. There is no new data backfill, data copying from rehearsal, or retirement of the existing Word assessment in this release.
 
 | Wave | Field | Type and limit |
 |---|---|---|
