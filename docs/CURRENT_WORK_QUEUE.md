@@ -293,8 +293,30 @@ search limits: `docs/audits/product-backlog-reconciliation-2026-10-31.md`.
   Concept eligibility, successor Review Panel and Cycle Dossier research exist
   separately; the old staged full-proposal pipeline is not implemented.
   Re-scope from current J27 intent before any build; do not revive its old migration.
-
-## Audit follow-ups — verified open, not silently prioritized
+- **Test Request Factory — not yet J27-shaped (logged 2026-11-14, no owner).**
+  The J27 Workbench is on in Production (every 2027-or-later request,
+  `docs/plans/J27_WORKBENCH_PRODUCTION_ROLLOUT_2026-11-07.md`), so internal
+  testing will want J27 test requests. Do before the Factory next creates them;
+  Codex is not working on the Factory now (owner, 2026-11-14). Three gaps
+  [`main` has none of the scenario titles, and `lib/services/test-requests/`
+  has no J27 name or `Submission-Documents` reference; VERIFIED via grep]:
+  1. *File names.* `lib/services/test-requests/file-plan.js:37-45` writes the
+     D26 names `ProposalNarrative_{N}.pdf` / `ProposalBibliography_{N}.pdf` to
+     `AI Materials` [VERIFIED via source]. Readers still accept them there, so
+     runs work, but they do not exercise J27's names `Project-Narrative_{N}.pdf`
+     / `Bibliography_{N}.pdf` or the `Submission-Documents` narrative place
+     (`lib/utils/proposal-document-names.js`, `proposalNarrativeNotFoundDetail`).
+  2. *Scenario names.* The eight J27 scenarios exist only on
+     `codex/j27-factory-scenarios` (`9070030c7`, 14 commits not on `main`;
+     plan `docs/plans/J27_FACTORY_SANDBOX_SCENARIOS_PLAN_2026-11-08.md` there,
+     §6). Titles such as `05 Semi-finalist No`, `06 Semi-finalist Yes` and
+     `07 Chairs approved` predate the shipped labels in
+     `shared/config/j27Labels.js` (Recommendation to Chairs, Not Recommended,
+     Not Invited) [ASSUMED mapping; confirm against the labels before renaming].
+  3. *No Deliberations scenario.* None of the eight has a presentation, so
+     sandbox #1000383 carries a hand-added presentation record (2026-11-12)
+     that must be preserved until a scenario replaces it; attendance testing
+     needs one.
 - **Hard-coded late-2026 `expiresAt` dates in unit-test fixtures (2026-09-27, S546).** **[CLOSED
   2026-10-08 UTC, S584: no clock dependence.]** All seven files pass at 05:48 UTC on 2026-10-08
   (236 tests), after four of the dates had passed. Each remaining value is display-only or under a fake
