@@ -217,3 +217,34 @@ describe('deriveJ27ForRow with later-phase facts', () => {
     expect(stage.basis).toBe('partial');
   });
 });
+
+describe('deriveJ27ForRow and the request page admission', () => {
+  const scope = { readinessOnlyProgramIds: ['c247b11a-a7cb-ee11-9078-000d3a341e8f'] };
+  const saved = () => row({ wmkf_initialassessmentrationale: 'Saved rationale', wmkf_staffreviewsummary: 'Saved summary', wmkf_staffvisitassessment: 'Saved assessment' });
+  const later = { presentation: { status: 'absent' }, roster: { status: 'absent' }, boardDraft: { status: 'absent' }, transition: { status: 'present', phase: null } };
+  const memo = (stage) => ['rationale', 'reviewSummary', 'visitAssessment'].map((key) => stage.input[key].status);
+  beforeEach(() => {
+    process.env.TEST_RATIONALE_WAVE = 'on';
+    process.env.TEST_SUMMARY_WAVE = 'on';
+    process.env.TEST_ROSTER_WAVE = 'on';
+  });
+
+  test('an admitted row uses the saved fields', () => {
+    const phaseAdmission = jest.fn(() => true);
+    const stage = deriveJ27ForRow(saved(), facts(), { calendar, scope, later, phaseAdmission });
+    expect(phaseAdmission).toHaveBeenCalledWith(String(saved().akoya_requestid).toLowerCase(), 'J27');
+    expect(memo(stage)).toEqual(['present', 'present', 'present']);
+    expect(stage.input.roster).toEqual({ status: 'absent' });
+  });
+
+  test.each([
+    ['a refused row', () => false],
+    ['no admission given (fails closed)', undefined],
+    ['a non-boolean answer', () => 'yes'],
+  ])('%s derives with the new fields not provisioned, as before the release', (_label, phaseAdmission) => {
+    const stage = deriveJ27ForRow(saved(), facts(), { calendar, scope, later, phaseAdmission });
+    expect(memo(stage)).toEqual(['not-provisioned', 'not-provisioned', 'not-provisioned']);
+    expect(stage.input.rosterMemo).toEqual({ status: 'not-provisioned' });
+    expect(stage.input.roster).toEqual({ status: 'not-provisioned' });
+  });
+});

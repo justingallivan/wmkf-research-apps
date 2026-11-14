@@ -13,7 +13,7 @@ const originalEnv = process.env;
 
 function env(values) {
   process.env = { ...originalEnv, VERCEL_ENV: undefined, NODE_ENV: 'test', ...values };
-  for (const key of ['WORKBENCH_PRODUCTION_SCHEMA_READY', 'INITIAL_RATIONALE_SCHEMA_READY', 'MEETING_ROSTER_SCHEMA_READY', 'CHAIRS_RECOMMENDATION_ENABLED', 'TEST_REQUEST_ISOLATION']) {
+  for (const key of ['DYNAMICS_SANDBOX_URL', 'WORKBENCH_PRODUCTION_SCHEMA_READY', 'INITIAL_RATIONALE_SCHEMA_READY', 'MEETING_ROSTER_SCHEMA_READY', 'CHAIRS_RECOMMENDATION_ENABLED', 'TEST_REQUEST_ISOLATION']) {
     if (!(key in values)) delete process.env[key];
   }
   if (values.VERCEL_ENV === undefined) delete process.env.VERCEL_ENV;
@@ -37,6 +37,7 @@ describe('the Production switch', () => {
     ['Production deployment on an unknown target', { VERCEL_ENV: 'production', DYNAMICS_URL: 'https://other.crm.dynamics.com', WORKBENCH_PRODUCTION_SCHEMA_READY: 'on' }],
     ['Preview on the Production target', { VERCEL_ENV: 'preview', DYNAMICS_URL: PROD, WORKBENCH_PRODUCTION_SCHEMA_READY: 'on' }],
     ['local on the Production target', { DYNAMICS_URL: PROD, WORKBENCH_PRODUCTION_SCHEMA_READY: 'on' }],
+    ['Production whose settings store points at the sandbox', { VERCEL_ENV: 'production', DYNAMICS_URL: PROD, DYNAMICS_SANDBOX_URL: SANDBOX, WORKBENCH_PRODUCTION_SCHEMA_READY: 'on' }],
   ])('%s has none of the fields', (_label, values) => {
     env(values);
     expect(productionWorkbenchFieldsReady()).toBe(false);

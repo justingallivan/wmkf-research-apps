@@ -1,7 +1,7 @@
 /** @jest-environment node */
 import {
   PHASE_ROLLOUT_KEY, PHASE_ROLLOUT_READ_DEADLINE_MS, parsePhaseRollout, readPhaseRollout,
-  rolloutAdmitsRequest, resolvePhaseAdmission, phaseRouteAdmitted,
+  rolloutAdmitsRequest, resolvePhaseAdmission, phaseRouteAdmitted, loadPhaseAdmission,
 } from '../../lib/services/workbench/phase-admission';
 
 const A = '11111111-1111-4111-8111-111111111111';
@@ -161,5 +161,33 @@ describe('phaseRouteAdmitted (field routes)', () => {
     expect(noField.getSettingStrict).not.toHaveBeenCalled();
     const off = deps({ getSettingStrict: async () => ({ found: true, value: '{"mode":"off"}' }) });
     expect(await phaseRouteAdmitted(A, () => true, off)).toBe(false);
+  });
+});
+
+describe('loadPhaseAdmission (one read per server read)', () => {
+  test('reads the setting once; the predicate needs a 2027-or-later cycle and the setting', async () => {
+    const value = JSON.stringify({ mode: 'pilot', requestIds: [A] });
+    const d = deps({ getSettingStrict: jest.fn(async () => ({ found: true, value })) });
+    const admits = await loadPhaseAdmission(d);
+    expect(admits(A, 'J27')).toBe(true);
+    expect(admits(A, 'D26')).toBe(false);
+    expect(admits(A, null)).toBe(false);
+    expect(admits(B, 'J27')).toBe(false);
+    expect(d.getSettingStrict).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([
+    ['the cycle page release is off', { workbenchPhaseReleaseAdmitted: () => false }],
+    ['the fields are not ready', { reviewSummaryFieldsReady: () => false }],
+  ])('refuses every request without reading when %s', async (_label, overrides) => {
+    const d = deps(overrides);
+    const admits = await loadPhaseAdmission(d);
+    expect(admits(A, 'J27')).toBe(false);
+    expect(d.getSettingStrict).not.toHaveBeenCalled();
+  });
+
+  test('a failed read refuses every request', async () => {
+    const admits = await loadPhaseAdmission(deps({ getSettingStrict: async () => { throw new Error('down'); } }));
+    expect(admits(A, 'J27')).toBe(false);
   });
 });

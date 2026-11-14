@@ -25,6 +25,10 @@ jest.mock('../../lib/services/workbench/j27-integrity-jobs', () => ({
   readLatestIntegrityStates: (...a) => readLatestIntegrityStates(...a),
 }));
 const loadJ27LaterFacts = jest.fn();
+// Admission itself is covered in workbench-phase-admission.test.js and at deriveJ27ForRow.
+const admits = jest.fn(() => false);
+const loadPhaseAdmission = jest.fn(async () => admits);
+jest.mock('../../lib/services/workbench/phase-admission', () => ({ loadPhaseAdmission: (...a) => loadPhaseAdmission(...a) }));
 jest.mock('../../lib/services/workbench/j27-later-facts', () => ({
   ...jest.requireActual('../../lib/services/workbench/j27-later-facts'),
   loadJ27LaterFacts: (...a) => loadJ27LaterFacts(...a),
@@ -520,6 +524,12 @@ describe('J27 read model on the proposal list (plan C7)', () => {
     });
     expect(byNumber['1000385'].j27).not.toHaveProperty('input');
     expect(byNumber['1000385'].reviewers.candidates).toBe(1);
+  });
+  test('one admission read per page, asked about each staged row with its linked cycle', async () => {
+    queryAllRequests.mockResolvedValue({ capped: false, records: [j27(80), j27(85)] });
+    await loadDashboard(args({ cycleCode: 'J27', scope: 'all' }));
+    expect(loadPhaseAdmission).toHaveBeenCalledTimes(1);
+    expect(admits.mock.calls.map(([id, cycle]) => [id, cycle])).toEqual([['r-80', 'J27'], ['r-85', 'J27']]);
   });
   test('merge-dark: a Production deployment without WORKBENCH_PHASE_RELEASE=on makes none of the J27 reads', async () => {
     const env = jest.replaceProperty(process, 'env', { ...process.env, VERCEL_ENV: 'production' });
