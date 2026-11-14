@@ -10,14 +10,15 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
-## November 2026 — J27 Workbench in Production (Session 675)
+## November 2026 — J27 Workbench in Production (Sessions 675–676)
 
-**Milestone:** The J27 Workbench line (phase-organized cycle page, request-page phase layout and its new staff fields) is on `main` and live in Production, with the request page held off per request until the owner admits it.
-**Sessions:** Session 675 (Claude, 2026-11-13), building on Sessions 671 to 674.
+**Milestone:** The J27 Workbench line (phase-organized cycle page, request-page phase layout and its new staff fields) is on `main` and live in Production, and since 2026-11-14 the request page's phase layout is on for every 2027-or-later request.
+**Sessions:** Sessions 675 and 676 (Claude, 2026-11-13 to 2026-11-14), building on Sessions 671 to 674.
 **Ship state:**
 - `cb26082fe` merged the J27 line dark; migration 096 and schema waves 37 to 40 applied to Production by the owner and read back.
 - `e6b6e6b09` added one server admission policy (`workbench.phase_rollout`: off, pilot, on), Production field readiness and manual-only attendance; two Codex reviews; rehearsed off/pilot/on on the sandbox Preview.
 - `WORKBENCH_PHASE_RELEASE` and `WORKBENCH_PRODUCTION_SCHEMA_READY` on in Production (`dpl_7c5JCq8ow5RAP1YQwdyqW2esnsEV`): 2027 cycle pages show the phase lists; request pages stay on the old layout until the pilot (no setting row yet).
+- Session 676 (owner-run script): pilot of test #1003456, where the rationale, review summary and visit assessment saved and reloaded with the owner as editor in AkoyaGO Audit History; then `workbench.phase_rollout` = `on` the same day (no real J27 applications for about three weeks). Attendance waits for a real presentation.
 - Also shipped: the structured integrity news rule (8000-token limit) and the reviewer rollup reading four chunks at a time.
 **Why it matters:** Research staff get the J27 workflow without a big-bang switch; the request page can be piloted on named requests and turned off instantly.
 **Pointers:** `docs/plans/J27_WORKBENCH_PRODUCTION_ROLLOUT_2026-11-07.md` (change record, rollback), `lib/services/workbench/phase-admission.js`, `scripts/set-workbench-phase-rollout.mjs`.

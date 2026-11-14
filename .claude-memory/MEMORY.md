@@ -34,7 +34,7 @@
 - Test venue (default: Production test requests, not sandbox) / Factory safety vs fidelity: feedback-factory-safe-not-full-fidelity.md; feedback-question-the-rehearsal-venue.md
 - Sandbox Request creates (GoVerify bypass) / derived request status business rules: project-sandbox-request-status-business-rules.md
 - Workbench is Research-only / SoCal as a separate app: project-workbench-is-research-only.md
-- J27 Workbench cycle/request pages (live in Production 2026-11-13; request page held by the phase rollout setting): project-j27-cycle-page-redesign-pending.md
+- J27 Workbench cycle/request pages (live in Production 2026-11-13; request page on since 2026-11-14): project-j27-cycle-page-redesign-pending.md
 - Reviewer product decisions: ../docs/agent-wiki/topics/reviewer-identity.md (Durable Memory); feedback-prioritize-contact-recall-over-identity-precision.md
 - Audits / review / test evidence: ../docs/agent-wiki/topics/dev-environment.md (Durable Memory)
 - Tone / user context: feedback-no-performative-contrition.md; feedback-user-facing-error-copy-voice.md; item codes in owner/colleague text: feedback-no-item-codes-in-owner-facing-text.md

@@ -1,6 +1,6 @@
 ---
 name: project-j27-cycle-page-redesign-pending
-description: "Owner wants the cycle-level Workbench page reorganized by the request page's J27 phases (Research-only); decided 2026-11-09; all five lists built 2026-11-11; merged to main and live in Production 2026-11-13 (cycle page phase lists on; request page held per request by the workbench.phase_rollout setting, no row yet = off)"
+description: "Owner wants the cycle-level Workbench page reorganized by the request page's J27 phases (Research-only); decided 2026-11-09; all five lists built 2026-11-11; merged to main and live in Production 2026-11-13 (cycle page phase lists on); request page phase layout on for every 2027-or-later request since 2026-11-14 (workbench.phase_rollout = on)"
 metadata:
   node_type: memory
   type: project
@@ -31,5 +31,7 @@ Read before touching the Workbench cycle-level tabs (`shared/components/workbenc
 **Later phases built 2026-11-10 to 2026-11-11 (Session 673), not promoted:** the Deliberations and Final Assessment tabs are request lists from server-side later-phase facts (the j27-later-facts module, which exists only on that branch until it merges), and the request page uses the same facts for every viewer. Plan and review record: `docs/plans/J27_LATER_PHASE_LISTS_PLAN_2026-11-10.md` (section 6); alignment log D62 to D65 on the J27 line. Nothing was exercised live; the Preview had not been moved.
 
 **Promoted 2026-11-13 (Session 675, owner go at each step):** the J27 line merged to `main` (`cb26082fe`), then the request-page admission branch (`e6b6e6b09`). In Production: migration 096 and schema waves 37 to 40 applied; `WORKBENCH_PHASE_RELEASE=on` and `WORKBENCH_PRODUCTION_SCHEMA_READY=on` set and redeployed, so 2027 cycle pages show the phase lists; request pages stay on the old layout until the owner writes `workbench.phase_rollout` (pilot, then on) with `scripts/set-workbench-phase-rollout.mjs --target=prod`. The only J27 request in Production is test request #1003456 (the planned pilot). Release state, change record, rollback: `docs/plans/J27_WORKBENCH_PRODUCTION_ROLLOUT_2026-11-07.md`. The retired names ("First Cut", "Semi-finalist") left Production with the merge. Statements above saying "not promoted" are historical.
+
+**Request page on 2026-11-14 (Session 676, owner-run script):** pilot of test #1003456 (rationale, review summary and visit assessment saved and reloaded; AkoyaGO Audit History names the owner as editor), then `workbench.phase_rollout` = `{"mode":"on"}` the same day, with no observation window because no real J27 applications arrive for about three weeks (owner). `on` still admits only 2027-or-later cycles. Attendance is untested until a real request has a presentation. Rollback: the same script with `off`. Change record: the rollout plan above. The "request pages stay on the old layout" sentence above is historical.
 
 **How to apply:** plan before building; owner reviews the plan; log the decision in `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`. Related: [[project-workbench-is-research-only]], [[feedback-anchor-multisession-features-to-the-original-ask]].
