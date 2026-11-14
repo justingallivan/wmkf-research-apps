@@ -101,6 +101,12 @@ rollup reading four chunks at a time (below).
   (thinking on by default) got one non-JSON and one empty reply in 10
   cases; at 8000 all 16 replies were valid. The model stays Haiku (owner).
 
+- **Admission rehearsal on the sandbox Preview, 2026-11-13 (owner, signed in on `wmkfresearchapps-preview.vercel.app`).** Setting changes by `scripts/set-workbench-phase-rollout.mjs --target=sandbox`, each a dry run then `--execute`, written by revision and read back, editor recorded as the owner [VERIFIED via owner-run script output]:
+  1. *No row* (the first dry run reported none): #1000369 opened in the phase layout, as before.
+  2. *Off* (created, then revision `W/"61882360"`): #1000369 showed the old tabs with no rationale or attendance editors and the Scoring card's explicit Save; the June 2027 cycle page kept its phase lists. The stage box above the tabs still shows, as designed: it follows `WORKBENCH_PHASE_RELEASE` [VERIFIED via owner screenshots].
+  3. *Pilot of #1000369* (`c8e1cac8-80b1-4bd6-a393-2d5880f7cfbf`, then `W/"61882401"`): #1000369 opened in the phase layout; #1000370 kept the old tabs [VERIFIED via owner screenshots].
+  4. *On* (from `W/"61882401"`): written and read back; the page check of #1000370 was not reported. The sandbox setting is left on.
+  Not exercised: a save from a page left open across a switch to off (covered by unit tests). The rehearsal found one script defect, fixed in `5cefb7067`: the printed `--execute` line did not quote the ETag for the shell.
 - **Preview moved for the admission rehearsal, 2026-11-13.** `claude/j27-read-model` fast-forwarded to `2adc6dfb0` (the merged J27 line plus `claude/workbench-production-admission`) and deployed as `dpl_8C5J3QpUy5uaPA1VLPAk12FprrRX` (attested: branch, commit, Ready). The stable sign-in alias `wmkfresearchapps-preview.vercel.app` now points at it [VERIFIED via `vercel inspect`]; previous target `dpl_CLcVRmYVBNEShTeszJeqH9ebheU7`. The rollout script had not yet written `workbench.phase_rollout` in the sandbox at this point [ASSUMED absent until the first dry run reports it]; with no row the Preview admits every 2027 request as before.
 - **Preview walk-through and move, 2026-11-12.** The owner walked the
   Preview and Claude took a second look in Chrome. The Final Assessment
