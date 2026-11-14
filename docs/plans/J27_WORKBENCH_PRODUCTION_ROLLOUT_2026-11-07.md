@@ -101,7 +101,7 @@ rollup reading four chunks at a time (below).
   (thinking on by default) got one non-JSON and one empty reply in 10
   cases; at 8000 all 16 replies were valid. The model stays Haiku (owner).
 
-- **Preview moved for the admission rehearsal, 2026-11-13.** `claude/j27-read-model` fast-forwarded to `2adc6dfb0` (the merged J27 line plus `claude/workbench-production-admission`) and deployed as `dpl_8C5J3QpUy5uaPA1VLPAk12FprrRX` (attested: branch, commit, Ready). The stable sign-in alias `wmkfresearchapps-preview.vercel.app` now points at it [VERIFIED via `vercel inspect`]; previous target `dpl_CLcVRmYVBNEShTeszJeqH9ebheU7`. No `workbench.phase_rollout` row exists in the sandbox yet, so the Preview admits every 2027 request as before.
+- **Preview moved for the admission rehearsal, 2026-11-13.** `claude/j27-read-model` fast-forwarded to `2adc6dfb0` (the merged J27 line plus `claude/workbench-production-admission`) and deployed as `dpl_8C5J3QpUy5uaPA1VLPAk12FprrRX` (attested: branch, commit, Ready). The stable sign-in alias `wmkfresearchapps-preview.vercel.app` now points at it [VERIFIED via `vercel inspect`]; previous target `dpl_CLcVRmYVBNEShTeszJeqH9ebheU7`. The rollout script had not yet written `workbench.phase_rollout` in the sandbox at this point [ASSUMED absent until the first dry run reports it]; with no row the Preview admits every 2027 request as before.
 - **Preview walk-through and move, 2026-11-12.** The owner walked the
   Preview and Claude took a second look in Chrome. The Final Assessment
   tab's Writeup review section failed with "Final writeup review tracking
