@@ -334,6 +334,35 @@ The memo fields above stay switched off in Production after waves 37 through 40 
 
 **Stop and restore the old path** for any wrong-cycle or wrong-request exposure, save without correct attribution, loss of an existing workflow, misdirected or inaccessible Word drafts for authorized staff, unexplained errors on save or reload, or unintended email, Zoom, status, or background activity. Record expected stale-edit conflicts separately from unexpected failures.
 
+### Production change record (DRAFT 2026-11-13, awaiting owner approval)
+
+**Candidate.** `main` at `e6b6e6b09` (merge of `claude/workbench-production-admission`), Production deployment `dpl_CrVFatyjgwx26BsR9WniHJk7ZnNS` (`wmkfresearchapps-6o1rtusvp`), Ready [VERIFIED via `vercel inspect` and the deployment's commit, 2026-11-13]. Merged dark: with the two switches unset and no setting row, Production behaves as before the merge.
+
+**Last known good, for rollback step 2.** `dpl_4xPvaNuQMW643fxL2CmuK9RWdKob` (`wmkfresearchapps-jz9n78zum`, `main` at `31ee58f8f`, the deployment before the merge) [VERIFIED via `vercel ls` and the deployment's commit]. Rolling back to it also removes the rollout script's reader, so step 1 (setting off) and unsetting the switches come first.
+
+**Done before this record.** Migration 096 applied (owner, 2026-11-13). Schema waves 37 to 40 applied and read back (owner, 2026-11-13). Admission rehearsed on the sandbox Preview: no row, off, pilot, on (above).
+
+**Production settings check** [VERIFIED via `vercel env ls production`, names only; values are encrypted in the listing]:
+- Present: `DATAVERSE_TARGET_INTERLOCK`, `DATAVERSE_DAL_ENFORCEMENT`, `DYNAMICS_IMPERSONATION_ENABLED`, `DYNAMICS_URL`, `TEST_REQUEST_ISOLATION`, `FINAL_WRITEUP_SCHEMA_READY`.
+- Absent: `DYNAMICS_SANDBOX_URL` (required absent or Production: field readiness and the settings store must resolve to the Production host), `WORKBENCH_PRODUCTION_SCHEMA_READY`, `WORKBENCH_PHASE_RELEASE`, `INITIAL_RATIONALE_SCHEMA_READY`, `MEETING_ROSTER_SCHEMA_READY`, `CHAIRS_RECOMMENDATION_ENABLED`, `AUTOMATIC_INTEGRITY_SCREENING`. The Chairs step and the automatic integrity screen stay off: both need the sandbox-only rationale helper.
+- **Owner to confirm in the Vercel dashboard** before step A: the literal values `DATAVERSE_TARGET_INTERLOCK=on`, `DATAVERSE_DAL_ENFORCEMENT=on`, `DYNAMICS_IMPERSONATION_ENABLED=true`, and `DYNAMICS_URL` on `wmkf.crm.dynamics.com`.
+
+**People.** Owner and operator: Justin Gallivan. Backup operator: *to be named by the owner*.
+
+**Pilot requests.** *To be chosen by the owner*: one or two real 2027-or-later Research requests (request GUIDs from the request page address). If none exists yet in Production, the release waits at step B.
+
+**Steps** (each needs the owner's go; nothing below is done):
+- **A. Switches on, setting absent.** In Vercel, set `WORKBENCH_PRODUCTION_SCHEMA_READY=on` and `WORKBENCH_PHASE_RELEASE=on` for Production, then redeploy `main`. Effect: the cycle page shows the phase lists for 2027 cycles, and the list reads the five new columns; request pages stay on the old layout (no setting row = off); the four field routes refuse.
+- **B. Read-only checks, signed in.** A 2027 request and a D26 request both open the old layout; a phase bookmark (`?tab=peer-review`) on a 2027 request lands safely; D26 and J26 cycle pages look as before; the four field routes refuse when called directly (404).
+- **C. Pilot.** `DATAVERSE_TARGET_INTERLOCK=on DATAVERSE_ALLOW_PROD_READS=yes node scripts/set-workbench-phase-rollout.mjs --target=prod pilot <GUIDs>` from the main checkout, then the printed `--execute` line with `DATAVERSE_PROD_WRITE_ACK="workbench phase rollout <today UTC>"` and `--actor-email`. Check: only the pilot requests open the new layout; rationale, review summary, visit assessment and attendance save and reload with the right editor; attendance offers no Zoom suggestions. Staff work on the pilot is the first Production write to the new fields.
+- **D. On**, after the owner reviews the pilot, with the same script.
+
+**Observation window.** *Owner to set* (suggested: one working week of pilot use before D).
+
+**Stop conditions** (any one: set the setting off, then review). A request outside the pilot or before 2027 shows the new layout or saves a new field; a save without the right editor; an existing workflow lost (old tabs, First Cut, Word drafts, reviewer actions); errors or timeouts on save or reload beyond expected stale-edit conflicts; any unexpected email, Zoom call, status change or background job; a cycle page that fails to load or slows noticeably after A.
+
+**Rollback order.** 1. Setting off with the script (instant, no redeploy). 2. If that is not enough, unset `WORKBENCH_PHASE_RELEASE` and `WORKBENCH_PRODUCTION_SCHEMA_READY` and redeploy. 3. Last resort, restore `dpl_4xPvaNuQMW643fxL2CmuK9RWdKob`. Saved staff text stays in the new fields in every case.
+
 ## Rollback
 
 1. **Set the rollout setting to `{"mode":"off"}`.** The release operator uses the authorized settings control (`DATAVERSE_TARGET_INTERLOCK=on DATAVERSE_ALLOW_PROD_READS=yes node scripts/set-workbench-phase-rollout.mjs --target=prod off`, then the printed `--execute` line with a same-day `DATAVERSE_PROD_WRITE_ACK`) and records its revision and time. Reload a pilot J27 request, an older-cycle request, and a former new phase bookmark. Verify the legacy UI, a working existing staff read path, and denial of the four new endpoints. Check that an open editor cannot begin another new-field save after disable.
