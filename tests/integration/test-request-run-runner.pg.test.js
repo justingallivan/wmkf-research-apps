@@ -36,9 +36,12 @@ if (/neon\.tech/i.test(TEST_URL) || (process.env.POSTGRES_URL && TEST_URL === pr
 const describeIf = TEST_URL ? describe : describe.skip;
 
 const MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/054_test_request_runs.sql');
+// 098 widens test_request_receipt_ok for the J27 file destinations; it is a
+// CREATE OR REPLACE, so it is applied on every run (idempotent).
+const RECEIPT_MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/098_test_request_j27_file_names.sql');
 
 /** Fail loudly when the throwaway ledger schema predates the migration file (constraints are created only with the tables). */
-async function assertLedgerSchemaCurrent(db, migrationSql) {
+async function assertLedgerSchemaCurrent(db, migrationSql, receiptSql = migrationSql) {
   const expected = [...migrationSql.matchAll(/CONSTRAINT\s+(\w+)/g)].map((m) => m[1]);
   const { rows } = await db.query(
     `SELECT c.conname FROM pg_constraint c JOIN pg_class t ON t.oid = c.conrelid
@@ -48,7 +51,7 @@ async function assertLedgerSchemaCurrent(db, migrationSql) {
   const missing = expected.filter((name) => !present.has(name));
   const fn = await db.query(`SELECT prosrc FROM pg_proc WHERE proname = 'test_request_receipt_ok'`);
   const normalize = (text) => String(text || '').replace(/\s+/g, ' ').trim();
-  const expectedBody = normalize(migrationSql.slice(migrationSql.indexOf('$receipt$') + 9, migrationSql.indexOf('$receipt$;')));
+  const expectedBody = normalize(receiptSql.slice(receiptSql.indexOf('$receipt$') + 9, receiptSql.indexOf('$receipt$;')));
   const liveBody = normalize(fn.rows[0]?.prosrc);
   if (liveBody !== expectedBody) missing.push('test_request_receipt_ok(jsonb) body differs from the migration');
   if (missing.length) {
@@ -335,7 +338,9 @@ describeIf('slice 5b runner against the live run ledger', () => {
     const { rows } = await db.query(`SELECT to_regclass('public.test_request_runs') AS reg`);
     const migrationSql = fs.readFileSync(MIGRATION_PATH, 'utf8');
     if (!rows[0]?.reg) await db.query(migrationSql);
-    await assertLedgerSchemaCurrent(db, migrationSql);
+    const receiptSql = fs.readFileSync(RECEIPT_MIGRATION_PATH, 'utf8');
+    await db.query(receiptSql);
+    await assertLedgerSchemaCurrent(db, migrationSql, receiptSql);
     const real = createRunLedger(db);
     // Record ledger writes into the same event log as the fake dispatches so
     // journal-before-dispatch ordering is asserted end to end.
@@ -356,7 +361,7 @@ describeIf('slice 5b runner against the live run ledger', () => {
     process.env.DYNAMICS_CLIENT_ID = previousClientId;
   });
 
-  async function setup({ recipe = 'basic' } = {}) {
+  async function setup({ recipe = 'basic', cycleCode = 'D26' } = {}) {
     log = [];
     const world = makeWorld(log);
     const preflight = await runPreflight(world.client, world.graph, world.sharePointTarget);
@@ -364,7 +369,7 @@ describeIf('slice 5b runner against the live run ledger', () => {
     const source = bundle.source.request;
     const manifest = buildCloneManifest(preflight, {
       source, fiscalYear: source.akoya_fiscalyear, meetingDate: source.wmkf_meetingdate, testLabel: 'Runner proof', bundle, recipe,
-      grantCycleId: GRANT_CYCLE_ID, cycleCode: 'D26',
+      grantCycleId: GRANT_CYCLE_ID, cycleCode,
     });
     const idempotencyKey = `runner-${crypto.randomBytes(4).toString('hex')}`;
     const { run } = await ledger.reserveRun({ actorId: cliActorId('runner-proof'), idempotencyKey, plan: reservePlan(manifest, bundle) });
@@ -390,6 +395,20 @@ describeIf('slice 5b runner against the live run ledger', () => {
   async function expireLease(runId) {
     await db.query("UPDATE test_request_runs SET locked_until = NOW() - interval '1 second' WHERE run_id = $1::uuid", [runId]);
   }
+
+  it('a J27 run copies the narrative into Submission-Documents under its J27 name and verifies to ready', async () => {
+    const { world, manifest, run, advance } = await setup({ cycleCode: 'J27' });
+    expect(manifest.values.documentLayout).toBe('single-submission');
+    const results = await runUntil(advance, null, { bypassGoverify: true });
+    expect(results.at(-1)).toMatchObject({ outcome: 'ready' });
+    const copies = (await ledger.listRunResources(run.runId)).filter((row) => row.step === 'copy_file');
+    expect(copies.map((row) => row.outcome)).toEqual(['verified', 'verified']);
+    const written = [...world.state.items.values()]
+      .filter((row) => row.folder.includes('1000400_'))
+      .map((row) => `${row.folder.split('/').at(-1)}/${row.name}`)
+      .sort();
+    expect(written).toEqual(['Reviewer Materials/Proposal_1000400.pdf', 'Submission-Documents/Project-Narrative_1000400.pdf']);
+  });
 
   it('drives every step to ready with GoVerify bypass, journaling each resource before its dispatch', async () => {
     const { world, run, advance } = await setup();

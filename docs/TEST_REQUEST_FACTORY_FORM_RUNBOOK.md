@@ -144,6 +144,21 @@ canonical reviewer proposal; other recognized Basic
 files are copied normally. This is a prepared reviewer package, not proof that
 intake assembly or AI processing ran. Production does not seed later recipes.
 
+**[BRANCH-BUILT 2026-11-14 on `claude/factory-j27-file-names`, not merged; needs
+ledger migration 098 first]** File destinations follow the destination cycle
+(owner, 2026-11-14). A run reserved for a J27-or-later Grant Cycle binds
+`values.documentLayout = 'single-submission'` into its manifest
+(`buildCloneManifest`, read back by `manifestDocumentLayout`), and the copy step
+writes the narrative and bibliography to
+`Submission-Documents/Project-Narrative_<n>.pdf` and
+`Submission-Documents/Bibliography_<n>.pdf`, where the request page and the
+governed readers look for a single-submission cycle. The source still supplies
+the D26 names from `AI Materials`. The other four J27 files (Biosketches, Other
+Support, Collaboration Letters, Graphical Abstract) are not copied and show as
+missing on the request page: an accepted limit for test requests. The layout is
+never inferred on resume, so a run reserved before this change, and every D26
+run, keeps the `AI Materials` destinations.
+
 Download the manifest and bundle **before the final clone step**, since the daily
 sweep may delete them once the run is internally ready. Complete the clone, use
 the existing status setter for Phase I `Invited` and then Phase II `Phase II

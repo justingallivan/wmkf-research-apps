@@ -147,6 +147,8 @@ function metadata(production) {
     fields.wmkf_projectleader = lookup('contact', 'wmkf_ProjectLeader');
     fields.akoya_primarycontactid = lookup('contact', 'akoya_primarycontactid');
     fields.wmkf_researchleader = lookup('contact', 'wmkf_ResearchLeader');
+    // Prepared J27 fixtures create with readiness false (prepared-fixture-contract.js).
+    fields.wmkf_readyforreview = { createable: true, requiredLevel: 'None', type: 'Boolean' };
   }
   return { entity: 'akoya_request', fields };
 }
@@ -377,6 +379,9 @@ describe('Confirm: sandbox and production reservations', () => {
     });
     expect(manifest.createBody['wmkf_GrantCycle@odata.bind']).toBe(`/wmkf_grantcycles(${GRANT_CYCLE_ID})`);
     expect(manifest.createBody.wmkf_meetingdate).toBe('2026-12-01');
+    // A D26 destination keeps the D26 file layout: no layout is bound.
+    expect(manifest.values).not.toHaveProperty('documentLayout');
+    expect(manifest.plannedFiles.every((file) => file.destination.folder !== 'Submission-Documents')).toBe(true);
     expect(h.createClientCalls.map((c) => c.resourceUrl)).toEqual([PRODUCTION_URL, PRODUCTION_URL]);
   });
 
@@ -1673,6 +1678,34 @@ describe('S1: source display read', () => {
     const result = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
     expect(result.source.cycleCode).toBeNull();
   });
+});
+
+test('a J27 production reservation binds the single-submission layout and plans the narrative into Submission-Documents', async () => {
+  const sourceDoc = (kind, folder, name, id) => ({
+    id, kind, library: 'akoya_request', folder: `9000001_ABC/${folder}`, name,
+    driveId: 'drive-src', graphItemId: `item-${id}`, size: 10,
+    sharePointSite: { key: 'akoyago-shared', hostname: 'appriver3651007194.sharepoint.com', pathname: '/sites/akoyago' }, mimeType: 'application/pdf',
+    eTag: '"etag-1"', versionId: '1.0', contentHash: 'c'.repeat(64),
+  });
+  const j27Bundle = (exportedAt) => {
+    const base = bundleAt(exportedAt);
+    return { ...base, documents: [
+      sourceDoc('proposalNarrative', 'AI Materials', 'ProposalNarrative_9000001.pdf', 'doc-1'),
+      sourceDoc('reviewerProposal', 'Reviewer Materials', 'Proposal_9000001.pdf', 'doc-2'),
+    ] };
+  };
+  const h = harness({ deployment: 'production', deps: {
+    resolveGrantCycle: async () => cloneCycleFromCalendarRow({ grantCycleId: GRANT_CYCLE_ID, cycleCode: 'J27', boardDate: '2027-06-03' }),
+    exportBundle: async ({ exportedAt }) => j27Bundle(exportedAt),
+  } });
+  const draft = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
+  const { run } = await h.service.confirmRun(h.confirmArgs(draft.draftId, { cycleCode: 'J27' }));
+  const manifest = JSON.parse(h.blobs.objects.get(runPathname('production', run.runId, 'manifest')).text);
+  expect(manifest.values).toMatchObject({ cycleCode: 'J27', documentLayout: 'single-submission' });
+  expect(manifest.plannedFiles.map((file) => [file.kind, file.destination.folder, file.destination.filenameTemplate])).toEqual([
+    ['proposalNarrative', 'Submission-Documents', 'Project-Narrative_{new-request-number}.pdf'],
+    ['reviewerProposal', 'Reviewer Materials', 'Proposal_{new-request-number}.pdf'],
+  ]);
 });
 
 test('prepared-package refusal is a preview blocker and typed 409, with no run reserved', async () => {

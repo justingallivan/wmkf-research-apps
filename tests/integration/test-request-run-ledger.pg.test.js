@@ -31,9 +31,11 @@ const describeIf = TEST_URL ? describe : describe.skip;
 
 const MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/054_test_request_runs.sql');
 const SLOT_MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/058_test_request_cast_slot_bindings.sql');
+// 098 is the latest test_request_receipt_ok definition (J27 file destinations).
+const RECEIPT_MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/098_test_request_j27_file_names.sql');
 
 /** Fail loudly when the throwaway ledger schema predates the migration file (constraints are created only with the tables). */
-async function assertLedgerSchemaCurrent(db, migrationSql) {
+async function assertLedgerSchemaCurrent(db, migrationSql, receiptSql = migrationSql) {
   const expected = [...migrationSql.matchAll(/CONSTRAINT\s+(\w+)/g)].map((m) => m[1]);
   const { rows } = await db.query(
     `SELECT c.conname FROM pg_constraint c JOIN pg_class t ON t.oid = c.conrelid
@@ -43,7 +45,7 @@ async function assertLedgerSchemaCurrent(db, migrationSql) {
   const missing = expected.filter((name) => !present.has(name));
   const fn = await db.query(`SELECT prosrc FROM pg_proc WHERE proname = 'test_request_receipt_ok'`);
   const normalize = (text) => String(text || '').replace(/\s+/g, ' ').trim();
-  const expectedBody = normalize(migrationSql.slice(migrationSql.indexOf('$receipt$') + 9, migrationSql.indexOf('$receipt$;')));
+  const expectedBody = normalize(receiptSql.slice(receiptSql.indexOf('$receipt$') + 9, receiptSql.indexOf('$receipt$;')));
   const liveBody = normalize(fn.rows[0]?.prosrc);
   if (liveBody !== expectedBody) missing.push('test_request_receipt_ok(jsonb) body differs from the migration');
   if (missing.length) {
@@ -94,8 +96,10 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
     );
     const migrationSql = fs.readFileSync(MIGRATION_PATH, 'utf8');
     if (!rows[0]?.reg) await db.query(migrationSql);
-    await assertLedgerSchemaCurrent(db, migrationSql);
     await db.query(fs.readFileSync(SLOT_MIGRATION_PATH, 'utf8'));
+    const receiptSql = fs.readFileSync(RECEIPT_MIGRATION_PATH, 'utf8');
+    await db.query(receiptSql);
+    await assertLedgerSchemaCurrent(db, migrationSql, receiptSql);
     ledger = createRunLedger(db);
   });
 
