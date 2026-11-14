@@ -13,14 +13,11 @@ const readLatestIntegrityStates = jest.fn();
 jest.mock('../../lib/services/workbench/j27-integrity-jobs', () => ({
   readLatestIntegrityStates: (...a) => readLatestIntegrityStates(...a),
 }));
-jest.mock('../../lib/services/workbench/staff-review-summary-service', () => ({
-  staffReviewSummaryEnabled: () => process.env.TEST_SUMMARY_WAVE === 'on',
-}));
-jest.mock('../../lib/utils/initial-assessment-rationale-readiness', () => ({
-  initialAssessmentRationaleEnabled: () => process.env.TEST_RATIONALE_WAVE === 'on',
-}));
-jest.mock('../../lib/utils/meeting-roster-readiness', () => ({
-  meetingRosterSchemaEnabled: () => process.env.TEST_ROSTER_WAVE === 'on',
+// Field readiness (sandbox rule or the Production switch) is covered in workbench-field-readiness.test.js.
+jest.mock('../../lib/utils/workbench-field-readiness', () => ({
+  reviewSummaryFieldsReady: () => process.env.TEST_SUMMARY_WAVE === 'on',
+  rationaleFieldReady: () => process.env.TEST_RATIONALE_WAVE === 'on',
+  rosterFieldReady: () => process.env.TEST_ROSTER_WAVE === 'on',
 }));
 jest.mock('../../lib/utils/j27-integrity-readiness', () => ({
   j27IntegrityTarget: () => process.env.TEST_INTEGRITY_TARGET || null,

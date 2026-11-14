@@ -8,8 +8,11 @@ import { bindPresentationTranscript } from '../../lib/services/post-presentation
 import { validateMeetingTranscriptManifest } from '../../lib/services/meeting-tracker-transcription/bundle';
 import { resolveSourceProvenance } from '../../lib/services/meeting-tracker-transcription/source-provenance';
 import { getMeetingAttendance } from '../../lib/services/meeting-tracker-recordings/zoom-client';
+import { getSettingStrict } from '../../lib/services/settings-service';
 import { presentationAttendeeNames } from '../../lib/services/workbench/meeting-roster-service';
 
+// The phase rollout setting (phase-admission.js): absent, which outside Production means on.
+jest.mock('../../lib/services/settings-service', () => ({ getSettingStrict: jest.fn(async () => ({ found: false, value: null, revision: null })) }));
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({ getById: jest.fn(), updateById: jest.fn() }));
 jest.mock('../../lib/dataverse/adapters/operations-grant-cycle', () => ({
   linkedCycleCode: row => row?.cycleCode, linkedCycleExpand: () => 'cycle',
@@ -186,5 +189,79 @@ describe('stageFacts for the request page stage', () => {
     findSummariesByRequests.mockResolvedValue({ records: [{ ...visit, scheduledend: '2027-03-01T19:30:00Z' }] });
     const [, moved] = await call('GET');
     expect(moved.stageFacts.roster).toEqual({ status: 'present', stale: true });
+  });
+});
+
+describe('in Production (phase admission and manual attendance)', () => {
+  const production = (rollout) => {
+    process.env = { ...env, VERCEL_ENV: 'production', DYNAMICS_URL: 'https://wmkf.crm.dynamics.com',
+      WORKBENCH_PRODUCTION_SCHEMA_READY: 'on', WORKBENCH_PHASE_RELEASE: 'on', DYNAMICS_IMPERSONATION_ENABLED: 'true' };
+    getSettingStrict.mockResolvedValue({ found: true, value: JSON.stringify(rollout), revision: 'W/"1"' });
+  };
+  const zoomReady = () => {
+    isMeetingTranscriptBundleSchemaReady.mockReturnValue(true);
+    bindPresentationTranscript.mockReturnValue({
+      transcript: { wmkf_transcriptbundlejson: '{}' }, boundary: { presentationEnd: { endMs: 20 * 60 * 1000 } },
+    });
+    validateMeetingTranscriptManifest.mockReturnValue({ sourceProvenance: {} });
+    resolveSourceProvenance.mockReturnValue({ status: 'verified_zoom', provenance: {
+      audioDurationMs: 30 * 60 * 1000,
+      zoom: { meetingUuid: 'verified-occurrence', audioOnlyFileCount: 1, audioFile: {
+        recordingStart: '2027-03-01T18:00:00Z', recordingEnd: '2027-03-01T18:30:00Z',
+      } },
+    } });
+    getMeetingAttendance.mockResolvedValue({ status: 'complete', participants: [{ name: 'Avery Morgan', status: 'in_meeting',
+      join_time: '2027-03-01T18:01:00Z', leave_time: '2027-03-01T18:22:00Z' }] });
+  };
+
+  test('a direct suggest=yes makes no Zoom request, and the panel offers no Zoom action', async () => {
+    production({ mode: 'on' });
+    zoomReady();
+    const [status, body] = await call('GET', null, { suggest: 'yes' });
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ suggestions: null, canSuggest: false });
+    expect(getMeetingAttendance).not.toHaveBeenCalled();
+    expect(validateMeetingTranscriptManifest).not.toHaveBeenCalled();
+  });
+
+  test('manual confirmation still saves', async () => {
+    production({ mode: 'on' });
+    const body = await saveBody();
+    expect((await call('POST', body))[0]).toBe(200);
+    expect(updateById).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([
+    ['off', { mode: 'off' }],
+    ['a pilot without this request', { mode: 'pilot', requestIds: [visitId] }],
+  ])('setting %s: GET and POST are refused before the request is read', async (_label, rollout) => {
+    production(rollout);
+    expect((await call('GET'))[0]).toBe(404);
+    expect((await call('POST', { requestId, visitId, version: 'W/"123"', binding: 'a'.repeat(64), wmkf: [], consultants: [] }))[0]).toBe(404);
+    expect(getById).not.toHaveBeenCalled();
+    expect(updateById).not.toHaveBeenCalled();
+  });
+
+  test('a pilot naming this request is admitted', async () => {
+    production({ mode: 'pilot', requestIds: [requestId] });
+    expect((await call('GET'))[0]).toBe(200);
+  });
+
+  test('switched off between the page load and the save: nothing is written', async () => {
+    production({ mode: 'on' });
+    const body = await saveBody();
+    // Route entry still sees on; the re-check just before the write sees off.
+    getSettingStrict
+      .mockResolvedValueOnce({ found: true, value: '{"mode":"on"}' })
+      .mockResolvedValueOnce({ found: true, value: '{"mode":"off"}' });
+    expect((await call('POST', body))[0]).toBe(404);
+    expect(updateById).not.toHaveBeenCalled();
+  });
+
+  test('without the cycle page release the roster is refused even with the setting on', async () => {
+    production({ mode: 'on' });
+    delete process.env.WORKBENCH_PHASE_RELEASE;
+    expect((await call('GET'))[0]).toBe(404);
+    expect(getById).not.toHaveBeenCalled();
   });
 });

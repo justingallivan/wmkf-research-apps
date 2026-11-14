@@ -7,9 +7,9 @@
  */
 
 import { j27IntegrityTarget, j27ChairsRecommendationEnabled, j27ChairsRecommendationRehearsalRequestId, j27IntegritySimulationRequestIds } from '../../lib/utils/j27-integrity-readiness';
-import { initialAssessmentRationaleEnabled } from '../../lib/utils/initial-assessment-rationale-readiness';
+import { rationaleFieldReady, reviewSummaryFieldsReady, rosterFieldReady } from '../../lib/utils/workbench-field-readiness';
+import { workbenchPhaseReleaseAdmitted } from '../../lib/utils/workbench-phase-release';
 import InitialAssessmentRationale from '../../shared/components/workbench/InitialAssessmentRationale';
-import { meetingRosterSchemaEnabled } from '../../lib/utils/meeting-roster-readiness';
 import MeetingRoster from '../../shared/components/workbench/MeetingRoster';
 import StaffVisitAssessment from '../../shared/components/workbench/StaffVisitAssessment';
 import StaffReviewSummary from '../../shared/components/workbench/StaffReviewSummary';
@@ -144,7 +144,9 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
     : null;
 
   // The redesigned shell follows the same sandbox boundary as the tested fields.
-  const phaseLayout = staffReviewSummary && isJ27ScopeCycle(visibleContext?.cycleCode);
+  // The server decides per request (phase-admission.js via resolve-request); the prop only says the
+  // deployment could admit any, so a phase address waits for the context instead of flashing the old tabs.
+  const phaseLayout = staffReviewSummary && visibleContext?.phaseLayout === true;
   const showInitialRationale = phaseLayout && initialRationaleEnabled;
   const rehearsalIds = chairsRecommendationRehearsalRequestId ? [chairsRecommendationRehearsalRequestId] : integritySimulationIds;
   const showChairsRecommendation = showInitialRationale && chairsRecommendationEnabled && (rehearsalIds.length
@@ -474,7 +476,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
           key={typeof requestId === 'string' ? requestId : ''}
           requestId={typeof requestId === 'string' ? requestId : ''}
           previewReadOnly={reviewerSurfaceReadOnly}
-          showStaffReviewSummary={staffReviewSummary && isJ27ScopeCycle(visibleContext?.cycleCode)}
+          showStaffReviewSummary={phaseLayout}
         />
       ) : activeTab === 'review-panel' ? (
         <ReviewPanelTab
@@ -548,11 +550,12 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
 export async function getServerSideProps() {
   const previewReadOnly = process.env.VERCEL_ENV === 'preview'
     && classifyTarget(process.env.DYNAMICS_URL) !== 'sandbox';
-  const staffReviewSummary = process.env.VERCEL_ENV !== 'production'
-    && classifyTarget(process.env.DYNAMICS_URL) === 'sandbox';
+  // Whether this deployment could admit any request to the phase layout; each request's
+  // admission comes from the request context.
+  const staffReviewSummary = workbenchPhaseReleaseAdmitted() && reviewSummaryFieldsReady();
   return { props: {
-    previewReadOnly, staffReviewSummary, meetingRosterEnabled: meetingRosterSchemaEnabled(),
-    initialRationaleEnabled: initialAssessmentRationaleEnabled(), chairsRecommendationEnabled: j27ChairsRecommendationEnabled(),
+    previewReadOnly, staffReviewSummary, meetingRosterEnabled: rosterFieldReady(),
+    initialRationaleEnabled: rationaleFieldReady(), chairsRecommendationEnabled: j27ChairsRecommendationEnabled(),
     chairsRecommendationRehearsalRequestId: j27ChairsRecommendationRehearsalRequestId(),
     integritySimulationIds: j27IntegritySimulationRequestIds(),
     automaticIntegrityEnabled: Boolean(j27IntegrityTarget()),

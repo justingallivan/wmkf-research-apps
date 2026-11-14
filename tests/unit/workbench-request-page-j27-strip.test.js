@@ -13,6 +13,8 @@ let routeSection;
 const pending = new Map();
 let overviewFacts = null;
 
+// The phase rollout setting (phase-admission.js): absent, which outside Production means on.
+jest.mock('../../lib/services/settings-service', () => ({ getSettingStrict: jest.fn(async () => ({ found: false, value: null, revision: null })) }));
 jest.mock('next/router', () => ({ useRouter: () => ({ query: { requestId: routeId, tab: routeTab, ...(routeSection ? { section: routeSection } : {}) }, push: jest.fn() }) }));
 jest.mock('next-auth/react', () => ({ useSession: () => ({ data: { user: { profileName: 'Test User', dynamicsSystemuserId: 'user-1' } } }) }));
 jest.mock('next/link', () => function LinkStub({ children }) { return <a href="#">{children}</a>; });
@@ -49,7 +51,7 @@ const input = {
 // An invited request with invitations open: no line until reviewer counts load, then "Send reviewer invitations".
 // The recommended request above reads "Awaiting the Chairs' outcome" either way, so it cannot show a facts change.
 const invitedInput = { ...input, request: { ...input.request, requestStatus: 'Phase II Pending', phaseIStatus: PHASE_I_CHAIRS.invited } };
-const resolved = (id, j27 = true, stageInput = invitedInput) => ({ ok: true, json: async () => ({ success: true, requestId: id, requestNumber: '1000384', cycleCode: 'J27', ...(j27 ? { j27: { phase: 'initial-assessment', input: stageInput } } : {}) }) });
+const resolved = (id, j27 = true, stageInput = invitedInput) => ({ ok: true, json: async () => ({ success: true, requestId: id, requestNumber: '1000384', cycleCode: 'J27', phaseLayout: true, ...(j27 ? { j27: { phase: 'initial-assessment', input: stageInput } } : {}) }) });
 
 beforeEach(() => {
   routeId = 'request-a'; routeTab = 'overview'; routeSection = undefined; pending.clear(); overviewFacts = null;
@@ -197,7 +199,7 @@ test('a later unknown freshness result replaces an earlier known one on the same
   render(<WorkbenchRequest />);
   const peerReview = { ...input, request: { ...input.request, requestStatus: 'Phase II Pending', phaseIStatus: 100000003, phaseIIStatus: 100000002 }, reviewSummary: { status: 'present' } };
   await act(async () => {
-    pending.get('/api/workbench/resolve-request?requestId=request-a')({ ok: true, json: async () => ({ success: true, requestId: 'request-a', cycleCode: 'J27', j27: { phase: 'peer-review', input: peerReview } }) });
+    pending.get('/api/workbench/resolve-request?requestId=request-a')({ ok: true, json: async () => ({ success: true, requestId: 'request-a', cycleCode: 'J27', phaseLayout: true, j27: { phase: 'peer-review', input: peerReview } }) });
   });
   await screen.findByLabelText('Where this request stands');
   await act(async () => { overviewFacts({ progress: { status: 'ready', data: { counts: { candidates: 3, invited: 3, accepted: 3, received: 1, completed: 0 } } }, summaryStale: true }); });

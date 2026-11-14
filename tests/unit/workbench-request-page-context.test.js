@@ -8,6 +8,8 @@ let routeId = 'request-a';
 let tabName = 'overview';
 const pending = new Map();
 
+// The phase rollout setting (phase-admission.js): absent, which outside Production means on.
+jest.mock('../../lib/services/settings-service', () => ({ getSettingStrict: jest.fn(async () => ({ found: false, value: null, revision: null })) }));
 jest.mock('next/router', () => ({
   useRouter: () => ({ query: { requestId: routeId, tab: tabName }, push: jest.fn() }),
 }));
@@ -214,7 +216,7 @@ test('Final Writeup reads the saved visit assessment while the Deliberations dra
     await act(async () => pending.get(url)({ ok: true, json: async () => body }));
   };
   await resolve('/api/workbench/resolve-request?requestId=request-a', {
-    success: true, requestId: 'request-a', cycleCode: 'J27',
+    success: true, requestId: 'request-a', cycleCode: 'J27', phaseLayout: true,
   });
   const assessmentUrl = '/api/workbench/staff-visit-assessment?requestId=request-a';
   const record = { assessment: 'Saved assessment', version: 'W/"123"' };
@@ -239,7 +241,7 @@ test('J27 Initial Assessment hides the Word option and keeps the rationale draft
   const view = render(<WorkbenchRequest staffReviewSummary initialRationaleEnabled />);
   await act(async () => {
     pending.get('/api/workbench/resolve-request?requestId=request-a')({
-      ok: true, json: async () => ({ success: true, requestId: 'request-a', cycleCode: 'J27' }),
+      ok: true, json: async () => ({ success: true, requestId: 'request-a', cycleCode: 'J27', phaseLayout: true }),
     });
   });
   await act(async () => {
@@ -294,12 +296,25 @@ test('J27 Initial Assessment hides the Word option and keeps the rationale draft
   expect(screen.getByRole('textbox', { name: 'Staff rationale' })).toHaveValue('Unsaved rationale');
 });
 
-// The phase layout belongs to every cycle from J27 on, not to the cycle named J27.
-test.each([['J27', true], ['D27', true], ['D26', false]])('cycle %s uses the phase layout: %s', async (cycleCode, expected) => {
+// The server decides per request (phase-admission.js, via resolve-request): the cycle rule and the
+// rollout setting live there. The page follows the context's answer, never the cycle code alone.
+test.each([
+  ['J27', true, true], ['D27', true, true],
+  ['J27', false, false], ['D27', undefined, false], ['D26', false, false],
+])('cycle %s with phaseLayout %s from the server uses the phase layout: %s', async (cycleCode, phaseLayout, expected) => {
   tabName = 'overview';
   render(<WorkbenchRequest staffReviewSummary />);
   await act(async () => pending.get('/api/workbench/resolve-request?requestId=request-a')({
-    ok: true, json: async () => ({ success: true, requestId: 'request-a', cycleCode }),
+    ok: true, json: async () => ({ success: true, requestId: 'request-a', cycleCode, phaseLayout }),
   }));
   expect(screen.queryAllByText('Peer Review').length > 0).toBe(expected);
+});
+
+test('a deployment that cannot admit any request keeps the old tabs even if a context says otherwise', async () => {
+  tabName = 'overview';
+  render(<WorkbenchRequest />);
+  await act(async () => pending.get('/api/workbench/resolve-request?requestId=request-a')({
+    ok: true, json: async () => ({ success: true, requestId: 'request-a', cycleCode: 'J27', phaseLayout: true }),
+  }));
+  expect(screen.queryAllByText('Peer Review')).toHaveLength(0);
 });

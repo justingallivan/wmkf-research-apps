@@ -4,6 +4,8 @@ import handler from '../../pages/api/workbench/initial-assessment-rationale';
 import { getById, updateById } from '../../lib/dataverse/adapters/grant-request';
 import { requireAppAccess } from '../../lib/utils/auth';
 
+// The phase rollout setting (phase-admission.js): absent, which outside Production means on.
+jest.mock('../../lib/services/settings-service', () => ({ getSettingStrict: jest.fn(async () => ({ found: false, value: null, revision: null })) }));
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
   getById: jest.fn(), updateById: jest.fn(),
 }));
