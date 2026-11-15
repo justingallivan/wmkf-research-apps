@@ -43,7 +43,7 @@ A variable change takes effect only in a new deployment. Details and rotation: `
    For prepared J27+ reviewer fixtures, Phase I Invited followed by Phase II
    Pending Committee Review and readiness finalization are required.
    Earlier-cycle clone behavior is unchanged.
-5. **Prepare for review** (prepared J27+ runs) [readiness route DEPLOYED 2bdf62b5d; one-button flow BRANCH-BUILT `claude/factory-prepare-for-review`].
+5. **Prepare for review** (prepared J27+ runs) [readiness route DEPLOYED 2bdf62b5d; one-button flow DEPLOYED 80cf7a628, 2026-11-15].
    A J27 Research request appears in the Workbench only once `wmkf_readyforreview`
    is true. For a prepared run the status panel shows one action, **Prepare for
    review** (owner, 2026-11-15: anyone with admin access, on their own runs). After
