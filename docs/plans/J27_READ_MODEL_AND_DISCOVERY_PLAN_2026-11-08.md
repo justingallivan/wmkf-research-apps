@@ -252,7 +252,7 @@ Owner decision (2026-11-09): step E ships with a minimal visible surface, a read
 
 ## 9. Step I: the offramp as a Phase II status (2026-11-09; owner go 2026-11-09 "1-3 in order"; BUILT, see the record at the end of this section)
 
-Decision input. Connor (2026-11-09): "adding a new phase II status choice is the way to go … Phase II Offramped #682090001 … the name can be changed later with no downstream consequences." [VERIFIED via production option-set metadata, owner-authorized read 2026-11-09] `wmkf_phaseiistatus` on `wmkf.crm.dynamics.com` carries `682090001` "Phase II Offramped"; the sandbox does not yet. D50 stands: staff decide the offramp after reviews, with a short written justification, and the Chairs do not approve it. D36 stands: the formal status is set in Dataverse; the apps read it. **[Superseded 2026-11-15 by D70: staff set and undo the offramp in the Workbench, `/api/workbench/offramp`, branch `claude/j27-offramp-control`.]**
+Decision input. Connor (2026-11-09): "adding a new phase II status choice is the way to go … Phase II Offramped #682090001 … the name can be changed later with no downstream consequences." [VERIFIED via production option-set metadata, owner-authorized read 2026-11-09] `wmkf_phaseiistatus` on `wmkf.crm.dynamics.com` carries `682090001` "Phase II Offramped"; the sandbox does not yet. D50 stands: staff decide the offramp after reviews, with a short written justification, and the Chairs do not approve it. D36 stands: the formal status is set in Dataverse; the apps read it. **[Superseded 2026-11-15 by D70: staff set and undo the offramp in the Workbench, `/api/workbench/offramp`, live in Production since 2026-11-15.]**
 
 What the production request-status rule does with it [VERIFIED 2026-11-09]: `WMKF_Set Request Status Program Phase II` has no branch for `682090001`, so recording Offramped leaves `akoya_requeststatus` as it was (normally `Phase II Pending`). The apps must key on the Phase II status value, never on the request status string, for this outcome.
 
@@ -278,7 +278,7 @@ Each gate keeps its legacy visibility check and adds one refusal: when the reque
 ### I4. Open after this step
 
 - **Written justification (D50(2)).** Connor's answer covers the status only. Candidates: a new memo column on `akoya_request` (sandbox-first, like the other J27 memos), or the existing visit-assessment memo. Not assumed here; the strip will say "Offramped" without the reason until decided.
-- **Who sets the status.** **[Answered 2026-11-15 by D70: any Workbench user, from the Staff Deliberations tab; undo restores the earlier value. Branch `claude/j27-offramp-control`.]** Original text: D36 says staff set it in Dataverse. If the Workbench should record it (a lead PD action next to First Cut and Semi-finalist), that is a step G-style write with the D5 editability rule and belongs in a later addendum.
+- **Who sets the status.** **[Answered 2026-11-15 by D70: any Workbench user, from the Staff Deliberations tab; undo restores the earlier value. Live in Production since 2026-11-15.]** Original text: D36 says staff set it in Dataverse. If the Workbench should record it (a lead PD action next to First Cut and Semi-finalist), that is a step G-style write with the D5 editability rule and belongs in a later addendum.
 - **Alignment log.** D36/D50 said the field was open; row D51 below records Connor's answer.
 
 ### I5. Tests and gates

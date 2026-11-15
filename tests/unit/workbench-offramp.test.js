@@ -106,9 +106,11 @@ describe('reading', () => {
     expect((await call('GET')).body).toMatchObject({ offramped: false, canOfframp: false });
   });
 
-  test('a justification kept after an undo stays visible', async () => {
+  test('a justification kept after an undo is hidden, and shown again on a later offramp', async () => {
     getById.mockResolvedValue({ ...row, wmkf_phaseiistatus: PENDING, wmkf_offrampjustification: 'Kept.' });
-    expect((await call('GET')).body).toMatchObject({ offramped: false, showJustification: true });
+    expect((await call('GET')).body).toMatchObject({ offramped: false, showJustification: false });
+    getById.mockResolvedValue({ ...row, wmkf_phaseiistatus: OFFRAMPED, wmkf_offrampjustification: 'Kept.' });
+    expect((await call('GET')).body).toMatchObject({ offramped: true, showJustification: true, justification: 'Kept.' });
   });
 });
 
@@ -140,8 +142,9 @@ describe('undo', () => {
   test.each([
     ['Pending Committee Review', PENDING, PENDING],
     ['nothing remembered', undefined, null],
-  ])('restores %s and clears the remembered value', async (_label, remembered, restored) => {
-    getById.mockResolvedValue({ ...row, wmkf_phaseiistatus: OFFRAMPED, wmkf_phaseiistatusbeforeofframp: remembered });
+  ])('restores %s, clears the remembered value and leaves the justification alone', async (_label, remembered, restored) => {
+    getById.mockResolvedValue({ ...row, wmkf_phaseiistatus: OFFRAMPED, wmkf_phaseiistatusbeforeofframp: remembered,
+      wmkf_offrampjustification: 'Kept.' });
     expect((await call('POST', { action: 'undo' })).status).toBe(200);
     expect(updateById).toHaveBeenCalledWith(requestId,
       { wmkf_phaseiistatus: restored, wmkf_phaseiistatusbeforeofframp: null }, writeOptions);
@@ -167,10 +170,16 @@ describe('justification', () => {
     expect(updateById).toHaveBeenCalledWith(requestId, { wmkf_offrampjustification: 'Three Poor reviews.' }, writeOptions);
   });
 
-  test('can be cleared after an undo', async () => {
-    getById.mockResolvedValue({ ...row, wmkf_phaseiistatus: PENDING, wmkf_offrampjustification: 'Kept.' });
+  test('can be cleared while offramped', async () => {
+    getById.mockResolvedValue({ ...row, wmkf_phaseiistatus: OFFRAMPED, wmkf_offrampjustification: 'Kept.' });
     expect((await call('POST', { action: 'justification', justification: '' })).status).toBe(200);
     expect(updateById).toHaveBeenCalledWith(requestId, { wmkf_offrampjustification: null }, writeOptions);
+  });
+
+  test('refuses a save after an undo, even with kept text', async () => {
+    getById.mockResolvedValue({ ...row, wmkf_phaseiistatus: PENDING, wmkf_offrampjustification: 'Kept.' });
+    expect((await call('POST', { action: 'justification', justification: 'New text.' })).status).toBe(409);
+    expect(updateById).not.toHaveBeenCalled();
   });
 
   test('refuses a request that was never offramped', async () => {

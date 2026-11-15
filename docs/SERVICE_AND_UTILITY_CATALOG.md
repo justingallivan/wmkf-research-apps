@@ -442,7 +442,7 @@ If you're touching a service or utility, read its header before this catalog. If
 ### Workbench release gates
 
 - **`workbench-phase-release.js`** — Merge-dark gate for the J27 Workbench screens: off in a Production deployment unless `WORKBENCH_PHASE_RELEASE` is the literal `on`; admitted elsewhere.
-- **`workbench-field-readiness.js`** — **[On `main` since 2026-11-13.]** Whether the deployment has the request page's new fields: each field's isolated sandbox rule, or a Production deployment on the Production target with `WORKBENCH_PRODUCTION_SCHEMA_READY=on`. Decides which columns reads select; per-request admission is `workbench/phase-admission.js`. Also `zoomAttendanceSuggestionsEnabled` (off in Production). The older rationale helper, which the Chairs step builds on, stays sandbox-only. `offrampControlReady` (branch `claude/j27-offramp-control`, not promoted): Production only, the Production rule plus its own `WORKBENCH_OFFRAMP_READY=on`, for `/api/workbench/offramp`.
+- **`workbench-field-readiness.js`** — **[On `main` since 2026-11-13.]** Whether the deployment has the request page's new fields: each field's isolated sandbox rule, or a Production deployment on the Production target with `WORKBENCH_PRODUCTION_SCHEMA_READY=on`. Decides which columns reads select; per-request admission is `workbench/phase-admission.js`. Also `zoomAttendanceSuggestionsEnabled` (off in Production). The older rationale helper, which the Chairs step builds on, stays sandbox-only. `offrampControlReady` (live in Production since 2026-11-15): Production only, the Production rule plus its own `WORKBENCH_OFFRAMP_READY=on`, for `/api/workbench/offramp`.
 
 ### Versioning
 

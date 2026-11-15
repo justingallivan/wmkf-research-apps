@@ -120,41 +120,49 @@ test('an Undo conflict caused by a colleague justification save shows their text
   expect(requestJson).toHaveBeenCalledTimes(3);
 });
 
-test('a status readback with a colleague justification conflicts with an edited draft', async () => {
-  requestJson.mockResolvedValueOnce({ ...offramped, justification: 'Old.' })
+test('after an undo the justification box disappears', async () => {
+  requestJson.mockResolvedValueOnce({ ...offramped, justification: 'Saved.' })
     .mockResolvedValueOnce({ success: true })
-    .mockResolvedValueOnce({ ...base, justification: 'Colleague text.', showJustification: true, version: 'W/"9"' });
-  render(<OfframpControl requestId={requestId} onStatusChange={() => {}} />);
-  fireEvent.change(await screen.findByLabelText('Offramp justification'), { target: { value: 'My text.' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Undo offramp' }));
-  await screen.findByText('Colleague text.');
-  expect(screen.getByLabelText('Offramp justification')).toHaveValue('My text.');
-  expect(screen.getByRole('button', { name: 'Save justification' })).toBeDisabled();
-});
-
-test('an untouched justification follows a colleague save picked up by a status readback', async () => {
-  requestJson.mockResolvedValueOnce({ ...offramped, justification: 'Old.' })
-    .mockResolvedValueOnce({ success: true })
-    .mockResolvedValueOnce({ ...base, justification: 'Colleague text.', showJustification: true, version: 'W/"9"' });
+    .mockResolvedValueOnce({ ...base, justification: 'Saved.', showJustification: false, version: 'W/"9"' });
   render(<OfframpControl requestId={requestId} onStatusChange={() => {}} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Undo offramp' }));
   await screen.findByText('Offramp undone.');
-  expect(screen.getByLabelText('Offramp justification')).toHaveValue('Colleague text.');
-  expect(screen.queryByText('Someone else saved a different justification')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Offramp justification')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Save justification' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Mark as offramped' })).toBeInTheDocument();
 });
 
-test('a status action stays available while a justification conflict is open', async () => {
+test('a later offramp shows the kept justification again', async () => {
+  requestJson.mockResolvedValueOnce({ ...base, justification: 'Kept.' })
+    .mockResolvedValueOnce({ success: true })
+    .mockResolvedValueOnce({ ...offramped, justification: 'Kept.', version: 'W/"9"' });
+  render(<OfframpControl requestId={requestId} onStatusChange={() => {}} />);
+  expect(await screen.findByRole('button', { name: 'Mark as offramped' })).toBeInTheDocument();
+  expect(screen.queryByLabelText('Offramp justification')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Mark as offramped' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm offramp' }));
+  expect(await screen.findByLabelText('Offramp justification')).toHaveValue('Kept.');
+  expect(screen.getByRole('button', { name: 'Save justification' })).toBeDisabled();
+});
+
+// Conflicts superseded by a later read. The later read comes from an Undo that
+// meets a 409, so the request is still offramped and the box stays visible.
+function conflictThenUndo409(laterJustification) {
   requestJson.mockResolvedValueOnce({ ...offramped, justification: 'Old.' })
     .mockRejectedValueOnce(Object.assign(new Error('This request changed.'), { status: 409 }))
     .mockResolvedValueOnce({ ...offramped, justification: 'Colleague text.', version: 'W/"9"' })
-    .mockResolvedValueOnce({ success: true })
-    .mockResolvedValueOnce({ ...base, justification: 'Colleague text.', showJustification: true, version: 'W/"10"' });
-  render(<OfframpControl requestId={requestId} onStatusChange={() => {}} />);
+    .mockRejectedValueOnce(Object.assign(new Error('This request changed again.'), { status: 409 }))
+    .mockResolvedValueOnce({ ...offramped, justification: laterJustification, version: 'W/"12"' });
+}
+
+test('an Undo stays available while a justification conflict is open and uses the newest version', async () => {
+  conflictThenUndo409('Colleague text.');
+  render(<OfframpControl requestId={requestId} />);
   fireEvent.change(await screen.findByLabelText('Offramp justification'), { target: { value: 'My text.' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save justification' }));
   await screen.findByText('Someone else saved a different justification');
   fireEvent.click(screen.getByRole('button', { name: 'Undo offramp' }));
-  await screen.findByText('Offramp undone.');
+  await screen.findByText('This request changed again.');
   expect(requestJson).toHaveBeenNthCalledWith(4, '/api/workbench/offramp', {
     method: 'POST', body: { requestId, version: 'W/"9"', action: 'undo' },
   });
@@ -163,30 +171,21 @@ test('a status action stays available while a justification conflict is open', a
 });
 
 test('a later read that matches the draft closes an open conflict', async () => {
-  requestJson.mockResolvedValueOnce({ ...offramped, justification: 'Old.' })
-    .mockRejectedValueOnce(Object.assign(new Error('This request changed.'), { status: 409 }))
-    .mockResolvedValueOnce({ ...offramped, justification: 'Colleague text.', version: 'W/"9"' })
-    .mockResolvedValueOnce({ success: true })
-    .mockResolvedValueOnce({ ...base, justification: 'My text.', showJustification: true, version: 'W/"11"' });
-  render(<OfframpControl requestId={requestId} onStatusChange={() => {}} />);
+  conflictThenUndo409('My text.');
+  render(<OfframpControl requestId={requestId} />);
   fireEvent.change(await screen.findByLabelText('Offramp justification'), { target: { value: 'My text.' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save justification' }));
   await screen.findByText('Someone else saved a different justification');
   fireEvent.click(screen.getByRole('button', { name: 'Undo offramp' }));
-  await screen.findByText('Offramp undone.');
+  await screen.findByText('This request changed again.');
   expect(screen.queryByText('Someone else saved a different justification')).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Use saved justification' })).not.toBeInTheDocument();
   expect(screen.getByLabelText('Offramp justification')).toHaveValue('My text.');
   expect(screen.getByRole('button', { name: 'Save justification' })).toBeDisabled();
 });
 
 test('a later read with newer text replaces the open conflict, and Use saved takes the newest text', async () => {
-  requestJson.mockResolvedValueOnce({ ...offramped, justification: 'Old.' })
-    .mockRejectedValueOnce(Object.assign(new Error('This request changed.'), { status: 409 }))
-    .mockResolvedValueOnce({ ...offramped, justification: 'Colleague text.', version: 'W/"9"' })
-    .mockResolvedValueOnce({ success: true })
-    .mockResolvedValueOnce({ ...base, justification: 'Newest text.', showJustification: true, version: 'W/"12"' });
-  render(<OfframpControl requestId={requestId} onStatusChange={() => {}} />);
+  conflictThenUndo409('Newest text.');
+  render(<OfframpControl requestId={requestId} />);
   fireEvent.change(await screen.findByLabelText('Offramp justification'), { target: { value: 'My text.' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save justification' }));
   await screen.findByText('Colleague text.');
@@ -198,19 +197,15 @@ test('a later read with newer text replaces the open conflict, and Use saved tak
   expect(screen.getByRole('button', { name: 'Save justification' })).toBeDisabled();
 });
 
-test('an untouched draft that follows newer text closes an open conflict', async () => {
-  requestJson.mockResolvedValueOnce({ ...offramped, justification: 'Old.' })
-    .mockRejectedValueOnce(Object.assign(new Error('This request changed.'), { status: 409 }))
-    .mockResolvedValueOnce({ ...offramped, justification: 'Colleague text.', version: 'W/"9"' })
-    .mockResolvedValueOnce({ success: true })
-    .mockResolvedValueOnce({ ...base, justification: 'Newest text.', showJustification: true, version: 'W/"12"' });
-  render(<OfframpControl requestId={requestId} onStatusChange={() => {}} />);
+test('an untouched draft follows newer text and no conflict reopens', async () => {
+  conflictThenUndo409('Newest text.');
+  render(<OfframpControl requestId={requestId} />);
   fireEvent.change(await screen.findByLabelText('Offramp justification'), { target: { value: 'My text.' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save justification' }));
-  fireEvent.click(await screen.findByRole('button', { name: 'Use saved justification' }));
   // Taking the saved text makes the draft untouched again, so the next read replaces it.
+  fireEvent.click(await screen.findByRole('button', { name: 'Use saved justification' }));
   fireEvent.click(screen.getByRole('button', { name: 'Undo offramp' }));
-  await screen.findByText('Offramp undone.');
+  await screen.findByText('This request changed again.');
   expect(screen.getByLabelText('Offramp justification')).toHaveValue('Newest text.');
   expect(screen.queryByText('Someone else saved a different justification')).not.toBeInTheDocument();
 });
