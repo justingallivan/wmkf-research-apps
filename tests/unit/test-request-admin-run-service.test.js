@@ -1589,6 +1589,46 @@ describe('diagnoseFactoryRun fail-closed inputs', () => {
     expect(result.message).toMatch(/repeat its read-only source, Request and file checks/);
   });
 
+  test.each(['timeout', 'network', 'upstream_http (http 503)', 'upstream_http (http 429)'])(
+    'a %s stop after the Request POST was sent offers the readback-first retry',
+    (reason) => {
+      const at = Date.parse('2026-10-03T12:02:00.000Z');
+      const result = diagnoseFactoryRun(run({
+        status: 'needs_attention', currentStep: 'create_request', stepIndex: 1, needsAttentionReason: reason,
+      }), [{
+        step: 'create_request', resourceKind: 'dataverse_request', outcome: 'planned',
+        readback: { createAttemptedAt: '2026-10-03T12:01:00.000Z' },
+      }], at);
+      expect(result.nextAction).toBe('retry');
+      expect(result.message).toMatch(/read the reserved Request GUID first/);
+    },
+  );
+
+  test.each(['upstream_http (http 400)', 'unknown_error', 'preallocated_request_present_not_owned'])(
+    'a %s stop after the Request POST was sent stays blocked',
+    (reason) => {
+      const at = Date.parse('2026-10-03T12:02:00.000Z');
+      const result = diagnoseFactoryRun(run({
+        status: 'needs_attention', currentStep: 'create_request', stepIndex: 1, needsAttentionReason: reason,
+      }), [{
+        step: 'create_request', resourceKind: 'dataverse_request', outcome: 'planned',
+        readback: { createAttemptedAt: '2026-10-03T12:01:00.000Z' },
+      }], at);
+      expect(result.nextAction).toBe('operator_review');
+    },
+  );
+
+  test('a timeout stop with a dispatched GoVerify bypass receipt stays blocked', () => {
+    const at = Date.parse('2026-10-03T12:02:00.000Z');
+    const result = diagnoseFactoryRun(run({
+      status: 'needs_attention', currentStep: 'create_request', stepIndex: 1, needsAttentionReason: 'timeout',
+    }), [
+      { step: 'create_request', resourceKind: 'dataverse_request', outcome: 'planned', readback: { createAttemptedAt: '2026-10-03T12:01:00.000Z' } },
+      { step: 'create_request', resourceKind: 'workflow_bypass', outcome: 'planned', readback: { deactivationPatchAttemptedAt: '2026-10-03T12:00:50.000Z' } },
+    ], at);
+    expect(result.nextAction).toBe('operator_review');
+  });
+
   test('a create dispatch marker does not override an unrelated stopped reason', () => {
     const at = Date.parse('2026-10-03T12:02:00.000Z');
     const result = diagnoseFactoryRun(run({
