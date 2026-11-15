@@ -92,3 +92,11 @@ test.each([
   expect(markButton().disabled).toBe(true);
   expect(screen.getByText(reason)).toBeTruthy();
 });
+
+test('readiness unavailable: the status controls still render and no readiness button is offered', async () => {
+  serve({ status: [{ status: 200, body: statusBody({ unavailable: true }) }] });
+  await renderControl();
+  expect(screen.getByText(/Readiness couldn't be checked just now/)).toBeTruthy();
+  expect(markButton()).toBeNull();
+  expect(screen.getByRole('button', { name: 'Set status' })).toBeTruthy();
+});

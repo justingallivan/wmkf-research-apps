@@ -1388,6 +1388,15 @@ describe('mark ready for review (owner, 2026-11-15)', () => {
     expect((await h.service.statusOptions({ profileId: PROFILE, runId })).readiness).toMatchObject({ applies: false, manifestStored: false });
   });
 
+  test('a readiness read failure leaves status options and history intact (Codex)', async () => {
+    const { h, runId } = readyRun();
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    h.spies.readReadinessState.mockRejectedValueOnce(new Error('blob down'));
+    const result = await h.service.statusOptions({ profileId: PROFILE, runId });
+    expect(result).toMatchObject({ runStatus: 'ready', current: { phase1: 100000001, phase2: null }, changes: [], readiness: { unavailable: true } });
+    warn.mockRestore();
+  });
+
   test('statusOptions carries the readiness state only for a ready run', async () => {
     const state = { applies: true, manifestStored: true, ready: false, attemptStatus: null, requiredPair: { phase1: 100000003, phase2: 100000002 } };
     let { h, runId } = readyRun();

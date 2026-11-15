@@ -31,6 +31,14 @@ export default function TestRequestReadinessControl({
   useEffect(() => { if (result) focusAndShow(resultRef.current); }, [result]);
 
   if (!readiness || readiness.applies === false) return null;
+  if (readiness.unavailable) {
+    return (
+      <section aria-labelledby="factory-readiness-heading" className="space-y-2 border-t border-gray-200 pt-5">
+        <h4 id="factory-readiness-heading" className="text-sm font-semibold text-gray-950">Ready for review</h4>
+        <p className="text-sm text-gray-600">Readiness couldn't be checked just now. Reload the run to try again.</p>
+      </section>
+    );
+  }
   const requestName = run.destinationRequestNumber ? `Request ${run.destinationRequestNumber}` : 'this test Request';
   const done = readiness.ready === true && readiness.attemptStatus === 'complete';
   // Sent but not finished: the same POST resumes it without another PATCH.
