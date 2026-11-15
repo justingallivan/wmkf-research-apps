@@ -2,6 +2,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { PDFDocument } from 'pdf-lib';
 import { cliActorId, createRunLedger } from '../../lib/services/test-requests/run-ledger.js';
 import { pgLedgerDb } from '../../lib/services/test-requests/run-ledger-db.js';
 import { advanceRun } from '../../lib/services/test-requests/run-runner.js';
@@ -36,9 +37,10 @@ if (/neon\.tech/i.test(TEST_URL) || (process.env.POSTGRES_URL && TEST_URL === pr
 const describeIf = TEST_URL ? describe : describe.skip;
 
 const MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/054_test_request_runs.sql');
-// 098 widens test_request_receipt_ok for the J27 file destinations; it is a
-// CREATE OR REPLACE, so it is applied on every run (idempotent).
-const RECEIPT_MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/098_test_request_j27_file_names.sql');
+// 099 is the latest test_request_receipt_ok (098's J27 destinations plus the
+// combined Narrative-Bibliography name); it is a CREATE OR REPLACE, so it is
+// applied on every run (idempotent).
+const RECEIPT_MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/099_test_request_narrative_bibliography.sql');
 
 /** Fail loudly when the throwaway ledger schema predates the migration file (constraints are created only with the tables). */
 async function assertLedgerSchemaCurrent(db, migrationSql, receiptSql = migrationSql) {
@@ -95,7 +97,7 @@ const SOURCE_DOCS = [
 ];
 
 /** In-memory sandbox Dataverse + Graph with an event log shared with the ledger wrapper. */
-function makeWorld(log) {
+function makeWorld(log, sourceDocs = SOURCE_DOCS) {
   const state = {
     requests: new Map(),
     locations: [],
@@ -110,7 +112,7 @@ function makeWorld(log) {
     hooks: {},
   };
   const event = (name) => log.push(name);
-  SOURCE_DOCS.forEach((doc, index) => {
+  sourceDocs.forEach((doc, index) => {
     const id = graphItemId('SRC', index);
     state.items.set(id, {
       id, name: doc.name, size: doc.bytes.length, mimeType: 'application/pdf', eTag: `"{0000000${index}-AAAA-4BBB-8CCC-DDDDDDDDDDDD},3"`,
@@ -276,13 +278,13 @@ function makeWorld(log) {
   return { state, client, graph, sharePointTarget: () => TARGET };
 }
 
-function buildBundle() {
+function buildBundle(sourceDocs = SOURCE_DOCS) {
   return readSourceBundle(buildSourceBundle({
     sourceRow: {
       akoya_requestid: SOURCE_ID, akoya_requestnum: '1003222', akoya_requesttype: GRANT, akoya_purpose: PURPOSE,
       akoya_request: 250000, akoya_fiscalyear: 'December 2026', wmkf_meetingdate: '2026-12-03T00:00:00Z', versionnumber: 98622844,
     },
-    documents: SOURCE_DOCS.map((doc, index) => ({
+    documents: sourceDocs.map((doc, index) => ({
       id: `inv-${index}`, kind: doc.kind, library: 'akoya_request', folder: doc.folder, name: doc.name,
       driveId: DRIVE_ID, graphItemId: graphItemId('SRC', index),
       sharePointSite: { key: TARGET.key, hostname: TARGET.hostname, pathname: TARGET.pathname },
@@ -361,11 +363,11 @@ describeIf('slice 5b runner against the live run ledger', () => {
     process.env.DYNAMICS_CLIENT_ID = previousClientId;
   });
 
-  async function setup({ recipe = 'basic', cycleCode = 'D26' } = {}) {
+  async function setup({ recipe = 'basic', cycleCode = 'D26', sourceDocs = SOURCE_DOCS } = {}) {
     log = [];
-    const world = makeWorld(log);
+    const world = makeWorld(log, sourceDocs);
     const preflight = await runPreflight(world.client, world.graph, world.sharePointTarget);
-    const bundle = buildBundle();
+    const bundle = buildBundle(sourceDocs);
     const source = bundle.source.request;
     const manifest = buildCloneManifest(preflight, {
       source, fiscalYear: source.akoya_fiscalyear, meetingDate: source.wmkf_meetingdate, testLabel: 'Runner proof', bundle, recipe,
@@ -408,6 +410,35 @@ describeIf('slice 5b runner against the live run ledger', () => {
       .map((row) => `${row.folder.split('/').at(-1)}/${row.name}`)
       .sort();
     expect(written).toEqual(['Reviewer Materials/Proposal_1000400.pdf', 'Submission-Documents/Project-Narrative_1000400.pdf']);
+  });
+
+  it('a J27 run with a narrative and a bibliography also builds AI Materials/Narrative-Bibliography and verifies to ready', async () => {
+    const pdf = async (sizes) => {
+      const doc = await PDFDocument.create();
+      for (const size of sizes) doc.addPage(size);
+      return Buffer.from(await doc.save());
+    };
+    const narrativeBytes = await pdf([[100, 100], [101, 101]]);
+    const sourceDocs = [
+      ...SOURCE_DOCS.map((doc) => (doc.kind === 'proposalNarrative' ? { ...doc, bytes: narrativeBytes } : doc)),
+      { kind: 'proposalBibliography', folder: `${SOURCE_FOLDER}/AI Materials`, name: 'ProposalBibliography_1003222.pdf', bytes: await pdf([[200, 200]]) },
+    ];
+    const { world, manifest, run, advance } = await setup({ cycleCode: 'J27', sourceDocs });
+    expect(manifest.invariants.expectedSharePointFiles).toBe(4);
+    const results = await runUntil(advance, null, { bypassGoverify: true });
+    expect(results.at(-1)).toMatchObject({ outcome: 'ready' });
+    const copies = (await ledger.listRunResources(run.runId)).filter((row) => row.step === 'copy_file');
+    expect(copies.map((row) => row.outcome)).toEqual(['verified', 'verified', 'verified', 'verified']);
+    const written = [...world.state.items.values()].filter((row) => row.folder.includes('1000400_'));
+    expect(written.map((row) => `${row.folder.split('/').at(-1)}/${row.name}`).sort()).toEqual([
+      'AI Materials/Narrative-Bibliography_1000400.pdf',
+      'Reviewer Materials/Proposal_1000400.pdf',
+      'Submission-Documents/Bibliography_1000400.pdf',
+      'Submission-Documents/Project-Narrative_1000400.pdf',
+    ]);
+    const combined = written.find((row) => row.name === 'Narrative-Bibliography_1000400.pdf');
+    const pages = (await PDFDocument.load(combined.buffer)).getPages().map((page) => page.getWidth());
+    expect(pages).toEqual([100, 101, 200]);
   });
 
   it('drives every step to ready with GoVerify bypass, journaling each resource before its dispatch', async () => {

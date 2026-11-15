@@ -3,7 +3,8 @@
     "054_test_request_runs.sql",
     "058_test_request_cast_slot_bindings.sql",
     "094_test_request_readiness_finalizations.sql",
-    "098_test_request_j27_file_names.sql"
+    "098_test_request_j27_file_names.sql",
+    "099_test_request_narrative_bibliography.sql"
   ],
   "fingerprint": {
     "tables": {
@@ -1593,7 +1594,7 @@
         "returnType": "boolean",
         "language": "sql",
         "volatile": "i",
-        "bodyHash": "9b8cd7d4cce0857be7475990e72628dc9032055ffa08475dd4ed1c1b6519b544"
+        "bodyHash": "d290103f0d23c76ebeadc2e949f49632e67b0c5f214e29c85950da2a9af091f1"
       }
     ]
   }

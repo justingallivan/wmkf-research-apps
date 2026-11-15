@@ -161,6 +161,20 @@ missing on the request page: an accepted limit for test requests. The layout is
 never inferred on resume, so a run reserved before this change, and every D26
 run, keeps the `AI Materials` destinations.
 
+**[BRANCH-BUILT 2026-11-15 (`claude/factory-narrative-bibliography`); needs
+ledger migration 099 applied first; not merged]** A J27-or-later run whose source has
+both a narrative and a bibliography also builds
+`AI Materials/Narrative-Bibliography_<n>.pdf` (alignment log D60; owner,
+2026-11-15): the narrative's pages, then the bibliography's, no cover page.
+Reviewer Finder opens it by default, as it will Connor's file on real
+requests. It is the last file of the copy step: each input is re-read and
+checked against the export exactly like a copied file, the combined bytes are
+uploaded create-only, and verify checks the folder listing and re-reads the
+bytes. A source without one of the two plans no combined file. A run reserved
+before this change copies only the files its manifest promised. An input that
+is not a readable PDF stops the run with `file_rejected` before anything is
+uploaded for the combined file.
+
 Download the manifest and bundle **before the final clone step**, since the daily
 sweep may delete them once the run is internally ready. Complete the clone, use
 the existing status setter for Phase I `Invited` and then Phase II `Phase II

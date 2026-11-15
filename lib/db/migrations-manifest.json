@@ -95,6 +95,7 @@
     "094_test_request_readiness_finalizations.sql",
     "095_reviewer_reminder_events.sql",
     "096_j27_integrity_jobs.sql",
-    "098_test_request_j27_file_names.sql"
+    "098_test_request_j27_file_names.sql",
+    "099_test_request_narrative_bibliography.sql"
   ]
 }

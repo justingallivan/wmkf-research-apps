@@ -31,8 +31,8 @@ const describeIf = TEST_URL ? describe : describe.skip;
 
 const MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/054_test_request_runs.sql');
 const SLOT_MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/058_test_request_cast_slot_bindings.sql');
-// 098 is the latest test_request_receipt_ok definition (J27 file destinations).
-const RECEIPT_MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/098_test_request_j27_file_names.sql');
+// 099 is the latest test_request_receipt_ok definition (combined Narrative-Bibliography name; 098 added the J27 destinations).
+const RECEIPT_MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/099_test_request_narrative_bibliography.sql');
 
 /** Fail loudly when the throwaway ledger schema predates the migration file (constraints are created only with the tables). */
 async function assertLedgerSchemaCurrent(db, migrationSql, receiptSql = migrationSql) {
@@ -789,6 +789,30 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
       { filename: '1000400 Initial Assessment 0a1b2c3d-9f8e7d6c.pdf' },
       { filename: `1000400 Initial Assessment Board v${FAKE_GITHUB_TOKEN.slice(0, 20)} 0a1b2c3d.docx` },
       { filename: 'Confidential Initial Assessment 0a1b2c3d-9f8e7d6c.docx' },
+    ];
+    for (const receipt of rejected) {
+      expect(() => assertLedgerReceipt(receipt, 'fixture')).toThrow();
+      const { rows } = await db.query(`SELECT test_request_receipt_ok($1::jsonb) AS ok`, [JSON.stringify(receipt)]);
+      expect(rows[0].ok).toBe(false);
+    }
+  });
+
+  it('099: the combined Narrative-Bibliography name is accepted, and look-alikes rejected, identically by JS and SQL', async () => {
+    const accepted = [
+      { filename: 'Narrative-Bibliography_1000400.pdf' },
+      { name: 'Narrative-Bibliography_1000400.pdf', folder: '1000400_5D54ABC57F744D23B4BE39599147E674/AI Materials' },
+    ];
+    for (const receipt of accepted) {
+      expect(assertLedgerReceipt(receipt, 'fixture')).toBe(receipt);
+      const { rows } = await db.query(`SELECT test_request_receipt_ok($1::jsonb) AS ok`, [JSON.stringify(receipt)]);
+      expect(rows[0].ok).toBe(true);
+    }
+    const rejected = [
+      { filename: 'Narrative-Bibliography_1000400.docx' },
+      { filename: 'Narrative-Bibliography_.pdf' },
+      { filename: 'narrative-bibliography_1000400.pdf' },
+      { filename: 'Narrative-Bibliography-Extra_1000400.pdf' },
+      { filename: 'Narrative_Bibliography_1000400.pdf' },
     ];
     for (const receipt of rejected) {
       expect(() => assertLedgerReceipt(receipt, 'fixture')).toThrow();

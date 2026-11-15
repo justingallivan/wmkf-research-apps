@@ -275,7 +275,15 @@ describe('migration 054 real SQL contains the load-bearing predicates the pure-J
       .replace('(Proposal|ProposalNarrative|ProposalBibliography)_', '(Proposal|ProposalNarrative|ProposalBibliography|Project-Narrative|Bibliography)_');
     expect(widened).not.toBe(fnBody(migration));
     expect(fnBody(j27Migration)).toBe(widened);
-    expect(fnBody(setupSql)).toBe(fnBody(j27Migration));
+    // 099 (combined narrative and bibliography) is now the latest definition:
+    // it differs from 098 only by the Narrative-Bibliography filename, and the
+    // fresh-install mirror carries that latest body.
+    const combinedMigration = fs.readFileSync(path.join(process.cwd(), 'lib/db/migrations/099_test_request_narrative_bibliography.sql'), 'utf8');
+    const widenedAgain = fnBody(j27Migration)
+      .replace('(Proposal|ProposalNarrative|ProposalBibliography|Project-Narrative|Bibliography)_', '(Proposal|ProposalNarrative|ProposalBibliography|Project-Narrative|Bibliography|Narrative-Bibliography)_');
+    expect(widenedAgain).not.toBe(fnBody(j27Migration));
+    expect(fnBody(combinedMigration)).toBe(widenedAgain);
+    expect(fnBody(setupSql)).toBe(fnBody(combinedMigration));
   });
 
   it('enforces the JS text grammars in PostgreSQL (Codex round eleven): every grammar-bound column has a CHECK', () => {
