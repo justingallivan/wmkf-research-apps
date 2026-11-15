@@ -421,8 +421,8 @@ dispatch/completion timestamps, allowlisted effect receipts, and sanitized error
 `readiness-journal.js` is the only writer. Its planned→dispatched conditional
 UPDATE returns a row to exactly one sender; dispatched operations never resend.
 `readiness-finalizer.js`, reached from owner CLI `--finalize-readiness` and
-[DEPLOYED 2bdf62b5d] from the admin form's **Mark ready
-for review** (`POST /api/admin/test-requests/runs/[runId]/readiness`, superuser,
+[DEPLOYED 2bdf62b5d] from the admin form's **Prepare for
+review** (last step) (`POST /api/admin/test-requests/runs/[runId]/readiness`, superuser,
 caller-owned run, stored manifest; owner 2026-11-15), reads it and corroborates the marked destination, reserved manifest/body/bundle,
 J27+ cycle, phase pair, derived status, status journal, Foundation isolation and
 copied destination files. Saved-source provenance and completed destination

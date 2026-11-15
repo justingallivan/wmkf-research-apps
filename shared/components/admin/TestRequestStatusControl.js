@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { requestJson } from '../../utils/api-request';
 import { CHANGE_STATUSES, OPEN_CHANGE_STATUSES, STATUS_FIELDS } from '../../config/testRequestFactory';
 import { StatusChip } from './AdminWorkspaceNavigation';
-import TestRequestReadinessControl from './TestRequestReadinessControl';
+import TestRequestPrepareForReview from './TestRequestPrepareForReview';
 import { codeOf, messageFor } from './test-request-factory-copy';
 import {
   ERROR_BAND, INPUT, SUMMARY_CLASS, TABLE_WRAP, TH, buttonProps, focusAndShow, formatTime,
@@ -303,8 +303,8 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
     return '';
   })();
 
-  return (
-    <div className="space-y-5">
+  const statusMenus = (
+    <>
       <div className="grid gap-4 sm:grid-cols-2">
         <label htmlFor="factory-status-field" className="block text-sm font-semibold text-gray-800">
           Status field
@@ -450,16 +450,6 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
         </div>
       ) : null}
 
-      <TestRequestReadinessControl
-        run={run}
-        readiness={data?.readiness ?? null}
-        current={data?.current ?? null}
-        statusChangeOpen={Boolean(open)}
-        writeBlock={writeBlock}
-        liveScope={liveScope}
-        onChanged={loadJournal}
-      />
-
       <details className="rounded-xl border border-gray-200 bg-white px-4" open={Boolean(open) || stuckHere}>
         <summary className={SUMMARY_CLASS}>Status change history ({changes.length})</summary>
         <div className="space-y-4 pb-4">
@@ -498,6 +488,40 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
 
         </div>
       </details>
+    </>
+  );
+
+  // Prepared J27+ runs (owner, 2026-11-15): one ordered action on top; the general menus under More options.
+  const readiness = data?.readiness ?? null;
+  if (readiness?.applies === true) {
+    return (
+      <div className="space-y-5">
+        <TestRequestPrepareForReview
+          run={run}
+          data={data}
+          writeBlock={writeBlock}
+          busy={busy}
+          setBusy={setBusy}
+          liveScope={liveScope}
+          reload={loadJournal}
+          openChangeBody={(fresh) => {
+            const change = (fresh?.changes || []).find((item) => OPEN_CHANGE_STATUSES.includes(item.status));
+            return change ? strictCheckBody(fresh, change) : null;
+          }}
+        />
+        <details className="rounded-xl border border-gray-200 bg-white px-4" open={stuckHere}>
+          <summary className={SUMMARY_CLASS}>More options: set any Phase I or Phase II status</summary>
+          <div className="space-y-5 pb-4">{statusMenus}</div>
+        </details>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-5">
+      {readiness?.unavailable ? (
+        <p className="text-sm text-gray-600">Readiness couldn&apos;t be checked just now, so Prepare for review isn&apos;t shown. Reload the run to try again.</p>
+      ) : null}
+      {statusMenus}
     </div>
   );
 }

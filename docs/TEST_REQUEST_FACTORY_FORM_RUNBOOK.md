@@ -43,17 +43,24 @@ A variable change takes effect only in a new deployment. Details and rotation: `
    For prepared J27+ reviewer fixtures, Phase I Invited followed by Phase II
    Pending Committee Review and readiness finalization are required.
    Earlier-cycle clone behavior is unchanged.
-5. **Ready for review** (prepared J27+ runs) [DEPLOYED 2bdf62b5d, 2026-11-15].
+5. **Prepare for review** (prepared J27+ runs) [readiness route DEPLOYED 2bdf62b5d; one-button flow BRANCH-BUILT `claude/factory-prepare-for-review`].
    A J27 Research request appears in the Workbench only once `wmkf_readyforreview`
-   is true. After both statuses are set, the status panel offers **Mark ready for
-   review** (owner, 2026-11-15: anyone with admin access, on their own runs). It asks
-   first, because readiness is never set back to false, then runs the same checks as
-   the CLI's `--finalize-readiness --confirm` against the stored manifest
-   (`POST /api/admin/test-requests/runs/[runId]/readiness`). "Check again" resumes
-   the same attempt and never sends a second PATCH. An attempt that needs attention,
-   or a run whose stored files are gone, still needs the owner CLI with the
-   downloaded manifest. The daily sweep keeps a ready prepared run's stored files until
-   its readiness completes, for at most 30 days.
+   is true. For a prepared run the status panel shows one action, **Prepare for
+   review** (owner, 2026-11-15: anyone with admin access, on their own runs). After
+   one confirmation it sets Phase I to Invited, then Phase II to Phase II Pending
+   Committee Review, then marks the Request ready, in that order (Invited is
+   allowed only while Phase II is empty). Each step uses the existing status route
+   or `POST /api/admin/test-requests/runs/[runId]/readiness`, which runs the same
+   checks as the CLI's `--finalize-readiness --confirm` against the stored manifest.
+   Any answer other than complete stops the flow; **Continue** resumes the same open
+   status change or readiness attempt and never sends a second PATCH. A Request whose
+   Phase II was set before Phase I was Invited is reported as unpreparable (create a
+   new test Request). The general status menus stay under **More options**. An
+   attempt that needs attention, or a run whose stored files are gone, still needs
+   the owner CLI with the downloaded manifest. The daily sweep keeps a ready prepared
+   run's stored files until its readiness completes, for at most 30 days. Expect
+   about 5 to 10 minutes: each step waits for Dynamics' background jobs (at least
+   90 seconds of quiet).
 
 The bundle is valid for file copying for 6 hours from lookup (`BUNDLE_MAX_AGE_MS`, `bundle-file-copy.js`). Finish the copy steps within that window. Completed verified copies do not expire for later status/readiness finalization because of that TTL or subsequent edits to the real source.
 
@@ -141,7 +148,7 @@ The recheck's `ok` means this pass found no newly unrecorded effects and no open
 | `--run-recheck=<runId>` | Read-only: the Foundation account against the run's baseline. |
 | `--advance=<runId> --manifest=<file> --bundle=<file>` | Uses the same backend runner. The form may withhold Advance when diagnosis is uncertain; an owner CLI retry remains subject to runner checks and separate operational authorization. Needs the run's manifest and bundle as local files. |
 | `--set-status`, `--status-recheck`, `--status-abandon` | The status setter, its recheck, and closing a change stuck `dispatched`. |
-| `--finalize-readiness=<runId> --manifest=<file>` | Deployed owner-only prepared J27+ readiness preview; add `--confirm` for the single journaled true stamp after all checks. Requires migration 094 on the operational ledger. The admin form's **Mark ready for review** calls the same finalizer with the stored manifest [DEPLOYED 2bdf62b5d]. |
+| `--finalize-readiness=<runId> --manifest=<file>` | Deployed owner-only prepared J27+ readiness preview; add `--confirm` for the single journaled true stamp after all checks. Requires migration 094 on the operational ledger. The admin form's **Prepare for review** calls the same finalizer with the stored manifest [DEPLOYED 2bdf62b5d]. |
 | `--recover-readiness=<runId> --manifest=<file>` | Read-only recovery preview; exact-destination confirmation can abandon only an unready attempt after all senders stop (procedure below). |
 | `--bind-reviewer=<runId>`, `--bind-reviewer-slot=<runId>` | Owner cast suggestion binding and separate read-only slot preview; only exact Request confirmation enables the slot operation. |
 | `--ledger-check` | Ledger schema against the tracked fingerprint. |
