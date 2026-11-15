@@ -13,6 +13,7 @@ import InitialAssessmentRationale from '../../shared/components/workbench/Initia
 import MeetingRoster from '../../shared/components/workbench/MeetingRoster';
 import StaffVisitAssessment from '../../shared/components/workbench/StaffVisitAssessment';
 import StaffReviewSummary from '../../shared/components/workbench/StaffReviewSummary';
+import OfframpControl from '../../shared/components/workbench/OfframpControl';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
@@ -493,8 +494,14 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
           onSelectTab={selectTab}
           mode={phaseLayout ? 'presentation' : 'legacy'}
           presentationContext={phaseLayout ? (
-            <StaffReviewSummary key={routeRequestId} requestId={routeRequestId} readOnly
-              onOpenReports={() => selectTab('reviews')} onJ27Facts={visibleContext?.j27 ? reportJ27Facts : null} />
+            <>
+              <StaffReviewSummary key={routeRequestId} requestId={routeRequestId} readOnly
+                onOpenReports={() => selectTab('reviews')} onJ27Facts={visibleContext?.j27 ? reportJ27Facts : null} />
+              {visibleContext?.j27 && (
+                <OfframpControl key={`offramp:${routeRequestId}`} requestId={routeRequestId}
+                  onStatusChange={refreshPhaseIStatus} />
+              )}
+            </>
           ) : null}
         />
       ) : activeTab === 'final-writeup' ? (
