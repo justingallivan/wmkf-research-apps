@@ -252,7 +252,13 @@ describe('confirm', () => {
     expect(server.bodies('POST', BASE)).toEqual([{
       draftId: DRAFT_ID, idempotencyKey: 'key-1', confirmSourceRequestNumber: '1001000', testLabel: 'My test', cycleCode: 'D26',
     }]);
-    expect(screen.getByText('Nothing has been created in Dataverse yet. Start it from the run panel below.')).toBeTruthy();
+    const reservedLine = screen.getByText('Nothing has been created in Dataverse yet. Start it from the run panel below.');
+    // Owner, 2026-11-15: the run panel (with its start button) sits directly under the reserved line, above "Your runs".
+    const panelHeading = screen.getByRole('heading', { name: 'My test' });
+    const runsHeading = screen.getByRole('heading', { name: 'Your runs' });
+    const FOLLOWING = Node.DOCUMENT_POSITION_FOLLOWING;
+    expect(reservedLine.compareDocumentPosition(panelHeading) & FOLLOWING).toBeTruthy();
+    expect(panelHeading.compareDocumentPosition(runsHeading) & FOLLOWING).toBeTruthy();
   });
 
   test('a 200 same-key retry also selects the run', async () => {

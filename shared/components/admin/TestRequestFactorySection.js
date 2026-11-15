@@ -287,6 +287,26 @@ export default function TestRequestFactorySection({ onTarget }) {
 
       <TestRequestFactoryIntake writeBlock={writeBlock} onLookupStart={abortActive} onReserved={onReserved} getSelectionToken={() => selectionSeqRef.current} hasSelection={Boolean(view)} />
 
+      {view ? (
+        <TestRequestFactoryRunPanel
+          view={view}
+          advancing={advancing}
+          stopRequested={stopRequested}
+          note={note}
+          writeBlock={writeBlock}
+          onAdvance={() => advance(view.run.runId)}
+          onStop={() => { stopRef.current = true; setStopRequested(true); }}
+          recheck={recheck}
+          onRecheck={() => recheckFoundation(view.run.runId)}
+          artifacts={artifacts}
+          onArtifacts={() => downloadArtifacts(view.run.runId)}
+          getScope={() => handleFor(view.run.runId)}
+          initialStuck={stuckMapRef.current.get(view.run.runId) || null}
+          onStuck={(record) => { if (record) stuckMapRef.current.set(view.run.runId, record); else stuckMapRef.current.delete(view.run.runId); }}
+          epoch={epoch}
+        />
+      ) : null}
+
       <section aria-labelledby="factory-runs-heading" className="space-y-3 border-t border-gray-200 pt-6">
         <div className="flex items-center justify-between gap-3">
           <h3 id="factory-runs-heading" className="text-base font-semibold text-gray-950">Your runs</h3>
@@ -332,26 +352,6 @@ export default function TestRequestFactorySection({ onTarget }) {
           </table>
         </div>
       </section>
-
-      {view ? (
-        <TestRequestFactoryRunPanel
-          view={view}
-          advancing={advancing}
-          stopRequested={stopRequested}
-          note={note}
-          writeBlock={writeBlock}
-          onAdvance={() => advance(view.run.runId)}
-          onStop={() => { stopRef.current = true; setStopRequested(true); }}
-          recheck={recheck}
-          onRecheck={() => recheckFoundation(view.run.runId)}
-          artifacts={artifacts}
-          onArtifacts={() => downloadArtifacts(view.run.runId)}
-          getScope={() => handleFor(view.run.runId)}
-          initialStuck={stuckMapRef.current.get(view.run.runId) || null}
-          onStuck={(record) => { if (record) stuckMapRef.current.set(view.run.runId, record); else stuckMapRef.current.delete(view.run.runId); }}
-          epoch={epoch}
-        />
-      ) : null}
     </div>
   );
 }
