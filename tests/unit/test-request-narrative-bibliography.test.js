@@ -280,3 +280,8 @@ describe('what a run promises', () => {
     expect(() => manifestBuildsNarrativeBibliography(d26)).toThrow(/narrativeBibliography/);
   });
 });
+
+test('a narrative with a PDF header but no readable page tree is refused with file_rejected, not a TypeError', async () => {
+  const broken = Buffer.from('%PDF-1.7\nnot really a pdf body');
+  await expect(buildNarrativeBibliographyPdf(broken, BIBLIOGRAPHY)).rejects.toMatchObject({ code: 'file_rejected' });
+});

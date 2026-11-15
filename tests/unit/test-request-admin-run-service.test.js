@@ -20,6 +20,8 @@ import { MANAGED_LEDGER_HOSTS } from '../../lib/db/ledger-registry.js';
 import { TEST_REQUEST_FIXED_FIELDS } from '../../lib/services/test-requests/policy.js';
 import { cloneCycleFromCalendarRow } from '../../lib/services/test-requests/sandbox-clone.js';
 
+// A one-page PDF the lookup's PDF check accepts (narrative and bibliography must open).
+const MINIMAL_PDF = '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 10 10]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n';
 const MANAGED = MANAGED_LEDGER_HOSTS[0];
 const SANDBOX_LEDGER = `postgresql://role:pw@${MANAGED}/ledger?sslmode=require`;
 const PROD_LEDGER = `postgresql://role:pw@${MANAGED}/ledger_prod?sslmode=require`;
@@ -727,7 +729,7 @@ describe('exportSource / readArtifacts / recheck', () => {
         throw new Error(`unexpected Dataverse read ${path}`);
       },
     });
-    const pdf = Buffer.from('source-pdf');
+    const pdf = Buffer.from(MINIMAL_PDF);
     const graphMetadata = { id: 'graph-item-1', name: 'ProjectDescription.pdf', size: pdf.length, mimeType: 'application/pdf', eTag: 'etag-1', versionId: '1.0' };
     const graphCalls = { listFiles: [] };
     const sourceDependencies = {
@@ -838,7 +840,7 @@ describe('cooperative deadlines (slice 2)', () => {
         throw new Error(`unexpected Dataverse read ${path}`);
       },
     });
-    const pdf = Buffer.from('source-pdf');
+    const pdf = Buffer.from(MINIMAL_PDF);
     const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
     // The seven allowlisted source documents (admin-preview-service DOCUMENT_SPECS).
     const items = [
