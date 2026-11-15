@@ -69,7 +69,7 @@ export default function TestRequestPrepareForReview({
   const [confirming, setConfirming] = useState(false);
   const [working, setWorking] = useState(-1);
   const [stop, setStop] = useState(null);
-  const confirmedRef = useRef(false);
+  const [confirmed, setConfirmed] = useState(false);
   const questionRef = useRef(null);
   const stopRef = useRef(null);
 
@@ -105,7 +105,7 @@ export default function TestRequestPrepareForReview({
 
   async function prepare() {
     setConfirming(false);
-    confirmedRef.current = true;
+    setConfirmed(true);
     const scope = liveScope();
     setBusy(true);
     setStop(null);
@@ -191,7 +191,7 @@ export default function TestRequestPrepareForReview({
             {...buttonProps(true)}
             disabled={Boolean(reason)}
             aria-describedby="factory-prepare-reason"
-            onClick={confirmedRef.current ? prepare : () => setConfirming(true)}
+            onClick={confirmed ? prepare : () => setConfirming(true)}
           >
             {started ? 'Continue' : 'Prepare for review'}
           </button>
