@@ -92,7 +92,7 @@ database application and deployment were pending at that provenance checkpoint; 
 `discussion_attribution` (confirmed draft decision), and
 `frozen_discussion_attribution` (publication/recovery decision). No backfill.
 Fresh installation executes the manifest migration through the existing bootstrap;
-there is no duplicate inline table definition. Justin applies 078 before merge.
+there is no duplicate inline table definition. **078 is merged and applied to Production** (recorded in `DEVELOPMENT_LOG.md` (Session 591): applied to Production by the owner before merge `06ef45ee8`, 2026-10-10; not re-probed).
 
 `prepareMeetingAttendance` reads the frozen source occurrence only. The guarded
 attendance POST and correction PATCH use the existing draft version CAS; edits to

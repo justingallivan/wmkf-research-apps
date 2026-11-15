@@ -2,8 +2,8 @@
 title: Zoom attendance and discussion speaker attribution
 kind: plan
 domain: transcription
-status: branch-built-not-deployed
-summary: "Branch-built attendance and discussion attribution in one boundary correction; migration 078 remains unapplied and requires owner application before merge. Offline acceptance and recovery verification are recorded below."
+status: shipped
+summary: "Attendance and discussion attribution in one boundary correction; merged 2026-10-10 (`06ef45ee8`) with migration 078 applied to Production by the owner before merge (DEVELOPMENT_LOG Session 591). Offline acceptance and recovery verification are recorded below."
 owner: product-engineering
 related:
   - docs/plans/ZOOM_TRANSCRIPT_PROVENANCE_PLAN_2026-10-09.md
@@ -14,7 +14,7 @@ related:
 
 # Zoom attendance and discussion speaker attribution
 
-**[BRANCH-BUILT, 2026-10-09; NOT DEPLOYED.]** Implementation is on `codex/zoom-attendance`; migration 078 is not applied. Claude orchestrates; Codex implements in `/Users/gallivan/Code/WMKF_Apps-codex-labels` on a branch cut from current `main`. This plan supersedes the field-level proposals in `/tmp/zoom-attribution-plan.md` and `/tmp/zoom-attribution-shared-contract.md` (historical, outside the repo). Codex's wind-down handoff is `/tmp/zoom-attendance-codex-handoff.md`.
+**[MERGED AND DEPLOYED 2026-10-10 (`06ef45ee8`); migration 078 applied to Production by the owner before merge, per `DEVELOPMENT_LOG.md` Session 591; not re-probed 2026-11-15.]** Historical build note: implementation was on `codex/zoom-attendance`. Claude orchestrates; Codex implements in `/Users/gallivan/Code/WMKF_Apps-codex-labels` on a branch cut from current `main`. This plan supersedes the field-level proposals in `/tmp/zoom-attribution-plan.md` and `/tmp/zoom-attribution-shared-contract.md` (historical, outside the repo). Codex's wind-down handoff is `/tmp/zoom-attendance-codex-handoff.md`.
 
 ## Outcome
 
