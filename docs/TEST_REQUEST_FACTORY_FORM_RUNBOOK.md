@@ -191,7 +191,9 @@ is not a readable PDF stops the run with `file_rejected` before anything is
 uploaded for the combined file.
 
 Download the manifest and bundle **before the final clone step**, since the daily
-sweep may delete them once the run is internally ready. Complete the clone, use
+sweep may delete them once the run is internally ready. [BRANCH-BUILT] A prepared
+J27+ run's stored files are now kept until its readiness completes (at most 30 days),
+so the form's readiness step needs no download; the CLI path still uses the local file. Complete the clone, use
 the existing status setter for Phase I `Invited` and then Phase II `Phase II
 Pending Committee Review`, and inspect each result. Invited may create a draft
 email and GoApply tracking row. The bounded 2026-11-03 fixture had no unexpected provisioning effects; future runs still require observation. The derived Request Status must read `Phase II Pending`.

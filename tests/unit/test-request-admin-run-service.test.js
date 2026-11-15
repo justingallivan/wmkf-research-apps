@@ -1373,16 +1373,19 @@ describe('mark ready for review (owner, 2026-11-15)', () => {
 
   test('the default readiness read: stored manifest decides applies, Dataverse gives ready, the journal gives the attempt', async () => {
     const gets = [];
-    const client = (ready) => ({ baseUrl: 'x', get: async (path) => { gets.push(path); return { ok: true, status: 200, body: { akoya_requestid: '12121212-1212-4121-8121-121212121212', wmkf_readyforreview: ready } }; } });
+    const client = (ready, cycle = 'J27') => ({ baseUrl: 'x', get: async (path) => { gets.push(path); return { ok: true, status: 200, body: { akoya_requestid: '12121212-1212-4121-8121-121212121212', wmkf_readyforreview: ready, wmkf_GrantCycle: { wmkf_cyclecode: cycle } } }; } });
     let { h, runId } = readyRun({ deps: { readReadinessState: undefined, createClient: () => client(false) } });
     expect((await h.service.statusOptions({ profileId: PROFILE, runId })).readiness).toEqual({
       applies: true, manifestStored: true, ready: false, attemptStatus: null, requiredPair: { phase1: 100000003, phase2: 100000002 },
     });
-    expect(gets.at(-1)).toMatch(/akoya_requests\(12121212-1212-4121-8121-121212121212\)\?\$select=akoya_requestid,wmkf_readyforreview$/);
+    expect(gets.at(-1)).toMatch(/akoya_requests\(12121212-1212-4121-8121-121212121212\)\?\$select=akoya_requestid,wmkf_readyforreview&\$expand=wmkf_GrantCycle\(\$select=wmkf_cyclecode\)$/);
     ({ h, runId } = readyRun({ manifest: { values: {} }, deps: { readReadinessState: undefined, createClient: () => client(null) } }));
     expect((await h.service.statusOptions({ profileId: PROFILE, runId })).readiness).toMatchObject({ applies: false, ready: null });
+    // Stored files gone: a J27 Request still shows the section (to say the CLI is needed); a swept D26 run does not.
     ({ h, runId } = readyRun({ manifest: null, deps: { readReadinessState: undefined, createClient: () => client(false) } }));
-    expect((await h.service.statusOptions({ profileId: PROFILE, runId })).readiness).toMatchObject({ applies: null, manifestStored: false });
+    expect((await h.service.statusOptions({ profileId: PROFILE, runId })).readiness).toMatchObject({ applies: true, manifestStored: false });
+    ({ h, runId } = readyRun({ manifest: null, deps: { readReadinessState: undefined, createClient: () => client(null, 'D26') } }));
+    expect((await h.service.statusOptions({ profileId: PROFILE, runId })).readiness).toMatchObject({ applies: false, manifestStored: false });
   });
 
   test('statusOptions carries the readiness state only for a ready run', async () => {

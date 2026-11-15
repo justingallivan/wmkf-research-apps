@@ -85,7 +85,7 @@ test('a check-again answer shows its message and offers Check again without a ne
 
 test.each([
   ['an attempt needing owner inspection', readiness({ attemptStatus: 'needs_attention' }), /needs the owner to inspect it/],
-  ['stored files gone', readiness({ applies: null, manifestStored: false }), /stored files are gone/],
+  ['stored files gone', readiness({ manifestStored: false }), /stored files are gone/],
 ])('disabled for %s', async (_label, state, reason) => {
   serve({ status: [{ status: 200, body: statusBody(state) }] });
   await renderControl();
