@@ -331,7 +331,8 @@ test('re-resolves and hashes the selected file, but strips every executable payl
 
   expect(deps.getRequestById).toHaveBeenCalledWith(SOURCE_ID);
   expect(deps.getFileMetadataById).toHaveBeenCalledTimes(2);
-  expect(deps.downloadFile).toHaveBeenCalledWith('drive-1', 'graph-item-1');
+  // The read is capped at the listed size (a PDF must match it exactly).
+  expect(deps.downloadFile).toHaveBeenCalledWith('drive-1', 'graph-item-1', { maxBytes: Buffer.byteLength('%PDF-preview') });
   expect(result.executionEnabled).toBe(false);
   expect(result.preview.planReady).toBe(false);
   expect(result.preview.executionReady).toBe(false);

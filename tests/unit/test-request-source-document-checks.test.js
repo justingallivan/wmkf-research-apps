@@ -40,8 +40,12 @@ function graphServing(states) {
       index += 1;
       return state && { id: 'item-1', name: state.name, size: state.bytes.length, mimeType: state.mimeType, eTag: state.eTag, versionId: state.versionId };
     }),
-    downloadFile: jest.fn(async () => {
+    // Honours the Graph byte cap like lib/services/graph/downloads.js.
+    downloadFile: jest.fn(async (driveId, itemId, options = {}) => {
       const state = current();
+      if (options.maxBytes != null && state.bytes.length > options.maxBytes) {
+        throw Object.assign(new Error('Graph download exceeds the allowed byte limit'), { code: 'graph_download_size_limit' });
+      }
       return { buffer: state.bytes, filename: state.name, mimeType: state.mimeType, size: state.bytes.length };
     }),
   };
@@ -142,5 +146,26 @@ describe('the read budget with rewritten Office files', () => {
     ];
     expect(docs.every((doc) => doc.size <= TEST_REQUEST_PREVIEW_READ_LIMITS.maxFileBytes)).toBe(true);
     expect(() => assertTestRequestSourceReadLimits(docs)).toThrow(expect.objectContaining({ code: 'test_request_preview_total_size_exceeded' }));
+  });
+});
+
+describe('the bytes actually downloaded are capped', () => {
+  test('an Office file replaced by something much larger mid-read refuses without reading it all', async () => {
+    const listed = Buffer.alloc(10);
+    const huge = Buffer.alloc(10 + 64 * 1024 + 1);
+    // Metadata says v3 at the listed size; the body served is far larger.
+    const deps = graphServing([xlsxState(3, listed)]);
+    const servedHuge = graphServing([xlsxState(4, huge)]);
+    deps.downloadFile = servedHuge.downloadFile;
+    await expect(hydrateTestRequestSourceDocument(selection({ size: 10 }), deps))
+      .rejects.toMatchObject({ code: 'test_request_preview_source_changed', message: expect.stringMatching(/grew past 65546 bytes/) });
+    expect(servedHuge.downloadFile.mock.calls[0][2]).toEqual({ maxBytes: 10 + 64 * 1024 });
+  });
+
+  test('a PDF download is capped at its exact listed size', async () => {
+    const name = 'ProjectDescription.pdf';
+    const deps = graphServing([{ name, mimeType: 'application/pdf', eTag: '"e1"', versionId: '1.0', bytes: REAL_PDF }]);
+    await hydrateTestRequestSourceDocument(selection({ kind: 'projectDescription', name, mimeType: 'application/pdf', size: REAL_PDF.length }), deps);
+    expect(deps.downloadFile.mock.calls[0][2]).toEqual({ maxBytes: REAL_PDF.length });
   });
 });
