@@ -285,3 +285,17 @@ test('a narrative with a PDF header but no readable page tree is refused with fi
   const broken = Buffer.from('%PDF-1.7\nnot really a pdf body');
   await expect(buildNarrativeBibliographyPdf(broken, BIBLIOGRAPHY)).rejects.toMatchObject({ code: 'file_rejected' });
 });
+
+test('inputs from different libraries still plan and build the combined file, each read from its own drive', async () => {
+  const archiveBibliography = sourceDoc('proposalBibliography', 'item-b', BIBLIOGRAPHY, { library: 'RequestArchive1' });
+  const bundle = bundleOf([sourceDoc('proposalNarrative', 'item-n', NARRATIVE), archiveBibliography]);
+  const plan = planBundleFileCopies(bundle, { destinationRequestNumber: '1000400', destinationLayout: J27 });
+  expect(plan.at(-1).kind).toBe(NARRATIVE_BIBLIOGRAPHY_KIND);
+  const { deps, destination } = fakeDependencies({
+    getDriveId: jest.fn(async (library) => (library === 'RequestArchive1' ? 'drive-archive' : REQUEST_DRIVE)),
+  });
+  await copyBundleFiles(params([plan.at(-1)]), deps, jest.fn(async () => {}));
+  expect(destination.has(`${REQUEST_FOLDER}/AI Materials/Narrative-Bibliography_1000400.pdf`)).toBe(true);
+  expect(deps.getFileMetadataById).toHaveBeenCalledWith('drive-archive', 'item-b');
+  expect(deps.downloadFile).toHaveBeenCalledWith('drive-archive', 'item-b');
+});

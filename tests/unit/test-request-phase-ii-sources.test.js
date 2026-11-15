@@ -109,3 +109,42 @@ describe('the lookup prefers Phase II and falls back to AI Materials', () => {
     expect(documents).toEqual([]);
   });
 });
+
+describe('one source per kind, across libraries and folders (Codex findings)', () => {
+  const ARCHIVE_ROOT = '1002912_ARCHIVE';
+  function discoverBuckets(byBucket) {
+    return discoverTestRequestSourceDocuments({ akoya_requestid: 'req-1', akoya_requestnum: '1002912' }, {
+      getRequestSharePointBuckets: jest.fn(async () => [
+        { library: 'akoya_request', folder: ROOT, source: 'active' },
+        { library: 'RequestArchive1', folder: ARCHIVE_ROOT, source: 'archive' },
+      ]),
+      listFiles: jest.fn(async (library, folder) => (byBucket[library] || []).map(([sub, name], index) => ({
+        id: `${library}-${index}`, folder: `${folder}/${sub}`, name, size: 10, mimeType: 'application/pdf',
+      }))),
+    });
+  }
+
+  test('a Phase II original in both libraries offers only the active one', async () => {
+    const { documents } = await discoverBuckets({
+      akoya_request: [['Phase II', 'Project Narrative.pdf']],
+      RequestArchive1: [['Phase II', 'Project Narrative.pdf']],
+    });
+    expect(documents.filter((d) => d.kind === 'proposalNarrative').map((d) => d.library)).toEqual(['akoya_request']);
+  });
+
+  test('an archive Phase II original beats an active AI Materials copy', async () => {
+    const { documents } = await discoverBuckets({
+      akoya_request: [['AI Materials', 'ProposalNarrative_1002912.pdf']],
+      RequestArchive1: [['Phase II', 'Project Narrative.pdf']],
+    });
+    expect(documents.filter((d) => d.kind === 'proposalNarrative').map((d) => [d.library, d.name]))
+      .toEqual([['RequestArchive1', 'Project Narrative.pdf']]);
+  });
+
+  test('a nested copy of Phase II is not a source', async () => {
+    const { documents } = await discoverBuckets({
+      akoya_request: [['backup/Phase II', 'Project Narrative.pdf'], ['AI Materials', 'ProposalNarrative_1002912.pdf']],
+    });
+    expect(documents.filter((d) => d.kind === 'proposalNarrative').map((d) => d.name)).toEqual(['ProposalNarrative_1002912.pdf']);
+  });
+});
