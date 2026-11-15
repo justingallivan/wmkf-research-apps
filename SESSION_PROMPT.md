@@ -1,8 +1,8 @@
-# Session 677 Prompt: Three open streams — J27 request page on in Production, expertise roster, Request narratives
+# Session 678 Prompt: Three open streams — J27 offramp justification next, expertise roster, Request narratives
 
 ## Start here, whichever agent you are
 
-This file holds three handoffs. Stream A was worked in Session 676
+This file holds three handoffs. Stream A was worked in Session 677
 (2026-11-14, Claude). Streams B and C were not touched by Claude and are
 carried as their authors wrote them on 2026-11-09. **Find out which stream the
 owner wants before doing anything; if he does not say, ask.** Then read that
@@ -11,7 +11,7 @@ yours to change.
 
 | Stream | Last worked by | Resume in | Read first | First step |
 |---|---|---|---|---|
-| **A. J27 Workbench** | Claude, Session 676 (2026-11-14) | `main` (live in Production, release steps A to D done). Worktree `/Users/gallivan/Code/WMKF_Apps-claude-production-admission` (merged); `claude/j27-read-model` (sandbox Preview) at `2adc6dfb0`, alias pointed at it | Stream A below; `docs/plans/J27_WORKBENCH_PRODUCTION_ROLLOUT_2026-11-07.md` (change record above its Rollback section) | Nothing urgent: real J27 applications arrive in about three weeks (owner). Check before intake, then the real-use checks (Stream A, Verified Open 1) |
+| **A. J27 Workbench** | Claude, Session 677 (2026-11-14) | `main`. Worktree `/Users/gallivan/Code/WMKF_Apps-claude-factory-j27-files` (branch `claude/factory-j27-file-names`, merged); `claude/j27-read-model` (sandbox Preview) at `2adc6dfb0` | Stream A below; alignment log D69 in `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md` | **Owner wants it soon:** build the offramp justification edit and display in the Workbench (Stream A, Verified Open 1). Clear the red `check:agent-wiki` gate first (Verified Open 2) |
 | **B. Expertise roster** | Codex, Session 670; Codex again 2026-11-10 and 2026-11-11 | **Observed 2026-11-12 by Claude, not Codex's own record:** `codex/expertise-roster-import-2026-11-10` last commit 2026-11-11 15:37 ("record reviewed native output schema build"), worktree `/Users/gallivan/Code/WMKF_Apps-codex-roster-import`. Codex's own section below still names the 2026-11-09 branch | Stream B below; `docs/plans/EXPERTISE_ROSTER_HANDOFF_2026-11-09.md`; that branch's own handoff commits | Ask Codex or the owner for the current boundary; do not resume from the 2026-11-09 text alone |
 | **C. Request narratives** | Codex, Session 669 | `codex/request-narratives-2026-11-09` at `06e1ba6a4`, pushed. Recorded worktree `/private/tmp/wmkf-request-narratives` is gone from disk | Stream C below; `docs/plans/REQUEST_NARRATIVES_HANDOFF_2026-11-09.md` | Power Automate initialization contract with Connor, then the J27 integration review |
 
@@ -25,19 +25,24 @@ Claude's to change; not rechecked 2026-11-14):**
   "Session 674 / 675" handoff**, which it calls branch-local: the shared
   Executor trial and four Sandbox recommendation jobs whose due-only cleanup
   deadlines fall on 2026-11-12 and 2026-11-18 (Phoenix time). That cleanup is
-  Codex's. **Session numbers clash**: `main`'s 674 to 676 are Claude's Stream
+  Codex's. **Session numbers clash**: `main`'s 674 to 677 are Claude's Stream
   A sessions; whoever lands a Codex handoff on `main` reconciles.
 - `/private/tmp/wmkf-staff-draft-store-20261111` had uncommitted Codex changes
   to `lib/services/execute-prompt.js` and `lib/services/prompt-jobs/*`.
-- **The owner says Codex is not working on the Test Request Factory now
-  (2026-11-14).** Its J27 gaps are logged in `docs/CURRENT_WORK_QUEUE.md`
-  ("Test Request Factory — not yet J27-shaped").
+- **Codex branches claim app migration number 097**
+  (`097_shared_prompt_jobs.sql`); Session 677 used 098 on `main`. Whoever lands
+  097 checks `schema_migrations` ordering (memory
+  `project-migration-numbers-claimed-off-main.md`).
+- **Other checkouts' `check:factory-ledger` gate is red until they pull
+  `main`:** both Factory ledgers now carry migration 098, and a checkout without
+  the 098 fingerprint refuses them.
 
-**Session numbers.** 669, 670 and 671 overlapped on 2026-11-09; 672 to 676
-were Stream A (Claude, 2026-11-10 to 2026-11-14). The next session is 677
+**Session numbers.** 669, 670 and 671 overlapped on 2026-11-09; 672 to 677
+were Stream A (Claude, 2026-11-10 to 2026-11-14). The next session is 678
 whichever stream it takes. Earlier handoffs: `git show
-749d59e40:SESSION_PROMPT.md` (Session 675 close: J27 merge, admission build,
-steps A and B), `git show 20deeb251:SESSION_PROMPT.md` (Session 674),
+1031a6ce2:SESSION_PROMPT.md` (Session 676 close: request page on in
+Production), `git show 749d59e40:SESSION_PROMPT.md` (Session 675),
+`git show 20deeb251:SESSION_PROMPT.md` (Session 674),
 `git show 146980bc6:SESSION_PROMPT.md` (Session 673),
 `git show 33a233633:SESSION_PROMPT.md` (Session 672),
 `git show b2c271344:SESSION_PROMPT.md` (Session 671),
@@ -86,135 +91,161 @@ steps A and B), `git show 20deeb251:SESSION_PROMPT.md` (Session 674),
    dashboards and Codex J27 Factory worktrees; every other stream's branches,
    worktrees and settings.
 
-## Stream A — J27 Workbench (Claude, Session 676)
+## Stream A — J27 Workbench (Claude, Session 677)
 
-Session 676 (2026-11-14) cleared the red wiki gate and finished the release:
-the request page's phase layout is now on in Production for every
-2027-or-later request.
+Session 677 (2026-11-14) made the Production Test Request Factory produce
+J27-shaped test requests, accepted it on a real run, worked through the
+owner's open items one at a time, and created the offramp justification field
+in Production.
 
 ### What Was Completed
 
-1. **Red gate cleared.** `check:agent-wiki` was red because
-   `docs/agent-wiki/topics/dataverse-dynamics.md` passed its 60-day window.
-   A delegated agent re-verified it against source (three stale claims
-   corrected: where the DAL write asserts live, the adapter count, stale line
-   references) and refreshed the date (`b1fb866be`). Every other start gate
-   was green.
-2. **Step C, pilot** (owner-run `scripts/set-workbench-phase-rollout.mjs`):
-   `workbench.phase_rollout` = pilot of #1003456
-   (`8f4f6bbf-7cfe-487b-8b03-9c02f131d738`). Owner signed in: #1003456 opens on
-   the phase tabs; rationale, staff review summary and staff visit assessment
-   saved and survived a hard reload (first Production writes to the new
-   fields); AkoyaGO Audit History shows three updates by the owner, one per
-   save, and no other field changed.
-3. **Step D, on**, the same day: no observation window (owner: no one else in
-   the apps, these saves send no email, no real J27 applications for about
-   three weeks, and `on` lets internal testing use every J27 test request).
-   Read back `on`; `on` still admits only 2027-or-later cycles
-   (`lib/services/workbench/phase-admission.js:126`, every caller goes
-   through the cycle-checked loader).
-4. **Factory gaps logged** in `docs/CURRENT_WORK_QUEUE.md`: D26 file names,
-   retired scenario names (First Cut, Semi-finalist) on the unmerged Codex
-   branch, no Deliberations scenario.
-5. **Docs reconciled:** change record (steps C and D, no-window decision),
-   Atlas, service catalog and route matrix no longer call the admission
-   "branch-built, not merged"; memory and router; DEVELOPMENT_LOG entry
-   extended to Sessions 675–676.
+1. **Factory J27 file destinations** (owner: Production Factory only; narrative
+   and bibliography only). A J27-or-later run copies them to
+   `Submission-Documents/Project-Narrative_N.pdf` and `Bibliography_N.pdf`;
+   the layout is bound in the manifest and plan digest. Ledger migration 098
+   widens `test_request_receipt_ok`; the owner applied it to both Factory
+   ledgers and the Production app database. Merged `3e382029a`, docs `2d0b43a67`.
+2. **Accepted on a real run.** Run `174e770e-cdfe-51c9-a8c5-945a02abe534`
+   (ledger `managed-ledger/ledger_prod`) created J27 test Request **1003515**
+   from 1002874. Its Initial Assessment → Proposal → Documents list shows
+   Project Narrative and Bibliography (View, Download) and the other four "not
+   received yet" (owner screenshot). The run is **parked `needs_attention` at
+   verify**: the GoVerify refresh triggered by the create changed the Keck
+   Foundation account (BMF 509 Undetermined → blank, subsection text shortened,
+   verified address upper-cased, PDF replaced; owner-read Audit History). These
+   are vendor writes; nothing restored. Runbook "What 'cannot continue' leaves
+   behind" records it (`a40aac95e`).
+3. **Two Factory fixes, promoted with the owner's go.** The form offers the
+   readback-first Retry after a create that timed out (`c689c352d`); the
+   Production Request create gets 60 s instead of 30 (`74f442200`). Both J27
+   runs (2026-11-03, 2026-11-14) timed out at 30 s while the create committed.
+4. **Owner decisions recorded** in the alignment log:
+   - **D68:** PDs meet before every J27 presentation. One question list per
+     request: the lead PD drafts it, the meeting edits it live (saved as typed),
+     it is tidied afterwards, then shared with the PI, co-PIs and liaison. AI may
+     suggest starting questions, each attributed. Not built; supersedes the
+     2026-10-26 "questions to PIs happen outside the apps".
+   - **D69:** offramp justification is a new Dataverse field, written in the
+     Workbench like the wave 37–40 memos, not on an AkoyaGO form.
+   - **D59:** the J27 `AI Materials` folder will be created and hold an
+     assemblage; the one file named is `Narrative-Bibliography_N.pdf` (D60),
+     which the governed readers do not accept, so no single-copy conflict.
+   - **D61:** budget fields wait (PDs use top-line numbers only).
+5. **Wave 41 applied to Production** (owner-run, dry-run then `--execute`):
+   `akoya_request.wmkf_offrampjustification`, Memo, 2,000 characters, optional
+   (`f80172d20`, `41379bc5b`, `1031a6ce2`).
+6. **Work queue:** Factory acceptance recorded; follow-up (unscheduled) to have
+   the Factory build `AI Materials/Narrative-Bibliography_N.pdf` (D60).
+7. Earlier in the session: Stream A doc fixes, wiki `wmkf_name` padding note,
+   `potential-reviewer.js:37` comment fixed, stage-box item closed.
 
 ### Commits
-- `b1fb866be` wiki page re-verified
-- `476373222`, `76392a3bd`, `22d705a84` step C (setting, checks, editor)
-- `13a6067c0` step D
-- `5f1fd966d` Factory gaps in the work queue
-- Session close commit (this handoff, reference docs, memory, dev log)
+- `7d6466a5c`, `353425585`, `3e382029a`, `2d0b43a67` Factory J27 files + 098
+- `75646ca16`, `c689c352d` Retry after create timeout
+- `1190e466a`, `74f442200` 60 s create limit
+- `a40aac95e`, `bc9df75d2`, `7527ce1af`, `23a61b0d2` runbook and work queue
+- `69ab3ba3c`, `1f4e4c918`, `1f0496028`, `98fa6dc9d` D68
+- `9cf4309cd`, `f9b1994c7`, `f80172d20`, `41379bc5b`, `1031a6ce2` D59, D61, D69, wave 41
+- `122962e50`, `e20825316`, `c6b052326` session-start decisions and wiki
+- Session close commit (this handoff)
 
 ### Next Items
 
 #### Verified Open
 
-1. **Before and at J27 intake (about 2026-12-05, owner estimate):** a
-   last check that #1003456 and a D26 request still open as expected; then,
-   on the first real J27 requests, the real-use checks listed in the change
-   record's Observation window: cycle-page load with full lists, several
+1. **Offramp justification in the Workbench (owner: build soon, next
+   session or after).** Field `wmkf_offrampjustification` exists in Production
+   [VERIFIED via owner-run wave 41 output]; no app code selects it [VERIFIED
+   via grep, 2026-11-14]. Pattern: the wave 37–40 memos, e.g.
+   `/api/workbench/initial-assessment-rationale` with request-ETag saves and a
+   schema-ready switch (Atlas `docs/atlas/dataverse-akoya-request.md`). Open
+   questions for the owner before planning: does the box appear only once
+   Phase II Status is "Phase II Offramped" (`682090001`, D51) or earlier; who
+   may edit it; where it shows (request page, All requests and Peer Review rows).
+   Branch work; promotion needs the owner's go. Needed by about 2027-03-25.
+2. **Red gate: `check:agent-wiki`.** `docs/agent-wiki/topics/review-panel.md`
+   passed its 60-day window (last_verified 2026-09-15). Re-verify against
+   source and refresh, as Session 676 did for `dataverse-dynamics.md`.
+3. **J27 intake checks (about 2026-12-05):** #1003456 and a D26 request still
+   open; then on real J27 requests: cycle-page load with full lists, several
    staff editing at once, attendance with a presentation and no Zoom
    suggestions.
-2. **Clean up after the release settles** (rollout plan): the Preview's
-   branch-scoped settings, the Neon branch `j27-preview`, and the `.env.local`
-   link in the admission worktree; then retire both J27 worktrees. Removal
-   work: run the preservation preflight first (Verify Before Acting).
-3. **Factory J27 gaps**: `docs/CURRENT_WORK_QUEUE.md` entry; no owner yet.
-   Do before the Factory next creates J27 test requests.
-4. **Stale code comment** at `lib/dataverse/adapters/potential-reviewer.js:37`
-   ("Dynamics does NOT recompute [wmkf_name]") contradicts the wiki's
-   2026-09-26 live proof that a server process rewrites it. Comment-only fix;
-   not yet made.
+4. **Clean up after intake** (owner, 2026-11-14): Preview branch settings on
+   `claude/j27-read-model` (6 Config settings, sandbox `DYNAMICS_URL`,
+   `POSTGRES_URL`/`DATABASE_URL`), Neon branch `j27-preview`, the J27
+   worktrees including `/Users/gallivan/Code/WMKF_Apps-claude-factory-j27-files`
+   (its `.agents/skills` symlink and the `~/.claude/projects/...-claude-factory-j27-files/memory`
+   symlink are local only). Preservation preflight first.
+5. **D68 plan** (pre-presentation questions): owner suggested the new year;
+   presentations start 2027-04-19. Starting point: the Site Visit Materials
+   route (PI and liaison link; no co-PIs). Open: one typist or several,
+   approval, co-PI addresses, send route, timing, attribution after edits.
 
 #### Owner Decision Needed
 
-1. Formal offramp outcome; Zoom attendance suggestions (both kept out).
-2. Carried: what is prepared before a J27 presentation (D65); Connor's
-   `AI Materials` folder (D59); offramp justification and other D61 items.
-3. The stage box above the request tabs following `WORKBENCH_PHASE_RELEASE`
-   while a request is on the old layout: now moot for J27 requests (all on
-   the new layout); close unless it matters for older cycles.
+1. Formal offramp outcome display and Zoom attendance suggestions: owner
+   recommended deciding after real J27 traffic (not decided).
+2. Ranking and briefing select `akoya_requeststatus = 'Phase II Pending'` and
+   the two Research program IDs; whether J27 requests carry both after the
+   Chairs is unconfirmed (alignment log, Apr–Jun note). Ask Connor and Sarah
+   before May.
 
 #### Verify Before Acting
 
-1. **Setting script**: run from a checkout with `.env.local`; Production
-   needs `DATAVERSE_TARGET_INTERLOCK=on DATAVERSE_ALLOW_PROD_READS=yes`, and
-   `--execute` a same-UTC-day `DATAVERSE_PROD_WRITE_ACK="workbench phase
-   rollout YYYY-MM-DD"`, `--actor-email`, and the revision quoted as printed
-   (`--expected-revision='W/"…"'`; the current Production revision follows the
-   2026-11-14 `on` write). The `MODULE_TYPELESS_PACKAGE_JSON` warning is
-   harmless.
-2. **Rollback order:** setting off; then unset the two switches and redeploy;
-   last resort `dpl_4xPvaNuQMW643fxL2CmuK9RWdKob` (`31ee58f8f`).
-3. **Audit evidence** for Production saves comes from the owner's AkoyaGO
-   Audit History: the production app user cannot read audit rows (wiki
-   `dataverse-dynamics.md`).
-4. **Cycle page vs request page:** the cycle page lists a request under the
-   phase it has reached (#1003456 sits under Peer Review); the request page
-   always shows all phase tabs. The rationale is Initial Assessment →
-   Assessment.
-5. Carried: the "presentation end not verified" blocker without a
-   presentation is required by reviewed tests; Neon `j27-preview` is a
-   Production-data copy; `vercel inspect` prints on stderr; shell
-   `git checkout --` restores the committed file (commit before mutation
-   checks).
+1. **Factory form runs that trigger a GoVerify refresh likely stop at verify**
+   on the Foundation transition contract (two runs) [ASSUMED from 2026-11-03
+   and 2026-11-14]. The test request itself is fine; read the stop text with
+   `vercel logs --environment production --since 30m -q "step stopped"`
+   (`-x` was removed from the CLI). Relaxing the contract is a reviewed change.
+2. Schema waves: `scripts/apply-dataverse-schema.js --wave=<dir suffix>`;
+   Production dry-run needs `DATAVERSE_TARGET_INTERLOCK=on
+   DATAVERSE_ALLOW_PROD_READS=yes`, `--execute` adds
+   `DATAVERSE_PROD_WRITE_ACK="<purpose> <UTC date>"`. No AkoyaGO form
+   placement is needed for app-edited fields.
+3. Carried from Session 676: setting-script and rollback details, audit
+   evidence via the owner's AkoyaGO Audit History, cycle page vs request page
+   (`git show 1031a6ce2:SESSION_PROMPT.md`).
 
 #### Parked
 
-1. Polish pass and older parked items: `git show 20deeb251:SESSION_PROMPT.md`.
+1. Factory follow-up: build `AI Materials/Narrative-Bibliography_N.pdf` on
+   test requests (work queue).
+2. Run `174e770e` / Request 1003515 stays `needs_attention` until the
+   post-intake cleanup.
+3. Codex's sandbox Factory branch (gaps 2 and 3): parked by the owner.
 
 #### Do Not Reopen Without New Decision
 
-1. No observation window before step D (owner, 2026-11-14); attendance
-   testing deferred to a real presentation (owner, option 1).
-2. The four 2026-11-13 admission decisions; structured news rule in
-   Production; Haiku with 8000 tokens; rollup concurrency 4.
-3. Session 672 to 675 decisions (see the earlier handoffs).
-4. "Next: Identify reviewers" with reviews received: no longer seen on
-   #1003456 (now "Next: Read the reviewer reports", 2026-11-14); reopen only
-   if it recurs.
+1. Factory venue is Production; J27 files limited to narrative and
+   bibliography; cleanup after intake; stage box closed (owner, 2026-11-14).
+2. D59, D61, D68, D69 as recorded on 2026-11-14.
+3. The Keck Foundation account GoVerify changes of 2026-11-14 are vendor
+   data; do not restore.
+4. Session 672 to 676 decisions (earlier handoffs).
 
 ### Key Files Reference
 
 | File | Purpose |
 |---|---|
-| `docs/plans/J27_WORKBENCH_PRODUCTION_ROLLOUT_2026-11-07.md` | Release state, change record (steps A to D), rollback |
-| `lib/services/workbench/phase-admission.js` | Per-request admission (2027-or-later and the setting) |
-| `lib/utils/workbench-field-readiness.js` | Field readiness, Zoom suggestions off in Production |
-| `scripts/set-workbench-phase-rollout.mjs` | Owner-run writer of `workbench.phase_rollout` |
-| `docs/CURRENT_WORK_QUEUE.md` | Factory J27 gaps entry |
+| `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md` | D59, D61, D68, D69 |
+| `lib/dataverse/schema/wave41-j27-offramp-justification/akoya_request.json` | Offramp justification field |
+| `docs/TEST_REQUEST_FACTORY_FORM_RUNBOOK.md` | Retry table, parked run 174e770e |
+| `lib/services/test-requests/admin-run-service.js` | Form diagnosis (Retry rules) |
+| `lib/services/test-requests/basic-clone-steps.js` | J27 layout, `CREATE_REQUEST_TIMEOUT_MS` |
+| `lib/db/migrations/098_test_request_j27_file_names.sql` | Ledger receipt widening |
+| `docs/CURRENT_WORK_QUEUE.md` | Factory entry, acceptance, follow-up |
 
 ### Testing
 
 ```bash
-npx jest tests/unit/workbench-phase-admission tests/unit/workbench-field-readiness tests/unit/workbench-phase-admission-routes tests/unit/set-workbench-phase-rollout tests/unit/workbench-meeting-roster
-npm run check:types
+npx jest tests/unit/test-request
+npm run check:factory-ledger -- --allow-unreachable
 ```
+Ledger pg suites run one at a time (shared schema).
 
-Milestone: DEVELOPMENT_LOG entry "J27 Workbench in Production (Sessions 675–676)".
+Milestone: none required this session (Factory and schema changes are
+incremental; the J27 Workbench milestone entry already exists).
 
 ## Stream B — Expertise roster (Codex, Session 670)
 
