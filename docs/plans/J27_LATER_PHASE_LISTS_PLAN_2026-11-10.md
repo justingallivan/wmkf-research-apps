@@ -69,7 +69,8 @@ carry `[VERIFIED via …]` or `[ASSUMED]`.
    more information earlier, and an applicant can be offramped before a
    presentation. What is prepared and shared before a J27 presentation will
    change and is not yet decided, so no pre-presentation step is built into
-   the row.
+   the row. **Owner, 2026-11-14 (alignment log D68):** the PD meeting stays;
+   its output is questions shared with the PI, co-PIs and liaison. Not built.
 3. **Where today's Staff deliberations list goes.** It carries the brief and
    draft cues the stage model does not (build plan, finding 6). Recommended:
    a second section under Deliberations, the way Reviewers sits under Peer
