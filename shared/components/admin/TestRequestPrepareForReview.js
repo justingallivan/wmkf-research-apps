@@ -161,6 +161,9 @@ export default function TestRequestPrepareForReview({
     if (busy) return 'Working…';
     return '';
   })();
+  // A retained success never outlives the state it described; current state messages always show (Codex round 3).
+  const shownStop = stop && !(stop.tone === 'green' && !state.allDone) ? stop : null;
+  const unlessShown = (text) => (shownStop?.text === text ? null : text);
   const started = state.done.some(Boolean) || Boolean(state.openChange) || state.readinessResumable;
   const chip = (index) => {
     if (state.done[index]) return <StatusChip tone="green">Done</StatusChip>;
@@ -184,15 +187,15 @@ export default function TestRequestPrepareForReview({
           </li>
         ))}
       </ol>
-      {stop ? (
-        <div ref={stopRef} tabIndex={-1} role={stop.tone === 'red' ? 'alert' : 'status'} className={`rounded-lg border px-4 py-3 text-sm leading-6 focus:outline-none ${STOP_TONES[stop.tone]}`}>{stop.text}</div>
+      {shownStop ? (
+        <div ref={stopRef} tabIndex={-1} role={shownStop.tone === 'red' ? 'alert' : 'status'} className={`rounded-lg border px-4 py-3 text-sm leading-6 focus:outline-none ${STOP_TONES[shownStop.tone]}`}>{shownStop.text}</div>
       ) : null}
       {state.blocked ? (
-        stop ? null : <p role="status" className={`rounded-lg border px-4 py-3 text-sm leading-6 ${STOP_TONES.amber}`}>{state.blocked}</p>
+        unlessShown(state.blocked) ? <p role="status" className={`rounded-lg border px-4 py-3 text-sm leading-6 ${STOP_TONES.amber}`}>{state.blocked}</p> : null
       ) : state.allDone ? (
-        stop ? null : <p className="text-sm text-gray-800">{requestName} is ready for review and appears in the Workbench.</p>
+        shownStop?.tone === 'green' ? null : <p className="text-sm text-gray-800">{requestName} is ready for review and appears in the Workbench.</p>
       ) : state.finished ? (
-        stop ? null : <p role="status" className={`rounded-lg border px-4 py-3 text-sm leading-6 ${STOP_TONES.amber}`}>{state.laterChange || `${requestName} is marked ready for review, but its statuses were changed afterwards. Check them under More options.`}</p>
+        <p role="status" className={`rounded-lg border px-4 py-3 text-sm leading-6 ${STOP_TONES.amber}`}>{state.laterChange || `${requestName} is marked ready for review, but its statuses were changed afterwards. Check them under More options.`}</p>
       ) : confirming ? (
         <div role="group" aria-label="Confirm Prepare for review" className="rounded-xl border border-gray-300 bg-gray-50 px-4 py-4 text-sm leading-6 text-gray-900">
           <p ref={questionRef} tabIndex={-1} className="font-semibold focus:outline-none">Prepare {requestName} for review on Production?</p>

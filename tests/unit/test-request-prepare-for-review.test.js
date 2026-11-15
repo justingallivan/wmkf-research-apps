@@ -174,3 +174,31 @@ test('a ready Request with a later open or failed status change is not shown as 
   expect(screen.queryByText(/is ready for review and appears in the Workbench/)).toBeNull();
   expect(prepareButton()).toBeNull();
 });
+
+test('a completed success disappears when a later change under More options reloads the state (Codex round 3)', async () => {
+  const ready = readiness({ ready: true, attemptStatus: 'complete' });
+  const laterOpen = { changeId: CHANGE_ID, sequence: 3, field: 'wmkf_phaseistatus', optionBefore: INVITED, optionAfter: PCR1, status: 'applied', dispatchedAt: '2026-11-15T23:00:00Z' };
+  serve({
+    status: [
+      body({ current: PAIR }),
+      body({ current: PAIR, r: ready }),
+      body({ current: PAIR, r: ready, changes: [laterOpen] }),
+    ],
+    posts: {
+      [READINESS]: [{ status: 200, body: { outcome: 'complete', ready: true, written: true } }],
+      [STATUS]: [{ status: 202, body: { outcome: 'jobs_open', code: 'status_change_jobs_open', message: 'check again', changeId: CHANGE_ID } }],
+    },
+  });
+  await renderControl();
+  fireEvent.click(prepareButton());
+  fireEvent.click(screen.getByRole('button', { name: 'Yes, prepare it' }));
+  expect(await screen.findByText('Request 1003517 is ready for review. It now appears in the Workbench.')).toBeTruthy();
+  // A later change through More options, in the same mounted control.
+  fireEvent.click(screen.getByText(/More options/));
+  fireEvent.change(screen.getByLabelText('Status field'), { target: { value: 'phase1' } });
+  fireEvent.change(screen.getByLabelText('New status'), { target: { value: String(PCR1) } });
+  fireEvent.click(screen.getByRole('button', { name: 'Set status' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Yes, set this status' }));
+  expect(await screen.findByText(/A later status change on this Request is still open/)).toBeTruthy();
+  expect(screen.queryByText('Request 1003517 is ready for review. It now appears in the Workbench.')).toBeNull();
+});
