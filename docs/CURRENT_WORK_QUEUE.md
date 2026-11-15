@@ -309,14 +309,7 @@ search limits: `docs/audits/product-backlog-reconciliation-2026-10-31.md`.
   parked `needs_attention` at verify on the Foundation GoVerify refresh (runbook
   "What 'cannot continue' leaves behind"); the create limit is now 60 s
   (`74f442200`) and the form offers Retry after a create timeout (`c689c352d`).
-  **Follow-up (owner, 2026-11-14; not scheduled):** have the Factory also produce
-  the combined staff version, the narrative and bibliography merged into one PDF
-  at the Request folder root as `{AKA}_Staff-Version_{N}.pdf`. The request page
-  shows it as "Combined proposal" and requires exactly one match
-  [VERIFIED via `lib/services/workbench-proposal-documents.js:211-229`]. Staff
-  make this file by hand today; the app has no producer [ASSUMED from a grep of
-  `lib/` for `staff-version`]. Needs a new copy-step kind, a receipt-grammar
-  widening (ledger migration, as 098) and an AKA source for the prefix.
+  **Follow-up (owner, 2026-11-14; not scheduled):** have the Factory also produce the combined narrative and bibliography, `AI Materials/Narrative-Bibliography_{N}.pdf` (alignment log D60). In real J27 requests Connor's flow builds it and Reviewer Finder loads it by default. Needs a merge of the two copied PDFs, a new copy-step kind and a receipt-grammar widening (ledger migration, as 098). The root `{AKA}_Staff-Version_{N}.pdf` ("Combined proposal" on the page) is a separate staff-made file and not part of this follow-up.
   Original entry follows.
   The J27 Workbench is on in Production (every 2027-or-later request,
   `docs/plans/J27_WORKBENCH_PRODUCTION_ROLLOUT_2026-11-07.md`), so internal
