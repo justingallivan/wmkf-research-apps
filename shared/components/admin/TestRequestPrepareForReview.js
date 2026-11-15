@@ -62,8 +62,16 @@ export function preparationState(data) {
   } else if (!readyDone && !readiness?.manifestStored) {
     blocked = "This run's stored files are gone, so the form can't mark it ready. The owner can do that from the command-line tool with the downloaded manifest.";
   }
+  // Once readiness is complete there is nothing left for this action to send; a later open or failed status
+  // change (from More options) keeps it from reading as finished.
+  const laterChange = readyDone && Boolean(openChange)
+    ? 'A later status change on this Request is still open. Check it under More options.' : '';
   return {
-    done: [phaseIDone, phaseIIDone, readyDone], allDone: readyDone && phaseIIDone, invited, pending, openChange, blocked,
+    done: [phaseIDone, phaseIIDone, readyDone],
+    allDone: readyDone && phaseIIDone && !openChange && !blocked,
+    finished: readyDone,
+    laterChange,
+    invited, pending, openChange, blocked,
     readinessResumable: ['dispatched', 'applied'].includes(readiness?.attemptStatus),
   };
 }
@@ -120,11 +128,12 @@ export default function TestRequestPrepareForReview({
       // every reload, including the last, before any "not finished" answer.
       for (let calls = 0; ; calls += 1) {
         const view = preparationState(fresh);
+        if (view.blocked) { setStop({ tone: 'amber', text: view.blocked }); return; }
         if (view.allDone) {
           setStop({ tone: 'green', text: `${requestName} is ready for review. It now appears in the Workbench.` });
           return;
         }
-        if (view.blocked) { setStop({ tone: 'amber', text: view.blocked }); return; }
+        if (view.finished) { setStop({ tone: 'amber', text: view.laterChange || `${requestName} is already marked ready; its statuses were changed afterwards. Check them under More options.` }); return; }
         if (calls >= 4) break;
         const reply = await sendStep(scope, fresh, view);
         if (!scope.alive()) return;
@@ -178,10 +187,12 @@ export default function TestRequestPrepareForReview({
       {stop ? (
         <div ref={stopRef} tabIndex={-1} role={stop.tone === 'red' ? 'alert' : 'status'} className={`rounded-lg border px-4 py-3 text-sm leading-6 focus:outline-none ${STOP_TONES[stop.tone]}`}>{stop.text}</div>
       ) : null}
-      {state.allDone ? (
-        stop ? null : <p className="text-sm text-gray-800">{requestName} is ready for review and appears in the Workbench.</p>
-      ) : state.blocked ? (
+      {state.blocked ? (
         stop ? null : <p role="status" className={`rounded-lg border px-4 py-3 text-sm leading-6 ${STOP_TONES.amber}`}>{state.blocked}</p>
+      ) : state.allDone ? (
+        stop ? null : <p className="text-sm text-gray-800">{requestName} is ready for review and appears in the Workbench.</p>
+      ) : state.finished ? (
+        stop ? null : <p role="status" className={`rounded-lg border px-4 py-3 text-sm leading-6 ${STOP_TONES.amber}`}>{state.laterChange || `${requestName} is marked ready for review, but its statuses were changed afterwards. Check them under More options.`}</p>
       ) : confirming ? (
         <div role="group" aria-label="Confirm Prepare for review" className="rounded-xl border border-gray-300 bg-gray-50 px-4 py-4 text-sm leading-6 text-gray-900">
           <p ref={questionRef} tabIndex={-1} className="font-semibold focus:outline-none">Prepare {requestName} for review on Production?</p>

@@ -161,3 +161,16 @@ test('an unrelated open change, then all three steps: four calls end in success,
   expect(screen.queryByText(/Stopped after the expected steps/)).toBeNull();
   expect(posts(calls)).toEqual(['phase1:Pending Committee Review:resume', 'phase1:Invited', 'phase2:Phase II Pending Committee Review', 'readiness']);
 });
+
+test('a ready Request with a later open or failed status change is not shown as finished (Codex round 2)', async () => {
+  const later = (status, error = null) => ({ changeId: CHANGE_ID, sequence: 3, field: 'wmkf_phaseiistatus', optionBefore: PCR2, optionAfter: PCR2 + 2, status, error, dispatchedAt: '2026-11-15T23:00:00Z' });
+  const ready = readiness({ ready: true, attemptStatus: 'complete' });
+  const state = (change) => preparationState({ options: OPTIONS(), current: PAIR, readiness: ready, changes: [change] });
+  expect(state(later('needs_attention', 'status_change_effects'))).toMatchObject({ allDone: false, blocked: expect.stringMatching(/needs the owner/) });
+  expect(state(later('applied'))).toMatchObject({ allDone: false, finished: true, laterChange: expect.stringMatching(/still open/) });
+  serve({ status: [body({ current: PAIR, r: ready, changes: [later('applied')] })] });
+  await renderControl();
+  expect(screen.getByText(/A later status change on this Request is still open/)).toBeTruthy();
+  expect(screen.queryByText(/is ready for review and appears in the Workbench/)).toBeNull();
+  expect(prepareButton()).toBeNull();
+});
