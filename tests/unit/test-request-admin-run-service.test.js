@@ -206,6 +206,8 @@ function harness({ deployment = 'preview', env = {}, preflightTarget = null, dep
     recheckStatusChange: jest.fn(async () => ({ sequence: 1, ok: true })),
     readLiveOptions: jest.fn(async (_client, field) => [{ value: 1, label: `option of ${field}` }]),
     readCurrentStatus: jest.fn(async () => ({ phase1: 100000001, phase2: null })),
+    readReadinessState: jest.fn(async () => null),
+    finalizeReadiness: jest.fn(async () => ({ runId: null, status: 'complete', ready: true, written: true })),
     listGrantCycles: jest.fn(async () => DESTINATION_CYCLES),
     resolveGrantCycle: jest.fn(async (_client, cycleCode) => {
       const row = DESTINATION_CYCLES.find((cycle) => cycle.cycleCode === cycleCode);
@@ -243,6 +245,8 @@ function harness({ deployment = 'preview', env = {}, preflightTarget = null, dep
     recheckStatusChange: spies.recheckStatusChange,
     readLiveOptions: spies.readLiveOptions,
     readCurrentStatus: spies.readCurrentStatus,
+    readReadinessState: spies.readReadinessState,
+    finalizeReadiness: spies.finalizeReadiness,
     ...deps,
   });
   const actorId = deriveActorId(PROFILE);
@@ -1044,6 +1048,7 @@ describe('status setter service (slice 2b)', () => {
       },
       current: { phase1: 100000001, phase2: null },
       changes: [],
+      readiness: null,
     });
     expect(h.spies.readCurrentStatus).toHaveBeenCalledWith(expect.anything(), '12121212-1212-4121-8121-121212121212');
     expect(h.createClientCalls.every((c) => !c.allowTestRequestMarkerWrites)).toBe(true);
@@ -1308,6 +1313,88 @@ describe('status setter service (slice 2b)', () => {
 });
 
 // ---- slice 3 Part 0: contract fixes the form relies on -----------------------
+
+describe('mark ready for review (owner, 2026-11-15)', () => {
+  const MANIFEST = { values: { preparedFixture: 'j27-reviewer-fixture/v1' }, marker: 'stored manifest' };
+  const readyRun = ({ status = 'ready', manifest = MANIFEST, deps = {}, env = {} } = {}) => {
+    const h = harness({ deployment: 'production', deps, env });
+    const { runId } = ids(h.actorId);
+    h.seedRun(runId, { status });
+    if (manifest) h.blobs.objects.set(runPathname('production', runId, 'manifest'), { text: JSON.stringify(manifest), uploadedAt: new Date() });
+    return { h, runId };
+  };
+  const mark = (h, runId, extra = {}) => h.service.markReady({ profileId: PROFILE, runId, deadlineAt: h.clock.t + 280_000, ...extra });
+  const finalizerError = (errorCode, message = 'finalizer detail') => Object.assign(new Error(message), { code: errorCode });
+
+  test('passes the stored manifest, a confirm and a dispatch time check to the finalizer; 200 shape', async () => {
+    const { h, runId } = readyRun();
+    await expect(mark(h, runId)).resolves.toEqual({ outcome: 'complete', ready: true, written: true });
+    const call = h.spies.finalizeReadiness.mock.calls[0][0];
+    expect(call).toMatchObject({ runId, confirm: true, manifest: MANIFEST });
+    expect(typeof call.journal.get).toBe('function');
+    expect(call.completion.deadlineAt).toBe(h.clock.t + 280_000 - 30_000);
+    // The PATCH is not dispatched without a minute left; the attempt then stays only planned.
+    h.clock.t += 280_000 - 59_000;
+    expect(() => call.beforeDispatch()).toThrow(expect.objectContaining({ code: 'factory_deadline_exceeded' }));
+    expect(h.createClientCalls.every((c) => !c.allowTestRequestMarkerWrites)).toBe(true);
+  });
+
+  test.each([
+    ['readiness_jobs_open', 'jobs_open'],
+    ['readiness_unconfirmed', 'unconfirmed'],
+  ])('%s is a check-again answer, not an error', async (errorCode, outcome) => {
+    const { h, runId } = readyRun();
+    h.spies.finalizeReadiness.mockRejectedValueOnce(finalizerError(errorCode));
+    await expect(mark(h, runId)).resolves.toMatchObject({ outcome, code: errorCode });
+  });
+
+  test('a finalizer refusal is a 409 with its message; anything else is not forwarded', async () => {
+    const { h, runId } = readyRun();
+    h.spies.finalizeReadiness.mockRejectedValueOnce(finalizerError('readiness_refused', 'Readiness finalization needs owner inspection; no write was repeated.'));
+    await expect(mark(h, runId)).rejects.toMatchObject({ httpStatus: 409, code: 'readiness_refused', message: expect.stringMatching(/owner inspection/) });
+    const upstream = new Error('upstream secret-host.example');
+    h.spies.finalizeReadiness.mockRejectedValueOnce(upstream);
+    await expect(mark(h, runId)).rejects.toBe(upstream);
+  });
+
+  test('refuses before any finalizer call: not ready, no stored manifest, too little time, switch off, someone else\'s run', async () => {
+    let { h, runId } = readyRun({ status: 'creating' });
+    expect(await code(mark(h, runId))).toBe('factory_run_not_ready');
+    ({ h, runId } = readyRun({ manifest: null }));
+    expect(await code(mark(h, runId))).toBe('factory_recovery_required');
+    ({ h, runId } = readyRun());
+    expect(await code(mark(h, runId, { deadlineAt: h.clock.t + 100_000 }))).toBe('factory_deadline_exceeded');
+    ({ h, runId } = readyRun({ env: { TEST_REQUEST_FACTORY_FORM: 'off' } }));
+    expect(await code(mark(h, runId))).toBe('factory_form_disabled');
+    ({ h, runId } = readyRun());
+    expect(await code(h.service.markReady({ profileId: 99, runId, deadlineAt: h.clock.t + 280_000 }))).toBe('factory_run_not_found');
+    expect(h.spies.finalizeReadiness).not.toHaveBeenCalled();
+  });
+
+  test('the default readiness read: stored manifest decides applies, Dataverse gives ready, the journal gives the attempt', async () => {
+    const gets = [];
+    const client = (ready) => ({ baseUrl: 'x', get: async (path) => { gets.push(path); return { ok: true, status: 200, body: { akoya_requestid: '12121212-1212-4121-8121-121212121212', wmkf_readyforreview: ready } }; } });
+    let { h, runId } = readyRun({ deps: { readReadinessState: undefined, createClient: () => client(false) } });
+    expect((await h.service.statusOptions({ profileId: PROFILE, runId })).readiness).toEqual({
+      applies: true, manifestStored: true, ready: false, attemptStatus: null, requiredPair: { phase1: 100000003, phase2: 100000002 },
+    });
+    expect(gets.at(-1)).toMatch(/akoya_requests\(12121212-1212-4121-8121-121212121212\)\?\$select=akoya_requestid,wmkf_readyforreview$/);
+    ({ h, runId } = readyRun({ manifest: { values: {} }, deps: { readReadinessState: undefined, createClient: () => client(null) } }));
+    expect((await h.service.statusOptions({ profileId: PROFILE, runId })).readiness).toMatchObject({ applies: false, ready: null });
+    ({ h, runId } = readyRun({ manifest: null, deps: { readReadinessState: undefined, createClient: () => client(false) } }));
+    expect((await h.service.statusOptions({ profileId: PROFILE, runId })).readiness).toMatchObject({ applies: null, manifestStored: false });
+  });
+
+  test('statusOptions carries the readiness state only for a ready run', async () => {
+    const state = { applies: true, manifestStored: true, ready: false, attemptStatus: null, requiredPair: { phase1: 100000003, phase2: 100000002 } };
+    let { h, runId } = readyRun();
+    h.spies.readReadinessState.mockResolvedValueOnce(state);
+    expect((await h.service.statusOptions({ profileId: PROFILE, runId })).readiness).toEqual(state);
+    ({ h, runId } = readyRun({ status: 'creating' }));
+    expect((await h.service.statusOptions({ profileId: PROFILE, runId })).readiness).toBeNull();
+    expect(h.spies.readReadinessState).not.toHaveBeenCalled();
+  });
+});
 
 describe('slice 3 server contract', () => {
   const exporterFor = (rows, extra = {}) => {

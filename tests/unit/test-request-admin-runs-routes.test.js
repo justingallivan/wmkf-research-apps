@@ -18,6 +18,7 @@ import recheckHandler, { config as recheckConfig } from '../../pages/api/admin/t
 import statusHandler, { config as statusConfig } from '../../pages/api/admin/test-requests/runs/[runId]/status/index';
 import statusRecheckHandler, { config as statusRecheckConfig } from '../../pages/api/admin/test-requests/runs/[runId]/status/recheck';
 import artifactsHandler, { config as artifactsConfig } from '../../pages/api/admin/test-requests/runs/[runId]/artifacts';
+import readinessHandler, { config as readinessConfig } from '../../pages/api/admin/test-requests/runs/[runId]/readiness';
 
 const RUN_ID = '11111111-1111-4111-8111-111111111111';
 const DRAFT_ID = '22222222-2222-4222-8222-222222222222';
@@ -45,6 +46,7 @@ const service = {
   changeStatus: jest.fn(),
   statusRecheck: jest.fn(),
   readArtifacts: jest.fn(),
+  markReady: jest.fn(),
 };
 
 // Every route and method: the handler, its service method, a valid request, and the Allow header.
@@ -86,6 +88,10 @@ const CASES = [
     req: () => ({ method: 'POST', query: { runId: RUN_ID }, body: {} }),
   },
   {
+    name: 'readiness POST', handler: readinessHandler, method: 'POST', allow: 'POST', fn: 'markReady', wrong: 'GET', perRun: true,
+    req: () => ({ method: 'POST', query: { runId: RUN_ID }, body: {} }),
+  },
+  {
     name: 'artifacts GET', handler: artifactsHandler, method: 'GET', allow: 'GET', fn: 'readArtifacts', wrong: 'POST', perRun: true,
     req: () => ({ method: 'GET', query: { runId: RUN_ID } }),
   },
@@ -108,6 +114,7 @@ beforeEach(() => {
   service.statusOptions.mockResolvedValue({ runId: RUN_ID, runStatus: 'ready', options: { phase1: [], phase2: [] }, changes: [] });
   service.changeStatus.mockResolvedValue({ outcome: 'complete', sequence: 1 });
   service.statusRecheck.mockResolvedValue({ sequence: 1, ok: true });
+  service.markReady.mockResolvedValue({ outcome: 'complete', ready: true, written: true });
 });
 afterEach(() => errorSpy.mockRestore());
 
@@ -199,9 +206,9 @@ describe('refusal logging', () => {
   });
 });
 
-describe('body-less POST routes (advance, recheck)', () => {
+describe('body-less POST routes (advance, recheck, readiness)', () => {
   test.each([
-    ['advance', advanceHandler], ['recheck', recheckHandler],
+    ['advance', advanceHandler], ['recheck', recheckHandler], ['readiness', readinessHandler],
   ])('%s accepts an absent or empty body and refuses any field, including profileId', async (_name, handler) => {
     for (const body of [undefined, {}]) {
       const res = mockRes();
@@ -210,6 +217,7 @@ describe('body-less POST routes (advance, recheck)', () => {
     }
     service.advance.mockClear();
     service.recheck.mockClear();
+    service.markReady.mockClear();
     for (const body of [{ profileId: 99 }, { x: 1 }, 'text', [1]]) {
       const res = mockRes();
       await handler({ method: 'POST', query: { runId: RUN_ID }, body }, res);
@@ -217,6 +225,21 @@ describe('body-less POST routes (advance, recheck)', () => {
     }
     expect(service.advance).not.toHaveBeenCalled();
     expect(service.recheck).not.toHaveBeenCalled();
+    expect(service.markReady).not.toHaveBeenCalled();
+  });
+});
+
+describe('readiness POST (owner, 2026-11-15)', () => {
+  const req = () => ({ method: 'POST', query: { runId: RUN_ID }, body: {} });
+  test('200 when complete, 202 for a check-again answer, never cached', async () => {
+    let res = mockRes();
+    await readinessHandler(req(), res);
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['Cache-Control']).toBe('no-store');
+    service.markReady.mockResolvedValueOnce({ outcome: 'jobs_open', code: 'readiness_jobs_open', message: 'check again' });
+    res = mockRes();
+    await readinessHandler(req(), res);
+    expect(res.statusCode).toBe(202);
   });
 });
 
@@ -326,7 +349,7 @@ describe('deadlines and limits', () => {
     const fs = require('fs');
     const path = require('path');
     const dir = path.join(__dirname, '../../pages/api/admin/test-requests/runs');
-    const files = ['source.js', 'index.js', '[runId]/index.js', '[runId]/advance.js', '[runId]/recheck.js', '[runId]/status/index.js', '[runId]/status/recheck.js', '[runId]/artifacts.js'];
+    const files = ['source.js', 'index.js', '[runId]/index.js', '[runId]/advance.js', '[runId]/recheck.js', '[runId]/status/index.js', '[runId]/status/recheck.js', '[runId]/artifacts.js', '[runId]/readiness.js'];
     for (const file of files) {
       const line = fs.readFileSync(path.join(dir, file), 'utf8').split('\n').find((text) => text.startsWith('export const config'));
       expect(line).toMatch(/^export const config = \{ api: \{ bodyParser: \{ sizeLimit: '32kb' \} \}(, maxDuration: 300)? \};$/);
@@ -337,6 +360,7 @@ describe('deadlines and limits', () => {
     ['source', sourceHandler, () => ({ method: 'POST', query: {}, body: { sourceRequestNumber: '9000001' } }), 'exportSource'],
     ['advance', advanceHandler, () => ({ method: 'POST', query: { runId: RUN_ID }, body: {} }), 'advance'],
     ['status', statusHandler, () => ({ method: 'POST', query: { runId: RUN_ID }, body: { field: 'phase1', optionLabel: 'Invited' } }), 'changeStatus'],
+    ['readiness', readinessHandler, () => ({ method: 'POST', query: { runId: RUN_ID }, body: {} }), 'markReady'],
   ])('%s passes a numeric deadlineAt about 280 s out', async (_name, handler, req, fn) => {
     const before = Date.now();
     await handler(req(), mockRes());
@@ -350,6 +374,7 @@ describe('deadlines and limits', () => {
     ['source', sourceHandler, () => ({ method: 'POST', query: {}, body: { sourceRequestNumber: '9000001' } }), 'exportSource'],
     ['advance', advanceHandler, () => ({ method: 'POST', query: { runId: RUN_ID }, body: {} }), 'advance'],
     ['status', statusHandler, () => ({ method: 'POST', query: { runId: RUN_ID }, body: { field: 'phase1', optionLabel: 'Invited' } }), 'changeStatus'],
+    ['readiness', readinessHandler, () => ({ method: 'POST', query: { runId: RUN_ID }, body: {} }), 'markReady'],
   ])('%s anchors the deadline at entry: time spent in the gate reduces the budget', async (_name, handler, req, fn) => {
     const entry = 1_000_000;
     const clock = jest.spyOn(Date, 'now').mockReturnValue(entry);
@@ -365,13 +390,14 @@ describe('deadlines and limits', () => {
     }
   });
 
-  test('config: 32kb body limit everywhere; maxDuration 300 only on source, advance and status', () => {
-    for (const config of [sourceConfig, runsConfig, runConfig, advanceConfig, recheckConfig, statusConfig, statusRecheckConfig, artifactsConfig]) {
+  test('config: 32kb body limit everywhere; maxDuration 300 only on source, advance, status and readiness', () => {
+    for (const config of [sourceConfig, runsConfig, runConfig, advanceConfig, recheckConfig, statusConfig, statusRecheckConfig, artifactsConfig, readinessConfig]) {
       expect(config.api.bodyParser.sizeLimit).toBe('32kb');
     }
     expect(sourceConfig.maxDuration).toBe(300);
     expect(advanceConfig.maxDuration).toBe(300);
     expect(statusConfig.maxDuration).toBe(300);
+    expect(readinessConfig.maxDuration).toBe(300);
     for (const config of [runsConfig, runConfig, recheckConfig, statusRecheckConfig, artifactsConfig]) {
       expect(config.maxDuration).toBeUndefined();
     }

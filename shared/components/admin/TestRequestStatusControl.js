@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { requestJson } from '../../utils/api-request';
 import { CHANGE_STATUSES, OPEN_CHANGE_STATUSES, STATUS_FIELDS } from '../../config/testRequestFactory';
 import { StatusChip } from './AdminWorkspaceNavigation';
+import TestRequestReadinessControl from './TestRequestReadinessControl';
 import { codeOf, messageFor } from './test-request-factory-copy';
 import {
   ERROR_BAND, INPUT, SUMMARY_CLASS, TABLE_WRAP, TH, buttonProps, focusAndShow, formatTime,
@@ -448,6 +449,16 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
           {checkReason ? <Reason id="factory-check-reason">{checkReason}</Reason> : null}
         </div>
       ) : null}
+
+      <TestRequestReadinessControl
+        run={run}
+        readiness={data?.readiness ?? null}
+        current={data?.current ?? null}
+        statusChangeOpen={Boolean(open)}
+        writeBlock={writeBlock}
+        liveScope={liveScope}
+        onChanged={loadJournal}
+      />
 
       <details className="rounded-xl border border-gray-200 bg-white px-4" open={Boolean(open) || stuckHere}>
         <summary className={SUMMARY_CLASS}>Status change history ({changes.length})</summary>
