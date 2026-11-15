@@ -24,6 +24,8 @@ import { buttonProps, focusAndShow } from './test-request-factory-ui';
  * journal's open status change (null when none or ambiguous).
  */
 const STEP_LABELS = ['Set Phase I to Invited', 'Set Phase II to Phase II Pending Committee Review', 'Mark ready for review'];
+// The one status failure readiness tolerates (readiness-finalizer.js): a 412 that wrote nothing.
+const NO_WRITE_412 = 'The Request changed since it was read (412); nothing was written.';
 const STOP_TONES = {
   green: 'border-green-200 bg-green-50 text-green-900',
   amber: 'border-amber-200 bg-amber-50 text-amber-900',
@@ -43,8 +45,11 @@ export function preparationState(data) {
   const pending = optionFor('phase2', pair?.phase2);
   const openChange = (data?.changes || []).find((change) => OPEN_CHANGE_STATUSES.includes(change.status)) || null;
 
+  const statusAttention = (data?.changes || []).some((change) => change.status === 'needs_attention' && change.error !== NO_WRITE_412);
   let blocked = '';
-  if (readiness?.attemptStatus === 'needs_attention') {
+  if (statusAttention) {
+    blocked = 'A status change on this Request needs the owner to inspect it (background jobs failed or something unexpected appeared). Nothing more can be sent from here; see the history under More options.';
+  } else if (readiness?.attemptStatus === 'needs_attention') {
     blocked = 'The last readiness attempt needs the owner to inspect it from the command-line tool. Nothing more can be sent from here.';
   } else if (readiness?.ready === true && !readyDone && !['dispatched', 'applied'].includes(readiness?.attemptStatus)) {
     blocked = 'This Request was marked ready outside this form; the owner inspects it from the command-line tool.';
@@ -111,14 +116,16 @@ export default function TestRequestPrepareForReview({
     setStop(null);
     let fresh = data;
     try {
-      // At most one call per step plus one resume: never an unbounded loop.
-      for (let calls = 0; calls < 4; calls += 1) {
+      // At most one call per step plus one resume: never an unbounded loop. The state is checked after
+      // every reload, including the last, before any "not finished" answer.
+      for (let calls = 0; ; calls += 1) {
         const view = preparationState(fresh);
         if (view.allDone) {
           setStop({ tone: 'green', text: `${requestName} is ready for review. It now appears in the Workbench.` });
           return;
         }
         if (view.blocked) { setStop({ tone: 'amber', text: view.blocked }); return; }
+        if (calls >= 4) break;
         const reply = await sendStep(scope, fresh, view);
         if (!scope.alive()) return;
         if (!reply) return;

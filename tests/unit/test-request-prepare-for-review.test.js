@@ -134,3 +134,30 @@ test('an already prepared Request shows it is in the Workbench and offers no act
   expect(screen.getByText('Request 1003517 is ready for review and appears in the Workbench.')).toBeTruthy();
   expect(prepareButton()).toBeNull();
 });
+
+test('a status change needing attention stops everything (Codex); a no-write 412 does not', () => {
+  const failed = (error) => ({ options: OPTIONS(), current: { phase1: INVITED, phase2: null }, readiness: readiness(), changes: [{ changeId: CHANGE_ID, sequence: 1, field: 'wmkf_phaseistatus', status: 'needs_attention', error }] });
+  expect(preparationState(failed('status_change_effects')).blocked).toMatch(/status change on this Request needs the owner/);
+  expect(preparationState(failed("The Request changed since it was read (412); nothing was written.")).blocked).toBe('');
+});
+
+test('an unrelated open change, then all three steps: four calls end in success, not "stopped" (Codex)', async () => {
+  const other = { changeId: CHANGE_ID, sequence: 1, field: 'wmkf_phaseistatus', optionBefore: null, optionAfter: PCR1, status: 'applied', dispatchedAt: '2026-11-15T22:00:00Z' };
+  const done = { ...other, status: 'complete' };
+  const calls = serve({
+    status: [
+      body({ changes: [other] }),
+      body({ current: { phase1: PCR1, phase2: null }, changes: [done] }),
+      body({ current: { phase1: INVITED, phase2: null }, changes: [done] }),
+      body({ current: PAIR, changes: [done] }),
+      body({ current: PAIR, changes: [done], r: readiness({ ready: true, attemptStatus: 'complete' }) }),
+    ],
+    posts: { [STATUS]: [complete], [READINESS]: [{ status: 200, body: { outcome: 'complete', ready: true, written: true } }] },
+  });
+  await renderControl();
+  fireEvent.click(prepareButton());
+  fireEvent.click(screen.getByRole('button', { name: 'Yes, prepare it' }));
+  expect(await screen.findByText('Request 1003517 is ready for review. It now appears in the Workbench.')).toBeTruthy();
+  expect(screen.queryByText(/Stopped after the expected steps/)).toBeNull();
+  expect(posts(calls)).toEqual(['phase1:Pending Committee Review:resume', 'phase1:Invited', 'phase2:Phase II Pending Committee Review', 'readiness']);
+});
