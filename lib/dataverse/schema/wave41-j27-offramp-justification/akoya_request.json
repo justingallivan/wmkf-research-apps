@@ -1,0 +1,12 @@
+{
+  "name": "akoya-request-j27-offramp-justification",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "akoya_request",
+  "attributes": [{
+    "type": "Memo",
+    "schemaName": "wmkf_OfframpJustification",
+    "displayName": "Offramp Justification",
+    "description": "Staff-written reason a request took the Phase II offramp (Phase II Status = Phase II Offramped), e.g. the reviews received.",
+    "maxLength": 2000
+  }]
+}
