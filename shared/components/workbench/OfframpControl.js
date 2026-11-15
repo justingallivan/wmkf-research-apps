@@ -15,7 +15,7 @@ const read = requestId => requestJson(endpoint + '?requestId=' + encodeURICompon
 export default function OfframpControl({ requestId, onStatusChange = null }) {
   const [record, setRecord] = useState(null);
   const [hidden, setHidden] = useState(false);
-  const [draft, setDraft] = useState('');
+  const [draft, setDraftState] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -23,15 +23,38 @@ export default function OfframpControl({ requestId, onStatusChange = null }) {
   // Saved justification that changed under an unsaved draft; Save waits until staff choose.
   const [conflictText, setConflictText] = useState(null);
   const generation = useRef(0);
+  // The draft as typed, and the saved text it was started from (null before the first read).
+  // Refs, so a refresh that lands after an await compares against the latest values.
+  const draftRef = useRef('');
+  const baselineRef = useRef(null);
 
-  async function load({ keepDraft = false } = {}) {
+  function setDraft(value) {
+    draftRef.current = value;
+    setDraftState(value);
+  }
+
+  /**
+   * Take a fresh read, whatever caused it. An untouched draft follows the saved
+   * text. An edited draft is kept; if the saved text moved away from what the
+   * draft started from (and from the draft), staff must choose before Save,
+   * because the new version would otherwise let Save overwrite unseen text.
+   */
+  function adopt(updated) {
+    const baseline = baselineRef.current;
+    const mine = draftRef.current.trim();
+    setRecord(updated);
+    if (baseline === null || mine === baseline) setDraft(updated.justification);
+    else if (updated.justification !== baseline && updated.justification !== mine) setConflictText(updated.justification);
+    baselineRef.current = updated.justification;
+  }
+
+  async function load() {
     const current = ++generation.current;
     setBusy(true);
     try {
       const result = await read(requestId);
       if (generation.current !== current) return;
-      setRecord(result);
-      if (!keepDraft) setDraft(result.justification);
+      adopt(result);
     } catch (failure) {
       if (generation.current !== current) return;
       if (failure.status === 404 && !record) setHidden(true);
@@ -50,7 +73,6 @@ export default function OfframpControl({ requestId, onStatusChange = null }) {
 
   async function post(body, doneMessage) {
     if (busy || !record?.version || (body.action === 'justification' && conflictText !== null)) return;
-    const editedFrom = record.justification;
     const current = ++generation.current;
     setBusy(true);
     setError('');
@@ -62,18 +84,20 @@ export default function OfframpControl({ requestId, onStatusChange = null }) {
       setConfirming(false);
       // The write consumed the version; read the new one before allowing another save.
       setRecord(previous => ({ ...previous, version: null }));
+      if (body.action === 'justification') {
+        // Our text is now the saved baseline; a different readback means another save landed after ours.
+        setDraft(body.justification);
+        baselineRef.current = body.justification;
+      }
       const updated = await read(requestId);
       if (generation.current !== current) return;
-      setRecord(updated);
-      // A status change leaves an unsaved justification draft alone.
-      if (body.action === 'justification') {
-        // Another save landed right after ours: keep our text as the draft and show theirs.
-        if (updated.justification !== body.justification) {
-          setNotice('');
-          setDraft(body.justification);
-          setConflictText(updated.justification);
-        } else setDraft(updated.justification);
-      } else onStatusChange?.();
+      if (body.action === 'justification' && updated.justification !== body.justification) {
+        setNotice('');
+        setRecord(updated);
+        setConflictText(updated.justification);
+        baselineRef.current = updated.justification;
+      } else adopt(updated);
+      if (body.action !== 'justification') onStatusChange?.();
     } catch (failure) {
       if (generation.current !== current) return;
       setError(failure.message);
@@ -81,10 +105,7 @@ export default function OfframpControl({ requestId, onStatusChange = null }) {
       if (failure.status === 409) {
         try {
           const updated = await read(requestId);
-          if (generation.current !== current) return;
-          setRecord(updated);
-          if (body.action === 'justification' && updated.justification !== editedFrom
-              && updated.justification !== body.justification) setConflictText(updated.justification);
+          if (generation.current === current) adopt(updated);
         } catch {
           if (generation.current === current) setRecord(previous => ({ ...previous, version: null }));
         }
@@ -175,7 +196,7 @@ export default function OfframpControl({ requestId, onStatusChange = null }) {
       {notice && <p className="mt-2 text-sm" role="status">{notice}</p>}
       {error && <p className="mt-2 text-sm text-red-700" role="alert">{error}</p>}
       {!busy && (!record || !record.version) && (
-        <Button size="sm" type="button" onClick={() => load({ keepDraft: true })}>Reload offramp status</Button>
+        <Button size="sm" type="button" onClick={() => load()}>Reload offramp status</Button>
       )}
     </section>
   );

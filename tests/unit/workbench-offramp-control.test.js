@@ -106,3 +106,58 @@ test('keeping the draft after a conflict saves with the new version', async () =
     method: 'POST', body: { requestId, version: 'W/"9"', action: 'justification', justification: 'My text.' },
   });
 });
+
+test('an Undo conflict caused by a colleague justification save shows their text instead of enabling an overwrite', async () => {
+  requestJson.mockResolvedValueOnce({ ...offramped, justification: 'Old.' })
+    .mockRejectedValueOnce(Object.assign(new Error('This request changed.'), { status: 409 }))
+    .mockResolvedValueOnce({ ...offramped, justification: 'Colleague text.', version: 'W/"9"' });
+  render(<OfframpControl requestId={requestId} />);
+  fireEvent.change(await screen.findByLabelText('Offramp justification'), { target: { value: 'My text.' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Undo offramp' }));
+  await screen.findByText('Colleague text.');
+  expect(screen.getByLabelText('Offramp justification')).toHaveValue('My text.');
+  expect(screen.getByRole('button', { name: 'Save justification' })).toBeDisabled();
+  expect(requestJson).toHaveBeenCalledTimes(3);
+});
+
+test('a status readback with a colleague justification conflicts with an edited draft', async () => {
+  requestJson.mockResolvedValueOnce({ ...offramped, justification: 'Old.' })
+    .mockResolvedValueOnce({ success: true })
+    .mockResolvedValueOnce({ ...base, justification: 'Colleague text.', showJustification: true, version: 'W/"9"' });
+  render(<OfframpControl requestId={requestId} onStatusChange={() => {}} />);
+  fireEvent.change(await screen.findByLabelText('Offramp justification'), { target: { value: 'My text.' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Undo offramp' }));
+  await screen.findByText('Colleague text.');
+  expect(screen.getByLabelText('Offramp justification')).toHaveValue('My text.');
+  expect(screen.getByRole('button', { name: 'Save justification' })).toBeDisabled();
+});
+
+test('an untouched justification follows a colleague save picked up by a status readback', async () => {
+  requestJson.mockResolvedValueOnce({ ...offramped, justification: 'Old.' })
+    .mockResolvedValueOnce({ success: true })
+    .mockResolvedValueOnce({ ...base, justification: 'Colleague text.', showJustification: true, version: 'W/"9"' });
+  render(<OfframpControl requestId={requestId} onStatusChange={() => {}} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Undo offramp' }));
+  await screen.findByText('Offramp undone.');
+  expect(screen.getByLabelText('Offramp justification')).toHaveValue('Colleague text.');
+  expect(screen.queryByText('Someone else saved a different justification')).not.toBeInTheDocument();
+});
+
+test('a status action stays available while a justification conflict is open', async () => {
+  requestJson.mockResolvedValueOnce({ ...offramped, justification: 'Old.' })
+    .mockRejectedValueOnce(Object.assign(new Error('This request changed.'), { status: 409 }))
+    .mockResolvedValueOnce({ ...offramped, justification: 'Colleague text.', version: 'W/"9"' })
+    .mockResolvedValueOnce({ success: true })
+    .mockResolvedValueOnce({ ...base, justification: 'Colleague text.', showJustification: true, version: 'W/"10"' });
+  render(<OfframpControl requestId={requestId} onStatusChange={() => {}} />);
+  fireEvent.change(await screen.findByLabelText('Offramp justification'), { target: { value: 'My text.' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save justification' }));
+  await screen.findByText('Someone else saved a different justification');
+  fireEvent.click(screen.getByRole('button', { name: 'Undo offramp' }));
+  await screen.findByText('Offramp undone.');
+  expect(requestJson).toHaveBeenNthCalledWith(4, '/api/workbench/offramp', {
+    method: 'POST', body: { requestId, version: 'W/"9"', action: 'undo' },
+  });
+  expect(screen.getByLabelText('Offramp justification')).toHaveValue('My text.');
+  expect(screen.getByText('Someone else saved a different justification')).toBeInTheDocument();
+});
