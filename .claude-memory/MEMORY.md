@@ -27,7 +27,7 @@
 - Multi-session features / MVP drift / owner review burden: feedback-anchor-multisession-features-to-the-original-ask.md; feedback-owner-review-burden-must-shrink.md; changing the owner's named input source: feedback-keep-the-owners-named-input-source.md
 - Git / releases: ../docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md; feedback-verify-branch-before-git-action.md; feedback-scope-git-stash-in-shared-worktrees.md
 - Migration numbers / schema_migrations / branch-applied migrations: project-migration-numbers-claimed-off-main.md
-- Action affordances / UI gating: feedback-ui-gates-must-mirror-server-guards.md; feedback-match-existing-ui-patterns.md
+- Action affordances / UI gating: feedback-ui-gates-must-mirror-server-guards.md; feedback-match-existing-ui-patterns.md; ordered workflows as one guided action: feedback-ordered-workflows-as-one-action.md
 - Tunables / mutable parameters: feedback-mutable-parameters-not-in-code.md
 - Cycle-scoped settings / per-cycle allowlists / cycle literals: feedback-minimize-per-cycle-configuration.md
 - Per-request/PD campaign settings vs central defaults: feedback-centralize-over-pd-specific-settings.md
