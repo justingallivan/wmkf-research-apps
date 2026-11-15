@@ -363,7 +363,7 @@ describeIf('slice 5b runner against the live run ledger', () => {
     process.env.DYNAMICS_CLIENT_ID = previousClientId;
   });
 
-  async function setup({ recipe = 'basic', cycleCode = 'D26', sourceDocs = SOURCE_DOCS } = {}) {
+  async function setup({ recipe = 'basic', cycleCode = 'D26', sourceDocs = SOURCE_DOCS, legacyFilePlan = false } = {}) {
     log = [];
     const world = makeWorld(log, sourceDocs);
     const preflight = await runPreflight(world.client, world.graph, world.sharePointTarget);
@@ -373,6 +373,11 @@ describeIf('slice 5b runner against the live run ledger', () => {
       source, fiscalYear: source.akoya_fiscalyear, meetingDate: source.wmkf_meetingdate, testLabel: 'Runner proof', bundle, recipe,
       grantCycleId: GRANT_CYCLE_ID, cycleCode,
     });
+    if (legacyFilePlan) {
+      // A manifest prepared before the combined file existed: it plans only the bundle documents.
+      manifest.plannedFiles = manifest.plannedFiles.slice(0, bundle.documents.length);
+      manifest.invariants = { ...manifest.invariants, expectedSharePointFiles: bundle.documents.length };
+    }
     const idempotencyKey = `runner-${crypto.randomBytes(4).toString('hex')}`;
     const { run } = await ledger.reserveRun({ actorId: cliActorId('runner-proof'), idempotencyKey, plan: reservePlan(manifest, bundle) });
     createdRunIds.push(run.runId);
@@ -439,6 +444,54 @@ describeIf('slice 5b runner against the live run ledger', () => {
     const combined = written.find((row) => row.name === 'Narrative-Bibliography_1000400.pdf');
     const pages = (await PDFDocument.load(combined.buffer)).getPages().map((page) => page.getWidth());
     expect(pages).toEqual([100, 101, 200]);
+  });
+
+  it('a J27 run reserved with an earlier two-input manifest copies only what it promised and builds no combined file', async () => {
+    const pdf = async (sizes) => {
+      const doc = await PDFDocument.create();
+      for (const size of sizes) doc.addPage(size);
+      return Buffer.from(await doc.save());
+    };
+    const narrativeBytes = await pdf([[100, 100]]);
+    const sourceDocs = [
+      ...SOURCE_DOCS.map((doc) => (doc.kind === 'proposalNarrative' ? { ...doc, bytes: narrativeBytes } : doc)),
+      { kind: 'proposalBibliography', folder: `${SOURCE_FOLDER}/AI Materials`, name: 'ProposalBibliography_1003222.pdf', bytes: await pdf([[200, 200]]) },
+    ];
+    const { world, manifest, run, advance } = await setup({ cycleCode: 'J27', sourceDocs, legacyFilePlan: true });
+    expect(manifest.invariants.expectedSharePointFiles).toBe(3);
+    const results = await runUntil(advance, null, { bypassGoverify: true });
+    expect(results.at(-1)).toMatchObject({ outcome: 'ready' });
+    const copies = (await ledger.listRunResources(run.runId)).filter((row) => row.step === 'copy_file');
+    expect(copies).toHaveLength(3);
+    const written = [...world.state.items.values()].filter((row) => row.folder.includes('1000400_')).map((row) => row.name);
+    expect(written).not.toContain('Narrative-Bibliography_1000400.pdf');
+    expect(written).toHaveLength(3);
+  });
+
+  it('a J27 run whose narrative is not a readable PDF stops at copy_file with file_rejected and writes no combined file', async () => {
+    const pdf = async (sizes) => {
+      const doc = await PDFDocument.create();
+      for (const size of sizes) doc.addPage(size);
+      return Buffer.from(await doc.save());
+    };
+    // The default narrative fixture bytes are not a real PDF.
+    const sourceDocs = [
+      ...SOURCE_DOCS,
+      { kind: 'proposalBibliography', folder: `${SOURCE_FOLDER}/AI Materials`, name: 'ProposalBibliography_1003222.pdf', bytes: await pdf([[200, 200]]) },
+    ];
+    const { world, run, advance } = await setup({ cycleCode: 'J27', sourceDocs });
+    const results = await runUntil(advance, 'never', { bypassGoverify: true });
+    const stored = await ledger.getRun(run.runId);
+    expect(stored).toMatchObject({ status: 'needs_attention', currentStep: 'copy_file', needsAttentionReason: 'file_rejected' });
+    expect(results.at(-1).step).toBe('copy_file');
+    const written = [...world.state.items.values()].filter((row) => row.folder.includes('1000400_')).map((row) => row.name);
+    expect(written).not.toContain('Narrative-Bibliography_1000400.pdf');
+    expect(written).toHaveLength(3);
+    // A second attempt refuses the same way and still writes nothing more.
+    const uploadsBefore = world.state.counts.upload;
+    await advance({ bypassGoverify: true }).catch(() => null);
+    expect(world.state.counts.upload).toBe(uploadsBefore);
+    expect((await ledger.getRun(run.runId)).needsAttentionReason).toBe('file_rejected');
   });
 
   it('drives every step to ready with GoVerify bypass, journaling each resource before its dispatch', async () => {

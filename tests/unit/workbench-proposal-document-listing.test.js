@@ -280,6 +280,22 @@ describe('single-submission layout (J27 onward)', () => {
     expect(result.aiMaterials[2]).toMatchObject({ library: 'akoya_request', folder: AI });
   });
 
+  test('the combined Narrative-Bibliography file (D60) never fills the Bibliography or Project Narrative row (D59)', async () => {
+    for (const folder of [AI, `${ROOT}/AI Materials`]) {
+      listFiles.mockResolvedValue([pdf('Narrative-Bibliography_1002379.pdf', folder)]);
+      const result = await listProposalDocuments(REQUEST_ID, REQUEST_NUMBER, 'J27');
+      const rows = Object.fromEntries(result.aiMaterials.map((item) => [item.label, item.found]));
+      expect(rows['Project Narrative']).toBe(false);
+      expect(rows.Bibliography).toBe(false);
+      expect(result.staffVersion.found).toBe(false);
+    }
+    // Present beside the real Bibliography, it does not make the row ambiguous.
+    listFiles.mockResolvedValue([pdf('Bibliography_1002379.pdf'), pdf('Narrative-Bibliography_1002379.pdf'),
+      pdf('Narrative-Bibliography_1002379.pdf', `${ROOT}/AI Materials`)]);
+    const result = await listProposalDocuments(REQUEST_ID, REQUEST_NUMBER, 'J27');
+    expect(result.aiMaterials.find((item) => item.label === 'Bibliography')).toMatchObject({ found: true, name: 'Bibliography_1002379.pdf' });
+  });
+
   test('a missing file is reported as not found, with the name that is expected', async () => {
     listFiles.mockResolvedValue([pdf('Project-Narrative_1002379.pdf')]);
 
