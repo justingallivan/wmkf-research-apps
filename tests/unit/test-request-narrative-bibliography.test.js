@@ -19,6 +19,11 @@ import {
   verifyCopiedFiles,
 } from '../../lib/services/test-requests/bundle-file-copy.js';
 import { buildNarrativeBibliographyPdf } from '../../lib/services/test-requests/narrative-bibliography.js';
+import {
+  NARRATIVE_BIBLIOGRAPHY_BUILT,
+  computeRunPlanDigest,
+  manifestBuildsNarrativeBibliography,
+} from '../../lib/services/test-requests/basic-clone-steps.js';
 import { assertLedgerReceipt } from '../../lib/services/test-requests/run-ledger.js';
 import {
   acceptedProposalBibliographyFilenames,
@@ -230,18 +235,22 @@ describe('copying the combined file', () => {
   });
 });
 
-describe('manifests prepared before the combined file existed', () => {
-  const manifestWith = (count) => ({ plannedFiles: Array(count).fill({}), invariants: { expectedSharePointFiles: count } });
-
-  test('a J27 manifest is valid with the current plan (3) or the earlier plan (2), and nothing else', () => {
-    expect(bundleManifestFileCountOk(manifestWith(3), fullBundle(), J27)).toBe(true);
-    expect(bundleManifestFileCountOk(manifestWith(2), fullBundle(), J27)).toBe(true);
-    expect(bundleManifestFileCountOk(manifestWith(4), fullBundle(), J27)).toBe(false);
-    expect(bundleManifestFileCountOk(manifestWith(1), fullBundle(), J27)).toBe(false);
-    expect(bundleManifestFileCountOk({ plannedFiles: Array(3).fill({}), invariants: { expectedSharePointFiles: 2 } }, fullBundle(), J27)).toBe(false);
+describe('what a run promises', () => {
+  const manifestWith = (count, lastKind = null) => ({
+    plannedFiles: Array.from({ length: count }, (_, i) => ({ kind: i === count - 1 && lastKind ? lastKind : 'proposalNarrative' })),
+    invariants: { expectedSharePointFiles: count },
   });
 
-  test('a D26 manifest still needs exactly the bundle documents', () => {
+  test('a manifest that promises the combined file must plan it, last', () => {
+    expect(bundleManifestFileCountOk(manifestWith(3, NARRATIVE_BIBLIOGRAPHY_KIND), fullBundle(), J27, true)).toBe(true);
+    expect(bundleManifestFileCountOk(manifestWith(2), fullBundle(), J27, true)).toBe(false);
+    expect(bundleManifestFileCountOk(manifestWith(3), fullBundle(), J27, true)).toBe(false);
+    expect(bundleManifestFileCountOk({ ...manifestWith(3, NARRATIVE_BIBLIOGRAPHY_KIND), invariants: { expectedSharePointFiles: 2 } }, fullBundle(), J27, true)).toBe(false);
+  });
+
+  test('a manifest that does not promise it plans exactly the bundle documents', () => {
+    expect(bundleManifestFileCountOk(manifestWith(2), fullBundle(), J27, false)).toBe(true);
+    expect(bundleManifestFileCountOk(manifestWith(3, NARRATIVE_BIBLIOGRAPHY_KIND), fullBundle(), J27, false)).toBe(false);
     expect(bundleManifestFileCountOk(manifestWith(2), fullBundle())).toBe(true);
     expect(bundleManifestFileCountOk(manifestWith(3), fullBundle())).toBe(false);
   });
@@ -253,5 +262,21 @@ describe('manifests prepared before the combined file existed', () => {
     for (const bad of [4, -1, undefined, '3']) {
       expect(() => filesPromisedByManifest(plan, bad)).toThrow(expect.objectContaining({ code: 'manifest_digest_mismatch' }));
     }
+  });
+
+  test('the promise is bound into the plan digest, and only a J27 manifest may carry it', () => {
+    const manifest = {
+      values: { runId: 'r', requestId: 'q', locationId: 'l', cycleCode: 'J27', documentLayout: J27, narrativeBibliography: NARRATIVE_BIBLIOGRAPHY_BUILT },
+      recipe: 'basic', source: { requestId: 's', revision: '1', bundleSha256: 'b' }, copyPolicy: { digest: 'c' }, createBodySha256: 'h', target: 'x',
+    };
+    const withoutPromise = { ...manifest, values: { ...manifest.values } };
+    delete withoutPromise.values.narrativeBibliography;
+    expect(manifestBuildsNarrativeBibliography(manifest)).toBe(true);
+    expect(manifestBuildsNarrativeBibliography(withoutPromise)).toBe(false);
+    expect(computeRunPlanDigest({ manifest })).not.toBe(computeRunPlanDigest({ manifest: withoutPromise }));
+    expect(() => manifestBuildsNarrativeBibliography({ ...manifest, values: { ...manifest.values, narrativeBibliography: 'yes' } })).toThrow(/narrativeBibliography/);
+    const d26 = { ...manifest, values: { ...manifest.values, cycleCode: 'D26' } };
+    delete d26.values.documentLayout;
+    expect(() => manifestBuildsNarrativeBibliography(d26)).toThrow(/narrativeBibliography/);
   });
 });

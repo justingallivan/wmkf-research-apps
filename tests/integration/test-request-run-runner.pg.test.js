@@ -10,6 +10,7 @@ import {
   FOUNDATION_NAME,
   GOVERIFY_WORKFLOW,
   buildCloneManifest,
+  computeRunPlanDigest,
   foundationBaselineDigest,
   runPreflight,
   sha256,
@@ -311,7 +312,8 @@ function reservePlan(manifest, bundle) {
     copyPolicyDigest: manifest.copyPolicy.digest,
     // Mirrors runReserve: recipe is bound into the digest so a same-key
     // retry naming a different recipe conflicts (tested in the ledger pg suite).
-    planDigest: sha256({ runId: manifest.values.runId, recipe: manifest.recipe ?? 'basic', createBodySha256: manifest.createBodySha256 }),
+    // The same shared helper the CLI and the admin form reserve with.
+    planDigest: computeRunPlanDigest({ manifest }),
     createBodySha256: manifest.createBodySha256,
     destinationEnvironment: 'sandbox',
     destinationDataverseHost: new URL(manifest.target).hostname,
@@ -374,7 +376,9 @@ describeIf('slice 5b runner against the live run ledger', () => {
       grantCycleId: GRANT_CYCLE_ID, cycleCode,
     });
     if (legacyFilePlan) {
-      // A manifest prepared before the combined file existed: it plans only the bundle documents.
+      // A manifest prepared before the combined file existed: no promise, and
+      // only the bundle documents. Reserved as such, so its digest matches.
+      delete manifest.values.narrativeBibliography;
       manifest.plannedFiles = manifest.plannedFiles.slice(0, bundle.documents.length);
       manifest.invariants = { ...manifest.invariants, expectedSharePointFiles: bundle.documents.length };
     }
@@ -466,6 +470,32 @@ describeIf('slice 5b runner against the live run ledger', () => {
     const written = [...world.state.items.values()].filter((row) => row.folder.includes('1000400_')).map((row) => row.name);
     expect(written).not.toContain('Narrative-Bibliography_1000400.pdf');
     expect(written).toHaveLength(3);
+  });
+
+  it('a reserved J27 run whose manifest is later edited to drop the combined file is refused before any write', async () => {
+    const pdf = async (sizes) => {
+      const doc = await PDFDocument.create();
+      for (const size of sizes) doc.addPage(size);
+      return Buffer.from(await doc.save());
+    };
+    const narrativeBytes = await pdf([[100, 100]]);
+    const sourceDocs = [
+      ...SOURCE_DOCS.map((doc) => (doc.kind === 'proposalNarrative' ? { ...doc, bytes: narrativeBytes } : doc)),
+      { kind: 'proposalBibliography', folder: `${SOURCE_FOLDER}/AI Materials`, name: 'ProposalBibliography_1003222.pdf', bytes: await pdf([[200, 200]]) },
+    ];
+    const { world, manifest, run, bundle } = await setup({ cycleCode: 'J27', sourceDocs });
+    expect(manifest.values.narrativeBibliography).toBe('built');
+    const edited = structuredClone(manifest);
+    delete edited.values.narrativeBibliography;
+    edited.plannedFiles = edited.plannedFiles.slice(0, bundle.documents.length);
+    edited.invariants.expectedSharePointFiles = bundle.documents.length;
+    await expect(advanceRun({
+      runId: run.runId, ledger, manifest: edited, bundle,
+      deps: { client: world.client, graph: world.graph, sharePointTarget: world.sharePointTarget, observationOverrides: { observationMs: 0 } },
+      options: { bypassGoverify: true },
+    })).rejects.toThrow(/planDigest/);
+    expect(world.state.counts.requestPost).toBe(0);
+    expect(world.state.counts.upload).toBe(0);
   });
 
   it('a J27 run whose narrative is not a readable PDF stops at copy_file with file_rejected and writes no combined file', async () => {

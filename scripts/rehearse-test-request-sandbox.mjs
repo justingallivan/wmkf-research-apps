@@ -63,6 +63,7 @@ import {
 import {
   assertBundleFresh,
   copyBundleFiles,
+  filesPromisedByManifest,
   planBundleFileCopies,
   reconcileJournaledCopies,
 } from '../lib/services/test-requests/bundle-file-copy.js';
@@ -559,10 +560,10 @@ async function copyBundleDocuments(manifest, request, requestFolder, preflight, 
   const { bundle } = bundleSourceOf(manifest);
   if (!request.akoya_requestnum) throw new Error('Destination request number is missing; cannot resolve file destinations.');
   // Numbered destinations resolve only now that the server assigned the number.
-  const plannedFiles = planBundleFileCopies(bundle, {
+  const plannedFiles = filesPromisedByManifest(planBundleFileCopies(bundle, {
     destinationRequestNumber: request.akoya_requestnum,
     destinationLayout: manifestDocumentLayout(manifest),
-  });
+  }), manifest.invariants?.expectedSharePointFiles);
   const { GraphService } = await import('../lib/services/graph-service.js');
   const { configuredSharePointTargetInfo } = await import('../lib/services/sharepoint-target-registry.js');
   receipt.fileCopyStartedAt = new Date().toISOString();

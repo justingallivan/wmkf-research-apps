@@ -170,8 +170,11 @@ Reviewer Finder opens it by default, as it will Connor's file on real
 requests. It is the last file of the copy step: each input is re-read and
 checked against the export exactly like a copied file, the combined bytes are
 uploaded create-only, and verify checks the folder listing and re-reads the
-bytes. A source without one of the two plans no combined file. A run reserved
-before this change copies only the files its manifest promised. An input that
+bytes. A source without one of the two plans no combined file. Whether a run
+builds it is recorded in the manifest (`values.narrativeBibliography`) and
+bound into the plan digest, so a manifest edited to drop it is refused before
+any write. A run reserved before this change carries no such record and copies
+only the files its manifest promised. An input that
 is not a readable PDF stops the run with `file_rejected` before anything is
 uploaded for the combined file.
 
