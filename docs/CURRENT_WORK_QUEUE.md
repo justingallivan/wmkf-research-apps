@@ -302,9 +302,14 @@ search limits: `docs/audits/product-backlog-reconciliation-2026-10-31.md`.
   **[GAP 1 MERGED 2026-11-14, Session 677, `3e382029a`]** Ledger migration 098
   applied by the owner to both Factory ledgers and the Production app database
   first (runbook "Prepared J27 reviewer fixtures"; Atlas
-  `docs/atlas/postgres-test-request-runs.md`). Open: one Factory run into a J27
-  cycle as the acceptance check (request page lists Project Narrative and
-  Bibliography). Original entry follows.
+  `docs/atlas/postgres-test-request-runs.md`). **[ACCEPTED 2026-11-14, owner
+  screenshot]** Run `174e770e` created J27 test Request 1003515; its Initial
+  Assessment → Proposal → Documents list shows Project Narrative and Bibliography
+  (View/Download) and the other four "not received yet". The run itself is
+  parked `needs_attention` at verify on the Foundation GoVerify refresh (runbook
+  "What 'cannot continue' leaves behind"); the create limit is now 60 s
+  (`74f442200`) and the form offers Retry after a create timeout (`c689c352d`).
+  Original entry follows.
   The J27 Workbench is on in Production (every 2027-or-later request,
   `docs/plans/J27_WORKBENCH_PRODUCTION_ROLLOUT_2026-11-07.md`), so internal
   testing will want J27 test requests. Do before the Factory next creates them;
