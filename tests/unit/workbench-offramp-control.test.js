@@ -161,3 +161,56 @@ test('a status action stays available while a justification conflict is open', a
   expect(screen.getByLabelText('Offramp justification')).toHaveValue('My text.');
   expect(screen.getByText('Someone else saved a different justification')).toBeInTheDocument();
 });
+
+test('a later read that matches the draft closes an open conflict', async () => {
+  requestJson.mockResolvedValueOnce({ ...offramped, justification: 'Old.' })
+    .mockRejectedValueOnce(Object.assign(new Error('This request changed.'), { status: 409 }))
+    .mockResolvedValueOnce({ ...offramped, justification: 'Colleague text.', version: 'W/"9"' })
+    .mockResolvedValueOnce({ success: true })
+    .mockResolvedValueOnce({ ...base, justification: 'My text.', showJustification: true, version: 'W/"11"' });
+  render(<OfframpControl requestId={requestId} onStatusChange={() => {}} />);
+  fireEvent.change(await screen.findByLabelText('Offramp justification'), { target: { value: 'My text.' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save justification' }));
+  await screen.findByText('Someone else saved a different justification');
+  fireEvent.click(screen.getByRole('button', { name: 'Undo offramp' }));
+  await screen.findByText('Offramp undone.');
+  expect(screen.queryByText('Someone else saved a different justification')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Use saved justification' })).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Offramp justification')).toHaveValue('My text.');
+  expect(screen.getByRole('button', { name: 'Save justification' })).toBeDisabled();
+});
+
+test('a later read with newer text replaces the open conflict, and Use saved takes the newest text', async () => {
+  requestJson.mockResolvedValueOnce({ ...offramped, justification: 'Old.' })
+    .mockRejectedValueOnce(Object.assign(new Error('This request changed.'), { status: 409 }))
+    .mockResolvedValueOnce({ ...offramped, justification: 'Colleague text.', version: 'W/"9"' })
+    .mockResolvedValueOnce({ success: true })
+    .mockResolvedValueOnce({ ...base, justification: 'Newest text.', showJustification: true, version: 'W/"12"' });
+  render(<OfframpControl requestId={requestId} onStatusChange={() => {}} />);
+  fireEvent.change(await screen.findByLabelText('Offramp justification'), { target: { value: 'My text.' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save justification' }));
+  await screen.findByText('Colleague text.');
+  fireEvent.click(screen.getByRole('button', { name: 'Undo offramp' }));
+  await screen.findByText('Newest text.');
+  expect(screen.queryByText('Colleague text.')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Use saved justification' }));
+  expect(screen.getByLabelText('Offramp justification')).toHaveValue('Newest text.');
+  expect(screen.getByRole('button', { name: 'Save justification' })).toBeDisabled();
+});
+
+test('an untouched draft that follows newer text closes an open conflict', async () => {
+  requestJson.mockResolvedValueOnce({ ...offramped, justification: 'Old.' })
+    .mockRejectedValueOnce(Object.assign(new Error('This request changed.'), { status: 409 }))
+    .mockResolvedValueOnce({ ...offramped, justification: 'Colleague text.', version: 'W/"9"' })
+    .mockResolvedValueOnce({ success: true })
+    .mockResolvedValueOnce({ ...base, justification: 'Newest text.', showJustification: true, version: 'W/"12"' });
+  render(<OfframpControl requestId={requestId} onStatusChange={() => {}} />);
+  fireEvent.change(await screen.findByLabelText('Offramp justification'), { target: { value: 'My text.' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save justification' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Use saved justification' }));
+  // Taking the saved text makes the draft untouched again, so the next read replaces it.
+  fireEvent.click(screen.getByRole('button', { name: 'Undo offramp' }));
+  await screen.findByText('Offramp undone.');
+  expect(screen.getByLabelText('Offramp justification')).toHaveValue('Newest text.');
+  expect(screen.queryByText('Someone else saved a different justification')).not.toBeInTheDocument();
+});

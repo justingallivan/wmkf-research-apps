@@ -42,10 +42,16 @@ export default function OfframpControl({ requestId, onStatusChange = null }) {
   function adopt(updated) {
     const baseline = baselineRef.current;
     const mine = draftRef.current.trim();
+    const saved = updated.justification;
     setRecord(updated);
-    if (baseline === null || mine === baseline) setDraft(updated.justification);
-    else if (updated.justification !== baseline && updated.justification !== mine) setConflictText(updated.justification);
-    baselineRef.current = updated.justification;
+    // The conflict view always shows the latest read, or closes.
+    if (baseline === null || mine === baseline) {
+      setDraft(saved);
+      setConflictText(null);
+    } else if (saved === mine) setConflictText(null);
+    else if (saved !== baseline) setConflictText(saved);
+    else setConflictText(previous => (previous === null ? null : saved));
+    baselineRef.current = saved;
   }
 
   async function load() {
