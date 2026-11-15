@@ -43,7 +43,7 @@ A variable change takes effect only in a new deployment. Details and rotation: `
    For prepared J27+ reviewer fixtures, Phase I Invited followed by Phase II
    Pending Committee Review and readiness finalization are required.
    Earlier-cycle clone behavior is unchanged.
-5. **Ready for review** (prepared J27+ runs) [BRANCH-BUILT `claude/factory-web-readiness`; not deployed].
+5. **Ready for review** (prepared J27+ runs) [DEPLOYED 2bdf62b5d, 2026-11-15].
    A J27 Research request appears in the Workbench only once `wmkf_readyforreview`
    is true. After both statuses are set, the status panel offers **Mark ready for
    review** (owner, 2026-11-15: anyone with admin access, on their own runs). It asks
@@ -141,7 +141,7 @@ The recheck's `ok` means this pass found no newly unrecorded effects and no open
 | `--run-recheck=<runId>` | Read-only: the Foundation account against the run's baseline. |
 | `--advance=<runId> --manifest=<file> --bundle=<file>` | Uses the same backend runner. The form may withhold Advance when diagnosis is uncertain; an owner CLI retry remains subject to runner checks and separate operational authorization. Needs the run's manifest and bundle as local files. |
 | `--set-status`, `--status-recheck`, `--status-abandon` | The status setter, its recheck, and closing a change stuck `dispatched`. |
-| `--finalize-readiness=<runId> --manifest=<file>` | Deployed owner-only prepared J27+ readiness preview; add `--confirm` for the single journaled true stamp after all checks. Requires migration 094 on the operational ledger. The admin form's **Mark ready for review** calls the same finalizer with the stored manifest [BRANCH-BUILT]. |
+| `--finalize-readiness=<runId> --manifest=<file>` | Deployed owner-only prepared J27+ readiness preview; add `--confirm` for the single journaled true stamp after all checks. Requires migration 094 on the operational ledger. The admin form's **Mark ready for review** calls the same finalizer with the stored manifest [DEPLOYED 2bdf62b5d]. |
 | `--recover-readiness=<runId> --manifest=<file>` | Read-only recovery preview; exact-destination confirmation can abandon only an unready attempt after all senders stop (procedure below). |
 | `--bind-reviewer=<runId>`, `--bind-reviewer-slot=<runId>` | Owner cast suggestion binding and separate read-only slot preview; only exact Request confirmation enables the slot operation. |
 | `--ledger-check` | Ledger schema against the tracked fingerprint. |
@@ -191,7 +191,7 @@ is not a readable PDF stops the run with `file_rejected` before anything is
 uploaded for the combined file.
 
 Download the manifest and bundle **before the final clone step**, since the daily
-sweep may delete them once the run is internally ready. [BRANCH-BUILT] A prepared
+sweep may delete them once the run is internally ready. [DEPLOYED 2bdf62b5d] A prepared
 J27+ run's stored files are now kept until its readiness completes (at most 30 days),
 so the form's readiness step needs no download; the CLI path still uses the local file. Complete the clone, use
 the existing status setter for Phase I `Invited` and then Phase II `Phase II
@@ -242,7 +242,7 @@ other needs_attention status history requires owner inspection.
 
 ## Repeatable prepared-fixture rehearsal
 
-[VERIFIED via the CLI parser/guards, deployed UI and the bounded 2026-11-03 rehearsal] The supported MVP was Admin cloning followed by owner phase/readiness operations. [BRANCH-BUILT `claude/factory-web-readiness`] The form's status panel now also sets both statuses and marks the Request ready (Normal run, step 5); the CLI steps below remain the owner path and the recovery path. These steps describe the procedure; each new Production write, communication or metered analysis needs its own authorized scope.
+[VERIFIED via the CLI parser/guards, deployed UI and the bounded 2026-11-03 rehearsal] The supported MVP was Admin cloning followed by owner phase/readiness operations. [DEPLOYED 2bdf62b5d] The form's status panel now also sets both statuses and marks the Request ready (Normal run, step 5); the CLI steps below remain the owner path and the recovery path. These steps describe the procedure; each new Production write, communication or metered analysis needs its own authorized scope.
 
 1. Choose a completed source with its applicant abstract and canonical reviewer PDF. Copying a D26 package into J27 tests reviewer mechanics, not new J27 intake assembly or AI output. Confirm the destination cycle and test marker in the preview.
 2. If the Foundation already has a generated GOverify PDF, retain the authorized pre-run URL in a private local file before cloning. Use mode 0600; never commit it or put the URL in shell arguments. The optional prior-PDF proof must reproduce the original baseline digest exactly. If that proof is unavailable or fails, stop for inspection rather than resetting the baseline.
