@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { AdminEditorPanel } from '../AdminWorkspaceNavigation';
 import TestRequestEmailAllowlistSection from '../TestRequestEmailAllowlistSection';
-import TestRequestPreviewSection from '../TestRequestPreviewSection';
 import TestRequestFactorySection from '../TestRequestFactorySection';
 import { appSystemSettingField } from '../DataverseFieldInfoButton';
 
@@ -27,14 +26,6 @@ export function TestRequestsWorkspace() {
         dataverseFields={TEST_REQUEST_EMAIL_ALLOWLIST_DATAVERSE_FIELDS}
       >
         <TestRequestEmailAllowlistSection />
-      </AdminEditorPanel>
-      <AdminEditorPanel
-        id="test-request-preview"
-        title="Basic Request clone preview"
-        description="Resolve one sandbox Request, choose proposal files, and inspect the server-controlled field and filename plan. This panel has no create or copy action."
-        scope="Sandbox data · Shared files · Read-only"
-      >
-        <TestRequestPreviewSection />
       </AdminEditorPanel>
       <AdminEditorPanel
         id="test-request-factory"

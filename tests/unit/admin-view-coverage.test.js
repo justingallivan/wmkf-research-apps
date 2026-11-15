@@ -175,7 +175,6 @@ const EXPECTED_HEADINGS = {
     'Workflow policies',
   ],
   'test-requests:preview': [
-    'Basic Request clone preview',
     'Create a test Request',
     'Test-request email allowlist',
     'Your runs',
