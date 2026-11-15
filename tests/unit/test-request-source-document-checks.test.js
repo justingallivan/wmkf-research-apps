@@ -120,3 +120,27 @@ describe('a .pdf that is not a usable PDF', () => {
       .resolves.toMatchObject({ contentHash: hash(REAL_PDF), size: REAL_PDF.length });
   });
 });
+
+describe('the read budget with rewritten Office files', () => {
+  test('a rewrite may add at most 64 KiB over the listed size', async () => {
+    const listed = Buffer.alloc(10);
+    const grown = Buffer.alloc(10 + 64 * 1024 + 1);
+    const deps = graphServing([xlsxState(3, listed), xlsxState(4, grown), xlsxState(4, grown), xlsxState(4, grown)]);
+    await expect(hydrateTestRequestSourceDocument(selection({ size: 10 }), deps))
+      .rejects.toMatchObject({ code: 'test_request_preview_source_changed' });
+  });
+
+  test('the preview rechecks the total against the verified sizes', async () => {
+    const { assertTestRequestSourceReadLimits } = await import('../../lib/services/test-requests/admin-preview-service.js');
+    const { TEST_REQUEST_PREVIEW_READ_LIMITS } = await import('../../lib/services/test-requests/admin-preview-service.js');
+    // Three files each within the per-file limit whose verified total is one byte over the total limit.
+    const third = Math.floor(TEST_REQUEST_PREVIEW_READ_LIMITS.maxTotalBytes / 3);
+    const docs = [
+      { name: 'a.pdf', size: third, mimeType: 'application/pdf' },
+      { name: 'b.pdf', size: third, mimeType: 'application/pdf' },
+      { name: 'c.xlsx', size: TEST_REQUEST_PREVIEW_READ_LIMITS.maxTotalBytes - 2 * third + 1, mimeType: XLSX },
+    ];
+    expect(docs.every((doc) => doc.size <= TEST_REQUEST_PREVIEW_READ_LIMITS.maxFileBytes)).toBe(true);
+    expect(() => assertTestRequestSourceReadLimits(docs)).toThrow(expect.objectContaining({ code: 'test_request_preview_total_size_exceeded' }));
+  });
+});
