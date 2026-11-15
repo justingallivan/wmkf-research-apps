@@ -73,7 +73,7 @@ describe('the planner accepts the Phase II originals', () => {
 describe('the lookup prefers Phase II and falls back to AI Materials', () => {
   function discover(files) {
     return discoverTestRequestSourceDocuments({ akoya_requestid: 'req-1', akoya_requestnum: '1002912' }, {
-      getRequestSharePointBuckets: jest.fn(async () => [{ library: 'akoya_request', folder: ROOT, source: 'active' }]),
+      getRequestSharePointBuckets: jest.fn(async () => [{ library: 'akoya_request', folder: ROOT, source: 'dynamics' }]),
       listFiles: jest.fn(async () => files.map(([folder, name], index) => ({
         id: `item-${index}`, folder: `${ROOT}/${folder}`, name, size: 10, mimeType: 'application/pdf',
       }))),
@@ -115,8 +115,9 @@ describe('one source per kind, across libraries and folders (Codex findings)', (
   function discoverBuckets(byBucket) {
     return discoverTestRequestSourceDocuments({ akoya_requestid: 'req-1', akoya_requestnum: '1002912' }, {
       getRequestSharePointBuckets: jest.fn(async () => [
-        { library: 'akoya_request', folder: ROOT, source: 'active' },
+        { library: 'akoya_request', folder: ROOT, source: 'dynamics' },
         { library: 'RequestArchive1', folder: ARCHIVE_ROOT, source: 'archive' },
+        { library: 'RequestArchive2', folder: ARCHIVE_ROOT, source: 'archive' },
       ]),
       listFiles: jest.fn(async (library, folder) => (byBucket[library] || []).map(([sub, name], index) => ({
         id: `${library}-${index}`, folder: `${folder}/${sub}`, name, size: 10, mimeType: 'application/pdf',
@@ -124,7 +125,7 @@ describe('one source per kind, across libraries and folders (Codex findings)', (
     });
   }
 
-  test('a Phase II original in both libraries offers only the active one', async () => {
+  test('a Phase II original in both libraries offers only the Dynamics-linked one', async () => {
     const { documents } = await discoverBuckets({
       akoya_request: [['Phase II', 'Project Narrative.pdf']],
       RequestArchive1: [['Phase II', 'Project Narrative.pdf']],
@@ -146,5 +147,56 @@ describe('one source per kind, across libraries and folders (Codex findings)', (
       akoya_request: [['backup/Phase II', 'Project Narrative.pdf'], ['AI Materials', 'ProposalNarrative_1002912.pdf']],
     });
     expect(documents.filter((d) => d.kind === 'proposalNarrative').map((d) => d.name)).toEqual(['ProposalNarrative_1002912.pdf']);
+  });
+});
+
+describe('ties resolve to exactly one source, through planning (Codex round 2)', () => {
+  const ARCHIVE_ROOT = '1002912_ARCHIVE';
+  function discover(buckets, byBucket) {
+    return discoverTestRequestSourceDocuments({ akoya_requestid: 'req-1', akoya_requestnum: '1002912' }, {
+      getRequestSharePointBuckets: jest.fn(async () => buckets),
+      listFiles: jest.fn(async (library, folder) => (byBucket[`${library}|${folder}`] || []).map(([sub, name], index) => ({
+        id: `${library}-${folder}-${index}`, folder: `${folder}/${sub}`, name, size: 10, mimeType: 'application/pdf',
+      }))),
+    });
+  }
+  const toPlanDocs = (documents) => documents.map((d) => sourceDoc({ id: d.id, kind: d.kind, folder: d.folder, name: d.name, library: d.library }));
+
+  test('Phase II originals in two archive libraries: the first archive library wins, and the plan has no collision', async () => {
+    const { documents } = await discover([
+      { library: 'akoya_request', folder: ROOT, source: 'dynamics' },
+      { library: 'RequestArchive1', folder: ARCHIVE_ROOT, source: 'archive' },
+      { library: 'RequestArchive2', folder: ARCHIVE_ROOT, source: 'archive' },
+    ], {
+      [`RequestArchive1|${ARCHIVE_ROOT}`]: [['Phase II', 'Project Narrative.pdf'], ['Phase II', 'Bibliography.pdf']],
+      [`RequestArchive2|${ARCHIVE_ROOT}`]: [['Phase II', 'Project Narrative.pdf'], ['Phase II', 'Bibliography.pdf']],
+    });
+    expect(documents.map((d) => [d.kind, d.library]).sort()).toEqual([
+      ['proposalBibliography', 'RequestArchive1'], ['proposalNarrative', 'RequestArchive1'],
+    ]);
+    expect(plan(toPlanDocs(documents), 'single-submission').blockers).toEqual([]);
+  });
+
+  test('two Dynamics-linked locations with originals: the first location wins', async () => {
+    const SECOND = '1002912_SECOND';
+    const { documents } = await discover([
+      { library: 'akoya_request', folder: ROOT, source: 'dynamics' },
+      { library: 'akoya_request', folder: SECOND, source: 'dynamics' },
+    ], {
+      [`akoya_request|${ROOT}`]: [['Phase II', 'Project Narrative.pdf']],
+      [`akoya_request|${SECOND}`]: [['Phase II', 'Project Narrative.pdf']],
+    });
+    expect(documents.map((d) => d.graphItemId)).toEqual([`akoya_request-${ROOT}-0`]);
+  });
+
+  test('a Dynamics-linked original beats an archive original even when the archive is listed first', async () => {
+    const { documents } = await discover([
+      { library: 'RequestArchive1', folder: ARCHIVE_ROOT, source: 'archive' },
+      { library: 'akoya_request', folder: ROOT, source: 'dynamics' },
+    ], {
+      [`RequestArchive1|${ARCHIVE_ROOT}`]: [['Phase II', 'Project Narrative.pdf']],
+      [`akoya_request|${ROOT}`]: [['Phase II', 'Project Narrative.pdf']],
+    });
+    expect(documents.map((d) => d.library)).toEqual(['akoya_request']);
   });
 });
