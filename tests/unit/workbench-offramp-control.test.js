@@ -74,3 +74,35 @@ test('a conflict shows the message and re-reads the current state', async () => 
   await screen.findByText('This request already has a Phase II outcome, so it cannot be offramped here.');
   expect(screen.queryByRole('button', { name: 'Mark as offramped' })).not.toBeInTheDocument();
 });
+
+test('a justification conflict shows the other saved text and blocks Save until staff choose', async () => {
+  requestJson.mockResolvedValueOnce({ ...offramped, justification: 'Old.' })
+    .mockRejectedValueOnce(Object.assign(new Error('This request changed.'), { status: 409 }))
+    .mockResolvedValueOnce({ ...offramped, justification: 'Colleague text.', version: 'W/"9"' });
+  render(<OfframpControl requestId={requestId} />);
+  fireEvent.change(await screen.findByLabelText('Offramp justification'), { target: { value: 'My text.' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save justification' }));
+  await screen.findByText('Colleague text.');
+  expect(screen.getByLabelText('Offramp justification')).toHaveValue('My text.');
+  expect(screen.getByRole('button', { name: 'Save justification' })).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Use saved justification' }));
+  expect(screen.getByLabelText('Offramp justification')).toHaveValue('Colleague text.');
+  expect(requestJson).toHaveBeenCalledTimes(3);
+});
+
+test('keeping the draft after a conflict saves with the new version', async () => {
+  requestJson.mockResolvedValueOnce({ ...offramped, justification: 'Old.' })
+    .mockRejectedValueOnce(Object.assign(new Error('This request changed.'), { status: 409 }))
+    .mockResolvedValueOnce({ ...offramped, justification: 'Colleague text.', version: 'W/"9"' })
+    .mockResolvedValueOnce({ success: true })
+    .mockResolvedValueOnce({ ...offramped, justification: 'My text.', version: 'W/"10"' });
+  render(<OfframpControl requestId={requestId} />);
+  fireEvent.change(await screen.findByLabelText('Offramp justification'), { target: { value: 'My text.' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Save justification' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Keep my draft' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save justification' }));
+  await screen.findByText('Justification saved.');
+  expect(requestJson).toHaveBeenNthCalledWith(4, '/api/workbench/offramp', {
+    method: 'POST', body: { requestId, version: 'W/"9"', action: 'justification', justification: 'My text.' },
+  });
+});

@@ -497,10 +497,8 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
             <>
               <StaffReviewSummary key={routeRequestId} requestId={routeRequestId} readOnly
                 onOpenReports={() => selectTab('reviews')} onJ27Facts={visibleContext?.j27 ? reportJ27Facts : null} />
-              {visibleContext?.j27 && (
-                <OfframpControl key={`offramp:${routeRequestId}`} requestId={routeRequestId}
-                  onStatusChange={refreshPhaseIStatus} />
-              )}
+              <OfframpControl key={`offramp:${routeRequestId}`} requestId={routeRequestId}
+                onStatusChange={refreshPhaseIStatus} />
             </>
           ) : null}
         />

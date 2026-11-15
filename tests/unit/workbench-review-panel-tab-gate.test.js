@@ -45,6 +45,9 @@ jest.mock('../../shared/components/workbench/StaffReviewSummary', () => function
   if (onOpenReports) return <h3>Staff interpretation from Reports</h3>;
   return <h3>Staff review summary</h3>;
 });
+jest.mock('../../shared/components/workbench/OfframpControl', () => function Stub({ onStatusChange }) {
+  return <h3 data-refresh={typeof onStatusChange}>Offramp</h3>;
+});
 jest.mock('../../shared/components/reviewers/ReviewersTab', () => function ReviewerStub() { return <div data-testid="reviewer-roster" />; });
 jest.mock('../../shared/components/workbench/OverviewTab', () => function OverviewStub() { return <div data-testid="overview-tab" />; });
 jest.mock('../../shared/components/workbench/ReviewPanelTab', () => function ReviewPanelStub(props) { return <div data-testid="review-panel-tab" data-request-id={props.requestId} data-title={props.title} />; });
@@ -280,7 +283,12 @@ test('J27 Deliberations leads with the presentation and keeps staff inputs below
   const roster = screen.getByRole('heading', { name: 'Meeting roster' });
   const visit = screen.getByRole('heading', { name: 'Staff assessment of the presentation' });
   const interpretation = screen.getByRole('heading', { name: 'Staff interpretation from Reports' });
+  const offramp = screen.getByRole('heading', { name: 'Offramp' });
   expect(presentation.compareDocumentPosition(interpretation)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  // D70: the offramp panel sits directly below the Reports interpretation and can reload the page.
+  expect(interpretation.compareDocumentPosition(offramp)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  expect(offramp).toHaveAttribute('data-refresh', 'function');
+  expect(offramp.compareDocumentPosition(roster)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   expect(interpretation.compareDocumentPosition(roster)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   expect(roster.compareDocumentPosition(visit)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 });

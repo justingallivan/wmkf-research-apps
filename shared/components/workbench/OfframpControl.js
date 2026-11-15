@@ -20,6 +20,8 @@ export default function OfframpControl({ requestId, onStatusChange = null }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  // Saved justification that changed under an unsaved draft; Save waits until staff choose.
+  const [conflictText, setConflictText] = useState(null);
   const generation = useRef(0);
 
   async function load({ keepDraft = false } = {}) {
@@ -47,7 +49,8 @@ export default function OfframpControl({ requestId, onStatusChange = null }) {
   }, []);
 
   async function post(body, doneMessage) {
-    if (busy || !record?.version) return;
+    if (busy || !record?.version || (body.action === 'justification' && conflictText !== null)) return;
+    const editedFrom = record.justification;
     const current = ++generation.current;
     setBusy(true);
     setError('');
@@ -63,8 +66,14 @@ export default function OfframpControl({ requestId, onStatusChange = null }) {
       if (generation.current !== current) return;
       setRecord(updated);
       // A status change leaves an unsaved justification draft alone.
-      if (body.action === 'justification') setDraft(updated.justification);
-      else onStatusChange?.();
+      if (body.action === 'justification') {
+        // Another save landed right after ours: keep our text as the draft and show theirs.
+        if (updated.justification !== body.justification) {
+          setNotice('');
+          setDraft(body.justification);
+          setConflictText(updated.justification);
+        } else setDraft(updated.justification);
+      } else onStatusChange?.();
     } catch (failure) {
       if (generation.current !== current) return;
       setError(failure.message);
@@ -72,7 +81,10 @@ export default function OfframpControl({ requestId, onStatusChange = null }) {
       if (failure.status === 409) {
         try {
           const updated = await read(requestId);
-          if (generation.current === current) setRecord(updated);
+          if (generation.current !== current) return;
+          setRecord(updated);
+          if (body.action === 'justification' && updated.justification !== editedFrom
+              && updated.justification !== body.justification) setConflictText(updated.justification);
         } catch {
           if (generation.current === current) setRecord(previous => ({ ...previous, version: null }));
         }
@@ -140,8 +152,20 @@ export default function OfframpControl({ requestId, onStatusChange = null }) {
               <textarea id="offramp-justification" aria-describedby="offramp-justification-guidance"
                 className="w-full rounded-lg border p-3" rows={4} maxLength={MAX}
                 value={draft} disabled={busy} onChange={event => { setDraft(event.target.value); setNotice(''); }} />
+              {conflictText !== null && (
+                <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  <p className="font-medium text-amber-900">Someone else saved a different justification</p>
+                  <p className="whitespace-pre-wrap text-gray-900">{conflictText || 'The saved justification was cleared.'}</p>
+                  <Button size="sm" type="button" variant="secondary" onClick={() => setConflictText(null)}>Keep my draft</Button>
+                  {' '}
+                  <Button size="sm" type="button" variant="secondary" onClick={() => {
+                    setDraft(conflictText);
+                    setConflictText(null);
+                  }}>Use saved justification</Button>
+                </div>
+              )}
               <Button size="sm" type="submit" loading={busy}
-                disabled={!record.version || trimmed === record.justification}>
+                disabled={!record.version || conflictText !== null || trimmed === record.justification}>
                 Save justification
               </Button>
             </form>
