@@ -88,6 +88,8 @@ Owner decision 2026-10-03: retain this partly built marked test record; no clean
 
 Parked **[RUN]**: run `20407283-c279-5e0c-b396-210ad6842482`, test Request 1003308, two PDFs verified, one XLSX uploaded and unverified.
 
+Parked **[RUN]** 2026-11-14: run `174e770e-cdfe-51c9-a8c5-945a02abe534`, J27 test Request 1003515 (source 1002874). The create timed out at 30 s and was recovered by readback; both J27 files copied and passed their checks. Final verification stops on the Foundation account only: the GoVerify refresh triggered by the create changed BMF 509 (Undetermined → blank), shortened the BMF Subsection Description, upper-cased the Verified address and replaced the GoVerify PDF (owner-read Audit History; GOverify Status ended unchanged). These are vendor writes; nothing was restored. A form run that triggers a GoVerify refresh is likely to stop the same way **[ASSUMED from two runs, 2026-11-03 and 2026-11-14]**: the transition contract protects those columns, and the prior-PDF evidence path is CLI-only and would not cover reformatting. The create limit is 60 s since this run.
+
 ## Read-only diagnosis — shipped in PR #426
 
 [SOURCE, October 3; owner-reported clean deployment after #426] The diagnosis adds guidance to the existing actor-owned run-detail GET. It reads only the saved run row and resource receipts. It does not read private artifacts, inspect live Dataverse/SharePoint records, claim a lease, run status recheck or write anything. Normal runner checks remain authoritative when an existing Advance is requested.
