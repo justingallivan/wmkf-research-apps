@@ -233,6 +233,16 @@ describe('a paused run reads from the server after a reload (1003518, 2026-11-15
     expect(screen.getByText(/A status change was sent and is still being confirmed/)).toBeTruthy();
   });
 
+  test('a planned (journaled, unsent) change says it is not sent yet and that Continue sends it (Codex)', async () => {
+    const planned = { changeId: CHANGE_ID, sequence: 1, field: 'wmkf_phaseistatus', optionBefore: null, optionAfter: INVITED, status: 'planned' };
+    serve({ status: [body({ changes: [planned] })] });
+    await renderControl();
+    expect(chipOf('Set Phase I to Invited')).toContain('Planned, not sent');
+    expect(chipOf('Set Phase I to Invited')).not.toContain('Sent, not confirmed');
+    expect(screen.getByText('A status change was saved but not sent yet. Press Continue to send it and carry on.')).toBeTruthy();
+    expect(screen.queryByText(/it is not sent again/)).toBeNull();
+  });
+
   test('a fresh run shows no paused note', async () => {
     serve({ status: [body()] });
     await renderControl();

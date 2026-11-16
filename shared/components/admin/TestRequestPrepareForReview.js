@@ -174,12 +174,14 @@ export default function TestRequestPrepareForReview({
   const chip = (index) => {
     if (state.done[index]) return <StatusChip tone="green">Done</StatusChip>;
     if (working === index) return <StatusChip tone="blue">In progress</StatusChip>;
-    if (sentStep === index) return <StatusChip tone="blue">Sent, not confirmed</StatusChip>;
+    // A planned change is journaled but not yet sent: Continue sends it (status-change-runner.js resumes it).
+    if (sentStep === index) return <StatusChip tone="blue">{state.openChange?.status === 'planned' ? 'Planned, not sent' : 'Sent, not confirmed'}</StatusChip>;
     return <StatusChip tone="gray">Not started</StatusChip>;
   };
   // Where a paused run stands, from the server's state, for when no reply from this mount is on screen.
   const pausedNote = (() => {
     if (busy || shownStop || state.blocked || state.finished) return '';
+    if (state.openChange?.status === 'planned') return 'A status change was saved but not sent yet. Press Continue to send it and carry on.';
     if (state.openChange) return 'A status change was sent and is still being confirmed. Press Continue to check it; it is not sent again.';
     if (state.readinessApplied) return `Ready for review is set, so ${requestName} already appears in the Workbench. The last check was still waiting for Dynamics' background jobs. Press Continue to finish it; nothing is sent again.`;
     if (state.readinessResumable) return "Ready for review was sent, but its result isn't confirmed yet. Press Continue to check; it is not sent again.";
