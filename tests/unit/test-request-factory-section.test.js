@@ -93,9 +93,9 @@ beforeAll(() => {
 });
 beforeEach(() => { uuidCounter = 0; global.fetch.mockReset(); localStorage.clear(); sessionStorage.clear(); });
 
-async function renderSection(server, runs = [makeRun()], extra = {}) {
+async function renderSection(server, runs = [makeRun()], extra = {}, props = {}) {
   server.on('GET', BASE, listBody(runs, extra));
-  const view = render(<TestRequestFactorySection />);
+  const view = render(<TestRequestFactorySection {...props} />);
   await screen.findByText(runs.length ? runs[0].testLabel : 'No runs yet.');
   return view;
 }
@@ -235,7 +235,10 @@ describe('confirm', () => {
     expect(reasonOf()).toBe('Choose a Grant Cycle.');
     fireEvent.change(screen.getByLabelText('Grant Cycle'), { target: { value: 'J27' } });
     expect(confirmButton().disabled).toBe(false);
-    expect(screen.getByText(/Confirm reserves the run and creates nothing in Dataverse yet/)).toBeTruthy();
+    const next = screen.getByText(/Confirm reserves the run; nothing is created in Dataverse yet/);
+    // The next steps point at the form's own Prepare for review, not the command-line tool (owner, 2026-11-15).
+    expect(next.textContent).toContain('Prepare for review');
+    expect(next.textContent).not.toMatch(/command-line/);
     expect(server.count('POST', BASE)).toBe(0);
   });
 
@@ -684,26 +687,11 @@ describe('inspect, recheck and files', () => {
 const primaries = () => [...document.querySelectorAll('[data-primary="true"]')].filter((button) => !button.disabled);
 
 describe('write target and consequence', () => {
-  test.each([
-    ['production', 'Writes to production', 'Production'],
-    ['sandbox', 'Writes to sandbox', 'the sandbox'],
-  ])('the band for the %s target names it once the list has answered', async (target, chip, where) => {
+  test.each(['production', 'sandbox'])('the %s target goes to the panel scope label, not a second band', async (target) => {
     const server = makeServer();
-    await renderSection(server, [], { target });
-    expect(screen.getByText(chip)).toBeTruthy();
-    const phase = ' and can change its Phase I or Phase II status';
-    const sentence = `This panel changes real data on ${where}: it creates a test Request step by step${target === 'production' ? phase : ''}.`;
-    expect(screen.getByText(sentence)).toBeTruthy();
-  });
-
-  test('the band is not shown before the list answers, and the form-off banner replaces it', async () => {
-    const server = makeServer();
-    server.on('GET', BASE, { status: 500, body: { error: 'x' } });
-    render(<TestRequestFactorySection />);
-    await screen.findByRole('alert');
-    expect(screen.queryByText('Writes to production')).toBeNull();
-    const off = makeServer();
-    await renderSection(off, [], { formEnabled: false });
+    const onTarget = jest.fn();
+    await renderSection(server, [], { target }, { onTarget });
+    await waitFor(() => expect(onTarget).toHaveBeenCalledWith(target));
     expect(screen.queryByText(/This panel changes real data/)).toBeNull();
   });
 
@@ -738,6 +726,26 @@ describe('write target and consequence', () => {
     expect(screen.queryByRole('link', { name: 'Open in the Workbench' })).toBeNull();
     await selectRun('Run P');
     expect(screen.getByRole('link', { name: 'Open in the Workbench' }).getAttribute('href')).toBe('/workbench/44444444-4444-4444-8444-444444444444');
+  });
+
+  test('a created production run puts the status control first, collapses the finished clone steps and drops the empty next-step box', async () => {
+    const prod = makeRun({ status: 'ready', currentStep: 'verify', stepIndex: 6, destinationRequestNumber: '1004000' });
+    const server = makeServer();
+    server.on('GET', `${BASE}/${RUN_A}`, runBody(prod, { diagnosis: { nextAction: 'none', message: 'This run has no continuation action.' } }));
+    server.on('GET', `${BASE}/${RUN_A}/status`, { status: 200, body: { runId: RUN_A, runStatus: 'ready', options: { phase1: [], phase2: [] }, current: { phase1: null, phase2: null }, changes: [] } });
+    await renderSection(server, [prod]);
+    await selectRun('Run A');
+    const statusHeading = await screen.findByRole('heading', { name: 'Phase I and Phase II status' });
+    const cloneSummary = screen.getByText('Test Request created · 7 steps done');
+    expect(cloneSummary.closest('details').open).toBe(false);
+    const FOLLOWING = Node.DOCUMENT_POSITION_FOLLOWING;
+    expect(cloneSummary.compareDocumentPosition(statusHeading) & FOLLOWING).toBeTruthy();
+    expect(statusHeading.compareDocumentPosition(screen.getByText(/^Recorded steps/)) & FOLLOWING).toBeTruthy();
+    expect(statusHeading.compareDocumentPosition(screen.getByText('Run tools')) & FOLLOWING).toBeTruthy();
+    expect(screen.queryByText('Suggested next step')).toBeNull();
+    expect(screen.queryByText(/This run has no continuation action/)).toBeNull();
+    expect(screen.queryByText(/command-line tool/)).toBeNull();
+    expect(screen.getAllByText('Created').length).toBeGreaterThan(0);
   });
 });
 

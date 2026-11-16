@@ -202,3 +202,41 @@ test('a completed success disappears when a later change under More options relo
   expect(await screen.findByText(/A later status change on this Request is still open/)).toBeTruthy();
   expect(screen.queryByText('Request 1003517 is ready for review. It now appears in the Workbench.')).toBeNull();
 });
+
+describe('a paused run reads from the server after a reload (1003518, 2026-11-15)', () => {
+  const chipOf = (label) => screen.getByText(new RegExp(`^\\d\\. ${label}$`)).closest('li').textContent;
+
+  test('readiness written and applied: step 3 is sent, not "Not started", and the note says it is in the Workbench', async () => {
+    const calls = serve({ status: [body({ current: PAIR, r: readiness({ ready: true, attemptStatus: 'applied' }) })] });
+    await renderControl();
+    expect(chipOf('Mark ready for review')).toContain('Sent, not confirmed');
+    expect(chipOf('Mark ready for review')).not.toContain('Not started');
+    expect(screen.getByText(/Ready for review is set, so Request 1003517 already appears in the Workbench/)).toBeTruthy();
+    expect(prepareButton().textContent).toBe('Continue');
+    expect(posts(calls)).toEqual([]);
+  });
+
+  test('readiness sent but not read back: the note does not claim the Workbench', async () => {
+    serve({ status: [body({ current: PAIR, r: readiness({ ready: false, attemptStatus: 'dispatched' }) })] });
+    await renderControl();
+    expect(chipOf('Mark ready for review')).toContain('Sent, not confirmed');
+    expect(screen.getByText(/Ready for review was sent, but its result isn't confirmed yet/)).toBeTruthy();
+    expect(screen.queryByText(/appears in the Workbench/)).toBeNull();
+  });
+
+  test('an open Phase II change marks step 2, not step 3', async () => {
+    const open = { changeId: CHANGE_ID, sequence: 2, field: 'wmkf_phaseiistatus', optionBefore: null, optionAfter: PCR2, status: 'dispatched' };
+    serve({ status: [body({ current: { phase1: INVITED, phase2: null }, changes: [open] })] });
+    await renderControl();
+    expect(chipOf('Set Phase II to Phase II Pending Committee Review')).toContain('Sent, not confirmed');
+    expect(chipOf('Mark ready for review')).toContain('Not started');
+    expect(screen.getByText(/A status change was sent and is still being confirmed/)).toBeTruthy();
+  });
+
+  test('a fresh run shows no paused note', async () => {
+    serve({ status: [body()] });
+    await renderControl();
+    expect(screen.queryByText(/Press Continue/)).toBeNull();
+    expect(chipOf('Mark ready for review')).toContain('Not started');
+  });
+});

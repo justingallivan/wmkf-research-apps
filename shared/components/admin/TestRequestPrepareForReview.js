@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { requestJson } from '../../utils/api-request';
-import { OPEN_CHANGE_STATUSES } from '../../config/testRequestFactory';
+import { OPEN_CHANGE_STATUSES, STATUS_FIELDS } from '../../config/testRequestFactory';
 import { StatusChip } from './AdminWorkspaceNavigation';
 import { messageFor } from './test-request-factory-copy';
 import { buttonProps, focusAndShow } from './test-request-factory-ui';
@@ -73,6 +73,9 @@ export function preparationState(data) {
     laterChange,
     invited, pending, openChange, blocked,
     readinessResumable: ['dispatched', 'applied'].includes(readiness?.attemptStatus),
+    readinessApplied: readiness?.attemptStatus === 'applied' && readiness?.ready === true,
+    // The step a sent-but-unconfirmed status change belongs to (0 or 1), else -1.
+    openStep: openChange ? (STATUS_FIELDS.find((field) => field.column === openChange.field)?.key === 'phase1' ? 0 : 1) : -1,
   };
 }
 
@@ -165,18 +168,30 @@ export default function TestRequestPrepareForReview({
   const shownStop = stop && !(stop.tone === 'green' && !state.allDone) ? stop : null;
   const unlessShown = (text) => (shownStop?.text === text ? null : text);
   const started = state.done.some(Boolean) || Boolean(state.openChange) || state.readinessResumable;
+  // From the server's state after a reload, not only from this mount: a step that was sent but not yet
+  // confirmed never reads "Not started".
+  const sentStep = state.openChange ? state.openStep : (state.readinessResumable ? 2 : -1);
   const chip = (index) => {
     if (state.done[index]) return <StatusChip tone="green">Done</StatusChip>;
     if (working === index) return <StatusChip tone="blue">In progress</StatusChip>;
+    if (sentStep === index) return <StatusChip tone="blue">Sent, not confirmed</StatusChip>;
     return <StatusChip tone="gray">Not started</StatusChip>;
   };
+  // Where a paused run stands, from the server's state, for when no reply from this mount is on screen.
+  const pausedNote = (() => {
+    if (busy || shownStop || state.blocked || state.finished) return '';
+    if (state.openChange) return 'A status change was sent and is still being confirmed. Press Continue to check it; it is not sent again.';
+    if (state.readinessApplied) return `Ready for review is set, so ${requestName} already appears in the Workbench. The last check was still waiting for Dynamics' background jobs. Press Continue to finish it; nothing is sent again.`;
+    if (state.readinessResumable) return "Ready for review was sent, but its result isn't confirmed yet. Press Continue to check; it is not sent again.";
+    return '';
+  })();
 
   return (
     <section aria-labelledby="factory-prepare-heading" className="space-y-4">
       <div>
         <h4 id="factory-prepare-heading" className="text-base font-semibold text-gray-950">Prepare for review</h4>
         <p className="mt-1 text-sm leading-6 text-gray-600">
-          Puts {requestName} in the Workbench: sets Phase I to Invited, then Phase II to Phase II Pending Committee Review, then marks it ready for review. Each step waits for Dynamics&apos; background jobs, so this takes about 5 to 10 minutes. Leave this page open.
+          Puts {requestName} in the Workbench in three steps. Each waits for Dynamics&apos; background jobs, so it takes about 5 to 10 minutes. Leave this page open.
         </p>
       </div>
       <ol className="divide-y divide-gray-200 rounded-xl border border-gray-200 bg-white">
@@ -187,6 +202,7 @@ export default function TestRequestPrepareForReview({
           </li>
         ))}
       </ol>
+      {pausedNote ? <p role="status" className="text-sm leading-6 text-gray-800">{pausedNote}</p> : null}
       {shownStop ? (
         <div ref={stopRef} tabIndex={-1} role={shownStop.tone === 'red' ? 'alert' : 'status'} className={`rounded-lg border px-4 py-3 text-sm leading-6 focus:outline-none ${STOP_TONES[shownStop.tone]}`}>{shownStop.text}</div>
       ) : null}

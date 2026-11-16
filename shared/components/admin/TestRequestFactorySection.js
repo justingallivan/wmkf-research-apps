@@ -270,20 +270,6 @@ export default function TestRequestFactorySection({ onTarget }) {
           {FORM_OFF_FULL}
         </div>
       ) : null}
-      {list.state === 'ready' && list.formEnabled ? (
-        <div className="rounded-xl border border-gray-200 bg-white px-4 py-4 text-sm text-gray-900">
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusChip tone={list.target === 'production' ? 'amber' : 'gray'}>
-              {list.target === 'production' ? 'Writes to production' : 'Writes to sandbox'}
-            </StatusChip>
-            <p className="max-w-3xl leading-6">
-              {list.target === 'production'
-                ? 'This panel changes real data on Production: it creates a test Request step by step and can change its Phase I or Phase II status.'
-                : 'This panel changes real data on the sandbox: it creates a test Request step by step.'}
-            </p>
-          </div>
-        </div>
-      ) : null}
 
       <TestRequestFactoryIntake writeBlock={writeBlock} onLookupStart={abortActive} onReserved={onReserved} getSelectionToken={() => selectionSeqRef.current} hasSelection={Boolean(view)} />
 

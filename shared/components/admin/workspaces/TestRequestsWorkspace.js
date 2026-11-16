@@ -19,6 +19,14 @@ export function TestRequestsWorkspace() {
   return (
     <div className="space-y-6">
       <AdminEditorPanel
+        id="test-request-factory"
+        title="Create a test Request"
+        description="Choose a source Request, create a marked test copy of it, then prepare the copy for review so it appears in the Workbench. Each step writes real data."
+        scope={factoryScope}
+      >
+        <TestRequestFactorySection onTarget={setFactoryTarget} />
+      </AdminEditorPanel>
+      <AdminEditorPanel
         id="test-request-email-allowlist"
         title="Test-request email allowlist"
         description="Who may receive email about a test request, for testing and training. Everyone else is refused."
@@ -26,14 +34,6 @@ export function TestRequestsWorkspace() {
         dataverseFields={TEST_REQUEST_EMAIL_ALLOWLIST_DATAVERSE_FIELDS}
       >
         <TestRequestEmailAllowlistSection />
-      </AdminEditorPanel>
-      <AdminEditorPanel
-        id="test-request-factory"
-        title="Create a test Request"
-        description="Clone one production Request into a labelled test Request, step by step, then set its Phase I or Phase II status. Each step writes real data, so every control says why it is off."
-        scope={factoryScope}
-      >
-        <TestRequestFactorySection onTarget={setFactoryTarget} />
       </AdminEditorPanel>
     </div>
   );

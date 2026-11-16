@@ -127,15 +127,28 @@ export default function TestRequestFactoryRunPanel({
         </span>
       </div>
 
-      {run.status === 'ready' && production ? <p className="text-sm text-gray-700">Cloning is complete. This run status does not confirm staff readiness. Prepared J27 fixtures need phase advancement and the owner’s readiness finalization before reviewer testing.</p> : null}
-
       {view.state === 'error' ? <div role="alert" className={ERROR_BAND}>{view.text}</div> : null}
 
       {run.status === 'retiring' || run.status === 'retired' ? (
         <p className="text-sm leading-6 text-gray-700">This run is {status.label.toLowerCase()}, so its steps are not shown.</p>
+      ) : run.status === 'ready' ? (
+        // Finished work collapses to one line (DESIGN.md Finished-Work Rule); the steps stay one click away.
+        <details className="rounded-xl border border-gray-200 bg-white px-4">
+          <summary className={SUMMARY_CLASS}>
+            <span>{`Test Request created · ${BASIC_STEPS.length} steps done`}</span>
+            <span className="ml-2 align-middle"><StatusChip tone="green">Done</StatusChip></span>
+          </summary>
+          <div className="pb-4"><ProgressList run={run} advancing={advancing} /></div>
+        </details>
       ) : (
         <ProgressList run={run} advancing={advancing} />
       )}
+
+      {run.status === 'ready' && production ? (
+        <section aria-label="Phase I and Phase II status" className="space-y-3">
+          <TestRequestStatusControl key={`${run.runId}:${epoch}`} run={run} writeBlock={writeBlock} getScope={getScope} initialStuck={initialStuck} onStuck={onStuck} />
+        </section>
+      ) : null}
 
       <div role="status" aria-live="polite" className="text-sm text-gray-700">{progressLine}</div>
       {advancing ? <p className="text-sm text-gray-600">This can take a few minutes. Leave this page open.</p> : null}
@@ -155,7 +168,7 @@ export default function TestRequestFactoryRunPanel({
           ) : null}
         </div>
       ) : null}
-      {!attention ? (
+      {!attention && run.status !== 'ready' ? (
         <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm leading-6 text-gray-800" aria-label="Run diagnosis">
           <p className="font-semibold">Suggested next step</p>
           <p id="factory-run-diagnosis" className="mt-1">{diagnosisMessage}</p>
@@ -257,12 +270,6 @@ export default function TestRequestFactoryRunPanel({
         </div>
       </details>
 
-      {run.status === 'ready' && production ? (
-        <section aria-labelledby="factory-status-heading" className="space-y-3 border-t border-gray-200 pt-5">
-          <h4 id="factory-status-heading" className="text-base font-semibold text-gray-950">Phase I and Phase II status</h4>
-          <TestRequestStatusControl key={`${run.runId}:${epoch}`} run={run} writeBlock={writeBlock} getScope={getScope} initialStuck={initialStuck} onStuck={onStuck} />
-        </section>
-      ) : null}
       {run.status === 'ready' && !production ? (
         <p className="border-t border-gray-200 pt-5 text-sm leading-6 text-gray-700">Status changes are available only for production test Requests.</p>
       ) : null}

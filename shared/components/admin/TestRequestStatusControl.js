@@ -518,6 +518,7 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
   }
   return (
     <div className="space-y-5">
+      <h4 className="text-base font-semibold text-gray-950">Phase I and Phase II status</h4>
       {readiness?.unavailable ? (
         <p className="text-sm text-gray-600">Readiness couldn&apos;t be checked just now, so Prepare for review isn&apos;t shown. Reload the run to try again.</p>
       ) : null}
