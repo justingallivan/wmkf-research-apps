@@ -79,8 +79,9 @@ Content / abstract:
 - `wmkf_excludedreviewers` (free-form names)
 - `wmkf_layabstract` and `wmkf_initialassessment` (optional plain-text Memo,
   100,000 characters each) — **[SCHEMA LIVE: historical owner-approved probe,
-  2026-11-09; Executive Summary editor integrated on feature branch 2026-11-16,
-  not promoted]**. Wave `36-request-narratives` provisioned both in Production;
+  2026-11-09; Executive Summary editor deployed at `1037d2dbd` and authenticated
+  Safari save/clear/conflict/reload tested on #1003518, 2026-11-16; original blank
+  Summary restored and reloaded]**. Wave `36-request-narratives` provisioned both in Production;
   `probe-request-narrative-fields.js --target=prod --verify` confirmed typed
   metadata and zero-row selection. The current editor exposes only `lay_abstract`
   as **Executive Summary**, via GET/PATCH `/api/workbench/request-narratives`.

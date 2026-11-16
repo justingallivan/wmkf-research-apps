@@ -3,7 +3,7 @@
 Owner: Codex. Updated 2026-11-16.
 Branch: `codex/executive-summary-integration-2026-11-16`.
 Worktree: `/private/tmp/wmkf-summary-integration-20261116`.
-Status: integrated with current J27 source; not promoted or deployed.
+Status: merged to `main` at `1037d2dbd`, deployed and live-tested 2026-11-16 with owner approval.
 
 ## Current scope
 
@@ -124,10 +124,20 @@ service credentials or env files. Run
 The default E2E server also covers the legacy Overview; J27 assertions apply when
 its phase tabs are present. Never reuse a live authenticated session for this test.
 
-Live authenticated staff save/readback remains unverified. Production
-promotion and a bounded test on an owner-approved test Request need explicit approval.
-The proposed test saves synthetic text, reloads, clears, confirms stale-form refusal,
-and restores the original Summary; it must preserve all other fields and test data.
+[VERIFIED via Vercel CLI, 2026-11-16] Owner explicitly authorized merge/deploy and
+Production testing on Request 1003518 with restoration. Commit `1037d2dbd` was
+fast-forwarded and pushed to main; deployment `dpl_HNvYavFYLae3VDZcJ9jZMoa8uJvE`
+reached Ready and received the `applications.wmkeck.org` alias.
+
+[VERIFIED via authenticated Safari UI, 2026-11-16] Marked TEST Request **1003518**
+(`cc80114d-85b7-5c5d-b53f-4da202644c64`) passed temporary text save/server reload,
+stale-tab save refusal with draft retention, explicit conflict reload, and intentional
+clear/save/server reload. Its original Summary was blank. The blank Summary was
+restored and confirmed by server reload in both tabs; the extra test tab was closed.
+No other request fields were edited. Chrome and direct custom-domain HTTP checks
+on this Mac timed out; Safari worked after owner-completed Microsoft sign-in.
+This proves the staff-editor persistence/conflict path, not the intake AI flow.
+
 Rollback is the prior app deployment; it does not undo saved text.
 
 ## Changed-fact reconciliation
@@ -141,5 +151,7 @@ Stream C of the session handoff. Other streams and separate PA branch code are n
 modified; their current Summary requirements must be read with this explicit owner
 supersession when that branch is resumed. Repeat scoped searches found zero remaining live stale initialization requirements
 in this checkout; historical schema descriptions are retained for parity.
-No tenant-wide overwrite guarantee,
-completed generation flow, Akoya form change or live staff-write proof is claimed.
+Deployment/live-test follow-up reconciled this handoff, SESSION_PROMPT.md and the
+Request Atlas against the Vercel result and authenticated Safari observations above.
+No tenant-wide overwrite guarantee, completed generation flow or Akoya form change
+is claimed. The original blank Summary was restored; no test text remains.

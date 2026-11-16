@@ -13,7 +13,7 @@ yours to change.
 |---|---|---|---|---|
 | **A. J27 Workbench** | Claude, Session 678 (2026-11-14 to 2026-11-15) | `main` (clean). Worktree `/Users/gallivan/Code/WMKF_Apps-claude-factory-j27-files` (merged, kept until cleanup); `claude/j27-read-model` (sandbox Preview) at `2adc6dfb0` | Stream A below; alignment log D70, D71 | Ask the owner. Candidates: note to Connor about broken bibliographies (Verified Open 1); intake checks around 2026-12-05 |
 | **B. Expertise roster** | Codex, Session 670; Codex again 2026-11-10 and 2026-11-11 | **Observed 2026-11-12 by Claude, not Codex's own record:** `codex/expertise-roster-import-2026-11-10` last commit 2026-11-11 15:37 ("record reviewed native output schema build"), worktree `/Users/gallivan/Code/WMKF_Apps-codex-roster-import`. Codex's own section below still names the 2026-11-09 branch | Stream B below; `docs/plans/EXPERTISE_ROSTER_HANDOFF_2026-11-09.md`; that branch's own handoff commits | Ask Codex or the owner for the current boundary; do not resume from the 2026-11-09 text alone |
-| **C. Executive Summary** | Codex, 2026-11-16 | `codex/executive-summary-integration-2026-11-16`; `/private/tmp/wmkf-summary-integration-20261116` | Stream C below; current Request-narratives handoff | Complete release verification; owner-approved promotion and staff save/readback |
+| **C. Executive Summary** | Codex, 2026-11-16 | `main`, runtime commit `1037d2dbd` | Stream C below; current Request-narratives handoff | Editor deployed and live-tested; generation/form hiding remain separate |
 
 **Other Codex work seen 2026-11-12 (observed by Claude; not a handoff, not
 Claude's to change; not rechecked 2026-11-14):**
@@ -52,7 +52,7 @@ Production), `git show 749d59e40:SESSION_PROMPT.md` (Session 675),
 
 **Where the streams meet.**
 - Stream C's Summary card is integrated with Stream A's current J27 Overview on
-  the integration branch; production promotion and live staff testing remain pending.
+  `main`; production deployment and live staff testing completed 2026-11-16.
 - **Stream A is on `main`**, including its change to
   `pages/api/expertise-finder/batch-match.js` (J27 staff version name, Session
   672) that Stream B also changes: Stream B rebases onto `main` and reconciles.
@@ -60,8 +60,8 @@ Production), `git show 749d59e40:SESSION_PROMPT.md` (Session 675),
 ## Rules for every stream
 
 1. **Promotion needs the owner's explicit go.** Stream A's J27 line is live
-   (2026-11-13 and 2026-11-14, owner go at each step); Streams B and C are
-   still on feature branches. `main` deploys to Production on push; only
+   (2026-11-13 and 2026-11-14, owner go at each step); Stream C was owner-approved and deployed 2026-11-16; Stream B remains
+   on a feature branch. `main` deploys to Production on push; only
    documentation lands there without the owner's go.
 2. **Worktrees under `/private/tmp` are volatile.** Several Codex ones listed
    by `git worktree list` are gone from disk (git marks them prunable; not
@@ -276,14 +276,13 @@ roster handoff. All are on the feature branch, not promoted by this docs landing
    remain necessary before cutover. No expertise-content/scoring decision is needed
    to resume mechanics. See roster plan on feature branch.
 3. Separate Executive Summary stream: the intake contract is accepted and J27
-   integration is branch-built (2026-11-16). Promotion and live staff save/readback
-   remain pending; use Stream C and its current handoff, not this older roster record.
+   integration is deployed and live staff save/readback passed (2026-11-16); use Stream C and its current handoff, not this older roster record.
 
 #### Owner Decision Needed
 
 - Roster Production release is not authorized. Private local exports/receipts need
   an approved secure transfer/retention location if continuing on another Mac.
-- Request-narratives release timing and test Request/environment remain owner decisions.
+- Request-narratives editor release and Production test on #1003518 were owner-approved and completed 2026-11-16; see Stream C.
 - Inherited J27 decisions (unchanged): offramp justification location and status owner,
   retention of First Cut answers, fit-flag meaning, intake outputs/owners, staff queues,
   Chairs materials and calendar changes. Recheck Claude's current alignment log.
@@ -326,8 +325,9 @@ roster work. CLAUDE.md unchanged. This main landing contains documentation only.
 
 ## Stream C — Executive Summary (Codex, 2026-11-16)
 
-Current branch: `codex/executive-summary-integration-2026-11-16`, based on main
-`a3b9c748e`. Worktree `/private/tmp/wmkf-summary-integration-20261116`.
+Runtime merged and pushed to `main`: `1037d2dbd` (2026-11-16), with explicit owner approval.
+Source branch: `codex/executive-summary-integration-2026-11-16`; retained worktree
+`/private/tmp/wmkf-summary-integration-20261116`.
 Read `docs/plans/REQUEST_NARRATIVES_HANDOFF_2026-11-09.md` for the current contract.
 Original November 9 two-field handoff remains in git history, not the resume boundary.
 
@@ -348,13 +348,24 @@ Original November 9 two-field handoff remains in git history, not the resume bou
 - 104 focused/Overview/J27 tests and the webpack production build passed. Independent
   code review found no material findings. See current handoff for evidence limits.
 
+### Deployment and live verification — 2026-11-16
+
+- [VERIFIED via Vercel CLI] Production deployment `dpl_HNvYavFYLae3VDZcJ9jZMoa8uJvE`
+  reached Ready and was assigned to `applications.wmkeck.org` after the merge/push.
+- [VERIFIED via authenticated Safari UI] Owner-authorized test on marked TEST
+  Request **1003518** (`cc80114d-85b7-5c5d-b53f-4da202644c64`): temporary Summary
+  save and server reload passed; a second stale tab was refused with its draft
+  retained; deliberate reload recovered the saved text; clear/save/reload passed.
+  The original Summary was blank and was restored, then confirmed by server reload
+  in both tabs. The extra test tab was closed. No other request fields were edited.
+- Chrome and direct custom-domain HTTP checks timed out on this Mac; Safari worked
+  after the owner completed Microsoft sign-in. This did not block the completed test.
+- Earlier local verification: Chromium fixture rehearsal, all 30 scoped gate/self-test
+  commands and scoped lint passed. The authenticated Safari test supplies the live
+  persistence evidence that the synthetic rehearsal could not.
+
 ### Remaining
 
-- Production candidate is locally verified: Chromium J27 rehearsal, all 30 scoped
-  gate/self-test commands and scoped lint pass. Browser APIs were synthetic; no
-  external write was performed. The candidate awaits explicit owner promotion approval.
-- Owner approval for production promotion and a bounded staff save/readback test:
-  edit, reload, clear, stale-form refusal, restore original on a marked test Request.
 - Actual generation and Akoya form hiding are not independently verified. Separate
   Short Title submit/poll results and machine Summary activation are not part of
   the editor release. Do not infer a working generation flow from Connor's contract.
