@@ -85,6 +85,19 @@ be separate prompts. Compliance and broader expertise matching scope are unresol
   18:31:58.521 UTC; remaining content November 23 at that time. Physical scoped
   cleanup remains due and is separate from restarting integration or deleting
   receipts/infrastructure. Check the retained receipt and current state before action.
+- **Owner-approved content-expiry cleanup (Session 680, 2026-11-16).** Run the parked
+  worktree's `scripts/run-summary-sandbox-http.cjs tick` once after 2026-11-17
+  18:31:58 UTC and once after 2026-11-23 18:31:58 UTC. [VERIFIED via parked-branch
+  source `8d97e9999`] The worker deletes only expired `prompt_job_content` rows in this
+  Summary pilot's scope before its active-policy check, so deletion still runs after
+  the Nov 18 policy expiry; the completed job then returns without model calls or
+  Dataverse writes. A tick before expiry deletes nothing. The saved Preview OIDC token
+  expires 2026-11-17 06:24 UTC and must be refreshed first (private file only). The
+  runner allows 8 ticks; 5 were used, so 3 remain. Each tick appends to
+  `http-state.json`. [ASSUMED from trial notes, not probed] the Preview deployment and
+  its settings still exist and the content rows are present. Out of scope: the two
+  earlier Short Title jobs in the same database, and fixture removal (test PI link on
+  1000389 and the TEST-folder PDF), which stay until the owner decides.
 - Private credentials/source/receipts under `/private/tmp/wmkf-summary-live-20261116`
   are not in Git and do not transfer between Macs. Do not copy credential files into
   handoff artifacts. Worktree directories are volatile; pushed branches preserve code.

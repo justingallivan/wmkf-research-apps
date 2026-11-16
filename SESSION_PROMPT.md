@@ -35,9 +35,11 @@ example prompt from Connor; response pending. Preserve existing work and receipt
   lists/rubrics, unassigned destinations and versioned storage. See handoff.
 - **Parked:** backend adoption/scheduling/rollout; no new AI calls or prompt
   publication authorized by closeout. No new prompt drafts created during stop.
-- **Verify before acting:** relevant current prompt versions/consumers; retained
-  trial cleanup deadlines. Policy expires November 18 at 19:30 UTC; content expiry
-  November 17/23. Physical cleanup is not yet proved and must preserve receipts.
+- **Approved cleanup (Session 680):** run the parked trial worker once after
+  Nov 17 18:32 UTC and once after Nov 23 18:32 UTC to delete expired trial content.
+  Refresh the Preview OIDC token first. Details and limits are in the handoff's
+  preservation section. Fixture removal is not approved; receipts stay.
+- **Verify before acting:** relevant current prompt versions/consumers.
 - **Do not reopen without owner decision:** replacing Connor's existing runner,
   requiring staff-edit flags, or merging the broad backend branch into main.
 
