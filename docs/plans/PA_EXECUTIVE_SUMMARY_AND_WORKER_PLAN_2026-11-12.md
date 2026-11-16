@@ -1,8 +1,8 @@
 # Executive Summary and worker automation
 
 Owner: Codex; implementation branch `codex/executive-summary-generation-2026-11-16`.
-Status: bounded Summary integration is branch-built and default-off. No Summary
-activation, deployment or live generation follows from this build. Current implementation,
+Status: bounded Summary integration passed an isolated Sandbox live trial on
+1000389; default-off elsewhere, with no Production promotion. Current implementation,
 verification and setup checklist: [bounded Summary integration](PA_EXECUTIVE_SUMMARY_INTEGRATION_2026-11-16.md).
 
 ## Current intake contract
@@ -40,13 +40,11 @@ expiry and a new event/key. Unknown provider/audit/write outcomes never authoriz
 another automatic attempt. Source replacement is checked before generation and
 publication. No staff marker column or migration is required.
 
-Before a bounded live setup, verify the actual
-`Submission-Documents/Project-Narrative_{Request#}.pdf` naming and upload completion,
-current Summary metadata/permissions, prompt/profile pins, exact Request/event and
-isolated database. Exercise submit, polling, worker advancement and readback under
-a separately reviewed bounded test setup. Do not reuse completed Short Title trial
-pins or credentials. Effective deployed duration and source extraction remain live
-verification items; offline tests are not evidence of either.
+The [November 16 live receipt](PA_EXECUTIVE_SUMMARY_LIVE_TRIAL_2026-11-16.md)
+proves exact synthetic narrative/PI preparation, hosted duration, real extraction,
+submit/poll, five worker stages, audit/write/readback and replay after restoration.
+Connor flow wiring and real applicant quality remain unverified. Completed trial
+pins do not authorize another execution.
 
 Keep one stage per invocation and durable leases/checkpoints. The new Summary drain
 is unscheduled; future unattended scheduling, production enrollment and broader

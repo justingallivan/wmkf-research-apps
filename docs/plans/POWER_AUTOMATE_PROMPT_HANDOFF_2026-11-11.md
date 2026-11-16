@@ -94,8 +94,8 @@ facade remains test-only.
 ## Executive Summary integration
 
 The [bounded Summary integration](PA_EXECUTIVE_SUMMARY_INTEGRATION_2026-11-16.md) is built on
-`codex/executive-summary-generation-2026-11-16`, default-off and not deployed or
-activated. The owner selected bounded exact Sandbox Requests first. Separate
+`codex/executive-summary-generation-2026-11-16`, tested in an isolated Sandbox
+Preview and default-off elsewhere. The owner selected bounded exact Sandbox Requests first. Separate
 `/api/automation/summary-jobs` submit/status routes and an unscheduled Summary drain
 use their own `PROMPT_JOB_SUMMARY_PILOT`; no Short Title policy changes are required.
 
@@ -105,8 +105,10 @@ field reservations preserve replay protection. Staff draft behavior stays unchan
 Connor confirmed `wmkf_readyforreview` is the final handoff after AI/document success;
 Power Automate halts failures and notifies check-in staff. Justin accepts the rare
 broken-intake rerun edge case; a persistent staff-edit marker is not a prerequisite.
-Actual filename/upload completion, metadata and enrollment pins remain bounded live
-setup checks. No broad production enrollment or live Summary call is claimed.
+The [bounded live trial](PA_EXECUTIVE_SUMMARY_LIVE_TRIAL_2026-11-16.md) proved
+synthetic narrative extraction, one real call/audit/publication and replay after
+restoration on 1000389. Actual Connor flow wiring/upload completion and broad
+Production enrollment remain outside that proof.
 
 The separate Short Title driver trial and Connor submit/poll test retain their own
 historical receipts below. Completed trial pins are not a new execution approval.

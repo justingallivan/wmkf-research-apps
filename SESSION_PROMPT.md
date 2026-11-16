@@ -380,14 +380,20 @@ additional unpromoted Executor/Admin/draft/recommendation work; review that rele
 delta before any merge. This is not a narrow patch on production main.
 
 853 distinct tests, scoped gates/lint/types and the webpack fallback production
-build passed. The feature branch is committed locally, not pushed or deployed.
+build passed. Runtime build `ac7cac093` and PDF parser fix `6d6a7c724` are committed
+locally. An isolated CLI Preview is Ready; no branch push or Production promotion.
 See `docs/plans/PA_EXECUTIVE_SUMMARY_INTEGRATION_2026-11-16.md` for evidence,
-activation prerequisites and the remaining bounded live test. No real provider,
-Graph, Dataverse, cloud DB, deployment, environment or Connor flow changed here.
+activation contract and rollout boundaries. The owner subsequently authorized the
+bounded Sandbox test: Request 1000389 completed one 192-word generation, audit and
+conditional publication. Same-key replay preserved the receipt; original blank
+Summary restored and replay confirmed no refill. Short Title and its old job receipts
+are unchanged. See `docs/plans/PA_EXECUTIVE_SUMMARY_LIVE_TRIAL_2026-11-16.md` for
+exact Preview, enrollment, retained fixtures, expiry and remaining PA flow work.
 
 ### Remaining
 
-- Actual generation and Akoya form hiding are not independently verified. Separate
+- Bounded Sandbox generation is verified; Connor intake wiring and Akoya form hiding
+  remain unverified. Separate
   Short Title submit/poll results and machine Summary activation are not part of
   the editor release. Do not infer a working generation flow from Connor's contract.
 - No other stream's worktree, fixture, settings or deployment is changed.

@@ -3,9 +3,9 @@
 Status: implementation in the isolated feature branch; no deployment or live policy,
 prompt, Request or credential changes. Connor’s test remains on its existing immutable
 Preview. Executive Summary uses the Submission-Documents narrative by owner decision;
-the separate [bounded Summary integration](PA_EXECUTIVE_SUMMARY_INTEGRATION_2026-11-16.md) is branch-built and default-off.
-Its exact Sandbox enrollment does not require a staff-edit marker; no Summary live
-activation or deployment is claimed here.
+the separate [bounded Summary integration](PA_EXECUTIVE_SUMMARY_INTEGRATION_2026-11-16.md) passed a separate isolated Sandbox live trial and stays default-off elsewhere.
+Its exact Sandbox enrollment does not require a staff-edit marker; see the
+[live receipt](PA_EXECUTIVE_SUMMARY_LIVE_TRIAL_2026-11-16.md).
 
 ## Scope and owner decision
 

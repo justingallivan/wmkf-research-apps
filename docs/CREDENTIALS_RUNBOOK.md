@@ -251,7 +251,9 @@ remain pending. [Sandbox handoff](plans/POWER_AUTOMATE_PROMPT_HANDOFF_2026-11-11
 
 ### Optional — Shared Executor machine Executive Summary pilot
 
-**[BRANCH-BUILT, DEFAULT OFF; no activation or deployment]**
+**[SANDBOX LIVE-TESTED 2026-11-16; DEFAULT OFF elsewhere]**
+One deployment-only enrollment completed the [bounded trial](plans/PA_EXECUTIVE_SUMMARY_LIVE_TRIAL_2026-11-16.md);
+no project-wide environment change or Production promotion.
 `PROMPT_JOB_SUMMARY_PILOT` is non-secret server-owned JSON configuration, stored
 readably when enrolled. It is separate from `PROMPT_JOB_MACHINE_PILOT`; setting one
 does not enable the other. Unset/empty disables Summary admission and drain;

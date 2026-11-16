@@ -3,7 +3,7 @@
 Owner: Codex. Current Summary integration branch:
 `codex/executive-summary-generation-2026-11-16`.
 Status: existing Lay Abstract storage is retained. The bounded machine integration
-is branch-built, default-off and not deployed or activated; see [bounded Summary integration](PA_EXECUTIVE_SUMMARY_INTEGRATION_2026-11-16.md).
+passed one isolated Sandbox live trial and stays default-off elsewhere; see [bounded Summary integration](PA_EXECUTIVE_SUMMARY_INTEGRATION_2026-11-16.md).
 No persistent staff-edit marker is required by the accepted intake contract.
 The staff editor was merged at `1037d2dbd`, deployed and live-tested on Request
 1003518 with its original Summary restored; the
@@ -42,7 +42,7 @@ Do not widen the allowlist during a later merge without checking Sandbox schema.
 | `shared/config/requestNarratives.js` | Existing column, 100,000-character manual limit, explicit enabled-field allowlist |
 | `proposal.executive-summary` | Existing `summary` output, 200-word cap; staff draft remains destination-free, exact machine Summary scope binds Lay Abstract |
 | Shared Executor / Admin prompt publish | Reject configurable persistence to Lay Abstract before provider dispatch/publication; dedicated staff saves do not use this path |
-| Machine endpoint/worker/store | Separate default-off Summary admission/status/policy/worker; exact Sandbox enrollment, frozen narrative/PI, audit and original-ETag publication; no live activation |
+| Machine endpoint/worker/store | Separate default-off Summary admission/status/policy/worker; exact Sandbox enrollment, frozen narrative/PI, audit and original-ETag publication; bounded Sandbox delivery proved |
 | Legacy AI Summary / dossier / Pre-Site | Unchanged. No mapping from Executive Summary to `aiContent.summary`, dossier input or governed document sections |
 | Dynamics Explorer | Source exposes read/export tools, not mutation tools. No nonexistent mutation path was added or claimed guarded |
 
@@ -57,8 +57,8 @@ Do not widen the allowlist during a later merge without checking Sandbox schema.
 | Correct staff identity | Fresh lead-PD comparison or superuser, linked actor, impersonation enabled, Preview-to-Production read-only, noFallback |
 | No stale UI response | Request-keyed editor, generation guard on success/error/reload, dirty-navigation confirmation |
 | No prompt-row bypass | Reserved-target check at Admin validation, Executor pre-dispatch and persistence; forceOverwrite and jsonPath regression tests |
-| Bounded machine Summary only | Separate exact Sandbox policy; generic and Short Title admission cannot initialize Summary; no activated enrollment |
-| Connor unchanged | No deployment, environment, credentials, jobs, Requests or worker calls in this slice |
+| Bounded machine Summary only | Separate exact Sandbox policy; generic and Short Title admission cannot initialize Summary; one exact Sandbox enrollment tested |
+| Connor unchanged | Existing Connor Preview and policies unchanged; separate Summary trial below |
 
 ## Sandbox schema
 
@@ -94,10 +94,10 @@ A staff edit after capture conflicts; replay after a later clear does not refill
 There is no general overwrite, reset or automatic regeneration path. Staff drafts
 remain destination-free and Short Title grants cannot select Lay Abstract.
 
-The owner selected bounded test Requests first. Actual narrative filename/upload
-completion, metadata/permissions and prompt/profile enrollment must be verified in
-bounded setup. See [bounded Summary integration](PA_EXECUTIVE_SUMMARY_INTEGRATION_2026-11-16.md) for the implementation and
-remaining live checks. No Summary deployment or paid live run occurred in this build.
+The owner-selected bounded Sandbox test passed on 1000389 with synthetic narrative
+and PI, pinned prompt/profile, one real model call, audit and field publication.
+Original blank restored; replay did not refill. See the [live receipt](PA_EXECUTIVE_SUMMARY_LIVE_TRIAL_2026-11-16.md).
+Connor flow upload completion and Production rollout remain separate.
 
 ## Historical evidence boundary
 

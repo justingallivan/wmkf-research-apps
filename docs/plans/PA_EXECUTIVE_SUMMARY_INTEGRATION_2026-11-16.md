@@ -1,6 +1,6 @@
 ---
 title: Bounded Executive Summary integration
-status: branch-built
+status: sandbox-live-tested
 last_verified: 2026-11-16
 ---
 
@@ -9,8 +9,10 @@ last_verified: 2026-11-16
 Owner: Codex. Branch: `codex/executive-summary-generation-2026-11-16`.
 Worktree: `/private/tmp/wmkf-summary-generation-20261116`.
 [OWNER DECISION 2026-11-16] Build on a branch; explicitly enrolled test Requests first.
-No deployment, enrollment, cloud migration, real model call or Request write occurred
-in this build. The separately deployed staff editor is documented in
+[VERIFIED via hosted HTTP, ledger and Dataverse readback] The approved bounded
+Sandbox trial passed on Request 1000389, including one real model call, audit,
+publication, replay and restoration. No Production deployment or cloud migration.
+See [live trial receipt](PA_EXECUTIVE_SUMMARY_LIVE_TRIAL_2026-11-16.md). The separately deployed staff editor is documented in
 [the narrative handoff](REQUEST_NARRATIVES_HANDOFF_2026-11-09.md).
 
 ## Contract and implementation
@@ -86,47 +88,35 @@ ticks sequentially and inspect status between calls, stopping at terminal state,
 transport ambiguity or the enrollment expiry. Never overlap ticks after a timeout;
 inspect retained lease/dispatch receipts first. Unattended scheduling is deferred.
 
-## Enrollment and bounded live acceptance remaining
+## Bounded acceptance completed; rollout remaining
 
-1. Review the full branch release delta. This branch starts from PA commit
-   `db00e33ba`, merged with current main `57eb7c40f` at `8e9a615bc`; it includes
-   inherited unpromoted shared Executor, Admin profile, staff draft and recommendation
-   work. It is not just a small patch on production main. Keep all unrelated trial
-   policies disabled and do not replace Connor's existing Preview.
-2. Prepare an isolated Sandbox Preview and database with canonical migrations using
-   the existing migration runner. Verify migration 097 fingerprints and database
-   identity; do not use fresh-install setup on an existing database. No schema apply
-   is authorized by this document alone.
-3. Select one explicitly approved test Request with a blank Summary, stored PI and
-   finalized narrative. Verify the exact file/path, Graph revision semantics and
-   readable PDF with the real producer. The ready flag is the final handoff, not an
-   AI prerequisite. Set the stable source-event UUID at enrollment; the broader
-   intake event mapping remains Connor's flow wiring, not a new unresolved source choice.
-4. Read the actual current Summary prompt/profile in the target environment and pin
-   their IDs/version/hashes. The checked-in November 11 v2 candidate supplies the
-   tested raw-output/profile shape; it is not proof those rows are published in the
-   selected Sandbox. Do not silently republish or alter prompt wording.
-5. Configure **only** `PROMPT_JOB_SUMMARY_PILOT`, never overwrite
-   `PROMPT_JOB_MACHINE_PILOT`. It uses the existing exact policy keys: `enabled`,
-   `pilotId`, `requestId`, `sourceEventId`, `tenantId`, `audience`, `clientId`,
-   `servicePrincipalId`, `role`, `promptId`, `promptVersion`, `promptHash`,
-   `profileHash`, `databaseIdentity`, `databaseEndpoint`, `expiresAt` (≤7 days).
-   `destinationGrant` is rejected; the Summary field is code-owned. Require the
-   pinned Sandbox origin, both Dataverse enforcement flags `on`, server nonce secret
-   and pinned Postgres URL. These policy IDs/hashes are nonsecret; credentials stay
-   server-side. Verify application token claims and wrong-request/status isolation.
-6. Inspect the deployed drain budget: route and exact Vercel override are 240 seconds,
-   lease 300 seconds, Executor deadline 210 seconds from tick entry (also bounded by
-   lease minus checkpoint margin). Metadata, extraction and final writes are not
-   globally abort-controlled: a platform termination must recover conservatively
-   through lease/unknown-outcome fences. No forced live timeout has been tested.
-7. Obtain approval for one bounded real generation/audit/write, then submit/poll and
-   advance stages. Verify one provider attempt, one audit, one applied Summary and
-   staff readback; replay the same key and confirm no additional side effects.
-   Restore original Summary if the approved fixture procedure calls for it. Retain
-   receipts and record cleanup deadlines. Content quality needs human review.
-8. Only after that evidence, decide deployment and future broader intake/scheduling.
-   Current code refuses Production; broad production activation is not a config flip.
+The November 16 [live receipt](PA_EXECUTIVE_SUMMARY_LIVE_TRIAL_2026-11-16.md)
+records exact enrollment, hosted budget, prompt/profile, database, fixture and
+successful delivery/replay/restoration. The policy expires November 18 at 19:30 UTC.
+No new execution is authorized by these completed trial pins.
+
+Before promotion, review the full branch delta: PA base `db00e33ba` plus main
+`57eb7c40f`, merged at `8e9a615bc`, includes inherited unpromoted Executor/Admin,
+staff-draft and recommendation work. Connor's actual intake submit/poll actions,
+upload-completion signal, final readiness/failure paths, and unattended worker
+scheduling still need integration acceptance. Synthetic input proves mechanics,
+not scientific quality on real applicant documents or staff browser readback of
+this machine result. Current code refuses Production; broad activation requires
+reviewed implementation, not a configuration flip. Production promotion is not
+authorized.
+
+Enrollment uses only `PROMPT_JOB_SUMMARY_PILOT`, with exact existing policy keys:
+`enabled`, `pilotId`, `requestId`, `sourceEventId`, `tenantId`, `audience`, `clientId`,
+`servicePrincipalId`, `role`, `promptId`, `promptVersion`, `promptHash`, `profileHash`,
+`databaseIdentity`, `databaseEndpoint`, `expiresAt` (at most seven days).
+`destinationGrant` is rejected. Preserve both Dataverse enforcement flags, Sandbox
+origin and database pins. Credentials stay server-side. Never overwrite another
+trial's policy. No schema apply is implied by these instructions.
+
+The hosted drain budget is 240 seconds, lease 300 seconds and Executor deadline
+210 seconds from tick entry. Metadata/extraction/final writes are not globally
+abort-controlled. Forced platform timeout remains untested; uncertainty must
+recover through the retained lease/dispatch fences, never blind retries.
 
 ## Verification and review evidence
 
@@ -149,7 +139,8 @@ bounded-test/rerun decisions. Current field/worker/handoff/config/architecture p
 ledger Atlas, route matrix, environment runbook, service catalogue and session notes
 received scoped corrections; earlier dated trials are historical evidence. This is
 not a whole-inventory truth audit of unrelated route/catalogue/environment entries. External PA/form
-configuration, hosted policy/prompt rows and live Summary delivery remain unverified.
+configuration remains unverified. Hosted policy/prompt rows and bounded Summary
+delivery are now verified in the linked live receipt.
 
 ### Completed local checks
 
@@ -165,11 +156,13 @@ configuration, hosted policy/prompt rows and live Summary delivery remain unveri
 - Production-mode webpack fallback build passed with credentials scrubbed and
   existing shared installed dependencies. The worktree's external `node_modules`
   symlink precludes a canonical Turbopack claim; no fresh dependency install or
-  hosted build was performed.
+  hosted build was performed in that local verification pass. The subsequent
+  bounded Preview reached Ready at `6d6a7c724`.
 - No live Summary quality, SharePoint extraction, Entra authorization, cloud schema
-  or field publication claim follows from these checks. A bounded live test remains.
+  or field publication claim follows from those local checks alone. The separate
+  live receipt now supplies bounded synthetic-input evidence.
 
 Repository storage: feature-branch commits are retained in the main repository's
 Git object store even if the temporary worktree disappears. No runtime branch push
-was performed because it could create a Preview deployment before the bounded
-setup is selected. Production main and Connor's Preview remain untouched.
+was performed. The authorized isolated CLI Preview uses deployment-only overrides;
+Production main and Connor's Preview remain untouched.

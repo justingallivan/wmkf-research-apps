@@ -34,7 +34,7 @@ Claim uses a transaction advisory lock plus a partial unique per-Request lease i
 
 A second initialization job cannot capture its Request ETag while an earlier initialized job has pending writeback, including a different field or a slot released by a failed sibling. It waits across worker ticks and captures the new ETag after the earlier publication settles.
 
-Audit exceptions are unknown unless the adapter explicitly proves a definitive rejection. Neither unknown nor failed delivery is automatically resent, and both block publication. A publication waits for all tasks to reach a known terminal generation state and cannot proceed while a contributing audit dispatch is in flight or uncertain. It coalesces eligible validated outputs into one immutable command and records the contributing IDs. Confirmed outcomes update all contributing task receipts together. Draft-only work has no Request writeback. Known pre-dispatch or validation failures release only eligible synthetic fixture slots before a physical publication exists. Only registered synthetic tasks in the test environment may release; all other slots remain reserved, including after known failure and content expiry. Summary retention and the separately enrolled machine Summary path are verified with isolated local SQL; deployment and activation remain pending. A field already holding staff content stays protected.
+Audit exceptions are unknown unless the adapter explicitly proves a definitive rejection. Neither unknown nor failed delivery is automatically resent, and both block publication. A publication waits for all tasks to reach a known terminal generation state and cannot proceed while a contributing audit dispatch is in flight or uncertain. It coalesces eligible validated outputs into one immutable command and records the contributing IDs. Confirmed outcomes update all contributing task receipts together. Draft-only work has no Request writeback. Known pre-dispatch or validation failures release only eligible synthetic fixture slots before a physical publication exists. Only registered synthetic tasks in the test environment may release; all other slots remain reserved, including after known failure and content expiry. Summary retention and the separately enrolled machine Summary path are verified with isolated local SQL; the separate bounded Sandbox delivery is now proved below. A field already holding staff content stays protected.
 
 ## Default-off machine Short Title pilot
 
@@ -90,7 +90,10 @@ marker is required by the accepted intake contract. The application never sets
 `wmkf_readyforreview`; Power Automate owns final readiness and failure notifications.
 
 [Integration and bounded test procedure](../plans/PA_EXECUTIVE_SUMMARY_INTEGRATION_2026-11-16.md).
-No live Summary job, activation, schedule or production policy is claimed.
+[VERIFIED via hosted HTTP, ledger and Dataverse readback] One Summary job completed
+on Sandbox 1000389 with one attempt, audit and publication. Replay after restoring
+the original blank did not refill it. [Live receipt](../plans/PA_EXECUTIVE_SUMMARY_LIVE_TRIAL_2026-11-16.md).
+No schedule or Production policy is enabled.
 
 ## Typed recommendations fixture
 
