@@ -5,6 +5,9 @@ import {
   startFinalWriteup,
 } from '../../lib/services/final-writeup/transition-service.js';
 import { readFile } from 'node:fs/promises';
+import { DEFAULT_DEPENDENCIES } from '../../lib/services/final-writeup/transition-dependencies.js';
+import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request.js';
+import * as cycleAdapter from '../../lib/dataverse/adapters/operations-grant-cycle.js';
 import { hashGovernedDocxContent } from '../../lib/services/documents/governed-docx-hash.js';
 import {
   PRE_SITE_VISIT_CONTRACT,
@@ -12,6 +15,15 @@ import {
   REQUEST_DOCUMENT_LIFECYCLE_STATE,
   REQUEST_DOCUMENT_OPERATION_STATUS,
 } from '../../shared/config/requestDocument.js';
+
+jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
+  ...jest.requireActual('../../lib/dataverse/adapters/grant-request.js'),
+  getById: jest.fn(),
+}));
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle.js', () => ({
+  ...jest.requireActual('../../lib/dataverse/adapters/operations-grant-cycle.js'),
+  linkedCycleExpand: jest.fn(),
+}));
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const SOURCE_ID = '22222222-2222-4222-8222-222222222222';
@@ -41,6 +53,8 @@ function createHarness({ actorId = LEAD_PD_ID, schemaReady = true } = {}) {
   const request = {
     akoya_requestid: REQUEST_ID,
     akoya_requestnum: '1002379',
+    wmkf_GrantCycle: { wmkf_cyclecode: 'D26' },
+    wmkf_phaseiistatus: 100000000,
     _wmkf_programdirector_value: LEAD_PD_ID,
     _wmkf_currentpresitevisit_value: SOURCE_ID,
     _wmkf_currentfinalwriteup_value: null,
@@ -438,6 +452,7 @@ test.each([true, false])('status projects the exact pending Final from populated
     available: true,
     phase: hasGenerating ? 'starting' : 'ready',
     canStart: true,
+    presentationSchedule: 'ended',
     startBlockedReason: null,
     canAdvance: false,
     sourceArtifactId: SOURCE_ID,
@@ -469,6 +484,8 @@ test.each([true, false])('status projects the exact pending Final from populated
       },
     },
   });
+  // A D26 request: stage facts are for the J27 request page only (no extra presentation read).
+  expect(result.stageFacts).toBeUndefined();
   expectFinalStatusReadPure(harness.dependencies, purityNames);
 });
 
@@ -523,6 +540,8 @@ test('status ignores pending rows after a valid committed Final pointer and rema
     },
     pendingArtifact: null,
   });
+  // A D26 request: stage facts are for the J27 request page only (no extra presentation read).
+  expect(result.stageFacts).toBeUndefined();
   expectFinalStatusReadPure(harness.dependencies, forbidden);
 });
 
@@ -776,7 +795,7 @@ test('GET readiness and POST both block group review before the scheduled end', 
   const status = await getFinalWriteupStatus({
     requestId: REQUEST_ID, actingUserSystemId: LEAD_PD_ID,
   }, h.dependencies);
-  expect(status).toMatchObject({ canStart: false, startBlockedReason: 'final_writeup_site_visit_not_ended' });
+  expect(status).toMatchObject({ canStart: false, startBlockedReason: 'final_writeup_site_visit_not_ended', presentationSchedule: 'upcoming' });
   await expect(startFinalWriteup({
     requestId: REQUEST_ID, expectedArtifactId: SOURCE_ID, actingUserSystemId: LEAD_PD_ID,
   }, h.dependencies)).rejects.toMatchObject({ code: 'final_writeup_site_visit_not_ended' });
@@ -914,5 +933,165 @@ describe('handoff email flag (group-review Stage 4)', () => {
       requestId: REQUEST_ID, isSuperuser: false, actingUserSystemId: LEAD_PD_ID, writeupViewer: null,
     }, harness.dependencies);
     expect(result.handoffEmailEnabled).toBe(expected);
+  });
+});
+
+
+test.each(['J27', 'D27', 'J28', null, 'invalid'])('complete REVIEW without a presentation cannot bypass the guard for cycle %s', async (cycleCode) => {
+  const h = createHarness();
+  h.request.wmkf_GrantCycle = cycleCode === null ? null : { wmkf_cyclecode: cycleCode };
+  h.source.wmkf_cyclecode = 'D26'; // A copied document code cannot grant the exception.
+  h.dependencies.findSiteVisits.mockResolvedValue({ records: [] });
+  const input = { requestId: REQUEST_ID, actingUserSystemId: LEAD_PD_ID };
+  expect(await getFinalWriteupStatus(input, h.dependencies)).toMatchObject({
+    canStart: false, canAdvance: false, startBlockedReason: 'final_writeup_site_visit_not_ended', presentationSchedule: 'missing',
+  });
+  await expect(startFinalWriteup({ ...input, expectedArtifactId: SOURCE_ID }, h.dependencies))
+    .rejects.toMatchObject({ code: 'final_writeup_site_visit_not_ended' });
+  expect(h.dependencies.createDocument).not.toHaveBeenCalled();
+  expect(h.dependencies.commitChangeset).not.toHaveBeenCalled();
+});
+
+test('the same complete REVIEW without a presentation still starts on a D26 request', async () => {
+  const h = createHarness();
+  h.source.wmkf_cyclecode = 'J27'; // The request link, not this copy, owns scope.
+  h.dependencies.findSiteVisits.mockResolvedValue({ records: [] });
+  const input = { requestId: REQUEST_ID, actingUserSystemId: LEAD_PD_ID };
+  expect(await getFinalWriteupStatus(input, h.dependencies)).toMatchObject({ canStart: true,
+    startCompatibilityReason: 'legacy_complete_review_without_schedule' });
+  await startFinalWriteup({ ...input, expectedArtifactId: SOURCE_ID }, h.dependencies);
+  expect(h.dependencies.commitChangeset).toHaveBeenCalledTimes(1);
+});
+
+test.each(['J27', 'D27', null])('absent schedule map does not grant the legacy exception for %s', async (cycleCode) => {
+  const h = createHarness();
+  h.request.wmkf_GrantCycle = cycleCode ? { wmkf_cyclecode: cycleCode } : null;
+  h.dependencies.env = { NODE_ENV: 'test' };
+  h.dependencies.readSchedulePairs.mockReturnValue([]);
+  const input = { requestId: REQUEST_ID, actingUserSystemId: LEAD_PD_ID };
+  expect(await getFinalWriteupStatus(input, h.dependencies)).toMatchObject({ canStart: false,
+    startBlockedReason: 'final_writeup_site_visit_not_ended' });
+  await expect(startFinalWriteup({ ...input, expectedArtifactId: SOURCE_ID }, h.dependencies))
+    .rejects.toMatchObject({ code: 'final_writeup_site_visit_not_ended' });
+  expect(h.dependencies.commitChangeset).not.toHaveBeenCalled();
+});
+
+test('a cycle changed to 2027 at activation cannot retain a legacy exception', async () => {
+  const h = createHarness();
+  h.dependencies.findSiteVisits.mockResolvedValue({ records: [] });
+  const read = h.dependencies.getRequest.getMockImplementation();
+  h.dependencies.getRequest.mockImplementation(async () => {
+    if (h.dependencies.getRequest.mock.calls.length === 4) h.request.wmkf_GrantCycle = { wmkf_cyclecode: 'D27' };
+    return read();
+  });
+  await expect(startFinalWriteup({ requestId: REQUEST_ID, expectedArtifactId: SOURCE_ID,
+    actingUserSystemId: LEAD_PD_ID }, h.dependencies)).rejects.toMatchObject({ code: 'final_writeup_site_visit_not_ended' });
+  expect(h.dependencies.createDocument).toHaveBeenCalledTimes(1);
+  expect(h.dependencies.commitChangeset).not.toHaveBeenCalled();
+});
+
+test.each([1, 2, 3, 4])('ended presentation cannot start an offramped request at request read %s', async (readNumber) => {
+  const h = createHarness();
+  h.request.wmkf_GrantCycle = { wmkf_cyclecode: 'D27' };
+  const read = h.dependencies.getRequest.getMockImplementation();
+  h.dependencies.getRequest.mockImplementation(async () => {
+    if (h.dependencies.getRequest.mock.calls.length === readNumber) h.request.wmkf_phaseiistatus = 682090001;
+    return read();
+  });
+  const input = { requestId: REQUEST_ID, actingUserSystemId: LEAD_PD_ID };
+  await expect(startFinalWriteup({ ...input, expectedArtifactId: SOURCE_ID }, h.dependencies))
+    .rejects.toMatchObject({ code: 'final_writeup_offramped', httpStatus: 409,
+      message: expect.stringContaining('will not go to the Board') });
+  expect(h.dependencies.commitChangeset).not.toHaveBeenCalled();
+  expect(h.request._wmkf_currentfinalwriteup_value).toBeNull();
+  expect(h.source.wmkf_lifecyclestate).toBe(REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW);
+  expect(await getFinalWriteupStatus(input, h.dependencies)).toMatchObject({
+    canStart: false, canAdvance: false, startBlockedReason: 'final_writeup_offramped', advanceBlockedReason: 'final_writeup_offramped',
+  });
+});
+
+test.each(['J27', 'D27', null])('non-offramped request with an ended presentation still starts for cycle %s', async (cycleCode) => {
+  const h = createHarness();
+  h.request.wmkf_GrantCycle = cycleCode ? { wmkf_cyclecode: cycleCode } : null;
+  const input = { requestId: REQUEST_ID, actingUserSystemId: LEAD_PD_ID };
+  expect(await getFinalWriteupStatus(input, h.dependencies)).toMatchObject({ canStart: true, presentationSchedule: 'ended' });
+  await startFinalWriteup({ ...input, expectedArtifactId: SOURCE_ID }, h.dependencies);
+  expect(h.dependencies.commitChangeset).toHaveBeenCalledTimes(1);
+});
+
+
+test('every default transition request read selects Phase II status and expands the authoritative cycle', async () => {
+  cycleAdapter.linkedCycleExpand.mockReturnValue('wmkf_GrantCycle($select=wmkf_cyclecode)');
+  grantRequestAdapter.getById.mockResolvedValue({ akoya_requestid: REQUEST_ID });
+  await DEFAULT_DEPENDENCIES.getRequest(REQUEST_ID);
+  expect(cycleAdapter.linkedCycleExpand).toHaveBeenCalledTimes(1);
+  expect(grantRequestAdapter.getById).toHaveBeenCalledWith(REQUEST_ID, {
+    select: expect.stringContaining('wmkf_phaseiistatus'),
+    expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  });
+});
+
+const createHarnessBase = createHarness;
+
+describe('status stageFacts (request page stage model, every viewer)', () => {
+  test('merge-dark: a Production deployment without WORKBENCH_PHASE_RELEASE=on reads no stage facts', async () => {
+    const env = jest.replaceProperty(process, 'env', { ...process.env, VERCEL_ENV: 'production' });
+    try {
+      const h = createHarness();
+      const status = await getFinalWriteupStatus({ requestId: REQUEST_ID, isSuperuser: false, actingUserSystemId: OTHER_USER_ID }, h.dependencies);
+      expect(status.stageFacts).toBeUndefined();
+      expect(h.dependencies.findSiteVisits).not.toHaveBeenCalled();
+    } finally {
+      env.restore();
+    }
+  });
+  // Stage facts are read only for a 2027-or-later request (the J27 request page).
+  const createHarness = (...args) => {
+    const h = createHarnessBase(...args);
+    h.request.wmkf_GrantCycle = { wmkf_cyclecode: 'D27' };
+    return h;
+  };
+  const ENDED_PRESENTATION = { status: 'present', exists: true, id: null, ended: true, legacyException: false };
+
+  test('stage facts do not depend on who may start: a non-starting viewer sees the same ended presentation', async () => {
+    const h = createHarness();
+    const other = await getFinalWriteupStatus({ requestId: REQUEST_ID, isSuperuser: false, actingUserSystemId: OTHER_USER_ID }, h.dependencies);
+    const lead = await getFinalWriteupStatus({ requestId: REQUEST_ID, isSuperuser: false, actingUserSystemId: LEAD_PD_ID }, h.dependencies);
+    // Setup has an ended presentation, so the non-starting viewer is the case the schedule check skips.
+    expect(other).toMatchObject({ canStart: false, presentationSchedule: 'not_checked' });
+    expect(other.stageFacts.presentation.ended).toBe(true);
+    expect(lead).toMatchObject({ canStart: true, presentationSchedule: 'ended' });
+    expect(lead.stageFacts).toEqual(other.stageFacts);
+    expect(other.stageFacts.presentation).toEqual(ENDED_PRESENTATION);
+  });
+
+  test('a rejected presentation read gives an unavailable presentation for a non-starting viewer and the status still resolves', async () => {
+    const h = createHarness();
+    h.dependencies.findSiteVisits.mockRejectedValue(new Error('dataverse 503'));
+    const status = await getFinalWriteupStatus({ requestId: REQUEST_ID, isSuperuser: false, actingUserSystemId: OTHER_USER_ID }, h.dependencies);
+    expect(status.available).toBe(true);
+    expect(status).toMatchObject({ canStart: false, presentationSchedule: 'not_checked' });
+    expect(h.dependencies.findSiteVisits).toHaveBeenCalled();
+    expect(status.stageFacts.presentation).toEqual({ status: 'unavailable' });
+    expect(status.stageFacts.boardDraft).toEqual({ status: 'present', exists: true });
+  });
+
+  test('in group review the status carries the group-review transition and an existing Board draft', async () => {
+    const h = createHarness();
+    h.rows.push(finalStatusRow({
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+      wmkf_claimtoken: null,
+      wmkf_sourceversionid: '2.0',
+      wmkf_sourcecontenthash: 'gdc1:final-source-hash',
+      wmkf_groupreviewstartedat: '2026-08-30T19:05:00Z',
+      _wmkf_groupreviewstartedby_value: LEAD_PD_ID,
+    }));
+    h.request._wmkf_currentfinalwriteup_value = FINAL_ID;
+    h.source.wmkf_lifecyclestate = REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL;
+    const status = await getFinalWriteupStatus({ requestId: REQUEST_ID, isSuperuser: false, actingUserSystemId: LEAD_PD_ID }, h.dependencies);
+    expect(status.phase).toBe('group-review');
+    expect(status.stageFacts.transition.phase).toBe('group-review');
+    expect(status.stageFacts.boardDraft).toEqual({ status: 'present', exists: true });
   });
 });

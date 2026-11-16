@@ -28,7 +28,7 @@ describe('fetchReviewerRollup (characterization)', () => {
   test('golden path: aggregates counts per request from the queried rows', async () => {
     const spy = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
       records: [
-        { _wmkf_request_value: REQUEST_A, wmkf_selected: true, wmkf_invited: true, wmkf_accepted: true, wmkf_declined: false, wmkf_emailsentat: '2026-01-01', wmkf_responsetype: RESPONSE_TYPE_MAP.accepted, wmkf_reviewstatus: 100000004 },
+        { _wmkf_request_value: REQUEST_A, wmkf_selected: true, wmkf_invited: true, wmkf_accepted: true, wmkf_declined: false, wmkf_emailsentat: '2026-01-01', wmkf_responsetype: RESPONSE_TYPE_MAP.accepted, wmkf_reviewstatus: 100000003, wmkf_reviewreceivedat: '2026-01-02' },
         { _wmkf_request_value: REQUEST_A, wmkf_selected: false, wmkf_invited: true, wmkf_accepted: false, wmkf_declined: true, wmkf_emailsentat: '2026-01-01', wmkf_responsetype: RESPONSE_TYPE_MAP.declined, wmkf_reviewstatus: null },
         { _wmkf_request_value: REQUEST_B, wmkf_selected: true, wmkf_invited: false, wmkf_accepted: false, wmkf_declined: false, wmkf_emailsentat: null, wmkf_responsetype: null, wmkf_reviewstatus: null },
       ],
@@ -42,7 +42,9 @@ describe('fetchReviewerRollup (characterization)', () => {
       accepted: 1,
       declined: 1,
       held: 0,
-      completed: 1,
+      received: 1,
+      completed: 0,
+      outstanding: 0,
       progress: {
         total: 2, accepted: 1, pending: 0, released: 0, declined: 1, uninvited: 0,
       },
@@ -60,7 +62,7 @@ describe('fetchReviewerRollup (characterization)', () => {
     expect(spy).toHaveBeenCalledTimes(1);
     const [entitySet, opts] = spy.mock.calls[0];
     expect(entitySet).toBe('wmkf_appreviewersuggestions');
-    expect(opts.select).toBe('_wmkf_request_value,wmkf_selected,wmkf_invited,wmkf_accepted,wmkf_declined,wmkf_emailsentat,wmkf_responsetype,wmkf_reviewstatus');
+    expect(opts.select).toBe('_wmkf_request_value,wmkf_selected,wmkf_invited,wmkf_accepted,wmkf_declined,wmkf_emailsentat,wmkf_responsetype,wmkf_reviewstatus,wmkf_reviewreceivedat');
     expect(opts.filter).toContain(`_wmkf_request_value eq ${REQUEST_A}`);
     expect(opts.filter).toContain(`_wmkf_request_value eq ${REQUEST_B}`);
     expect(opts.filter).toContain('(wmkf_selected eq true or wmkf_declined eq true or wmkf_responsetype eq 100000001)');
@@ -145,6 +147,40 @@ describe('fetchReviewerRollup (characterization)', () => {
     expect(out[REQUEST_A].held).toBe(1);
   });
 
+  test('outstanding counts active accepted reviewers with no review received; the totals alone cannot tell', async () => {
+    const accepted = { wmkf_selected: true, wmkf_invited: true, wmkf_accepted: true, wmkf_declined: false, wmkf_emailsentat: '2026-01-01', wmkf_responsetype: RESPONSE_TYPE_MAP.accepted };
+    const released = { ...accepted, wmkf_reviewstatus: TERMINAL_REVIEW_STATUS_VALUES.released };
+    const active = { ...accepted, wmkf_reviewstatus: null };
+    jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
+      records: [
+        // A: the released reviewer's report is in; the active reviewer still owes one.
+        { ...released, _wmkf_request_value: REQUEST_A, wmkf_reviewreceivedat: '2026-01-05' },
+        { ...active, _wmkf_request_value: REQUEST_A, wmkf_reviewreceivedat: null },
+        // B: the active reviewer's report is in; the released reviewer returned nothing.
+        { ...released, _wmkf_request_value: REQUEST_B, wmkf_reviewreceivedat: null },
+        { ...active, _wmkf_request_value: REQUEST_B, wmkf_reviewreceivedat: '2026-01-05' },
+      ],
+    });
+    const out = await fetchReviewerRollup([REQUEST_A, REQUEST_B]);
+    const totals = ({ accepted: a, received, progress }) => ({ accepted: a, received, progressAccepted: progress.accepted, released: progress.released });
+    expect(totals(out[REQUEST_A])).toEqual(totals(out[REQUEST_B]));
+    expect(out[REQUEST_A].outstanding).toBe(1);
+    expect(out[REQUEST_B].outstanding).toBe(0);
+    expect(emptyCounts().outstanding).toBe(0);
+  });
+
+  test('outstanding ignores declined, not-yet-accepted and archived reviewers', async () => {
+    jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
+      records: [
+        { _wmkf_request_value: REQUEST_A, wmkf_selected: true, wmkf_invited: true, wmkf_accepted: true, wmkf_declined: true, wmkf_responsetype: RESPONSE_TYPE_MAP.declined, wmkf_reviewreceivedat: null },
+        { _wmkf_request_value: REQUEST_A, wmkf_selected: true, wmkf_invited: true, wmkf_accepted: false, wmkf_declined: false, wmkf_responsetype: null, wmkf_reviewreceivedat: null },
+        { _wmkf_request_value: REQUEST_A, wmkf_selected: false, wmkf_invited: true, wmkf_accepted: true, wmkf_declined: false, wmkf_responsetype: RESPONSE_TYPE_MAP.accepted, wmkf_reviewreceivedat: null },
+      ],
+    });
+    const out = await fetchReviewerRollup([REQUEST_A]);
+    expect(out[REQUEST_A].outstanding).toBe(0);
+  });
+
   test('chunks requestIds at 25 per OR-chain call: first call gets ids 0-24 in order, second gets id 25', async () => {
     const ids = Array.from({ length: 30 }, (_, i) => `3333333${i.toString().padStart(1, '0')}-0000-4000-8000-000000000000`);
     const spy = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({ records: [] });
@@ -158,5 +194,51 @@ describe('fetchReviewerRollup (characterization)', () => {
     // Exact contents + order: first call gets elements 0..24 in order, second gets element 25..29.
     expect(firstOrChain.split(' or ')).toEqual(ids.slice(0, 25).map((id) => `_wmkf_request_value eq ${id}`));
     expect(secondOrChain.split(' or ')).toEqual(ids.slice(25).map((id) => `_wmkf_request_value eq ${id}`));
+  });
+
+  describe('chunk concurrency', () => {
+    // 150 ids = 6 chunks; each chunk's first id names it.
+    const ids = Array.from({ length: 150 }, (_, i) => `${String(i).padStart(8, '0')}-0000-4000-8000-000000000000`);
+    const chunkOf = (opts) => Math.floor(Number(opts.filter.match(/eq (\d{8})-/)[1]) / 25);
+
+    test('reads at most four chunks at a time and counts every chunk', async () => {
+      const pending = [];
+      let inFlight = 0;
+      let peak = 0;
+      jest.spyOn(DynamicsService, 'queryAllRecords').mockImplementation((_set, opts) => {
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        const id = ids[chunkOf(opts) * 25];
+        return new Promise((resolve) => pending.push(() => {
+          inFlight -= 1;
+          resolve({ records: [{ _wmkf_request_value: id, wmkf_selected: true }] });
+        }));
+      });
+      const result = fetchReviewerRollup(ids);
+      await new Promise((r) => setImmediate(r));
+      expect(pending).toHaveLength(4);
+      // Finish out of order: the last started first.
+      while (pending.length) {
+        pending.pop()();
+        await new Promise((r) => setImmediate(r));
+      }
+      const out = await result;
+      expect(peak).toBe(4);
+      expect(Object.keys(out).sort()).toEqual([0, 1, 2, 3, 4, 5].map((c) => ids[c * 25]).sort());
+      for (const c of [0, 1, 2, 3, 4, 5]) expect(out[ids[c * 25]].candidates).toBe(1);
+    });
+
+    test('a failed chunk fails the rollup and starts no further chunk', async () => {
+      const started = [];
+      jest.spyOn(DynamicsService, 'queryAllRecords').mockImplementation(async (_set, opts) => {
+        const chunk = chunkOf(opts);
+        started.push(chunk);
+        if (chunk === 0) throw new Error('chunk read failed');
+        await new Promise((r) => setImmediate(r));
+        return { records: [] };
+      });
+      await expect(fetchReviewerRollup(ids)).rejects.toThrow('chunk read failed');
+      expect(started.sort()).toEqual([0, 1, 2, 3]);
+    });
   });
 });

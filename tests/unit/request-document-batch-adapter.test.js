@@ -53,6 +53,31 @@ test('list facts preserve provenance and schema gates while dropping document bo
   await findByRequests([DOCUMENT_ID], { listFactsOnly: true });
   fields = DynamicsService.queryAllRecords.mock.calls.at(-1)[1].select.split(',');
   expect(fields).toContain('wmkf_groupreviewstartedat');
+  // The committed-Final and leadership-checkpoint rules need these four on a list-facts row.
+  expect(fields).toEqual(expect.arrayContaining([
+    'wmkf_sourceversionid', 'wmkf_sourcecontenthash', 'wmkf_sharepointetag', 'wmkf_contenthash',
+  ]));
   await findByRequests([DOCUMENT_ID]);
   expect(DynamicsService.queryAllRecords.mock.calls.at(-1)[1].select).toContain('wmkf_presiteproposalcorejson');
+});
+
+test('findByRequests with concurrency keeps chunk order and the capped flag', async () => {
+  const { findByRequests } = await import('../../lib/dataverse/adapters/request-document.js');
+  let inFlight = 0;
+  let peak = 0;
+  let call = 0;
+  DynamicsService.queryAllRecords.mockImplementation(async () => {
+    const n = call++;
+    inFlight += 1; peak = Math.max(peak, inFlight);
+    // Earlier chunks answer last.
+    await new Promise((resolve) => setTimeout(resolve, (4 - n) * 2));
+    inFlight -= 1;
+    return { records: [{ chunk: n }], totalCount: 1, capped: n === 2 };
+  });
+  const ids = Array.from({ length: 4 * REQUEST_DOCUMENT_BATCH_MAX_IDS },
+    (_, index) => `11111111-1111-4111-8111-${String(index).padStart(12, '0')}`);
+  const result = await findByRequests(ids, { concurrency: 4 });
+  expect(peak).toBe(4);
+  expect(result.records.map((row) => row.chunk)).toEqual([0, 1, 2, 3]);
+  expect(result).toMatchObject({ totalCount: 4, capped: true, hasMore: true });
 });

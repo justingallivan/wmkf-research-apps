@@ -31,6 +31,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import ReviewerRosterOverview from './ReviewerRosterOverview';
 import ReviewerManagePanel from './ReviewerManagePanel';
 import { reviewerDocumentIsPending } from './reviewer-document-state';
 import ReviewerFindPanel from './ReviewerFindPanel';
@@ -46,7 +47,17 @@ const SUB_TABS = [
   { key: 'candidates', label: 'Invite Reviewers' },
   { key: 'track', label: 'Track Reviewers' },
 ];
+// Phase layout (J27 onward): the three work views in the order the work
+// happens, then the read-only roster summary (owner, 2026-11-11: a summary
+// should not be the first thing seen before anyone is found or invited).
+const PANEL_TABS = [
+  { key: 'find', label: 'Find' },
+  { key: 'candidates', label: 'Invite' },
+  { key: 'track', label: 'Track' },
+  { key: 'roster', label: 'Roster' },
+];
 const SUB_TAB_KEYS = new Set(SUB_TABS.map((t) => t.key));
+const PANEL_TAB_KEYS = new Set(PANEL_TABS.map((t) => t.key));
 
 // How long a confirmed-invite overlay is allowed to stand before a plain
 // refetch repaints pure server truth. The overlay asserts a PAST fact (the
@@ -75,6 +86,7 @@ export default function ReviewersTab({
   deadlineActorContext = null,
   settings = {},
   previewReadOnly = false,
+  phaseLayout = false,
 }) {
   const router = useRouter();
   const [proposal, setProposal] = useState(null);
@@ -83,6 +95,8 @@ export default function ReviewersTab({
   const [candidates, setCandidates] = useState([]);
   const [removedCandidates, setRemovedCandidates] = useState([]);
   const [candidatesLoading, setCandidatesLoading] = useState(true);
+  const [landing, setLanding] = useState(null); // { requestId, sub }: the phase layout's opening view
+  const [candidateLoadError, setCandidateLoadError] = useState(null);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [campaignOpen, setCampaignOpen] = useState(false);
   const [declineReferrals, setDeclineReferrals] = useState([]);
@@ -121,17 +135,22 @@ export default function ReviewersTab({
       candidate?.declined || candidate?.responseType === 'declined'
     )),
   ], [candidates, removedCandidates]);
-  // Candidates badge: saved candidates not yet invited (and not accepted/declined).
-  const candidatesToInvite = candidates.filter((c) => !c.invited && !c.accepted && !c.declined).length;
+  // Staff can record a received report without an invitation or acceptance.
+  // Such rows belong to Track and Reports, even with both flags unset.
+  const inviteCandidates = candidates.filter((c) => !c.reviewReceivedAt);
+  const candidatesToInvite = inviteCandidates.filter((c) => (
+    !c.invited && !c.accepted && !c.declined && !c.responseType && c.canRemove !== false
+  )).length;
   // Invited, no answer yet, not closed by a response type. These never reach
   // the reviewers roster (accepted onward), yet synthesis waits on them, so
   // Track Reviewers lists them as a trailing group and counts them (owner,
   // 2026-09-09: an unanswered invite was invisible everywhere but Invite).
-  const pendingInvites = candidates.filter((c) => c.invited && !c.accepted && !c.declined && !c.responseType);
+  const pendingInvites = inviteCandidates.filter((c) => c.invited && !c.accepted && !c.declined && !c.responseType);
 
   const subParam = typeof router.query.sub === 'string' ? router.query.sub : null;
   const normalizedSubParam = subParam === 'invite' || subParam === 'completed' ? 'track' : subParam;
-  const activeSub = normalizedSubParam && SUB_TAB_KEYS.has(normalizedSubParam) ? normalizedSubParam : null;
+  const activeSub = normalizedSubParam && (phaseLayout ? PANEL_TAB_KEYS : SUB_TAB_KEYS).has(normalizedSubParam)
+    ? normalizedSubParam : null;
   const proposalFileKey = typeof router.query.proposalFile === 'string'
     ? router.query.proposalFile
     : null;
@@ -211,18 +230,15 @@ export default function ReviewersTab({
     const gen = ++candidatesGenRef.current;
     const isCurrent = () => rid === currentRequestIdRef.current && gen === candidatesGenRef.current;
     setCandidatesLoading(true);
+    setCandidateLoadError(null);
     try {
-      const { ok, data, error } = await requestEnvelope(
+      const { ok, data, error: loadError } = await requestEnvelope(
         `/api/reviewer-finder/my-candidates?requestId=${encodeURIComponent(rid)}`,
         { tolerantBody: true },
       );
       if (!isCurrent()) return; // request changed or a newer load superseded this one
-      if (!ok) {
-        setError(error.message);
-        setCandidates([]);
-        setRemovedCandidates([]);
-        return;
-      }
+      if (!ok) throw new Error(loadError.message);
+      if (!Array.isArray(data.proposals)) throw new Error('Saved candidate data was unavailable.');
       const prop = (data.proposals && data.proposals[0]) || null;
       const rows = (prop && prop.candidates) || [];
       const removed = (prop && prop.removedCandidates) || [];
@@ -243,8 +259,9 @@ export default function ReviewersTab({
         reconcileTimerRef.current = setTimeout(() => loadCandidates(), OVERLAY_RECONCILE_MS);
       }
       setRemovedCandidates(Array.isArray(removed) ? removed : []);
-    } catch {
+    } catch (e) {
       if (isCurrent()) {
+        setCandidateLoadError(e.message);
         setCandidates([]);
         setRemovedCandidates([]);
       }
@@ -307,8 +324,13 @@ export default function ReviewersTab({
   }, [loadCandidates, loadReviewers, loadDeclineReferrals]);
 
   const selectSub = (key) => {
+    const query = { ...router.query, sub: key };
+    if (key === 'roster') {
+      delete query.repairCandidate;
+      delete query.repairSuggestion;
+    }
     router.push(
-      { pathname: router.pathname, query: { ...router.query, sub: key } },
+      { pathname: router.pathname, query },
       undefined,
       { shallow: true },
     );
@@ -445,10 +467,22 @@ export default function ReviewersTab({
     });
   };
 
-  // When the URL names no sub-tab, land on a state-aware default (computed, not
-  // a redirect — so the choice stays implicit until the user clicks). While the
-  // fetch is in flight we don't guess.
-  const current = activeSub || (loading ? null : computeDefaultSub(reviewers));
+  // Explicit sub-tab links retain their tools. Otherwise every layout opens on
+  // the step with work waiting, once reviewer data has loaded. The phase
+  // layout also opens on Invite when saved candidates wait (owner,
+  // 2026-11-11), so it waits for the candidate read too, and it settles the
+  // opening view once per request: the candidate list reloads after every
+  // invitation, and a recomputed default would move staff off Invite as soon
+  // as the last candidate was invited.
+  const landingReady = !loading && !(phaseLayout && candidatesLoading);
+  const settledLanding = landing && landing.requestId === requestId ? landing.sub : null;
+  const computedLanding = landingReady
+    ? computeDefaultSub(reviewers, phaseLayout ? { candidatesToInvite } : {})
+    : null;
+  useEffect(() => {
+    if (phaseLayout && landingReady && settledLanding === null) setLanding({ requestId, sub: computedLanding });
+  }, [phaseLayout, landingReady, settledLanding, requestId, computedLanding]);
+  const current = activeSub || (phaseLayout ? (settledLanding || computedLanding) : computedLanding);
   const pendingReviewDocumentKey = current === 'track'
     ? reviewers
       .filter(reviewerDocumentIsPending)
@@ -493,79 +527,81 @@ export default function ReviewersTab({
 
   return (
     <div className="space-y-4">
-      {/* Sub-tab strip */}
-      <div className="border-b border-gray-200 flex items-center justify-between">
-        <nav className="flex gap-1">
-          {SUB_TABS.map((t) => {
-            const isManage = t.key !== 'find';
-            return (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => selectSub(t.key)}
-                className={`flex items-center px-4 py-2 text-sm font-medium border-b-2 ${
-                  current === t.key
-                    ? 'border-gray-900 text-gray-900'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                {t.label}
-                {t.key === 'candidates' ? (
-                  <SubTabBadge count={candidatesToInvite} workRemaining={candidatesToInvite} />
-                ) : isManage ? (
-                  // Track Reviewers folds in pending decline-referrals so the tab
-                  // signals them (amber) even when no reviewer has accepted yet —
-                  // otherwise the badge reads 0 and staff never open the tab where
-                  // the referral callout lives (the all-declined-before-accept case).
-                  <SubTabBadge
-                    count={countForMode(reviewers, t.key) + (t.key === 'track' ? declineReferrals.length + pendingInvites.length : 0)}
-                    workRemaining={workRemainingForMode(reviewers, t.key) + (t.key === 'track' ? declineReferrals.length + pendingInvites.length : 0)}
-                  />
-                ) : null}
-              </button>
-            );
-          })}
+      <div className={phaseLayout ? 'space-y-3' : 'border-b border-gray-200 flex flex-wrap items-center justify-between'}>
+        <nav className={`flex flex-wrap gap-x-2 ${phaseLayout ? 'border-b border-gray-200' : ''}`}
+          aria-label={phaseLayout ? 'Reviewer panel views' : 'Reviewer tools'}>
+          {(phaseLayout ? PANEL_TABS : SUB_TABS).map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => selectSub(t.key)}
+              aria-current={current === t.key ? 'page' : undefined}
+              className={`flex items-center py-2 text-sm font-medium border-b-2 ${phaseLayout ? 'min-h-11 px-3' : 'px-4'} ${
+                current === t.key
+                  ? 'border-gray-900 text-gray-900'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {t.label}
+              {t.key === 'candidates' ? (
+                <SubTabBadge count={candidatesToInvite} workRemaining={candidatesToInvite} />
+              ) : t.key === 'track' ? (
+                // Track Reviewers folds in pending decline-referrals so the tab
+                // signals them (amber) even when no reviewer has accepted yet —
+                // otherwise the badge reads 0 and staff never open the tab where
+                // the referral callout lives (the all-declined-before-accept case).
+                <SubTabBadge
+                  count={countForMode(reviewers, t.key) + declineReferrals.length + pendingInvites.length}
+                  workRemaining={workRemainingForMode(reviewers, t.key) + declineReferrals.length + pendingInvites.length}
+                />
+              ) : null}
+            </button>
+          ))}
         </nav>
-        <button
-          type="button"
-          onClick={() => setCampaignOpen(true)}
-          disabled={!canEdit}
-          className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-40"
-          title={previewReadOnly
-            ? 'Campaign settings are disabled in read-only Preview'
-            : !canManage
-              ? 'Only the lead Program Director or a superuser can edit campaign settings'
-            : "Edit this request's reviewer campaign settings (days to respond, review due date)"}
-        >
-          ⚙ Campaign settings
-        </button>
-        <button
-          type="button"
-          onClick={() => setTemplatesOpen(true)}
-          disabled={previewReadOnly}
-          className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-40"
-          title={previewReadOnly
-            ? 'Email templates are disabled in read-only Preview'
-            : 'Edit your default reviewer email templates'}
-        >
-          ✎ Email templates
-        </button>
-        {previewReadOnly ? (
-          <span
-            className="px-1 py-1 text-xs text-gray-400 opacity-40 whitespace-nowrap"
-            title="Template management is disabled in read-only Preview"
-            aria-disabled="true"
-          >
-            Manage in Profile →
-          </span>
-        ) : (
-          <Link
-            href="/profile-settings"
-            className="text-xs text-gray-400 hover:text-gray-700 px-1 py-1 whitespace-nowrap"
-            title="Manage all your email templates in Profile Settings"
-          >
-            Manage in Profile →
-          </Link>
+        {(!phaseLayout || current === 'candidates') && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1" aria-label="Invitation settings">
+            <button
+              type="button"
+              onClick={() => setCampaignOpen(true)}
+              disabled={!canEdit}
+              className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-40"
+              title={previewReadOnly
+                ? 'Campaign settings are disabled in read-only Preview'
+                : !canManage
+                  ? 'Only the lead Program Director or a superuser can edit campaign settings'
+                : "Edit this request's reviewer campaign settings (days to respond, review due date)"}
+            >
+              ⚙ Campaign settings
+            </button>
+            <button
+              type="button"
+              onClick={() => setTemplatesOpen(true)}
+              disabled={previewReadOnly}
+              className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-40"
+              title={previewReadOnly
+                ? 'Email templates are disabled in read-only Preview'
+                : 'Edit your default reviewer email templates'}
+            >
+              ✎ Email templates
+            </button>
+            {previewReadOnly ? (
+              <span
+                className="px-1 py-1 text-xs text-gray-400 opacity-40 whitespace-nowrap"
+                title="Template management is disabled in read-only Preview"
+                aria-disabled="true"
+              >
+                Manage in Profile →
+              </span>
+            ) : (
+              <Link
+                href="/profile-settings"
+                className="text-xs text-gray-400 hover:text-gray-700 px-1 py-1 whitespace-nowrap"
+                title="Manage all your email templates in Profile Settings"
+              >
+                Manage in Profile →
+              </Link>
+            )}
+          </div>
         )}
       </div>
 
@@ -574,7 +610,14 @@ export default function ReviewersTab({
         <CampaignConfigModal requestId={requestId} onClose={() => setCampaignOpen(false)} />
       )}
 
-      {error && (
+      {current !== 'roster' && candidateLoadError && (
+        <div className="p-3 bg-amber-50 text-amber-800 rounded-lg text-sm" role="status">
+          Couldn’t load reviewers: {candidateLoadError}{' '}
+          <button type="button" onClick={() => loadCandidates()} className="underline">Retry</button>
+        </div>
+      )}
+
+      {current !== 'roster' && error && (
         <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
           Couldn’t load reviewers: {error}{' '}
           <button type="button" onClick={loadReviewers} disabled={loading} className="underline">
@@ -583,7 +626,15 @@ export default function ReviewersTab({
         </div>
       )}
 
-      {current === null ? (
+      {current === 'roster' ? (
+        <ReviewerRosterOverview
+          candidates={candidates}
+          reviewers={[...reviewers, ...(proposal?.noResponseHistory || [])]}
+          loading={loading || candidatesLoading}
+          incomplete={Boolean(error || candidateLoadError)}
+          onRetry={refreshAll}
+        />
+      ) : current === null ? (
         <div className="flex justify-center py-12">
           <div className="w-6 h-6 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin" />
         </div>
@@ -603,7 +654,7 @@ export default function ReviewersTab({
       ) : current === 'candidates' ? (
         <ReviewerInvitePanel
           requestId={requestId}
-          candidates={candidates}
+          candidates={inviteCandidates}
           removedCandidates={removedCandidates}
           loading={candidatesLoading}
           onRefresh={refreshAll}

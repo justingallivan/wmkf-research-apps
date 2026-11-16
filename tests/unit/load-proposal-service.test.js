@@ -177,6 +177,28 @@ test('default prefers the exact active canonical proposal over the Phase I fallb
   expect(mockSiteVisitFilter).toHaveBeenCalledWith('akoya_request', 'F', expect.any(Array));
 });
 
+test('default prefers the Narrative-Bibliography document when the request has one', async () => {
+  listFiles.mockResolvedValue([
+    file('Proposal_1002836.pdf'),
+    file('ProjectDescription.pdf', { folder: 'F/Phase I' }),
+    file('Narrative-Bibliography_1002836.pdf', { folder: 'F/AI Materials' }),
+  ]);
+  const out = await loadProposal({ requestId: REQ });
+  expect(out.picked).toBe('akoya_request::F/AI Materials::Narrative-Bibliography_1002836.pdf');
+  expect(downloadFileByPath).toHaveBeenCalledWith('akoya_request', 'F/AI Materials', 'Narrative-Bibliography_1002836.pdf');
+});
+
+test('a Narrative-Bibliography file in the wrong folder or for another request is not used', async () => {
+  listFiles.mockResolvedValue([
+    file('Proposal_1002836.pdf'),
+    file('Narrative-Bibliography_1002836.pdf', { folder: 'F/Submission-Documents' }),
+    file('Narrative-Bibliography_1009999.pdf', { folder: 'F/AI Materials' }),
+    file('Narrative-Bibliography_1002836.docx', { folder: 'F/AI Materials' }),
+  ]);
+  const out = await loadProposal({ requestId: REQ });
+  expect(out.picked).toBe('akoya_request::F/Reviewer Materials::Proposal_1002836.pdf');
+});
+
 test('default fails closed and returns the picker list when neither automatic path exists', async () => {
   listFiles.mockResolvedValue([
     file('Project Narrative.pdf', { folder: 'F/Phase I' }),
@@ -184,7 +206,7 @@ test('default fails closed and returns the picker list when neither automatic pa
   const err = await loadProposal({ requestId: REQ }).catch((e) => e);
   expect(err.httpStatus).toBe(404);
   expect(err.body.error).toBe(
-    'Reviewer proposal not found at Reviewer Materials/Proposal_1002836.pdf or Phase I/ProjectDescription.pdf. Choose a request file to override.',
+    'Reviewer proposal not found at AI Materials/Narrative-Bibliography_1002836.pdf, Reviewer Materials/Proposal_1002836.pdf or Phase I/ProjectDescription.pdf. Choose a request file to override.',
   );
   expect(err.body.allFiles).toHaveLength(1);
   expect(downloadFileByPath).not.toHaveBeenCalled();

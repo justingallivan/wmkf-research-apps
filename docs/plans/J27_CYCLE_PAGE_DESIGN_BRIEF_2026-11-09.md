@@ -178,7 +178,7 @@ guide's "about 64px" for list rows.
 | Empty search | "No requests match '…'." with a Clear search link. |
 | Error | A message in the list's place with Retry; tabs, controls and the header stay. |
 | Read-only Preview | Unchanged; the lists have no actions to disable. |
-| Until the later phases are derived | Requests that may be in Deliberations or Final Assessment show their last known standing with "Some details could not be read." rather than a guess. |
+| Until the later phases are derived | Requests that may be in Deliberations or Final Assessment show their last known standing with "Some details could not be read." rather than a guess. *(Interim only. Since 2026-11-10 the later phases are derived on the J27 line; see `docs/plans/J27_LATER_PHASE_LISTS_PLAN_2026-11-10.md`.)* |
 
 Ranges to design against: 0 to about 300 rows on All requests in December
 (the cycle information plan's figure). The rest are working estimates, not

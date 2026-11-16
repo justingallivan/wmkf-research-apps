@@ -6,7 +6,7 @@ import TestRequestFactoryIntake from './TestRequestFactoryIntake';
 import TestRequestFactoryRunPanel from './TestRequestFactoryRunPanel';
 import { messageFor } from './test-request-factory-copy';
 import {
-  ERROR_BAND, OUTLINE_BUTTON, TABLE_WRAP, TH, formatTime,
+  ERROR_BAND, OUTLINE_BUTTON, SUMMARY_CLASS, TABLE_WRAP, TH, formatTime,
 } from './test-request-factory-ui';
 
 const BASE = '/api/admin/test-requests/runs';
@@ -270,29 +270,48 @@ export default function TestRequestFactorySection({ onTarget }) {
           {FORM_OFF_FULL}
         </div>
       ) : null}
-      {list.state === 'ready' && list.formEnabled ? (
-        <div className="rounded-xl border border-gray-200 bg-white px-4 py-4 text-sm text-gray-900">
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusChip tone={list.target === 'production' ? 'amber' : 'gray'}>
-              {list.target === 'production' ? 'Writes to production' : 'Writes to sandbox'}
-            </StatusChip>
-            <p className="max-w-3xl leading-6">
-              {list.target === 'production'
-                ? 'This panel changes real data on Production: it creates a test Request step by step and can change its Phase I or Phase II status.'
-                : 'This panel changes real data on the sandbox: it creates a test Request step by step.'}
-            </p>
-          </div>
-        </div>
-      ) : null}
 
       <TestRequestFactoryIntake writeBlock={writeBlock} onLookupStart={abortActive} onReserved={onReserved} getSelectionToken={() => selectionSeqRef.current} hasSelection={Boolean(view)} />
 
-      <section aria-labelledby="factory-runs-heading" className="space-y-3 border-t border-gray-200 pt-6">
-        <div className="flex items-center justify-between gap-3">
-          <h3 id="factory-runs-heading" className="text-base font-semibold text-gray-950">Your runs</h3>
+      {view ? (
+        <TestRequestFactoryRunPanel
+          view={view}
+          advancing={advancing}
+          stopRequested={stopRequested}
+          note={note}
+          writeBlock={writeBlock}
+          onAdvance={() => advance(view.run.runId)}
+          onStop={() => { stopRef.current = true; setStopRequested(true); }}
+          recheck={recheck}
+          onRecheck={() => recheckFoundation(view.run.runId)}
+          artifacts={artifacts}
+          onArtifacts={() => downloadArtifacts(view.run.runId)}
+          getScope={() => handleFor(view.run.runId)}
+          initialStuck={stuckMapRef.current.get(view.run.runId) || null}
+          onStuck={(record) => { if (record) stuckMapRef.current.set(view.run.runId, record); else stuckMapRef.current.delete(view.run.runId); }}
+          epoch={epoch}
+        />
+      ) : null}
+
+      {/* Owner, 2026-11-15: previous runs sit behind a caret; a list error stays visible outside it. */}
+      {list.state === 'error' ? (
+        <div className="space-y-3">
+          <div role="alert" className={ERROR_BAND}>{list.text}</div>
           <button type="button" className={OUTLINE_BUTTON} onClick={loadList}>Reload list</button>
         </div>
-        {list.state === 'error' ? <div role="alert" className={ERROR_BAND}>{list.text}</div> : null}
+      ) : null}
+      <details className="border-t border-gray-200 pt-3">
+        <summary className={SUMMARY_CLASS}>
+          <h3 id="factory-runs-heading" className="inline text-base font-semibold text-gray-950">
+            {list.state === 'ready' ? `Previous runs (${list.runs.length})` : 'Previous runs'}
+          </h3>
+        </summary>
+        <section aria-labelledby="factory-runs-heading" className="space-y-3 pb-2">
+        {list.state === 'error' ? null : (
+          <div className="flex justify-end">
+            <button type="button" className={OUTLINE_BUTTON} onClick={loadList}>Reload list</button>
+          </div>
+        )}
         <div className={TABLE_WRAP}>
           <table className="min-w-full divide-y divide-gray-200 text-left text-sm">
             <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-600">
@@ -331,27 +350,8 @@ export default function TestRequestFactorySection({ onTarget }) {
             </tbody>
           </table>
         </div>
-      </section>
-
-      {view ? (
-        <TestRequestFactoryRunPanel
-          view={view}
-          advancing={advancing}
-          stopRequested={stopRequested}
-          note={note}
-          writeBlock={writeBlock}
-          onAdvance={() => advance(view.run.runId)}
-          onStop={() => { stopRef.current = true; setStopRequested(true); }}
-          recheck={recheck}
-          onRecheck={() => recheckFoundation(view.run.runId)}
-          artifacts={artifacts}
-          onArtifacts={() => downloadArtifacts(view.run.runId)}
-          getScope={() => handleFor(view.run.runId)}
-          initialStuck={stuckMapRef.current.get(view.run.runId) || null}
-          onStuck={(record) => { if (record) stuckMapRef.current.set(view.run.runId, record); else stuckMapRef.current.delete(view.run.runId); }}
-          epoch={epoch}
-        />
-      ) : null}
+        </section>
+      </details>
     </div>
   );
 }

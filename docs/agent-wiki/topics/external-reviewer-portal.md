@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-10-31
+last_verified: 2026-11-15
 stale_after_days: 60
 owner: reviewer-finder
 source_files:
@@ -85,9 +85,9 @@ Use this page before work on the token-authed external reviewer surface: the
 accept/decline flow, the materials/upload views, review-token lifecycle, the
 Playwright E2E harness, and the live prod automation that an accept triggers.
 
-## Source refresh — 2026-10-31
+## Source refresh — 2026-10-31, rechecked 2026-11-15
 
-[VERIFIED via source at `bfa65bc4d`] This refresh checks the route/service
+[VERIFIED via source at `bfa65bc4d`; rechecked against `main` 2026-11-15, where the external-route and service paths changed only by terminology-copy commits] This refresh checks the route/service
 boundaries, response guards, draft cleanup, proposal access, token replacement,
 and briefing-page source described below. It does not re-probe Production,
 re-certify dated deployment receipts, or establish current environment values.
@@ -469,7 +469,7 @@ existing path. Do not infer eligibility from a visible staff menu alone.
   regenerate-token { suggestionId }` from an authenticated STAFF session — it mints the
   token *in prod* (where the real `EXTERNAL_LINK_SECRET` lives) and returns `{ url }`, the
   `reviews.wmkeck.org/external/review/<jwt>` link. `REVIEWER_EMAIL_DELIVERY_MODE=capture`
-  is hard-blocked in Vercel production (`send-emails.js:778`), so this prod-mint route is
+  is hard-blocked in Vercel production (`lib/services/review-manager/send-emails-service.js:1916`), so this prod-mint route is
   for accept/decline-link smoke only, not for rehearsing a send. Loading the
   link may persist the first-access stamp; a real ACCEPT fires the honorarium automation
   (creates an `akoya_request`), so for UI checks opt out of the honorarium and stop before
@@ -532,7 +532,8 @@ existing path. Do not infer eligibility from a visible staff menu alone.
   `listReviewerMaterials` in `lib/external/reviewer-materials.js` → `getRequestSharePointBuckets` +
   `isReviewerProposalFile`; the staff-side
   `/api/review-manager/materials-preflight` missing-proposal warning reuses the same
-  function/filter so the two surfaces cannot disagree). Other files in that
+  filter through `listReviewerMaterialsWithAvailability` in the same module, so the two
+  surfaces cannot disagree). Other files in that
   folder are internal and remain invisible; specifically,
   `Research Phase I Application_<timestamp>.pdf` contains more information than
   WMKF sends reviewers and must never be exposed. No Dataverse link entity or outbound-file pointer field
@@ -597,7 +598,7 @@ writes v2 snapshots; rows written by the phase-1 deployment are still
 compared under the v1 list, so an expertise-only change registers as drift
 only for briefs generated after phase 2) — and
 `PRE_RP_BRIEF_CONTRACT.renderVersion` moved `'4'` → `'5'` alongside it, since
-the change binds both together (`lib/services/pre-rp-brief/artifact-service.js:748`).
+the change binds both together (`shared/config/requestDocument.js:171`, consumed in `lib/services/pre-rp-brief/artifact-service.js`).
 Widening that list would have invalidated every stored brief's fingerprint
 (re-hashing a v1 row's snapshot with the new 11-field list no longer equals
 the fingerprint that row was written with), so the readers accept snapshot schemaVersion `1` and `2`; phase 1 (main `90b6c6838`)

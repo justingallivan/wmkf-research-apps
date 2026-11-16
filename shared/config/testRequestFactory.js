@@ -23,7 +23,7 @@ export const BASIC_STEPS = Object.freeze([
 export const RUN_STATUSES = Object.freeze({
   prepared: Object.freeze({ label: 'Reserved, not started', tone: 'gray' }),
   creating: Object.freeze({ label: 'Started, not finished', tone: 'gray' }),
-  ready: Object.freeze({ label: 'Ready', tone: 'green' }),
+  ready: Object.freeze({ label: 'Created', tone: 'green' }),
   needs_attention: Object.freeze({ label: 'Needs attention', tone: 'amber' }),
   retiring: Object.freeze({ label: 'Retiring', tone: 'gray' }),
   retired: Object.freeze({ label: 'Retired', tone: 'gray' }),

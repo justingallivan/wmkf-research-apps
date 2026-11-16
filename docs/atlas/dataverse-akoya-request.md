@@ -78,22 +78,22 @@ Content / abstract:
 - `wmkf_abstract` (full proposal abstract; added by WMKF, not in vendor schema)
 - `wmkf_excludedreviewers` (free-form names)
 - `wmkf_layabstract` and `wmkf_initialassessment` (optional plain-text Memo,
-  100,000 characters each) — Production schema created November 9; Lay Abstract alone
-  was provisioned and independently verified in Sandbox November 13 UTC (metadata
-  parity and zero-row runtime projection). Justin confirmed
-  on November 12 that Lay Abstract is the intended **Executive Summary** field.
-  The PA integration branch reuses `wmkf_layabstract` with stable API key `lay_abstract`
-  and staff-facing Executive Summary label; it keeps the Dataverse label Lay Abstract.
-  Its explicit allowlist exposes only this field through the separate Overview card
-  and GET/PATCH `/api/workbench/request-narratives`, with linked lead-PD/superuser
-  conditional saves. Initial Assessment is not selected or writable in that integration.
-  The original two-field branch is documented in the historical
-  `docs/plans/REQUEST_NARRATIVES_HANDOFF_2026-11-09.md`; this assessment remains separate
-  from the governed Initial Assessment artifact. App deployment and automatic Summary
-  delivery are not enabled by the field reuse. The owner selected the project narrative
-  in `Submission-Documents` on November 13; combined Narrative-Bibliography remains
-  reviewer-matching input. Initialization timing and the proposed monotonic staff-edit
-  Boolean remain planned/unprovisioned; see `docs/plans/PA_EXECUTIVE_SUMMARY_FIELD_CONTRACT_2026-11-13.md`.
+  100,000 characters each) — **[SCHEMA LIVE: historical owner-approved probe,
+  2026-11-09; Executive Summary editor deployed at `1037d2dbd` and authenticated
+  Safari save/clear/conflict/reload tested on #1003518, 2026-11-16; original blank
+  Summary restored and reloaded]**. Wave `36-request-narratives` provisioned both in Production;
+  `probe-request-narrative-fields.js --target=prod --verify` confirmed typed
+  metadata and zero-row selection. The current editor exposes only `lay_abstract`
+  as **Executive Summary**, via GET/PATCH `/api/workbench/request-narratives`.
+  Workbench users read; linked lead PD/superuser saves with the original ETag.
+  `wmkf_initialassessment` remains outside this editor and separate from the
+  governed Initial Assessment document pointer below.
+  Connor's intake contract (reported by Justin 2026-11-16): Summary generation
+  precedes final `wmkf_readyforreview`; any failed run halts intake and notifies
+  check-in staff. No later flow is intended to write Summary. Justin accepts
+  exceptional intake reruns overwriting later staff edits/clears; no staff-edit
+  marker is required. External flow/form behavior is not independently verified.
+  See `docs/plans/REQUEST_NARRATIVES_HANDOFF_2026-11-09.md`.
 
 Governed artifact pointers:
 - `wmkf_currentinitialassessment` (Lookup →
@@ -222,12 +222,18 @@ WMKF status / flags (the long tail):
   " Ineligible" (label has a leading space) · 707510001 Proposal Late · 707510002 Rescinded Grant · 707510003
   Request Withdrawn · 682090001 Deferred. `wmkf_phaseiistatus` (Picklist): 100000002 Phase II Pending Committee
   Review · 100000004 Recommended · 100000005 Not Recommended · 100000003 Approved · 100000001 Phase II Declined ·
-  100000000 Phase II Deferred · 707510001 Phase II Request Below Minimum · 707510002 Phase II Withdrawn.
+  100000000 Phase II Deferred · 707510001 Phase II Request Below Minimum · 707510002 Phase II Withdrawn · 682090001 Phase II Offramped (Production only, added 2026-11-09, D51).
   **Semantics (owner 2026-10-26):** the phase picklists record the staff recommendation for that stage;
   `akoya_requeststatus` changes only at the Board's final decision. Example: on 2026-10-26 staff marked 8 of
   the 23 D26 Advancing proposals `Not Recommended` (15 `Recommended`); all 23 stayed `Phase II Pending`
   [VERIFIED via `scripts/probe-d26-phase-statuses.js`, owner-run].
-- **J27 First Cut [VERIFIED via sandbox browser rehearsal and successful Production deployment of `dc3eb523`].** The Workbench Proposal tab reads the Phase I status and row version via `GET /api/workbench/resolve-request`. `POST /api/workbench/first-cut` authorizes the lead PD or a superuser and writes only `wmkf_phaseistatus`, conditionally on the row version. Eligible current values are unset, Pending Committee Review, Scored and Not Scored. Yes writes Scored and No writes Not Scored. Semi-finalist and final outcomes are outside this writer's allowed transitions.
+- **J27 scoring decision (formerly "First Cut") [VERIFIED via sandbox browser rehearsal and successful Production deployment of `dc3eb523`, where the route is still `/api/workbench/first-cut`; renamed `/api/workbench/scoring` on `claude/j27-read-model`, 2026-11-09, not yet promoted].** The Workbench Proposal tab reads the Phase I status and row version via `GET /api/workbench/resolve-request`. `POST /api/workbench/scoring` authorizes the lead PD or a superuser and writes only `wmkf_phaseistatus`, conditionally on the row version. Eligible current values are unset, Pending Committee Review, Scored and Not Scored. The staff choices are Scored and Not Scored. The recommendation to Chairs (formerly "Semi-finalist") and final outcomes are outside this writer's allowed transitions.
+- **J27 Reports staff summary [development branch, sandbox only].** Wave 37 adds `wmkf_staffreviewsummary` (Memo) and `wmkf_staffreviewevidencehash` (String). `/api/workbench/staff-review-summary` reads both and saves them together with the request ETag. Reports keeps the generated reviewer facts separate. Deliberations reads the same memo. The route refuses non-sandbox targets. The review synthesis JSON retains its independent generated content.
+- **J27 staff visit assessment [development branch, sandbox only].** Wave 38 adds `wmkf_staffvisitassessment` (Memo). Staff Deliberations edits the memo through `/api/workbench/staff-visit-assessment` with the request ETag. The Final Writeup tab displays the memo read-only. A save is independent of transcript availability and Word workflow transitions.
+- **J27 meeting roster [development branch, sandbox only].** Wave 39 adds `wmkf_confirmedmeetingroster` (Memo), keyed by Site Visit activity ID. The request ETag protects staff confirmation even after the presentation activity is completed. The saved occurrence and scheduled times must match before Workbench displays the sentence. Zoom supplies on-demand name suggestions. Staff confirm the categories. Enable `MEETING_ROSTER_SCHEMA_READY=on` after provisioning.
+- **J27 Initial Assessment rationale [development branch, sandbox only].** Wave 40 defines `wmkf_initialassessmentrationale` (Memo, 10,000 characters). Initial Assessment reads and edits it through `/api/workbench/initial-assessment-rationale`. The request ETag protects staff saves. The memo is independent of status, AI findings and the Word assessment. Enable `INITIAL_RATIONALE_SCHEMA_READY=on` after provisioning.
+- **J27 offramp justification [applied to Production 2026-11-15 UTC, owner-run `--target=prod --execute`; VERIFIED via command output].** Wave 41 defines `wmkf_offrampjustification` (Memo, 2,000 characters, optional): the staff-written reason a request took the offramp (`wmkf_phaseiistatus = 682090001`, alignment log D51, D69). Staff write it in the Workbench, like the wave 37–40 memos; it is not on an AkoyaGO form. **Writer [on `main`, live in Production since 2026-11-15 with `WORKBENCH_OFFRAMP_READY=on`; VERIFIED via source and `tests/unit/workbench-offramp.test.js`]:** `/api/workbench/offramp` (`lib/services/workbench/offramp-service.js`) reads and saves it with the request ETag, only while the request is offramped. An undo leaves the text in place, hidden; a later offramp shows it again.
+- **J27 offramp status writer and Phase II Status before offramp [on `main`, live in Production since 2026-11-15 (`WORKBENCH_OFFRAMP_READY=on`, deployment of `382ee6d52`); wave 42 applied to Production 2026-11-15 UTC, owner-run `--target=prod --execute`, VERIFIED via command output (attribute created); not applied to the sandbox].** Owner decision D70 (2026-11-15) reverses D36's "the apps read it": Workbench staff set and undo the offramp. Wave 42 (`lib/dataverse/schema/wave42-j27-phase-ii-status-before-offramp/akoya_request.json`) defines `wmkf_phaseiistatusbeforeofframp` (Integer, optional). `/api/workbench/offramp` writes `wmkf_phaseiistatus = 682090001` and the previous value (blank or 100000002 only; any other current value is refused) in one conditional PATCH as the staff member; undo, allowed only while Offramped, writes the remembered value back (blank when nothing was remembered, e.g. an offramp set in AkoyaGO; any other remembered value is refused) and clears the field. Readiness: Production deployment and target with `WORKBENCH_PRODUCTION_SCHEMA_READY=on` and `WORKBENCH_OFFRAMP_READY=on`, then the request-page phase admission. Production's `WMKF_Set Request Status Program Phase II` derives `Phase II Pending` from 100000002 and has no branch for 682090001, so neither direction should change `akoya_requeststatus` [VERIFIED 2026-11-09 for those two values via memory `project-sandbox-request-status-business-rules.md`; restore of blank not separately observed].
 - `wmkf_readyforreview` (**Boolean**, Yes/true and No/false; [VERIFIED 2026-11-02 via owner-authorized Production metadata GET, `scripts/probe-j27-readiness-contract.cjs`]). Power Automate owns the post-assembly/AI handoff marker. The apps read it for J27-and-later dashboard visibility; earlier linked cycles retain their prior eligibility. Runtime deployed via PR #611 (`46b4cd2cf`); bounded owner-authorized read-only Research Workbench verification passed 2026-11-02, including unchanged D26 membership and exclusion of unready J27. Evidence: `docs/plans/evidence/j27-readiness-production-visibility-2026-11-02.json`. Policy: `shared/config/requestReadiness.js`; scope and evidence: `docs/plans/J27_READY_FOR_REVIEW_VISIBILITY_PLAN_2026-11-02.md`.
 - `wmkf_galreadyforreview`, `wmkf_pcgoverifycomplete` (Picklist; unchanged historical classification)
 - `wmkf_vendorverified` (Picklist), `wmkf_rationalesummarycompleted`
@@ -257,6 +263,17 @@ Sample row had **364 total fields** (vendor + WMKF + standard Dataverse audit fi
   `grantRequestAdapter.findByPotentialReviewerSlots` — capped read across the
   five legacy reviewer lookups for optional Find-card prior-request context;
   excludes the current request and never treats a slot as lifecycle proof
+
+- **J27 later-phase facts (built on `claude/j27-cycle-page`, 2026-11-10; not
+  promoted).** The Workbench request list feed and request resolution select
+  `_wmkf_currentpresitevisit_value` and `_wmkf_currentfinalwriteup_value`
+  (both from the pre-site draft schema, wave 19) for 2027-or-later rows, and
+  read `wmkf_confirmedmeetingroster` where its schema is on, so
+  `lib/services/workbench/j27-later-facts.js` can work out the Board draft,
+  review stage and confirmed attendance. The Final Writeup transition's
+  request read also selects `wmkf_phaseiistatus` and expands the linked Grant
+  Cycle (offramp and presentation-first guards, alignment log D63). Reads
+  only. `[VERIFIED via source on the branch]`
 
 ## Write paths
 

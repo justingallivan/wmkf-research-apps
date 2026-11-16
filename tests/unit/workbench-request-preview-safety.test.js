@@ -73,17 +73,17 @@ afterEach(() => {
 test('keeps sandbox Preview editable and makes production or unknown Preview targets read-only', async () => {
   process.env.VERCEL_ENV = 'preview';
   process.env.DYNAMICS_URL = `https://${PRODUCTION_HOSTS[0]}`;
-  await expect(getServerSideProps()).resolves.toEqual({ props: { previewReadOnly: true } });
+  await expect(getServerSideProps()).resolves.toMatchObject({ props: { previewReadOnly: true, staffReviewSummary: false } });
 
   process.env.DYNAMICS_URL = `https://${SANDBOX_HOSTS[0]}`;
-  await expect(getServerSideProps()).resolves.toEqual({ props: { previewReadOnly: false } });
+  await expect(getServerSideProps()).resolves.toMatchObject({ props: { previewReadOnly: false, staffReviewSummary: true } });
 
   process.env.DYNAMICS_URL = 'https://unregistered-target.example';
-  await expect(getServerSideProps()).resolves.toEqual({ props: { previewReadOnly: true } });
+  await expect(getServerSideProps()).resolves.toMatchObject({ props: { previewReadOnly: true, staffReviewSummary: false } });
 
   process.env.VERCEL_ENV = 'production';
   process.env.DYNAMICS_URL = `https://${PRODUCTION_HOSTS[0]}`;
-  await expect(getServerSideProps()).resolves.toEqual({ props: { previewReadOnly: false } });
+  await expect(getServerSideProps()).resolves.toMatchObject({ props: { previewReadOnly: false, staffReviewSummary: false } });
 });
 
 test('shows the read-only contract and passes it through both reviewer request surfaces', () => {
@@ -104,4 +104,34 @@ test('leaves reviewer controls enabled when the server does not classify the dep
 
   expect(screen.queryByText('Preview is read-only for reviewer work.')).not.toBeInTheDocument();
   expect(screen.getByTestId('reviewers-tab')).toHaveAttribute('data-preview-read-only', 'false');
+});
+
+test('the exact dropdown rehearsal is admitted only in sandbox Preview with screening explicitly off', async () => {
+  const id = '1a651d20-4a8a-471d-a6c8-f165ec112ccc';
+  const env = jest.replaceProperty(process, 'env', {
+    ...process.env,
+    VERCEL_ENV: 'preview',
+    DYNAMICS_URL: `https://${SANDBOX_HOSTS[0]}`,
+    CHAIRS_RECOMMENDATION_ENABLED: 'on',
+    INITIAL_RATIONALE_SCHEMA_READY: 'on',
+    TEST_REQUEST_ISOLATION: 'on',
+    AUTOMATIC_INTEGRITY_SCREENING: 'off',
+    CHAIRS_RECOMMENDATION_REHEARSAL_REQUEST_ID: id.toUpperCase(),
+  });
+  try {
+    await expect(getServerSideProps()).resolves.toMatchObject({ props: {
+      chairsRecommendationEnabled: true, chairsRecommendationRehearsalRequestId: id, automaticIntegrityEnabled: false,
+    } });
+    process.env.AUTOMATIC_INTEGRITY_SCREENING = 'on';
+    await expect(getServerSideProps()).resolves.toMatchObject({ props: {
+      chairsRecommendationRehearsalRequestId: null, automaticIntegrityEnabled: true,
+    } });
+    process.env.AUTOMATIC_INTEGRITY_SCREENING = 'off';
+    process.env.VERCEL_ENV = 'production';
+    await expect(getServerSideProps()).resolves.toMatchObject({ props: {
+      chairsRecommendationEnabled: false, chairsRecommendationRehearsalRequestId: null, automaticIntegrityEnabled: false,
+    } });
+  } finally {
+    env.restore();
+  }
 });

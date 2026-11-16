@@ -99,6 +99,12 @@ function RetractionMatchCard({ match, onDismiss }) {
   );
 }
 
+function citedNewsSources(result) {
+  return result?.analysisOutcome === 'flag_for_review' && Array.isArray(result.rawResults)
+    ? result.rawResults.filter(item => /^https?:\/\//i.test(item?.link || ''))
+    : [];
+}
+
 /**
  * AI-analyzed result card (PubPeer or News)
  */
@@ -135,6 +141,12 @@ function AIResultCard({ source, result, onDismiss, screenedName }) {
 
       <div className="p-4">
         <p className="text-sm text-gray-700 whitespace-pre-wrap">{result.error || result.summary || integritySourceLabel(result)}</p>
+        {citedNewsSources(result).map(({ link, title }) => (
+          <a key={link} href={link} target="_blank" rel="noopener noreferrer"
+            className="mt-2 block text-sm text-blue-700 underline underline-offset-2">
+            {title || 'Open news source'}
+          </a>
+        ))}
 
         <div className="flex gap-2 pt-3 mt-3 border-t border-gray-100">
           {result.searchUrl && (
@@ -539,6 +551,7 @@ function IntegrityScreenerPage() {
           if (newsResult.summary) {
             builder.addParagraph(newsResult.summary);
           }
+          for (const { link } of citedNewsSources(newsResult)) builder.addParagraph(link);
         }
       });
 
@@ -671,6 +684,7 @@ function IntegrityScreenerPage() {
           md += `- **Results Found:** ${newsResult.resultCount}\n`;
         }
         md += `\n${newsResult.error || newsResult.summary || 'Incomplete source'}\n\n`;
+        for (const { link } of citedNewsSources(newsResult)) md += `- Source ${link}\n`;
       }
 
 

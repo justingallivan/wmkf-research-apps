@@ -1249,7 +1249,9 @@ test('status header shows the reminder date once the day-12 cron has sent one', 
 });
 
 test('an unanswered invitation past the estimated date is called out; a fresh one is not', async () => {
-  const longAgo = new Date(Date.now() - 20 * 86400000).toISOString();
+  // 20 days plus a six-hour margin: the component adds 14 calendar days, so a
+  // daylight-saving change inside the window would otherwise floor 6 days to 5.
+  const longAgo = new Date(Date.now() - 20 * 86400000 - 6 * 3600000).toISOString();
   wireFetch({ abstract: { invitedAt: longAgo } });
   const { unmount } = render(<AwardeeTab requestId={REQ} context={CYCLE_CTX} />);
   await waitFor(() => expect(screen.getByText(/past the estimated response date/i)).toBeInTheDocument());

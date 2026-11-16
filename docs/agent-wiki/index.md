@@ -1,7 +1,7 @@
 ---
 agent_wiki: index
 status: active
-last_verified: 2026-10-01
+last_verified: 2026-11-15
 stale_after_days: 90
 owner: agent-operations
 source_files:
@@ -37,7 +37,7 @@ reviewing. It is subordinate to source, Atlas, and live probes.
 |---|---|---|
 | Reviewer origination, retrieval lanes, provenance, ranking, recall-vs-precision | [Reviewer Origination](topics/reviewer-origination.md) | `docs/REVIEWER_FINDER_SPARSE_PROPOSAL_ANCHOR_STRATEGY.md`, `docs/REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md` |
 | Reviewer identity, ORCID, contact, candidate persistence, COI, PI identity, invite confidence | [Reviewer Identity](topics/reviewer-identity.md) | `docs/APPLICATION_STATE_ATLAS.md`, `docs/atlas/dataverse-wmkf-potentialreviewers.md`, `docs/atlas/dataverse-wmkf-appreviewersuggestion.md` |
-| Zoom attendance, discussion exclusions, shared microphones, correction confirmation | `docs/plans/ZOOM_ATTENDANCE_ATTRIBUTION_PLAN_2026-10-09.md` | `lib/services/meeting-tracker-transcription/attendance-service.js`, `lib/services/meeting-tracker-transcription/discussion-attribution.js`, migration 078 (apply before merge) |
+| Zoom attendance, discussion exclusions, shared microphones, correction confirmation | `docs/plans/ZOOM_ATTENDANCE_ATTRIBUTION_PLAN_2026-10-09.md` | `lib/services/meeting-tracker-transcription/attendance-service.js`, `lib/services/meeting-tracker-transcription/discussion-attribution.js`, migration 078 (source and manifest entry are on `main`; Production application is not verified here and the plan and Atlas pages still carry pre-merge wording) |
 | Zoom transcript origin, recording provenance, revision identity, Stage 4 dependency | `docs/plans/ZOOM_TRANSCRIPT_PROVENANCE_PLAN_2026-10-09.md` | `docs/atlas/postgres-zoom-recording-imports.md`, `docs/atlas/postgres-meeting-transcript-publications.md`, `lib/services/meeting-tracker-transcription/source-provenance.js` | <!-- drain-table:ignore reason=transcription-atlas-filename-not-retired-table -->
 | Reviewer workbench, roster, lifecycle, referral, address collection | [Reviewer Workbench & Lifecycle](topics/reviewer-workbench-lifecycle.md) | `docs/APPLICATION_STATE_ATLAS.md`, reviewer app routes/services |
 | Find candidates, applicant suggestions and promotion | [Find and Applicant Flow](topics/reviewer-find-applicant-flow.md) | Reviewer lifecycle hub and source pointers in the topic |

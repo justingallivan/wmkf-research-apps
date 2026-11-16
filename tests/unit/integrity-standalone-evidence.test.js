@@ -126,3 +126,23 @@ test('staff help and app discovery describe manual-only PubPeer access', () => {
   expect(app.features).toContain('Manual PubPeer Link');
   expect(app.features).not.toContain('PubPeer Search');
 });
+
+test('a structured news finding retains its cited source in the screen and exports', async () => {
+  const original = result.sources.news;
+  const link = 'https://example.org/reported-inquiry';
+  result.sources.news = {
+    searched: true, hasConcerns: true, analysisOutcome: 'flag_for_review', error: null,
+    summary: 'Reported allegation: An official inquiry began.',
+    rawResults: [{ title: 'Reported inquiry', link }],
+  };
+  try {
+    await run();
+    expect(screen.getByRole('link', { name: 'Reported inquiry' })).toHaveAttribute('href', link);
+    fireEvent.click(screen.getByRole('button', { name: 'Export Markdown' }));
+    expect(captured[0]).toContain(link);
+    fireEvent.click(screen.getByRole('button', { name: 'Export PDF' }));
+    await waitFor(() => expect(mockPdfCalls).toContainEqual(['addParagraph', link]));
+  } finally {
+    result.sources.news = original;
+  }
+});

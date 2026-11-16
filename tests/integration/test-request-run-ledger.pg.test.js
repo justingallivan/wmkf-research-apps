@@ -31,9 +31,11 @@ const describeIf = TEST_URL ? describe : describe.skip;
 
 const MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/054_test_request_runs.sql');
 const SLOT_MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/058_test_request_cast_slot_bindings.sql');
+// 099 is the latest test_request_receipt_ok definition (combined Narrative-Bibliography name; 098 added the J27 destinations).
+const RECEIPT_MIGRATION_PATH = path.join(process.cwd(), 'lib/db/migrations/099_test_request_narrative_bibliography.sql');
 
 /** Fail loudly when the throwaway ledger schema predates the migration file (constraints are created only with the tables). */
-async function assertLedgerSchemaCurrent(db, migrationSql) {
+async function assertLedgerSchemaCurrent(db, migrationSql, receiptSql = migrationSql) {
   const expected = [...migrationSql.matchAll(/CONSTRAINT\s+(\w+)/g)].map((m) => m[1]);
   const { rows } = await db.query(
     `SELECT c.conname FROM pg_constraint c JOIN pg_class t ON t.oid = c.conrelid
@@ -43,7 +45,7 @@ async function assertLedgerSchemaCurrent(db, migrationSql) {
   const missing = expected.filter((name) => !present.has(name));
   const fn = await db.query(`SELECT prosrc FROM pg_proc WHERE proname = 'test_request_receipt_ok'`);
   const normalize = (text) => String(text || '').replace(/\s+/g, ' ').trim();
-  const expectedBody = normalize(migrationSql.slice(migrationSql.indexOf('$receipt$') + 9, migrationSql.indexOf('$receipt$;')));
+  const expectedBody = normalize(receiptSql.slice(receiptSql.indexOf('$receipt$') + 9, receiptSql.indexOf('$receipt$;')));
   const liveBody = normalize(fn.rows[0]?.prosrc);
   if (liveBody !== expectedBody) missing.push('test_request_receipt_ok(jsonb) body differs from the migration');
   if (missing.length) {
@@ -94,8 +96,10 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
     );
     const migrationSql = fs.readFileSync(MIGRATION_PATH, 'utf8');
     if (!rows[0]?.reg) await db.query(migrationSql);
-    await assertLedgerSchemaCurrent(db, migrationSql);
     await db.query(fs.readFileSync(SLOT_MIGRATION_PATH, 'utf8'));
+    const receiptSql = fs.readFileSync(RECEIPT_MIGRATION_PATH, 'utf8');
+    await db.query(receiptSql);
+    await assertLedgerSchemaCurrent(db, migrationSql, receiptSql);
     ledger = createRunLedger(db);
   });
 
@@ -785,6 +789,30 @@ describeIf('test_request_runs ledger (live Postgres proof)', () => {
       { filename: '1000400 Initial Assessment 0a1b2c3d-9f8e7d6c.pdf' },
       { filename: `1000400 Initial Assessment Board v${FAKE_GITHUB_TOKEN.slice(0, 20)} 0a1b2c3d.docx` },
       { filename: 'Confidential Initial Assessment 0a1b2c3d-9f8e7d6c.docx' },
+    ];
+    for (const receipt of rejected) {
+      expect(() => assertLedgerReceipt(receipt, 'fixture')).toThrow();
+      const { rows } = await db.query(`SELECT test_request_receipt_ok($1::jsonb) AS ok`, [JSON.stringify(receipt)]);
+      expect(rows[0].ok).toBe(false);
+    }
+  });
+
+  it('099: the combined Narrative-Bibliography name is accepted, and look-alikes rejected, identically by JS and SQL', async () => {
+    const accepted = [
+      { filename: 'Narrative-Bibliography_1000400.pdf' },
+      { name: 'Narrative-Bibliography_1000400.pdf', folder: '1000400_5D54ABC57F744D23B4BE39599147E674/AI Materials' },
+    ];
+    for (const receipt of accepted) {
+      expect(assertLedgerReceipt(receipt, 'fixture')).toBe(receipt);
+      const { rows } = await db.query(`SELECT test_request_receipt_ok($1::jsonb) AS ok`, [JSON.stringify(receipt)]);
+      expect(rows[0].ok).toBe(true);
+    }
+    const rejected = [
+      { filename: 'Narrative-Bibliography_1000400.docx' },
+      { filename: 'Narrative-Bibliography_.pdf' },
+      { filename: 'narrative-bibliography_1000400.pdf' },
+      { filename: 'Narrative-Bibliography-Extra_1000400.pdf' },
+      { filename: 'Narrative_Bibliography_1000400.pdf' },
     ];
     for (const receipt of rejected) {
       expect(() => assertLedgerReceipt(receipt, 'fixture')).toThrow();

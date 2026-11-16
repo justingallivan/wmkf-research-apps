@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-16
+last_verified: 2026-11-15
 stale_after_days: 90
 owner: finance-ops
 source_files:
@@ -90,7 +90,7 @@ with strict `===` `[VERIFIED via lib/bill/onboard-reviewer-service.js:90]`. The
 bug was inert until honorarium go-live on 2026-07-02 opened the path, so every
 reviewer accept from that same day fell through to the `BILL_ENABLED !== 'true'`
 branch and wrote a `bill_manual_onboarding` warning alert
-`[VERIFIED via :94-96, :544-566]`. **61 alerts accumulated**, first
+`[VERIFIED via :94-96, :544-562]`. **61 alerts accumulated**, first
 `2026-07-02 17:48 UTC`, last `2026-08-10 19:52 UTC`, before the flag was
 overwritten to exactly `true` on Production and Preview and production redeployed
 `[VERIFIED via read-only system_alerts census, 2026-08-11; denominator is
@@ -167,7 +167,7 @@ non-versioned, or in another status blocks the reviewer transition; an already
 the same retain-and-withdraw rule. **Historical September 16 snapshot:** source
 was built and the two Production release-email defaults were verified, with
 runtime promotion then pending. Implementation commits `1abc097a8` and `87af339b3`
-are ancestors of current HEAD (checked 2026-10-22). Git ancestry establishes
+are ancestors of current HEAD (rechecked 2026-11-15). Git ancestry establishes
 repository inclusion, not a hosted deployment or today's setting values.
 
 The 2026-06-22 production lock was capture-only:

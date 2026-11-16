@@ -12,6 +12,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Card } from '../Layout';
 import { requestJson } from '../../utils/api-request';
 
@@ -49,9 +50,9 @@ export function presentationMaterialsStatus(siteVisitContext, summary, timing) {
   if (summary.state === 'closed') {
     const activity = attention ? ` · ${attentionCount || 1} upload${attentionCount === 1 ? ' needs' : 's need'} attention`
       : processing ? ` · ${processingCount || 1} upload${processingCount === 1 ? '' : 's'} processing` : '';
-    return { tone: attention ? 'error' : 'body', text: `Presentation scheduled · materials request closed${activity}.` };
+    return { tone: attention ? 'error' : 'body', attention, text: `Presentation scheduled · materials request closed${activity}.` };
   }
-  if (attention) return { tone: 'error', text: `Presentation scheduled · ${attentionCount || 1} upload${attentionCount === 1 ? ' needs' : 's need'} coordinator attention.` };
+  if (attention) return { tone: 'error', attention: true, text: `Presentation scheduled · ${attentionCount || 1} upload${attentionCount === 1 ? ' needs' : 's need'} coordinator attention.` };
   if (processing) return { tone: 'body', text: `Presentation scheduled · ${processingCount || 1} upload${processingCount === 1 ? '' : 's'} processing.` };
   if (summary.state === 'ready') return { tone: 'body', text: 'Presentation scheduled · materials ready.' };
   return { tone: 'body', text: 'Presentation scheduled · materials requested.' };
@@ -136,6 +137,10 @@ export default function ResearchPresentationMaterialsCard({ requestId, siteVisit
         </h3>
         <p className={`mt-1 text-sm ${status ? TONE_CLASS[status.tone] : 'text-gray-600'}`} aria-live="polite">
           {status ? status.text : 'Checking the presentation schedule…'}
+          {/* The coordinator resolves a stuck upload in Meeting Tracker, not here (staff flow audit, finding 13). */}
+          {status?.attention && requestId && (
+            <> <Link href={`/meeting-tracker/visits/${encodeURIComponent(requestId)}`} className="font-medium text-blue-800 underline">Open meeting record</Link></>
+          )}
         </p>
         {body}
       </section>

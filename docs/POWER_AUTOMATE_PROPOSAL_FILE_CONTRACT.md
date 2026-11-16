@@ -56,8 +56,32 @@ files are PDFs except `Graphical-Abstract_{Request#}`, which is an image
 (format not specified). Connor's other J27 `AI Materials`
 files (`Graphical-Abstract_`, `Biosketches_`, `Other-Support_`,
 `Collaboration-Letters_`, `PhaseI-Cover-Page_`, `Abstract_`,
-`Graphical-Abstract-Page_`) are not app inputs today. The J27 staff and
-reviewer copies are still to be specified.
+`Graphical-Abstract-Page_`) are not AI inputs today.
+
+**Changed 2026-11-10 (Connor; alignment log D58):** the J27 individual files
+live in `Submission-Documents`, not `AI Materials`. Connor's Production test
+request 1003384 holds `Project-Narrative_`, `Bibliography_`, `Biosketches_`,
+`Other-Support_` and `Collaboration-Letters_` (each `{Request#}.pdf`) and
+`Graphical-Abstract_{Request#}.jpg` there, and has no `AI Materials` folder.
+On the J27 line (not promoted) the Workbench Proposal tab lists those six from
+`Submission-Documents` for J27 and later cycles, matching names exactly. The
+governed narrative and bibliography readers accept the J27 names in
+`Submission-Documents` as well (owner, 2026-11-10; alignment log D59). They
+still require exactly one copy across the accepted places and fail closed
+otherwise: `AI Materials` under either name, or `Submission-Documents` under the
+J27 name. Connor plans an `AI Materials` folder for J27 with different contents.
+The one item named so far is `Narrative-Bibliography_{Request#}.pdf`, the
+combined document for Reviewer Finder, built by Connor's flow (alignment log
+D60; not yet created). Derived files go in `AI Materials` so that
+`Submission-Documents` holds only the applicant's originals. On the J27 line
+Reviewer Finder loads that file by default when a request has exactly one.
+
+The J27 staff version sits at the root of the request folder, named
+`{AKA}_Staff-Version_{Request#}` (Connor, 2026-11-10; AKA is the institution's
+short name). The Proposal tab on the J27 line shows it first, matching any
+single root file whose name ends `_Staff-Version_{Request#}.pdf` (Connor
+confirmed the extension). The Expertise Finder batch match reads the same
+file, and still accepts the earlier `Phase_I_Staff_Version` name. The J27 reviewer copy is still to be specified.
 
 ## File purposes
 

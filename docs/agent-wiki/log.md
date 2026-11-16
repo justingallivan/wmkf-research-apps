@@ -1,7 +1,7 @@
 ---
 agent_wiki: log
 status: active
-last_verified: 2026-09-08
+last_verified: 2026-11-15
 stale_after_days: 90
 owner: agent-operations
 source_files:
@@ -38,3 +38,11 @@ update_triggers:
   `last_verified`). The reviewer-workbench-lifecycle topic gained an operating note for the
   single-page Workbench shell (PR #204 and its follow-up panel step). No structural change
   to the wiki.
+
+## 2026-11-15
+
+- Freshness pass: re-verified the reviewer-identity, intake-portal, security-auth, finance-honoraria,
+  dev-environment, reviewer-origination, external-reviewer-portal, and index pages against source. Corrected
+  moved line references, the webhook proxy-allowlist location, the preflight helper name, and the index's
+  migration 078 wording; added the ninth enforcement contract to reviewer-identity. Live Vercel, Dataverse,
+  and deployment claims were not re-probed and keep their cited evidence labels. No structural change.

@@ -23,6 +23,7 @@
  * Dataverse answer snapshots; the browser only requests and downloads it.
  */
 
+import StaffReviewSummary from './StaffReviewSummary';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { requestEnvelope } from '../../utils/api-request';
 import { Card } from '../Layout';
@@ -814,7 +815,7 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry, updating =
   );
 }
 
-export default function ReviewsTab({ requestId, previewReadOnly = false }) {
+export default function ReviewsTab({ requestId, previewReadOnly = false, showStaffReviewSummary = false }) {
   // Phase 2: the live admin-panel question set (or null on fetch failure —
   // fail-soft per the route; the matrix derivation falls back to
   // snapshot-order-only and marks nothing retired in that case).
@@ -824,6 +825,25 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
   // existing, unchanged default rendering; "compare" is the new schema-free
   // matrix.
   const [view, setView] = useState('cards');
+  const viewStorageKey = showStaffReviewSummary ? `workbench:reports-view:${requestId}` : null;
+  useEffect(() => {
+    if (!viewStorageKey) return;
+    try {
+      setView(window.sessionStorage.getItem(viewStorageKey) === 'compare' ? 'compare' : 'cards');
+    } catch {
+      // Reports still works when browser storage is unavailable.
+    }
+  }, [viewStorageKey]);
+
+  function selectView(nextView) {
+    setView(nextView);
+    if (!viewStorageKey) return;
+    try {
+      window.sessionStorage.setItem(viewStorageKey, nextView);
+    } catch {
+      // The current selection still applies in this view.
+    }
+  }
   const [manualEntry, setManualEntry] = useState(null);
   const [snapshot, setSnapshot] = useState(null);
   const [updating, setUpdating] = useState(false);
@@ -944,9 +964,14 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
     </div>
   ) : null;
 
+  const staffSummary = showStaffReviewSummary && activeProposal && (
+    <StaffReviewSummary key={requestId} requestId={requestId} reviewers={submitted}
+      evidenceHash={activeProposal.staffReviewEvidenceHash} refreshReports={load} />
+  );
   if (submitted.length === 0 && outstanding.length === 0) {
     return (
       <div className="space-y-4">
+        {staffSummary}
         {refreshNotice}
         {updating && <p className="text-sm text-gray-500" role="status">Updating reviews…</p>}
         <Card hover={false}>
@@ -973,6 +998,7 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
 
   return (
     <div className="space-y-4">
+      {staffSummary}
       {refreshNotice}
       {updating && <p className="text-sm text-gray-500" role="status">Updating reviews…</p>}
       {outstanding.length > 0 && (
@@ -1029,14 +1055,16 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
               <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden text-xs">
                 <button
                   type="button"
-                  onClick={() => setView('cards')}
+                  aria-pressed={view === 'cards'}
+                  onClick={() => selectView('cards')}
                   className={`px-3 py-1.5 ${view === 'cards' ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
                 >
                   Cards
                 </button>
                 <button
                   type="button"
-                  onClick={() => setView('compare')}
+                  aria-pressed={view === 'compare'}
+                  onClick={() => selectView('compare')}
                   className={`px-3 py-1.5 border-l border-gray-300 ${view === 'compare' ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
                 >
                   Compare
@@ -1055,6 +1083,12 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
               <CompareView submitted={submitted} liveQuestions={activeLiveQuestions} />
             </Card>
           )}
+          {staffSummary && (
+            <button type="button" onClick={() => document.getElementById('staff-review-summary-heading')?.focus()}
+              className="min-h-11 rounded-md text-sm font-semibold text-blue-800 underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-blue-600">
+              Back to staff summary
+            </button>
+          )}
         </>
       )}
       <SynthesisCard
@@ -1066,7 +1100,7 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
         updating={updating}
         previewReadOnly={previewReadOnly}
       />
-      {submitted.length > 0 && (
+      {submitted.length > 0 && !showStaffReviewSummary && (
         <WriteupParagraphsCard
           reviewers={submitted}
           synthesis={activeProposal?.reviewSynthesis ?? null}

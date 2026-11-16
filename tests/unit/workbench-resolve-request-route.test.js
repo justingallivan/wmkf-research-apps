@@ -7,6 +7,8 @@
  *
  * @jest-environment node
  */
+// The phase rollout setting (phase-admission.js): absent, which outside Production means on.
+jest.mock('../../lib/services/settings-service', () => ({ getSettingStrict: jest.fn(async () => ({ found: false, value: null, revision: null })) }));
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
 jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: {
@@ -49,6 +51,13 @@ const SELECT = [
   'wmkf_ai_summary',
   'wmkf_ai_dataextract',
   'wmkf_ai_fieldprimer',
+  // J27 read model request fields (plan C7); memo columns join only when
+  // their schema helpers are on, which this test's env leaves off.
+  'wmkf_phaseiistatus',
+  'wmkf_readyforreview',
+  'wmkf_triagestatus',
+  '_wmkf_currentpresitevisit_value',
+  '_wmkf_currentfinalwriteup_value',
 ].join(',');
 
 function mockRes() {
@@ -129,6 +138,8 @@ test('golden path by GUID: resolves and returns the expected DTO shape (full env
     requestNumber: '1002794',
     title: 'A Study',
     cycleCode: 'J26',
+    // A cycle before 2027 is never admitted to the phase layout.
+    phaseLayout: false,
     cycleLabel: 'June 2026',
     // The linked cycle's calendar Board date, not the request's meeting date.
     meetingDate: '2026-06-04',

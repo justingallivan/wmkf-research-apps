@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-20
+last_verified: 2026-11-15
 stale_after_days: 90
 owner: dev-ops
 source_files:
@@ -119,7 +119,7 @@ Claude config sync, and environment-specific operating notes.
   (a ~86 MB SQLite DB + WAL, daemon pid/socket/log) is gitignored twice — root
   `.gitignore` and a self-written `.codegraph/.gitignore` (`*` + `!.gitignore`). It is a
   derived artifact rebuilt from source, like `node_modules/`/`.next/`; do NOT commit or
-  try to sync it between machines. Each machine runs its own daemon (v1.3.0) whose file
+  try to sync it between machines. Each machine runs its own daemon (v1.3.0 when observed 2026-07-08; `codegraph --version` reported 1.2.0 on this machine 2026-11-15) whose file
   watcher auto-syncs on change — the startup log shows a full re-index (`Auto-synced N
   file(s)`) then per-edit incremental syncs, so it stays current across a `git pull`
   (verified 2026-07-08: after a 576-commit pull it auto-synced 668 files on startup and

@@ -473,6 +473,7 @@ describe('getReviewers — characterization', () => {
             blockers: [],
             ...UNAVAILABLE_JOB_STATE,
           },
+          staffReviewEvidenceHash: expect.stringMatching(/^[a-f0-9]{64}$/),
           statusSummary: { review_received: 1, materials_sent: 1, accepted: 1 },
           reviewers: [
             {
@@ -714,6 +715,7 @@ describe('getReviewers — characterization', () => {
             blockers: [{ suggestionId: 'sug-b1', reason: 'missing_current_token', name: null, accepted: true, emailSentAt: null }],
             ...UNAVAILABLE_JOB_STATE,
           },
+          staffReviewEvidenceHash: expect.stringMatching(/^[a-f0-9]{64}$/),
           statusSummary: { accepted: 1 },
           reviewers: [
             {
@@ -903,6 +905,7 @@ describe('getMyCandidates — characterization', () => {
               responseReceivedAt: '2026-12-12T10:00:00Z',
               respondReminderSentAt: null,
               reviewDueDateOverride: '2027-02-20',
+              reviewReceivedAt: null,
               requestReviewDeadline: '2027-02-15',
               effectiveReviewDeadline: '2027-02-20',
               savedAt: '2026-12-01T08:00:00Z',
@@ -943,6 +946,7 @@ describe('getMyCandidates — characterization', () => {
               responseReceivedAt: null,
               respondReminderSentAt: null,
               reviewDueDateOverride: null,
+              reviewReceivedAt: null,
               requestReviewDeadline: '2027-02-15',
               effectiveReviewDeadline: '2027-02-15',
               savedAt: '2026-12-02T09:00:00Z',

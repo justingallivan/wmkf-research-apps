@@ -39,10 +39,28 @@ A variable change takes effect only in a new deployment. Details and rotation: `
 1. **Look up** the source Request number. The form reads the Request and its documents from production and saves a bundle. Limits (`TEST_REQUEST_PREVIEW_READ_LIMITS`, `admin-preview-service.js`): at most 7 documents, 25 MB each, 50 MB in total; PDF and XLSX only.
 2. **Confirm and reserve run.** Writes the bundle and manifest to the Blob store and one row to the ledger. Nothing exists in Dynamics yet.
 3. **Start production run.** One request per step; the form keeps going until the run is ready or a step stops. `copy_file` runs once per document. `observe` waits about a minute.
-4. **Status:** available once the run is `ready` (clone provisioning complete).
+4. **Status:** available once the run is `ready` (clone provisioning complete). The form labels this state **Created**, not "Ready", because it does not mean ready for review. [Page layout 2026-11-15: for a created run the clone steps collapse to one line and the status control comes next, above Recorded steps and Run tools.]
    For prepared J27+ reviewer fixtures, Phase I Invited followed by Phase II
-   Pending Committee Review and owner readiness finalization are required.
+   Pending Committee Review and readiness finalization are required.
    Earlier-cycle clone behavior is unchanged.
+5. **Prepare for review** (prepared J27+ runs) [readiness route DEPLOYED 2bdf62b5d; one-button flow DEPLOYED 80cf7a628, 2026-11-15].
+   A J27 Research request appears in the Workbench only once `wmkf_readyforreview`
+   is true. For a prepared run the status panel shows one action, **Prepare for
+   review** (owner, 2026-11-15: anyone with admin access, on their own runs). After
+   one confirmation it sets Phase I to Invited, then Phase II to Phase II Pending
+   Committee Review, then marks the Request ready, in that order (Invited is
+   allowed only while Phase II is empty). Each step uses the existing status route
+   or `POST /api/admin/test-requests/runs/[runId]/readiness`, which runs the same
+   checks as the CLI's `--finalize-readiness --confirm` against the stored manifest.
+   Any answer other than complete stops the flow; **Continue** resumes the same open
+   status change or readiness attempt and never sends a second PATCH. After a reload, a step whose change was sent but not confirmed shows **Sent, not confirmed** (a journaled but unsent change shows **Planned, not sent**, which Continue sends), with a sentence saying what Continue will do. A Request whose
+   Phase II was set before Phase I was Invited is reported as unpreparable (create a
+   new test Request). The general status menus stay under **More options**. An
+   attempt that needs attention, or a run whose stored files are gone, still needs
+   the owner CLI with the downloaded manifest. The daily sweep keeps a ready prepared
+   run's stored files until its readiness completes, for at most 30 days. Expect
+   about 5 to 10 minutes: each step waits for Dynamics' background jobs (at least
+   90 seconds of quiet).
 
 The bundle is valid for file copying for 6 hours from lookup (`BUNDLE_MAX_AGE_MS`, `bundle-file-copy.js`). Finish the copy steps within that window. Completed verified copies do not expire for later status/readiness finalization because of that TTL or subsequent edits to the real source.
 
@@ -62,7 +80,7 @@ When available, "Retry step" sends the same advance again. What that does depend
 |---|---|---|---|
 | any | `timeout`, `network`, `upstream_http`, `unknown_error` **before** the step's write was attempted | Re-attempts the step | Yes |
 | `fence_source` | `source_fence_failed`, `preflight_identity_changed`, `manifest_digest_mismatch`, `preallocated_request_present` | Re-reads; stops again unless the cause was a transient read failure | Only if it clears. Nothing was created; look up the source again and start a new run |
-| `create_request` | first stop after the create was sent and refused or lost; a refusal is recorded as `unknown_error` **[RUN: Preview]** | Looks for the Request by its reserved ID. Found and owned: recovered, continues. Not found: `ambiguous_create_outcome` | Only if the create actually landed |
+| `create_request` | first stop after the create was sent and refused or lost; a refusal is recorded as `unknown_error` **[RUN: Preview]** | Looks for the Request by its reserved ID. Found and owned: recovered, continues. Not found: `ambiguous_create_outcome`. The form offers Retry here when the stop was `timeout`, `network` or `upstream_http` 429/5xx (added after production run `174e770e` timed out on the create, 2026-11-14); an `unknown_error` refusal stays blocked | Only if the create actually landed |
 | `create_request` | `ambiguous_create_outcome` **[RUN: Preview]** | Reads the reserved ID again; never sends a second create. Found and owned: recovered, continues. Still absent: stops again | Only if the create eventually landed. Otherwise start a new run |
 | `create_request` | `preallocated_request_present_not_owned` | Stops again. Never sends a second create | No. Start a new run |
 | `correct_meeting_date` | `meeting_date_readback_mismatch` | Production never writes the date; stops again | No |
@@ -87,6 +105,8 @@ A run that cannot continue stays `needs_attention` in the ledger. Whatever it cr
 Owner decision 2026-10-03: retain this partly built marked test record; no cleanup or recovery is authorized by that decision. Factory v2’s first diagnosis slice shipped in #426; later operations remain in the [plan](plans/TEST_REQUEST_FACTORY_V2_PLAN_2026-10-03.md).
 
 Parked **[RUN]**: run `20407283-c279-5e0c-b396-210ad6842482`, test Request 1003308, two PDFs verified, one XLSX uploaded and unverified.
+
+Parked **[RUN]** 2026-11-14: run `174e770e-cdfe-51c9-a8c5-945a02abe534`, J27 test Request 1003515 (source 1002874). The create timed out at 30 s and was recovered by readback; both J27 files copied and passed their checks. Final verification stops on the Foundation account only: the GoVerify refresh triggered by the create changed BMF 509 (Undetermined → blank), shortened the BMF Subsection Description, upper-cased the Verified address and replaced the GoVerify PDF (owner-read Audit History; GOverify Status ended unchanged). These are vendor writes; nothing was restored. A form run that triggers a GoVerify refresh is likely to stop the same way **[ASSUMED from two runs, 2026-11-03 and 2026-11-14]**: the transition contract protects those columns, and the prior-PDF evidence path is CLI-only and would not cover reformatting. The create limit is 60 s since this run.
 
 ## Read-only diagnosis — shipped in PR #426
 
@@ -128,7 +148,7 @@ The recheck's `ok` means this pass found no newly unrecorded effects and no open
 | `--run-recheck=<runId>` | Read-only: the Foundation account against the run's baseline. |
 | `--advance=<runId> --manifest=<file> --bundle=<file>` | Uses the same backend runner. The form may withhold Advance when diagnosis is uncertain; an owner CLI retry remains subject to runner checks and separate operational authorization. Needs the run's manifest and bundle as local files. |
 | `--set-status`, `--status-recheck`, `--status-abandon` | The status setter, its recheck, and closing a change stuck `dispatched`. |
-| `--finalize-readiness=<runId> --manifest=<file>` | Deployed owner-only prepared J27+ readiness preview; add `--confirm` for the single journaled true stamp after all checks. Requires migration 094 on the operational ledger. No web finalization action. |
+| `--finalize-readiness=<runId> --manifest=<file>` | Deployed owner-only prepared J27+ readiness preview; add `--confirm` for the single journaled true stamp after all checks. Requires migration 094 on the operational ledger. The admin form's **Prepare for review** calls the same finalizer with the stored manifest [DEPLOYED 2bdf62b5d]. |
 | `--recover-readiness=<runId> --manifest=<file>` | Read-only recovery preview; exact-destination confirmation can abandon only an unready attempt after all senders stop (procedure below). |
 | `--bind-reviewer=<runId>`, `--bind-reviewer-slot=<runId>` | Owner cast suggestion binding and separate read-only slot preview; only exact Request confirmation enables the slot operation. |
 | `--ledger-check` | Ledger schema against the tracked fingerprint. |
@@ -144,8 +164,43 @@ canonical reviewer proposal; other recognized Basic
 files are copied normally. This is a prepared reviewer package, not proof that
 intake assembly or AI processing ran. Production does not seed later recipes.
 
+**[MERGED 2026-11-14 (`3e382029a`); ledger migration 098 applied first to both
+managed ledgers and the Production app database; no J27 Factory run yet]** File destinations follow the destination cycle
+(owner, 2026-11-14). A run reserved for a J27-or-later Grant Cycle binds
+`values.documentLayout = 'single-submission'` into its manifest
+(`buildCloneManifest`, read back by `manifestDocumentLayout`), and the copy step
+writes the narrative and bibliography to
+`Submission-Documents/Project-Narrative_<n>.pdf` and
+`Submission-Documents/Bibliography_<n>.pdf`, where the request page and the
+governed readers look for a single-submission cycle. The source still supplies
+the D26 names from `AI Materials`. The other four J27 files (Biosketches, Other
+Support, Collaboration Letters, Graphical Abstract) are not copied and show as
+missing on the request page: an accepted limit for test requests. The layout is
+never inferred on resume, so a run reserved before this change, and every D26
+run, keeps the `AI Materials` destinations.
+
+**[BRANCH-BUILT 2026-11-15 (`claude/factory-narrative-bibliography`); ledger
+migration 099 applied to both ledgers and the Production app database
+2026-11-15; not merged]** A J27-or-later run whose source has
+both a narrative and a bibliography also builds
+`AI Materials/Narrative-Bibliography_<n>.pdf` (alignment log D60; owner,
+2026-11-15): the narrative's pages, then the bibliography's, no cover page.
+Reviewer Finder opens it by default, as it will Connor's file on real
+requests. It is the last file of the copy step: each input is re-read and
+checked against the export exactly like a copied file, the combined bytes are
+uploaded create-only, and verify checks the folder listing and re-reads the
+bytes. A source without one of the two plans no combined file. Whether a run
+builds it is recorded in the manifest (`values.narrativeBibliography`) and
+bound into the plan digest, so a manifest edited to drop it is refused before
+any write. A run reserved before this change carries no such record and copies
+only the files its manifest promised. An input that
+is not a readable PDF stops the run with `file_rejected` before anything is
+uploaded for the combined file.
+
 Download the manifest and bundle **before the final clone step**, since the daily
-sweep may delete them once the run is internally ready. Complete the clone, use
+sweep may delete them once the run is internally ready. [DEPLOYED 2bdf62b5d] A prepared
+J27+ run's stored files are now kept until its readiness completes (at most 30 days),
+so the form's readiness step needs no download; the CLI path still uses the local file. Complete the clone, use
 the existing status setter for Phase I `Invited` and then Phase II `Phase II
 Pending Committee Review`, and inspect each result. Invited may create a draft
 email and GoApply tracking row. The bounded 2026-11-03 fixture had no unexpected provisioning effects; future runs still require observation. The derived Request Status must read `Phase II Pending`.
@@ -194,7 +249,7 @@ other needs_attention status history requires owner inspection.
 
 ## Repeatable prepared-fixture rehearsal
 
-[VERIFIED via the CLI parser/guards, deployed UI and the bounded 2026-11-03 rehearsal] The supported MVP is Admin cloning followed by owner phase/readiness operations. A web readiness button is not required for this increment. These steps describe the procedure; each new Production write, communication or metered analysis needs its own authorized scope.
+[VERIFIED via the CLI parser/guards, deployed UI and the bounded 2026-11-03 rehearsal] The supported MVP was Admin cloning followed by owner phase/readiness operations. [DEPLOYED 2bdf62b5d] The form's status panel now also sets both statuses and marks the Request ready (Normal run, step 5); the CLI steps below remain the owner path and the recovery path. These steps describe the procedure; each new Production write, communication or metered analysis needs its own authorized scope.
 
 1. Choose a completed source with its applicant abstract and canonical reviewer PDF. Copying a D26 package into J27 tests reviewer mechanics, not new J27 intake assembly or AI output. Confirm the destination cycle and test marker in the preview.
 2. If the Foundation already has a generated GOverify PDF, retain the authorized pre-run URL in a private local file before cloning. Use mode 0600; never commit it or put the URL in shell arguments. The optional prior-PDF proof must reproduce the original baseline digest exactly. If that proof is unavailable or fails, stop for inspection rather than resetting the baseline.
@@ -239,5 +294,8 @@ With the form off, the run list, run detail and artifacts download still work.
 ## Known gaps
 
 - **First lookup refused once.** The first lookup of source 1002988 (Preview) and of source 1002860 (Production) was refused with "changed while its bytes were being verified" and passed on retry; the production log named an XLSX **[RUN]**. A later lookup of 1002988 passed first time. Cause not established. Retry the lookup. Since S564 the refusal log line names each comparison that failed with its before → after values (metadata eTag/versionId/size, the download's metadata size, the content length) and the cTag, which moves only when the bytes change; read it from the function log (`admin test-request run refusal: 409 test_request_preview_source_changed …`) at the next occurrence.
+  **Cause found 2026-11-15 [RUN]; fix deployed 2026-11-15 (`eab2db1ce`).** The log for source 1002912 named `Project Budget spreadsheet.xlsx`: version 3 → 4, 34,182 → 34,367 bytes, cTag moved, with nobody editing. SharePoint rewrote the Office package's document properties while it was being read [ASSUMED mechanism: property demotion on read; consistent with the +185 bytes and the cTag change]. The fix reads a Word or Excel file once more when SharePoint gives it a new version during the read, and accepts it only if that second read is stable. A Word or Excel listing size is no longer binding; the stable read is. PDFs are not re-read. A rewrite may add at most 64 KiB over the listed size, every source download is capped (exact size for a PDF, listed + 64 KiB for Word or Excel), and the total limit is rechecked on the verified sizes.
+- **Source PDF that is not a PDF (2026-11-15) [RUN].** Run `d702e242` (test Request 1003516, source 1002912) stopped at `copy_file` building the combined Narrative-Bibliography file: source `AI Materials/ProposalBibliography_1002912.pdf` is about 3.85 MB of text starting `[null,null,null,`, not a PDF (owner `xxd`/`file` check). The copy matched the source byte for byte. No app code writes that file; on real requests it comes from Connor's flow. Fix deployed 2026-11-15 (`eab2db1ce`; owner: refuse at lookup): the lookup refuses any `.pdf` it would copy without a PDF header in the first 1,024 bytes, and a narrative or bibliography that does not open unencrypted, with `test_request_preview_source_invalid_pdf` naming the file, before anything is reserved. Run `d702e242` stays `needs_attention` for the post-intake cleanup.
+- **Narrative and bibliography sources (owner, 2026-11-15) [DEPLOYED cd874469a].** The owner found the `AI Materials` bibliographies broken on other requests too. The lookup now prefers the applicant's originals in the source's `Phase II` folder, `Project Narrative.pdf` and `Bibliography.pdf` (shown as "(Phase II original)"), and offers the `AI Materials` copy only when the Phase II one is missing. Destinations are unchanged: J27 runs copy to `Submission-Documents/Project-Narrative_<n>.pdf` and `Bibliography_<n>.pdf` (D58) and build the combined file from them; D26 runs copy to the `AI Materials` names.
 - **XLSX verification** is characterized for one SharePoint rewrite (`docProps/custom.xml`). A spreadsheet rewritten in another way, or one over the package limits, stops at `copy_file` after upload and cannot continue.
 - **Not checked in a browser:** long-label wrapping, the selected-row tint, a narrow window.

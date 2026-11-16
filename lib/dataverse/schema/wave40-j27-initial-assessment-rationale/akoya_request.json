@@ -1,0 +1,12 @@
+{
+  "name": "akoya-request-j27-initial-assessment-rationale",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "akoya_request",
+  "attributes": [{
+    "type": "Memo",
+    "schemaName": "wmkf_InitialAssessmentRationale",
+    "displayName": "Initial Assessment Rationale",
+    "description": "Staff-authored rationale for triaging or advancing a proposal during Initial Assessment.",
+    "maxLength": 10000
+  }]
+}

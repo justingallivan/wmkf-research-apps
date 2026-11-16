@@ -64,6 +64,22 @@ beforeEach(() => {
   global.fetch = jest.fn();
 });
 
+// This list renders only outside the J27 stage layout (WorkbenchShell), e.g. a
+// 2027 cycle before the release is admitted, so its rows keep triage (owner, 2026-11-13).
+test.each(['J27', 'D27', 'D26'])('%s requests keep the Advancing badge and triage control', async (cycleCode) => {
+  global.fetch.mockResolvedValueOnce(response({
+    cycleCode,
+    proposals: [row({ advancing: true })],
+    rollup: { total: 1, stages: { find: 1 } },
+  }));
+
+  renderPanel({ cycleCode });
+
+  expect(await screen.findByRole('link', { name: '#1001' })).toBeInTheDocument();
+  expect(screen.getByTitle('Set triage status')).toHaveValue('advancing');
+  expect(screen.getAllByText('Advancing').some((node) => node.tagName === 'SPAN')).toBe(true);
+});
+
 test('retains same-key rows while triage refresh is held, then accepts a successful empty response', async () => {
   let release;
   const held = new Promise((resolve) => { release = resolve; });

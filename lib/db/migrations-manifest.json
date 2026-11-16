@@ -94,6 +94,9 @@
     "093_prompt_publish_audit_catalog_status.sql",
     "094_test_request_readiness_finalizations.sql",
     "095_reviewer_reminder_events.sql",
-    "097_shared_prompt_jobs.sql"
+    "096_j27_integrity_jobs.sql",
+    "097_shared_prompt_jobs.sql",
+    "098_test_request_j27_file_names.sql",
+    "099_test_request_narrative_bibliography.sql"
   ]
 }

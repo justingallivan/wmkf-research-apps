@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-10-22
+last_verified: 2026-11-15
 verification_scope: "Scoped repository-source review of requested reviewer-count handling and proposal-input status, plus read-only Production observation of the reviewer model-override setting; no provider-list call, runtime/cache/environment resolution, or whole-page/live-state recertification"
 stale_after_days: 60
 owner: reviewer-finder
@@ -42,9 +42,10 @@ lanes, provenance, ranking, and the recall-vs-precision posture. For who a
 candidate *is* (identity, contact, COI, PI identity), use the
 [Reviewer Identity](reviewer-identity.md) page instead.
 
-> **Scoped source review (2026-10-22):** only requested reviewer-count handling
-> and proposal-input status were checked against repository sources and the
-> linked durable note. This date does not recertify the whole page or live state.
+> **Source recheck (2026-11-15):** code symbols, constants, file paths, and line
+> references on this page were rechecked against repository source (an earlier
+> 2026-10-22 pass covered requested reviewer-count handling and proposal-input
+> status). Live state, owner decisions, and experiment results were not re-probed.
 > The model entry remains a 2026-08-23 observation; current setting, runtime
 > resolution, and deployment remain unprobed. Other dated experiments and owner
 > decisions retain their original evidence scope.
@@ -78,7 +79,7 @@ origination.
 `.claude-memory/project-reviewer-sourcing-constraints.md`):** applicant-suggested
 reviewers capped ~1/panel (recent anti-stacking policy — could evolve); reviewer
 reuse is per-PD practice (none currently; a departed colleague reused repeatedly —
-STRATEGY.md:81 reflects his practice); referral is a MULTIPLIER on the engine
+the `docs/STRATEGY.md` passage the owner pointed to, once at line 81, is no longer in the current file); referral is a MULTIPLIER on the engine
 (never-contacted experts can't refer). So the Claude-assisted engine fills nearly
 every panel seat and its slate quality compounds through referral; deprioritize
 roster-reuse/applicant-recs-first designs.
@@ -251,7 +252,7 @@ bare keyword→author lane is what underperformed.
   (S249 D1), and the clause owns LINE 1 (S424).** A period cannot terminate the name,
   because titles and middle initials carry one — the original space-joined encoding
   truncated "Dr. Abby Doyle" to "Dr" on reload. The newline is the terminator, so the
-  downstream annotations `save-candidates-service.js:1034`/`:1037` append onto a later
+  downstream annotations `save-candidates-service.js:1032`/`:1035` append onto a later
   line and can never re-enter the name. Encode/decode is the canonical trio
   `formatReferredByReason` / `splitReferredByReason` / `parseReferredByReason`
   (`lib/utils/reviewer-provenance.js`); route new producers through it rather than

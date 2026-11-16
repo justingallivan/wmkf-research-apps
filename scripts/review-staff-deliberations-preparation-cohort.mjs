@@ -55,6 +55,7 @@ async function main() {
 
   const scanCycle = async (cycleCode) => {
     const filter = withOrdinaryTestRequestODataFilter(
+      // Plan F2 (J27 discovery): deliberately unchanged — legacy cohort script; the readiness probe is the F1 exception.
       [linkedCycleFilter(cycleCode), buildVisibilityFilter(false)].map((c) => `(${c})`).join(' and '),
       isolationEnv,
     );

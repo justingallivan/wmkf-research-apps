@@ -10,7 +10,7 @@ import { REQUEST_DOCUMENT_ARTIFACT_TYPE as TYPE, REQUEST_DOCUMENT_OPERATION_STAT
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
 
 const id = (n) => `${String(n).padStart(8, '0')}-1111-4111-8111-111111111111`;
-const request = (n, program = 0) => ({ akoya_requestid: id(n), akoya_requestnum: String(1000 + n), akoya_title: `Proposal ${n}`, _akoya_programid_value: RESEARCH_PROGRAM_IDS[program], _akoya_applicantid_value_formatted: `Institution ${n}`, wmkf_meetingdate: '2026-12-03T00:00:00Z', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } });
+const request = (n, program = 0) => ({ akoya_requestid: id(n), akoya_requeststatus: 'Phase II Pending', akoya_requestnum: String(1000 + n), akoya_title: `Proposal ${n}`, _akoya_programid_value: RESEARCH_PROGRAM_IDS[program], _akoya_applicantid_value_formatted: `Institution ${n}`, wmkf_meetingdate: '2026-12-03T00:00:00Z', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } });
 const J26 = { wmkf_meetingdate: '2026-06-03T00:00:00Z', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } };
 const document = (n, type = TYPE.TRANSCRIPT_SUMMARY) => ({ _wmkf_request_value: id(n), wmkf_requestdocumentid: id(n + type), wmkf_artifacttype: type, wmkf_operationstatus: OP.READY, wmkf_sharepointdriveid: 'drive', wmkf_sharepointitemid: 'item', createdon: '2026-10-19T00:00:00Z' });
 let deps;
@@ -22,6 +22,7 @@ beforeEach(() => {
     readText: jest.fn(async () => ({ ok: true, text: 'What was presented\n\nA novel approach to imaging.\n\nQuestions and answers\nMore detail.', item: { stale: false, publishedAt: '2026-10-19' } })),
     readSentiments: jest.fn(async () => ({ [id(1)]: { status: 'current', sentiment: { headline: 'Support with reservations.' } }, [id(2)]: { status: 'none', sentiment: null } })),
     listBoardDates: jest.fn(async () => [{ wmkf_cyclecode: 'J26', wmkf_meetingdate: '2026-06-04' }, { wmkf_cyclecode: 'D26', wmkf_meetingdate: '2026-12-10' }]),
+    listPrograms: jest.fn(async () => ({ records: [{ wmkf_grantprogramid: '94cab30b-958f-ee11-8179-000d3a341e8f', wmkf_name: 'Research' }] })),
     now: () => new Date('2026-10-19T12:00:00Z'),
   };
   // The link helpers check the wmkf_grantcycle restriction (covered in grant-cycle-link.test.js).
@@ -161,4 +162,16 @@ test('J27 briefing excludes unready rows before any artifact or sentiment reads'
   expect(deps.queryRequests.mock.calls[0][0].select).toContain('wmkf_readyforreview');
   deps.queryRequests.mockResolvedValue({ records: [make(1, false)] });
   expect(await load({ profileId: 7 })).toMatchObject({ cycles: [], defaultCycleCode: null });
+});
+
+test('plan F2: the briefing query carries the discovery projection, keeps SE/MR membership, and admits a ready J27 Research intake row', async () => {
+  const { assertDiscoveryQuery } = jest.requireActual('../../shared/config/workbenchVisibility.js');
+  const j27 = { ...request(3), akoya_requeststatus: 'Phase I Pending', _wmkf_grantprogram_value: '94cab30b-958f-ee11-8179-000d3a341e8f', wmkf_readyforreview: true, wmkf_GrantCycle: { wmkf_cyclecode: 'J27' } };
+  deps.queryRequests.mockResolvedValue({ records: [j27], capped: false });
+  const body = await load({ cycleCode: 'J27', profileId: 7 });
+  const query = deps.queryRequests.mock.calls[0][0];
+  assertDiscoveryQuery(query);
+  expect(query.filter).toContain('_akoya_programid_value');
+  expect(query.filter).toContain('_wmkf_grantprogram_value eq 94cab30b-958f-ee11-8179-000d3a341e8f) and wmkf_readyforreview eq true');
+  expect(body.groups.flatMap((g) => g.proposals.map((p) => p.requestNumber))).toEqual(['1003']);
 });

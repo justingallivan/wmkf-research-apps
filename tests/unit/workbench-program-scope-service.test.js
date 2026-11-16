@@ -1,9 +1,17 @@
 /** @jest-environment node */
 
 import {
+  assignmentQueryOptions,
   buildProgramScopeFilter,
+  readinessOnlyProgramIds,
   resolveWorkbenchProgramScope,
 } from '../../lib/services/workbench/program-scope-service.js';
+import { assertDiscoveryQuery } from '../../shared/config/workbenchVisibility.js';
+
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle.js', () => ({
+  ...jest.requireActual('../../lib/dataverse/adapters/operations-grant-cycle.js'),
+  linkedCycleExpand: () => 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+}));
 
 const RESEARCH = '11111111-1111-4111-8111-111111111111';
 const SOCAL = '22222222-2222-4222-8222-222222222222';
@@ -13,7 +21,7 @@ const PD = '44444444-4444-4444-8444-444444444444';
 function deps(records, assigned = []) {
   return {
     listPrograms: jest.fn(async () => ({ records })),
-    queryAssignedRequests: jest.fn(async () => ({ records: assigned.map((id) => ({ _wmkf_grantprogram_value: id, wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } })) })),
+    queryAssignedRequests: jest.fn(async () => ({ records: assigned.map((id) => ({ _wmkf_grantprogram_value: id, akoya_requeststatus: 'Phase II Pending', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } })) })),
   };
 }
 
@@ -48,8 +56,8 @@ test('uses only the newest visible Workbench cycle for the PD default', async ()
   ]);
   dependencies.queryAssignedRequests.mockResolvedValue({
     records: [
-      { _wmkf_grantprogram_value: SOCAL, wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } },
-      { _wmkf_grantprogram_value: RESEARCH, wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } },
+      { akoya_requeststatus: 'Phase II Pending', _wmkf_grantprogram_value: SOCAL, wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } },
+      { akoya_requeststatus: 'Phase II Pending', _wmkf_grantprogram_value: RESEARCH, wmkf_meetingdate: '2026-12-11', wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } },
     ],
   });
   await expect(resolveWorkbenchProgramScope({ callerSystemId: PD, dependencies })).resolves.toMatchObject({
@@ -65,7 +73,7 @@ test('the newest cycle is the newest Grant Cycle link, never a meeting date', as
   ]);
   dependencies.queryAssignedRequests.mockResolvedValue({
     records: [
-      { _wmkf_grantprogram_value: SOCAL, wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } },
+      { akoya_requeststatus: 'Phase II Pending', _wmkf_grantprogram_value: SOCAL, wmkf_meetingdate: '2026-06-04', wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } },
       // A later December meeting date with no link has no cycle and cannot be newest.
       { _wmkf_grantprogram_value: RESEARCH, wmkf_meetingdate: '2026-12-11' },
     ],
@@ -90,11 +98,22 @@ test('unready J27 assignments do not displace the earlier-cycle program default'
     { wmkf_grantprogramid: RESEARCH, wmkf_name: 'Research' },
     { wmkf_grantprogramid: SOCAL, wmkf_name: 'Southern California' },
   ]);
-  const later = { _wmkf_grantprogram_value: RESEARCH, wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, wmkf_readyforreview: false };
+  const later = { akoya_requeststatus: 'Phase II Pending', _wmkf_grantprogram_value: RESEARCH, wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, wmkf_readyforreview: false };
   dependencies.queryAssignedRequests.mockResolvedValue({ records: [
-    { _wmkf_grantprogram_value: SOCAL, wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } }, later,
+    { akoya_requeststatus: 'Phase II Pending', _wmkf_grantprogram_value: SOCAL, wmkf_GrantCycle: { wmkf_cyclecode: 'D26' } }, later,
   ] });
   expect((await resolveWorkbenchProgramScope({ callerSystemId: PD, dependencies })).defaultProgramId).toBe(SOCAL);
   later.wmkf_readyforreview = true;
   expect((await resolveWorkbenchProgramScope({ callerSystemId: PD, dependencies })).defaultProgramId).toBe(RESEARCH);
+});
+
+test('plan F2: the assignment discovery query carries the discovery projection, and the scope resolves one Research program', async () => {
+  assertDiscoveryQuery(assignmentQueryOptions('filter'));
+  expect(readinessOnlyProgramIds([{ wmkf_grantprogramid: RESEARCH, wmkf_name: 'Research' }, { wmkf_grantprogramid: SOCAL, wmkf_name: 'Southern California' }])).toEqual([RESEARCH]);
+  expect(readinessOnlyProgramIds([{ programId: RESEARCH, name: 'Research' }])).toEqual([RESEARCH]);
+  expect(readinessOnlyProgramIds([{ wmkf_grantprogramid: RESEARCH, wmkf_name: 'Research' }, { wmkf_grantprogramid: OTHER, wmkf_name: 'research' }])).toEqual([]);
+  const dependencies = deps([{ wmkf_grantprogramid: RESEARCH, wmkf_name: 'Research' }], [RESEARCH]);
+  const scope = await resolveWorkbenchProgramScope({ callerSystemId: PD, dependencies });
+  expect(scope.discoveryScope).toEqual({ readinessOnlyProgramIds: [RESEARCH] });
+  expect(dependencies.queryAssignedRequests.mock.calls[0][0]).toContain(`_wmkf_grantprogram_value eq ${RESEARCH}) and wmkf_readyforreview eq true`);
 });

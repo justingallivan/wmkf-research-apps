@@ -4,6 +4,7 @@ import { requireAppAccess } from '../../../../../lib/utils/auth';
 import { withDalContext } from '../../../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../../../lib/services/service-http-error';
 import { recordWorkbenchIntegrityReview } from '../../../../../lib/services/workbench/integrity-service';
+import { isJ27IntegritySimulationRequest } from '../../../../../lib/utils/j27-integrity-readiness';
 import { isGuid } from '../../../../../lib/utils/guid';
 
 export const config = { api: { bodyParser: { sizeLimit: '16kb' } } };
@@ -23,6 +24,9 @@ export default async function handler(req, res) {
   const rawRequestId = req.query.requestId;
   const requestId = typeof rawRequestId === 'string' ? rawRequestId.trim() : '';
   if (!isGuid(requestId)) return res.status(400).json({ error: 'requestId must be a GUID' });
+  if (isJ27IntegritySimulationRequest(requestId)) {
+    return res.status(409).json({ error: 'This request is reserved for automatic screening rehearsal.' });
+  }
 
   const body = req.body;
   if (!body || typeof body !== 'object' || Array.isArray(body)

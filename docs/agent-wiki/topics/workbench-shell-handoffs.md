@@ -27,6 +27,11 @@ watch_paths:
   - pages/workbench/[requestId].js
   - lib/services/pre-site-visit/preparation-config.js
   - pages/api/cron/staff-deliberations-preparation.js
+  - shared/components/workbench/workbench-location.js
+  - shared/components/workbench/J27RequestList.js
+  - shared/utils/j27CycleRows.js
+  - lib/services/workbench/j27-later-facts.js
+  - shared/utils/j27PageStage.js
 update_triggers:
   - "Workbench shell navigation or view ordering changes"
   - "Staff Deliberations preparation, handoff, or cycle behavior changes"
@@ -59,6 +64,56 @@ extraction_segments:
 > match, and nine synthetic cases, but makes no live application request. The 2026-10-31 wording in the historical
 > extract remains dated context. See the [current work queue](../../CURRENT_WORK_QUEUE.md)
 > and [terminology audit](../../audits/terminology-completion-audit-2026-11-01.md).
+
+## J27 cycle page layout (branch-built 2026-11-09 to 2026-11-10; not promoted)
+
+`[VERIFIED via source on claude/j27-cycle-page, 2026-11-10]` This describes the
+J27 line only. `main` and Production still run the six-panel shell described
+under Operating Notes below.
+
+- **Which layout.** `isStageLayout` in
+  `shared/components/workbench/workbench-location.js` chooses the phase layout
+  when the cycle is J27 or later and the program is one of the feed's
+  `stageProgramIds` (`lib/services/workbench/dashboard-service.js`). No cycle
+  literal: a later cycle qualifies without a code change. Earlier cycles and
+  other programs keep the older tabs.
+- **Pending state.** Until the cycle list arrives the shell cannot tell which
+  layout applies, so `layoutPending` in `WorkbenchShell.js` renders a plain
+  "Loading…" status and mounts no panel. An old link is not mapped to a phase
+  tab before the page knows whether the program qualifies.
+- **Tabs.** `J27_VIEWS` in `WorkbenchViewsNav.js`: All requests, Initial
+  Assessment, Peer Review, Deliberations, Final Assessment, Awardees.
+  `resolveWorkbenchView` maps every older view key to a tab the layout has.
+- **Lists.** All requests, Initial Assessment and Peer Review are one
+  component, `J27RequestList.js`, over rows from `useJ27CycleRows.js`. Every
+  chip, next-step line, filter and tab count is decided in
+  `shared/utils/j27CycleRows.js`; every label comes from
+  `shared/config/j27Labels.js`. The request page's stage strip
+  (`J27StageStrip.js`) calls the same `rowLine`, but over facts the page
+  loads tab by tab, so the two agree only on the facts both have.
+- **Deliberations and Final Assessment are lists too** (2026-11-10). The feed
+  loads the later-phase facts (`lib/services/workbench/j27-later-facts.js`:
+  presentation, confirmed attendance, Board draft, review stage) in three
+  batched reads for the rows the stage model describes, so a request reaches
+  these tabs by the same rule for every viewer. Deliberations rows carry a
+  timing chip and no line until the presentation has ended; Final Assessment
+  rows carry Draft Writeup, Group review or Leadership review. Today's Staff
+  deliberations and Final writeups panels are each tab's second section
+  (`STAGE_SECTION` in `workbench-location.js`: `drafts`, `writeup-review`);
+  old links land on them. The Deliberations section is temporary until the
+  J27 pre-presentation step is decided.
+- **The request page uses the same facts.** Request resolution, the Final
+  Writeup status read and the attendance read each report whole keys from
+  that module, and `shared/utils/j27PageStage.js` replaces keys rather than
+  merging. One accepted difference: only the page knows when a saved review
+  summary is out of date.
+- **Hazards.** When every open row has a failed read (`degradedEverywhere`),
+  the list says so once above the rows instead of on each one. "Nothing is
+  waiting on staff right now." is not shown on a row whose basis is degraded
+  (`rowLine`). A
+  request with a final decision is listed on All requests only. Tests:
+  `tests/unit/j27-cycle-rows.test.js`, `tests/unit/workbench-shell-j27-layout.test.js`.
+- **Decision record.** Alignment log D62 (`docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`).
 
 <!-- source-lines: 2013-2098 -->
 ## Final Writeup lifecycle (Slices 1–4)

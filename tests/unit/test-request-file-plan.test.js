@@ -329,6 +329,74 @@ describe('compileBasicCloneFilePlan', () => {
     expect(result.plannedFiles).toEqual([]);
   });
 
+  describe('single-submission destination layout (J27 and later cycles)', () => {
+    const narrative = document({
+      folder: '1000123_GUID/AI Materials',
+      id: 'narrative',
+      kind: TEST_REQUEST_DOCUMENT_KINDS.proposalNarrative,
+      name: 'ProposalNarrative_1000123.pdf',
+    });
+    const bibliography = document({
+      folder: '1000123_GUID/AI Materials',
+      id: 'bibliography',
+      kind: TEST_REQUEST_DOCUMENT_KINDS.proposalBibliography,
+      name: 'ProposalBibliography_1000123.pdf',
+    });
+    const reviewer = document({
+      folder: '1000123_GUID/Reviewer Materials',
+      id: 'reviewer-proposal',
+      kind: TEST_REQUEST_DOCUMENT_KINDS.reviewerProposal,
+      name: 'Proposal_1000123.pdf',
+    });
+    const all = { sourceDocuments: [narrative, bibliography, reviewer, document()] };
+    const allIds = { selectedDocumentIds: ['narrative', 'bibliography', 'reviewer-proposal', 'project-description'] };
+    const destinationsOf = result => Object.fromEntries(result.plannedFiles.map(file => [file.source.id, file.destination]));
+
+    test('sends the narrative and bibliography to Submission-Documents under the J27 names', () => {
+      const result = compile({ ...all, destinationLayout: 'single-submission', destinationRequestNumber: '1003500' }, allIds);
+      expect(result.blockers).toEqual([]);
+      expect(destinationsOf(result)).toEqual({
+        narrative: { folder: 'Submission-Documents', filename: 'Project-Narrative_1003500.pdf', filenameTemplate: null },
+        bibliography: { folder: 'Submission-Documents', filename: 'Bibliography_1003500.pdf', filenameTemplate: null },
+        'reviewer-proposal': { folder: 'Reviewer Materials', filename: 'Proposal_1003500.pdf', filenameTemplate: null },
+        'project-description': { folder: 'Phase I', filename: 'ProjectDescription.pdf', filenameTemplate: null },
+      });
+    });
+
+    test('previews J27 templates before the destination number exists', () => {
+      const result = compile({ ...all, destinationLayout: 'single-submission' }, allIds);
+      expect(result.blockers).toEqual([]);
+      expect(destinationsOf(result).narrative).toEqual({
+        folder: 'Submission-Documents', filename: null, filenameTemplate: 'Project-Narrative_{new-request-number}.pdf',
+      });
+      expect(destinationsOf(result).bibliography).toEqual({
+        folder: 'Submission-Documents', filename: null, filenameTemplate: 'Bibliography_{new-request-number}.pdf',
+      });
+    });
+
+    test('still requires the D26 source names in AI Materials', () => {
+      const j27Source = document({ ...narrative, name: 'Project-Narrative_1000123.pdf' });
+      const result = compile({ sourceDocuments: [j27Source], destinationLayout: 'single-submission' }, { selectedDocumentIds: ['narrative'] });
+      expect(result.blockers).toEqual([expect.objectContaining({ code: 'SOURCE_DOCUMENT_MISMATCH' })]);
+    });
+
+    test.each([undefined, null])('keeps the D26 destinations when the layout is %p', layout => {
+      const result = compile({ ...all, destinationLayout: layout, destinationRequestNumber: '1003500' }, allIds);
+      expect(result.blockers).toEqual([]);
+      expect(destinationsOf(result).narrative).toEqual({ folder: 'AI Materials', filename: 'ProposalNarrative_1003500.pdf', filenameTemplate: null });
+      expect(destinationsOf(result).bibliography).toEqual({ folder: 'AI Materials', filename: 'ProposalBibliography_1003500.pdf', filenameTemplate: null });
+    });
+
+    test.each(['Single-Submission', 'd26', '', 1, true])('blocks an unknown layout %p', layout => {
+      const result = compile({ ...all, destinationLayout: layout }, allIds);
+      expect(result.planReady).toBe(false);
+      expect(result.plannedFiles).toEqual([]);
+      expect(result.blockers).toEqual(expect.arrayContaining([
+        expect.objectContaining({ code: 'DESTINATION_LAYOUT_INVALID', field: 'destinationLayout' }),
+      ]));
+    });
+  });
+
   test('keeps the planner import graph pure and leaf-only', () => {
     const source = readFileSync(path.join(__dirname, '../../lib/services/test-requests/file-plan.js'), 'utf8');
     const imports = [...source.matchAll(/from\s+['"]([^'"]+)['"]/g)].map(match => match[1]);

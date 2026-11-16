@@ -234,3 +234,146 @@ test('J27 GOApply names fill the AI Materials slots; both D26 and J27 names pres
     expect.objectContaining({ key: 'proposalBibliography', found: false, filename: 'ProposalBibliography_1002379.pdf' }),
   ]);
 });
+
+describe('single-submission layout (J27 onward)', () => {
+  const AI = `${ROOT}/Submission-Documents`;
+  const pdf = (name, folder = AI) => ({ name, folder, mimeType: 'application/pdf' });
+
+  beforeEach(() => {
+    getRequestSharePointBuckets.mockResolvedValue([ACTIVE]);
+    getProposalDocumentConfig.mockReturnValue({
+      layout: 'single-submission',
+      phaseFolder: null,
+      excludeFilenames: [],
+      slots: [],
+    });
+  });
+
+  test('lists the six individual files in order and leaves the front matter out', async () => {
+    listFiles.mockResolvedValue([
+      pdf('Project-Narrative_1002379.pdf'),
+      pdf('Bibliography_1002379.pdf'),
+      pdf('Biosketches_1002379.pdf'),
+      pdf('Other-Support_1002379.pdf'),
+      pdf('Collaboration-Letters_1002379.pdf'),
+      { name: 'Graphical-Abstract_1002379.jpg', folder: AI, mimeType: 'image/jpeg' },
+      pdf('declarationofstatus_Test 1.pdf'),
+      pdf('Research Proposal_2026-10-28T19-04-54Z.pdf'),
+      pdf('PhaseI-Cover-Page_1002379.pdf'),
+      pdf('Abstract_1002379.pdf'),
+      pdf('Graphical-Abstract-Page_1002379.pdf'),
+    ]);
+
+    const result = await listProposalDocuments(REQUEST_ID, REQUEST_NUMBER, 'J27');
+
+    expect(result.layout).toBe('single-submission');
+    expect(result.slots).toEqual([]);
+    expect(result.otherDocuments).toEqual([]);
+    expect(result.aiMaterials.map((item) => [item.label, item.found, item.name])).toEqual([
+      ['Project Narrative', true, 'Project-Narrative_1002379.pdf'],
+      ['Bibliography', true, 'Bibliography_1002379.pdf'],
+      ['Biosketches', true, 'Biosketches_1002379.pdf'],
+      ['Other Support', true, 'Other-Support_1002379.pdf'],
+      ['Collaboration Letters', true, 'Collaboration-Letters_1002379.pdf'],
+      ['Graphical Abstract', true, 'Graphical-Abstract_1002379.jpg'],
+    ]);
+    expect(result.aiMaterials[2]).toMatchObject({ library: 'akoya_request', folder: AI });
+  });
+
+  test('the combined Narrative-Bibliography file (D60) never fills the Bibliography or Project Narrative row (D59)', async () => {
+    for (const folder of [AI, `${ROOT}/AI Materials`]) {
+      listFiles.mockResolvedValue([pdf('Narrative-Bibliography_1002379.pdf', folder)]);
+      const result = await listProposalDocuments(REQUEST_ID, REQUEST_NUMBER, 'J27');
+      const rows = Object.fromEntries(result.aiMaterials.map((item) => [item.label, item.found]));
+      expect(rows['Project Narrative']).toBe(false);
+      expect(rows.Bibliography).toBe(false);
+      expect(result.staffVersion.found).toBe(false);
+    }
+    // Present beside the real Bibliography, it does not make the row ambiguous.
+    listFiles.mockResolvedValue([pdf('Bibliography_1002379.pdf'), pdf('Narrative-Bibliography_1002379.pdf'),
+      pdf('Narrative-Bibliography_1002379.pdf', `${ROOT}/AI Materials`)]);
+    const result = await listProposalDocuments(REQUEST_ID, REQUEST_NUMBER, 'J27');
+    expect(result.aiMaterials.find((item) => item.label === 'Bibliography')).toMatchObject({ found: true, name: 'Bibliography_1002379.pdf' });
+  });
+
+  test('a missing file is reported as not found, with the name that is expected', async () => {
+    listFiles.mockResolvedValue([pdf('Project-Narrative_1002379.pdf')]);
+
+    const result = await listProposalDocuments(REQUEST_ID, REQUEST_NUMBER, 'J27');
+
+    expect(result.aiMaterials.map((item) => [item.key, item.found, item.filename])).toEqual([
+      ['proposalNarrative', true, 'Project-Narrative_1002379.pdf'],
+      ['proposalBibliography', false, 'Bibliography_1002379.pdf'],
+      ['biosketches', false, 'Biosketches_1002379.pdf'],
+      ['otherSupport', false, 'Other-Support_1002379.pdf'],
+      ['collaborationLetters', false, 'Collaboration-Letters_1002379.pdf'],
+      ['graphicalAbstract', false, null],
+    ]);
+  });
+
+  test('the graphical abstract page is not taken for the graphical abstract; two images are ambiguous', async () => {
+    listFiles.mockResolvedValue([pdf('Graphical-Abstract-Page_1002379.pdf')]);
+    let result = await listProposalDocuments(REQUEST_ID, REQUEST_NUMBER, 'J27');
+    expect(result.aiMaterials.find((item) => item.key === 'graphicalAbstract').found).toBe(false);
+
+    listFiles.mockResolvedValue([
+      { name: 'Graphical-Abstract_1002379.png', folder: AI },
+      { name: 'Graphical-Abstract_1002379.jpg', folder: AI },
+    ]);
+    result = await listProposalDocuments(REQUEST_ID, REQUEST_NUMBER, 'J27');
+    expect(result.aiMaterials.find((item) => item.key === 'graphicalAbstract').found).toBe(false);
+  });
+
+  test('files outside the Submission-Documents folder and another request\'s files do not fill a row; the D26 narrative name is ignored there', async () => {
+    listFiles.mockResolvedValue([
+      pdf('Biosketches_1002379.pdf', `${ROOT}/AI Materials`),
+      pdf('Other-Support_1009999.pdf'),
+      pdf('Project-Narrative_1002379.pdf'),
+      pdf('ProposalNarrative_1002379.pdf'),
+    ]);
+
+    const result = await listProposalDocuments(REQUEST_ID, REQUEST_NUMBER, 'J27');
+
+    // As in the governed reader, only the J27 name counts in Submission-Documents,
+    // so a stray D26-named copy beside it neither fills the row nor empties it.
+    expect(result.aiMaterials.filter((item) => item.found).map((item) => [item.key, item.name]))
+      .toEqual([['proposalNarrative', 'Project-Narrative_1002379.pdf']]);
+    // No phase folder is configured, so nothing is swept into "Other documents".
+    expect(result.otherDocuments).toEqual([]);
+  });
+  test('finds the staff version at the request root by its name ending, whatever the institution prefix', async () => {
+    listFiles.mockResolvedValue([
+      pdf('Caltech_Staff-Version_1002379.pdf', ROOT),
+      pdf('Project-Narrative_1002379.pdf'),
+    ]);
+
+    const result = await listProposalDocuments(REQUEST_ID, REQUEST_NUMBER, 'J27');
+
+    expect(result.staffVersion).toMatchObject({
+      key: 'staffVersion', found: true, library: 'akoya_request', folder: ROOT, name: 'Caltech_Staff-Version_1002379.pdf',
+    });
+  });
+
+  test('the staff version is not found when missing, in a subfolder, for another request, or ambiguous', async () => {
+    for (const files of [
+      [],
+      [pdf('Caltech_Staff-Version_1002379.pdf', AI)],
+      [pdf('Caltech_Staff-Version_1002379.pdf', `${ROOT}/AI Materials`)],
+      [pdf('Caltech_Staff-Version_1009999.pdf', ROOT)],
+      [pdf('_Staff-Version_1002379.pdf', ROOT)],
+      [pdf('Caltech_Staff-Version_1002379.docx', ROOT)],
+      [pdf('Caltech_Staff-Version_1002379.pdf', ROOT), pdf('CIT_Staff-Version_1002379.pdf', ROOT)],
+    ]) {
+      listFiles.mockResolvedValue(files);
+      const result = await listProposalDocuments(REQUEST_ID, REQUEST_NUMBER, 'J27');
+      expect(result.staffVersion).toEqual({ key: 'staffVersion', label: 'Staff version', found: false });
+    }
+  });
+
+  test('earlier cycles carry no staff version entry', async () => {
+    getProposalDocumentConfig.mockReturnValue({ phaseFolder: 'Phase I', excludeFilenames: [], slots: [] });
+    listFiles.mockResolvedValue([pdf('Caltech_Staff-Version_1002379.pdf', ROOT)]);
+    const result = await listProposalDocuments(REQUEST_ID, REQUEST_NUMBER, 'D26');
+    expect(result).not.toHaveProperty('staffVersion');
+  });
+});

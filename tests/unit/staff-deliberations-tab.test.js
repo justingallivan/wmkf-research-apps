@@ -1587,6 +1587,7 @@ test('post-visit drafting: an in-progress start (202) shows Starting group revie
 
 test.each([
   [{ canStart: false, startBlockedReason: null }, 'The lead Program Director marks this ready for group review when the draft is done.'],
+  [{ canStart: false, startBlockedReason: 'final_writeup_offramped' }, 'This request has been offramped and will not go to the Board. Group review is unavailable.'],
   [{ canStart: false, startBlockedReason: 'final_writeup_site_visit_not_ended' }, 'Group review becomes available after the scheduled presentation ends.'],
   [{ canStart: false, startBlockedReason: 'final_writeup_schedule_unavailable' }, /presentation schedule could not be verified/],
 ])('post-visit drafting without start permission explains who hands off (%o)', async (overrides, note) => {
@@ -1920,4 +1921,24 @@ test.each(['draftDirty', 'recoveryPending', 'mutationPending'])('retains a close
   expect(mountedSourceArtifactIds).toEqual(originalMounts);
   await act(async () => lastDistributionProps.onRetentionChange({ draftDirty: false, editorDirty: false, mutationPending: false, recoveryPending: false }));
   expect(screen.queryByTestId('mock-source-artifact-id')).toBeNull();
+});
+
+test('J27 Deliberations shows presentation evidence and skips earlier Word workflows', async () => {
+  queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(DRAFT) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} mode="presentation" />);
+  expect(await screen.findByRole('heading', { name: /Presentation/ })).toBeInTheDocument();
+  await waitFor(() => expect(calls('presiteGet')).toHaveLength(1));
+  expect(calls('briefGet')).toHaveLength(0);
+  expect(screen.queryByRole('link', { name: /Edit draft writeup in Word/ })).toBeNull();
+  expect(screen.queryByRole('button', { name: /Generate proposal discussion brief/ })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Ready for group review' })).toBeNull();
+});
+
+test('Draft Writeup preparation retains the existing file and excludes early brief and review actions', async () => {
+  queueRoute('presiteGet', statusResponse({ currentArtifact: preSiteArtifact(DRAFT) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} mode="board-draft" />);
+  expect(await screen.findByRole('link', { name: 'Edit draft writeup in Word' })).toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx');
+  expect(screen.getByRole('heading', { name: 'Draft Writeup' })).toBeInTheDocument();
+  expect(calls('briefGet')).toHaveLength(0);
+  expect(screen.queryByRole('button', { name: 'Ready for group review' })).toBeNull();
 });

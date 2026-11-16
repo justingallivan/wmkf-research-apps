@@ -145,6 +145,13 @@ Added from the staff flow audit (owner agreed, 2026-11-09):
 
 ## 5. What is already built and what is not
 
+*(Snapshot as of 2026-11-09. Since then the cycle page has been built on
+`claude/j27-cycle-page`, including the Deliberations and Final Assessment
+lists, whose rows now carry the later-phase facts described as "not loaded"
+below: see `docs/plans/J27_CYCLE_PAGE_BUILD_PLAN_2026-11-09.md` section 7 and
+`docs/plans/J27_LATER_PHASE_LISTS_PLAN_2026-11-10.md` section 6. Not
+promoted.)*
+
 - The dashboard feed attaches a stage to each in-scope Research row: phase,
   next task, all task keys, blocker keys, recorded standing and outcome.
   `[VERIFIED via lib/services/workbench/j27-read-model-inputs.js:147-158 and dashboard-service.js:344-392]`

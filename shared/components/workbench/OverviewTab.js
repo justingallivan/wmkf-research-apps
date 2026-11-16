@@ -1,24 +1,15 @@
 /**
- * Request Workbench — Overview tab (v1).
- *
- * The per-request "command center" (REQUEST_WORKBENCH_SCOPING.md §3.2/§3.7):
- * a fast answer to "where is this request and what do I do next." v1 is
- * deliberately scoped to data that already has a live source:
- *   - the request `context` the shell already loaded (resolve-request)
- *   - the per-request reviewer-stage rollup from /api/workbench/reviewer-rollup
- *     (the shared lightweight count path — counts only, no person/researcher
- *     fan-out; the server derives the funnel counts + the "what next" hint).
- *
- * Out of v1 (no live source yet — lands as those tabs are built): writeup status
- * and returned-review state. The full actionability rule set (`isActionableForPD`)
- * is also deferred — the rollup `hint` here is a light heuristic, not that rule.
+ * Request Workbench Overview. The J27 development layout leads with a
+ * read-only handoff cue. Request details and the existing lightweight
+ * reviewer rollup are still available below it.
  */
 
-import { useState, useEffect, useRef } from 'react';
-import { requestEnvelope } from '../../utils/api-request';
+import { useEffect } from 'react';
 import { Card } from '../Layout';
 import { StatusBadge } from './StatusTab';
+import J27Overview from './J27Overview';
 import RequestNarrativesCard from './RequestNarrativesCard';
+import useReviewerProgress from './useReviewerProgress';
 
 const USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 const money = (n) => (typeof n === 'number' && Number.isFinite(n) ? USD.format(n) : '—');
@@ -43,15 +34,16 @@ function Field({ label, children }) {
   );
 }
 
-function Section({ title, action, children }) {
+function Section({ title, action, children, embedded }) {
+  const Container = embedded ? 'section' : Card;
   return (
-    <Card hover={false}>
+    <Container {...(embedded ? {} : { hover: false })}>
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-base font-semibold text-gray-900">{title}</h2>
         {action}
       </div>
       {children}
-    </Card>
+    </Container>
   );
 }
 
@@ -74,32 +66,8 @@ function aiArtifacts(ai = {}) {
   ].map(([label, v]) => ({ label, present: !!v }));
 }
 
-function ReviewerProgress({ requestId }) {
-  const requestKey = String(requestId || '').toLowerCase();
-  const [state, setState] = useState({ status: 'loading', data: null, requestKey: '' });
-  const reqRef = useRef(0);
-
-  useEffect(() => {
-    if (!requestId) return undefined;
-    const token = (reqRef.current += 1);
-    let cancelled = false;
-    setState({ status: 'loading', data: null, requestKey });
-    // Lightweight per-request rollup (counts only, no person/researcher fan-out —
-    // Codex S260). Returns { counts, needed, workRemaining, hint }.
-    requestEnvelope(`/api/workbench/reviewer-rollup?requestId=${encodeURIComponent(requestId)}`, { tolerantBody: true })
-      .then(({ ok: resOk, status: resStatus, data: body }) => {
-        if (cancelled || token !== reqRef.current) return;
-        if (!resOk || !body.success) throw new Error(body.error || `Failed (${resStatus})`);
-        const counts = body.counts && typeof body.counts === 'object' ? body.counts : {};
-        setState({ status: 'ready', data: { counts, needed: body.needed, hint: body.hint }, requestKey });
-      })
-      .catch(() => {
-        if (!cancelled && token === reqRef.current) setState({ status: 'error', data: null, requestKey });
-      });
-    return () => { cancelled = true; };
-  }, [requestId, requestKey]);
-
-  if (state.requestKey !== requestKey || state.status === 'loading') return <p className="text-sm text-gray-500">Loading reviewer progress…</p>;
+function ReviewerProgress({ state, showHint }) {
+  if (state.status === 'loading') return <p className="text-sm text-gray-500">Loading reviewer progress…</p>;
   if (state.status === 'error') return <p className="text-sm text-amber-600">Couldn’t load reviewer progress.</p>;
 
   const { counts, needed, hint } = state.data;
@@ -107,29 +75,38 @@ function ReviewerProgress({ requestId }) {
 
   return (
     <div className="space-y-3">
-      <dl className="grid grid-cols-4 gap-4">
+      <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Field label="Candidates">{n(counts.candidates)}</Field>
         <Field label="Invited">{n(counts.invited)}</Field>
         <Field label="Accepted">{Number.isFinite(needed) ? `${n(counts.accepted)} / ${needed}` : n(counts.accepted)}</Field>
-        <Field label="Complete">{n(counts.completed)}</Field>
+        <Field label={showHint ? "Complete" : "Closed out"}>{n(counts.completed)}</Field>
       </dl>
-      {hint && <p className="text-sm text-gray-600">{hint}</p>}
+      {showHint && hint && <p className="text-sm text-gray-600">{hint}</p>}
     </div>
   );
 }
 
-export default function OverviewTab({ context, requestId, onSelectTab }) {
+export default function OverviewTab({ context, requestId, onSelectTab, j27Handoffs, initialRationaleEnabled, chairsRecommendationEnabled, meetingRosterEnabled, onJ27Facts = null, reviewerProgress: pageProgress = null }) {
+  // A 2027-or-later request page loads the rollup itself and reports it to the
+  // strip (C7 amendment, 2026-11-12); this tab then reads that state and fetches nothing.
+  const ownProgress = useReviewerProgress(pageProgress ? null : requestId);
+  const reviewerProgress = pageProgress || ownProgress;
+  // Step E: the page recomputes the J27 stage once the rollup settles (plan C7).
+  useEffect(() => {
+    if (!pageProgress && onJ27Facts && requestId && reviewerProgress.status !== 'loading') onJ27Facts(requestId, { progress: reviewerProgress });
+  }, [pageProgress, onJ27Facts, requestId, reviewerProgress]);
   const info = context?.proposalInfo || {};
   const coPIs = Array.isArray(info.coPIs) ? info.coPIs : [];
   const artifacts = aiArtifacts(context?.aiContent);
   const anyArtifact = artifacts.some((a) => a.present);
 
-  return (
-    <div className="space-y-4">
+  const details = (
+    <div className={j27Handoffs ? "space-y-5 divide-y divide-gray-200 [&>section+section]:pt-5" : "space-y-4"}>
       {/* Snapshot */}
       {context && <Section
         title="Request snapshot"
-        action={<TabLink onSelectTab={onSelectTab} tab="proposal">Open proposal →</TabLink>}
+        embedded={j27Handoffs}
+        action={!j27Handoffs && <TabLink onSelectTab={onSelectTab} tab="proposal">Open proposal →</TabLink>}
       >
         <dl className="grid sm:grid-cols-2 gap-4">
           <Field label="Principal Investigator">{info.pi}</Field>
@@ -139,7 +116,7 @@ export default function OverviewTab({ context, requestId, onSelectTab }) {
           <Field label="Requested Amount">{money(info.requestedAmount)}</Field>
           <Field label="Total Project Budget">{money(info.totalProjectBudget)}</Field>
           <Field label="Program">{context.grantProgram}</Field>
-          <Field label="Status">
+          <Field label={j27Handoffs ? "Recorded request status" : "Status"}>
             {context.requestStatus ? (
               <span className="inline-flex items-center gap-2">
                 {context.requestStatus}
@@ -150,10 +127,8 @@ export default function OverviewTab({ context, requestId, onSelectTab }) {
         </dl>
       </Section>}
 
-      {context && <RequestNarrativesCard requestId={requestId} />}
-
       {/* AI artifacts */}
-      {context && <Section
+      {context && !j27Handoffs && <Section
         title="AI content"
         action={<TabLink onSelectTab={onSelectTab} tab="proposal">View / generate →</TabLink>}
       >
@@ -187,11 +162,27 @@ export default function OverviewTab({ context, requestId, onSelectTab }) {
 
       {/* Reviewers */}
       <Section
-        title="Reviewers"
-        action={<TabLink onSelectTab={onSelectTab} tab="reviewers">Manage reviewers →</TabLink>}
+        title={j27Handoffs ? "Reviewer counts" : "Reviewers"}
+        embedded={j27Handoffs}
+        action={!j27Handoffs && <TabLink onSelectTab={onSelectTab} tab="reviewers">Manage reviewers →</TabLink>}
       >
-        <ReviewerProgress requestId={requestId} />
+        <ReviewerProgress state={reviewerProgress} showHint={!j27Handoffs} />
       </Section>
+    </div>
+  );
+  if (!j27Handoffs) return <div className="space-y-4"><RequestNarrativesCard requestId={requestId} />{details}</div>;
+
+  return (
+    <div className="space-y-4">
+      <J27Overview key={requestId} context={context} requestId={requestId}
+        reviewerProgress={reviewerProgress} onJ27Facts={onJ27Facts}
+        onOpenReports={onSelectTab ? () => onSelectTab('reviews') : null}
+        initialRationaleEnabled={initialRationaleEnabled} chairsRecommendationEnabled={chairsRecommendationEnabled} meetingRosterEnabled={meetingRosterEnabled} />
+      <RequestNarrativesCard requestId={requestId} />
+      <details className="rounded-xl border border-gray-200 bg-white p-4">
+        <summary className="cursor-pointer text-sm font-semibold">Request details</summary>
+        <div className="mt-4">{details}</div>
+      </details>
     </div>
   );
 }
