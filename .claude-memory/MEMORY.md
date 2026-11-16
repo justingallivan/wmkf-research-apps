@@ -42,6 +42,7 @@
 - Search / schema language: feedback-grep-general-codebase-terms.md; feedback-human-legibility-schema-principle.md; feedback-staff-ui-never-shows-internal-ids.md; feedback-staff-ui-desktop-first.md
 
 ## Task Routing
+- Intake / pre-flight prompts (CSO workbook intent, Connor PA delivery): project-j27-review-workbook-reflects-cso-intent.md; ../docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md
 - Grant Reporting / Literature Analyzer: project-grant-reporting-rework.md; project-literature-analyzer-rework.md
 - Reviewer search post-refactor limitations / separate Impeccable exceptions: ../docs/plans/REVIEWER_SEARCH_FOLLOW_UPS_2026-09-18.md
 - Reviewer origination / retrieval / excluded-reviewer intake: ../docs/agent-wiki/topics/reviewer-origination.md; ../docs/EXCLUDED_REVIEWERS_STRUCTURED_INTAKE_PLAN.md
