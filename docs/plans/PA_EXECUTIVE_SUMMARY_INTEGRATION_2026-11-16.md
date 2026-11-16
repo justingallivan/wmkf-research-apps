@@ -1,6 +1,6 @@
 ---
 title: Bounded Executive Summary integration
-status: sandbox-live-tested
+status: parked
 last_verified: 2026-11-16
 ---
 
@@ -14,6 +14,15 @@ Sandbox trial passed on Request 1000389, including one real model call, audit,
 publication, replay and restoration. No Production deployment or cloud migration.
 See [live trial receipt](PA_EXECUTIVE_SUMMARY_LIVE_TRIAL_2026-11-16.md). The separately deployed staff editor is documented in
 [the narrative handoff](REQUEST_NARRATIVES_HANDOFF_2026-11-09.md).
+
+## Owner direction at coordinated stop
+
+**PARKED, 2026-11-16.** Deliver prompt rows compatible with Connor's existing flows.
+Do not continue submit/poll adoption, scheduling or Production rollout. The bounded
+trial below is retained engineering evidence, not the current next-step plan.
+Use [the consolidated handoff](PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md) as the sole
+resume point. Its direction supersedes earlier rollout recommendations in the
+inherited PA plans. No infrastructure deletion/deactivation is authorized.
 
 ## Contract and implementation
 
@@ -88,7 +97,7 @@ ticks sequentially and inspect status between calls, stopping at terminal state,
 transport ambiguity or the enrollment expiry. Never overlap ticks after a timeout;
 inspect retained lease/dispatch receipts first. Unattended scheduling is deferred.
 
-## Bounded acceptance completed; rollout remaining
+## Bounded acceptance completed; rollout parked
 
 The November 16 [live receipt](PA_EXECUTIVE_SUMMARY_LIVE_TRIAL_2026-11-16.md)
 records exact enrollment, hosted budget, prompt/profile, database, fixture and
