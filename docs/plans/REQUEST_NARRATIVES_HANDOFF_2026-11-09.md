@@ -1,135 +1,145 @@
-# Optional Request narrative text — 2026-11-09
+# Executive Summary staff editor — current integration handoff
 
-Owner: Codex. Branch: `codex/request-narratives-2026-11-09`.
-Worktree: `/private/tmp/wmkf-request-narratives`.
+Owner: Codex. Updated 2026-11-16.
+Branch: `codex/executive-summary-integration-2026-11-16`.
+Worktree: `/private/tmp/wmkf-summary-integration-20261116`.
+Status: integrated with current J27 source; not promoted or deployed.
 
-This handoff is also retained on main. Implementation paths and the API inventory
-below refer to the feature branch; the docs-only main landing does not promote
-the route, editor, schema script, or tests.
+## Current scope
 
-## Scope and state
+The Overview displays **Executive Summary**, using API key `lay_abstract` and
+Dataverse column `akoya_request.wmkf_layabstract`. It appears below the J27
+handoff guidance and above Request details; the legacy Overview also includes it.
+Staff with Workbench access can read. The assigned lead Program Director or a
+superuser with a linked Dynamics actor can explicitly save or clear the text.
 
-[VERIFIED via source and focused Jest tests] Two optional persistent plain-text
-fields are implemented in branch source. Staff with Workbench access can read;
-the assigned lead Program Director or a superuser with a linked Dynamics actor
-can edit/save. The app never generates these values. No existing abstract,
-AI summary, governed Initial Assessment document, or document pointer changes.
+This slice reuses the narrowed editor from `codex/power-automate-integration-2026-11-11`
+at `db00e33ba`, not the original two-field editor. `wmkf_initialassessment` is
+not selected or writable here. Existing AI Summary, reviewer matching and governed
+Initial Assessment documents are separate and unchanged. No AI call, machine
+Summary admission, prompt publication, worker activation or schedule is added.
+Connor's Short Title submit/poll test remains independent and pending his results.
 
-| App/API key | Dataverse logical column | Display name | Storage |
-|---|---|---|---|
-| `lay_abstract` | `wmkf_layabstract` | Lay Abstract | Optional Memo, 100,000 characters |
-| `initial_assessment` | `wmkf_initialassessment` | Initial Assessment | Optional Memo, 100,000 characters |
+## Accepted intake contract — 2026-11-16
 
-[VERIFIED LIVE 2026-11-09 Pacific] After explicit owner approval, schema wave
-`36-request-narratives` created both columns in Production (`wmkf.crm.dynamics.com`).
-`scripts/probe-request-narrative-fields.js --target=prod --verify` independently
-confirmed the exact schema/display names, Memo type, optional RequiredLevel,
-100,000-character limits, and read/update capability. The runtime API accepted
-both columns in a zero-row projection; no Request content was retrieved or changed.
-Metadata IDs: Lay Abstract `b96d22b9-bcdc-f111-84e8-000d3a31b218`;
-Initial Assessment `0f0c69cc-bcdc-f111-84e8-000d3a361d0a`.
+Authority: Connor's response supplied by Justin, followed by Justin's explicit
+acceptance of exceptional intake reruns overwriting staff edits. This is an agreed
+operating contract, not an independent live inspection of the external flow.
 
-The existing publisher and solution were reused. No broad publish operation was
-needed: the new columns were already selectable after creation. Sandbox URL is
-not configured locally, and local staff impersonation is disabled (read-only
-editor until an authorized environment enables it). App deployment, live staff
-save/readback, and the external Power Automate flow remain unverified.
+- Power Automate orchestrates Executive Summary generation during intake and stores
+  the result in `wmkf_layabstract`. The selected input is the project narrative in
+  `Submission-Documents`; the combined Narrative–Bibliography PDF remains for
+  reviewer matching. Justin does not require another source-document decision.
+- `wmkf_readyforreview` is the final step, after documents and AI processing.
+  Any failed run halts intake and notifies check-in staff; failed Summary generation
+  therefore holds the readiness handoff.
+- Connor intends no later flow to edit the field and offered to hide it from the
+  Akoya Request form so this app owns subsequent staff editing. Actual form hiding
+  and the working generation flow have not been independently verified.
+- An exceptional intake rerun may overwrite a staff edit or intentional clear.
+  Justin accepts that risk. A persistent staff-edited marker, external once-only
+  receipt and external conditional-write guarantee are not prerequisites for this
+  staff-editor release. Do not recreate those requirements from older handoffs.
+- Ordinary concurrent saves in our app still use the original concrete ETag and
+  refuse conflicts. This decision does not authorize automatic regeneration or a
+  new background writer in our app.
 
-## Contract and overwrite protection
+Exact intake event identifiers and filename activation belong to the separate
+machine-generation implementation if resumed. They do not block the staff editor.
+The PA branch's disconnected marker helpers and offline tests remain there as
+historical experiments; they are not brought into this release or deleted here.
+
+## Read/edit/save contract
 
 Overview → `RequestNarrativesCard` → GET/PATCH `/api/workbench/request-narratives`
 → `request-narratives-service` → grant-request adapter → `akoya_request`.
 
-GET is read-only and returns both texts, the concrete row version, and edit
-eligibility. PATCH accepts `{requestId, version, changes}`. Only the two named
-keys are allowed in `changes`; omitted keys are untouched. Null or empty string
-clears a field; other text, including whitespace and line breaks, is preserved.
-Unknown keys, wrong types, excessive length, absent/wildcard version, or invalid
-request ID fail before writes. A no-change save does not PATCH.
+GET returns text, a concrete row version and server-computed edit eligibility.
+PATCH accepts `{requestId, version, changes: {lay_abstract}}`. Unknown fields,
+wrong types, invalid GUIDs, absent/wildcard versions and text over 100,000 characters
+are rejected. Empty string or null clears the field. Other text is preserved;
+unchanged saves skip the write. Browser textareas may normalize CRLF to LF.
 
-Authorization is based on the fresh request's lead PD and the authenticated
-session. PATCH uses that request's concrete ETag and actor with no impersonation
-fallback; editing requires `DYNAMICS_IMPERSONATION_ENABLED=true`. A mismatched version or Dataverse 412 yields 409 with no retry. Preview
-against production is read-only. Existing DAL restrictions and target interlock
-remain in force.
+Authorization uses the authenticated session and fresh lead-PD lookup. Writes
+require `DYNAMICS_IMPERSONATION_ENABLED=true`, a linked actor, trusted DAL context,
+and original row ETag with `noFallback:true`. A stale form or Dataverse 412 returns
+409 without retry. Preview against Production remains read-only. The normal target
+interlock applies. Unrelated row edits can also cause a legitimate version conflict.
 
-The editor never polls, autosaves or regenerates. Dirty drafts survive save errors;
-reload asks before discarding them. Navigation asks before discarding dirty text.
-Request-keyed mounting plus generation guards prevent late success/error responses
-from changing a different request. A successful PATCH followed by a failed reload
-is reported as saved with reload required, not as a failed write. A transport error
-may have an uncertain write outcome: reload and compare before another save.
+The editor never polls, autosaves or generates. Save errors retain a copyable draft
+and require reload before another save. Successful write followed by failed readback
+is reported as saved with reload required. A transport error may leave an uncertain
+write outcome: reload and compare. Request-keyed mounting and generation guards
+fence stale async responses. Dirty reload and navigation require confirmation.
 
-## Power Automate owner contract — required before rollout
+## Schema and provenance
 
-The external workflow is not stored or modified here. The app cannot constrain a
-workflow that directly writes Dataverse. The flow owner must implement and verify:
+[HISTORICAL LIVE EVIDENCE, 2026-11-09] The owner-approved wave
+`36-request-narratives` created optional plain-text Memo columns `wmkf_layabstract`
+and `wmkf_initialassessment` in Production, both 100,000 characters. The independent
+`probe-request-narrative-fields.js --target=prod --verify` checked typed metadata
+and a zero-row projection without reading Request content. Metadata IDs:
+Lay Abstract `b96d22b9-bcdc-f111-84e8-000d3a31b218`; Initial Assessment
+`0f0c69cc-bcdc-f111-84e8-000d3a361d0a`. No schema operation is needed for this integration.
 
-1. Initialize only on the designated first submission/initialization event, with a
-   durable workflow-owned idempotency receipt per Request. Do not run on every
-   Request modification. A blank field alone is NOT proof of first initialization:
-   staff may deliberately clear text.
-2. Before generation/read-modify-write, read the Request and retain its concrete
-   `@odata.etag`. Supply that exact value as `If-Match` on the initialization PATCH.
-   If text already exists or initialization was recorded, do not overwrite it.
-3. On 412, stop and route for review; never reread and blindly retry with a fresh
-   ETag. Retrying the original conditional PATCH cannot overwrite a later edit.
-4. Write only the intended new columns; preserve all other fields. Record successful
-   initialization durably, including reconciliation of uncertain outcomes. Prevent
-   retries from refilling a human-cleared field or overwriting a human revision.
-5. Verify initial fill, repeat event, concurrent staff edit, deliberate clearing,
-   and a timeout-after-write against owned test data before enabling the flow.
+Original two-field implementation: `7b5305a7c`, `06e1ba6a4` on
+`codex/request-narratives-2026-11-09`. The November 13 PA branch narrowed it to
+Executive Summary, improved conflict-draft copying and permission handling, and
+recorded separate Sandbox Lay Abstract provisioning. Those older deployment and
+probe receipts are historical, not fresh production verification.
 
-No automatic-overwrite guarantee is claimed for the external flow until these
-checks pass. The app protects its own save path only.
+## Verification and release boundary
 
-## Provision and release
+[VERIFIED via local tests, 2026-11-16] 104 focused and existing Overview/J27/page
+regression tests passed. Independent read-only review found no material issue and
+independently ran the three narrative suites (39 tests passed). The production
+webpack fallback build passed using the locally installed dependencies; the
+worktree shares node_modules with main. This is not a fresh lockfile installation
+or a deployed Turbopack build.
 
-Use the existing Dataverse schema process; no Postgres migration or fresh-install
-schema change applies. The isolated additive wave contains exactly these two
-optional Memo attributes. Read-only commands:
+[VERIFIED via Chromium, 2026-11-16] The real J27 Workbench page passed the
+route-mocked browser rehearsal: intake text display, explicit save/reload,
+intentional clear/reload, stale-save rejection, copyable retained draft, cancelled
+tab navigation and deliberate reload. No page errors or unexpected network requests
+remained. All APIs were browser fixtures; the server used a scrubbed environment
+with no external service credentials. This proves UI behavior, not live persistence.
+The browser fixture initially lacked the required Azure identity and two navigation
+API responses; those fixture omissions were corrected before the passing run.
 
-```sh
-DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-request-narrative-fields.js --target=prod --verify
-DATAVERSE_ALLOW_PROD_READS=yes node scripts/apply-dataverse-schema.js --target=prod --wave=36-request-narratives
-```
+All 30 scoped gate/self-test commands passed (the new worktree memory symlink was
+created after the first local invariant check failed, then that gate passed).
+Scoped ESLint and `git diff --check` passed. No runtime source fix was needed after
+the independent review. The schema probe was recovered from its original verified
+commit rather than the PA branch's older census-only copy; only syntax was checked.
+The checked-in schema descriptions are retained historical metadata; no metadata
+update or external overwrite protection is implied.
 
-Provisioning is complete under the owner's explicit approval. The apply used the
-normal dated production-write acknowledgement and `--execute`; the subsequent
-independent typed-metadata/runtime projection probe passed. No Request-record
-mutation, main merge, application deployment, or external workflow edit was
-performed. Remaining release work is workflow-owner verification, an approved
-staff save/readback rehearsal, J27 integration review, and deliberate app promotion.
+Browser reproduction: build with `npm run build -- --webpack` in this isolated
+checkout, using `NEXTAUTH_SECRET=e2e-throwaway-nextauth-secret-32-chars` and
+`NEXTAUTH_URL=http://localhost:3116` in both build and server. Start on port 3116
+with the synthetic target `DYNAMICS_URL=https://orgd9e66399.crm.dynamics.com`,
+`INITIAL_RATIONALE_SCHEMA_READY=on` and `MEETING_ROSTER_SCHEMA_READY=on`, but no
+service credentials or env files. Run
+`E2E_PORT=3116 npx playwright test tests/e2e/executive-summary.spec.js --project=chromium`.
+The default E2E server also covers the legacy Overview; J27 assertions apply when
+its phase tabs are present. Never reuse a live authenticated session for this test.
 
-Review the one-card Overview integration against Claude's active J27 branch before
-merge; the owner explicitly authorized the small independent integration. The
-original main checkout and other sessions' dirty work were preserved.
+Live authenticated staff save/readback remains unverified. Production
+promotion and a bounded test on an owner-approved test Request need explicit approval.
+The proposed test saves synthetic text, reloads, clears, confirms stale-form refusal,
+and restores the original Summary; it must preserve all other fields and test data.
+Rollback is the prior app deployment; it does not undo saved text.
 
-## Bounded verification and fact reconciliation
+## Changed-fact reconciliation
 
-Scope: the new text fields only; existing governed document workflows are unrelated.
-Source, schema, route, editor, and tests agree on both field names and their
-optional semantics. Atlas and API security inventory distinguish live schema from the
-branch-built, not-yet-promoted app consumer. Historical Initial Assessment document and AI-summary
-references remain unchanged because they describe distinct surfaces.
-
-Partial-success unit: one atomic conditional Request PATCH, never a batch. No new
-background job, stream, model call, Postgres table, cleanup policy, or helper
-extraction. Stored text remains with its Request. Existing consumers do not select
-these new columns; only the dedicated reader does, keeping unavailable schema from
-breaking the existing request resolver. The new card reports a scoped error.
-
-Startup ran all 72 defined checks/self-tests sequentially; the initial local-link
-check raced the new memory-link setup and passed on rerun. Focused tests cover
-authorization, session identity, validation, omitted fields, clearing, readback,
-stale versions, concurrent changes, explicit-save behavior, read-only rendering,
-and stale async responses. Live persistence and Power Automate behavior are NOT
-proved by mocked tests. Independent review found SPA draft loss; the navigation
-confirmation and regression test address it.
-
-Final verification: 33 focused tests passed across service, route and editor suites;
-18 existing Overview regression tests also passed. Production build passed. Scoped
-lint has zero errors (one pre-existing Overview effect warning). All 26 affected
-gates/self-tests passed, including local agent links, API inventory, Atlas,
-fact consistency, canonical pointers, doc currency/symbols, route lifecycle/service
-boundaries, GUID validation, DAL/context boundaries, type checking and secret scan.
+Sweep Mode A scope: Summary field identity, app integration and the accepted
+intake-only writer contract. Authority: current owner/Connor statements plus source
+and tests. Searched docs, memory, wiki, session instructions and runtime for
+`wmkf_layabstract`, `request-narratives`, and the old initialization requirements.
+Updated this handoff, the Request Atlas, route inventory, canonical route counts and
+Stream C of the session handoff. Other streams and separate PA branch code are not
+modified; their current Summary requirements must be read with this explicit owner
+supersession when that branch is resumed. Repeat scoped searches found zero remaining live stale initialization requirements
+in this checkout; historical schema descriptions are retained for parity.
+No tenant-wide overwrite guarantee,
+completed generation flow, Akoya form change or live staff-write proof is claimed.

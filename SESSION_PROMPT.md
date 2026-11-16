@@ -3,8 +3,8 @@
 ## Start here, whichever agent you are
 
 This file holds three handoffs. Stream A was worked in Session 678
-(2026-11-14 to 2026-11-15, Claude). Streams B and C were not touched by Claude and are
-carried as their authors wrote them on 2026-11-09. **Find out which stream the
+(2026-11-14 to 2026-11-15, Claude). Stream B retains its older author handoff; Stream C was updated by Codex on
+2026-11-16 after Connor’s intake response and Justin’s risk decision. **Find out which stream the
 owner wants before doing anything; if he does not say, ask.** Then read that
 stream's section and the document it names. The other two streams are not
 yours to change.
@@ -13,7 +13,7 @@ yours to change.
 |---|---|---|---|---|
 | **A. J27 Workbench** | Claude, Session 678 (2026-11-14 to 2026-11-15) | `main` (clean). Worktree `/Users/gallivan/Code/WMKF_Apps-claude-factory-j27-files` (merged, kept until cleanup); `claude/j27-read-model` (sandbox Preview) at `2adc6dfb0` | Stream A below; alignment log D70, D71 | Ask the owner. Candidates: note to Connor about broken bibliographies (Verified Open 1); intake checks around 2026-12-05 |
 | **B. Expertise roster** | Codex, Session 670; Codex again 2026-11-10 and 2026-11-11 | **Observed 2026-11-12 by Claude, not Codex's own record:** `codex/expertise-roster-import-2026-11-10` last commit 2026-11-11 15:37 ("record reviewed native output schema build"), worktree `/Users/gallivan/Code/WMKF_Apps-codex-roster-import`. Codex's own section below still names the 2026-11-09 branch | Stream B below; `docs/plans/EXPERTISE_ROSTER_HANDOFF_2026-11-09.md`; that branch's own handoff commits | Ask Codex or the owner for the current boundary; do not resume from the 2026-11-09 text alone |
-| **C. Request narratives** | Codex, Session 669 | `codex/request-narratives-2026-11-09` at `06e1ba6a4`, pushed. Recorded worktree `/private/tmp/wmkf-request-narratives` is gone from disk | Stream C below; `docs/plans/REQUEST_NARRATIVES_HANDOFF_2026-11-09.md` | Power Automate initialization contract with Connor, then the J27 integration review |
+| **C. Executive Summary** | Codex, 2026-11-16 | `codex/executive-summary-integration-2026-11-16`; `/private/tmp/wmkf-summary-integration-20261116` | Stream C below; current Request-narratives handoff | Complete release verification; owner-approved promotion and staff save/readback |
 
 **Other Codex work seen 2026-11-12 (observed by Claude; not a handoff, not
 Claude's to change; not rechecked 2026-11-14):**
@@ -51,9 +51,8 @@ Production), `git show 749d59e40:SESSION_PROMPT.md` (Session 675),
 `git show 5782bad43:SESSION_PROMPT.md` (roster).
 
 **Where the streams meet.**
-- Stream C's Overview card must be reviewed against Stream A's J27 line
-  (now live, request page and offramp control included) before any runtime promotion (Stream C,
-  Verified Open 2).
+- Stream C's Summary card is integrated with Stream A's current J27 Overview on
+  the integration branch; production promotion and live staff testing remain pending.
 - **Stream A is on `main`**, including its change to
   `pages/api/expertise-finder/batch-match.js` (J27 staff version name, Session
   672) that Stream B also changes: Stream B rebases onto `main` and reconciles.
@@ -276,9 +275,9 @@ roster handoff. All are on the feature branch, not promoted by this docs landing
 2. Owner-reviewed minimal matching prompt contract and full isolated app rehearsal
    remain necessary before cutover. No expertise-content/scoring decision is needed
    to resume mechanics. See roster plan on feature branch.
-3. Separate Request-narratives stream: external Power Automate initialization contract,
-   J27 integration review, and approved staff save/readback remain open as recorded in
-   its owning handoff. Recheck with that owner before acting; do not restart built code.
+3. Separate Executive Summary stream: the intake contract is accepted and J27
+   integration is branch-built (2026-11-16). Promotion and live staff save/readback
+   remain pending; use Stream C and its current handoff, not this older roster record.
 
 #### Owner Decision Needed
 
@@ -311,8 +310,9 @@ packet exports. Existing scope boundaries preserved, not newly authorized.
   privacy-sensitive Board members, separate lead eligibility, preserved expertise fields.
 - Justin/Jean/John lead eligible; Beth off; Kevin inactive; Amy staged inactive. John
   reuses roster ID 1. TBD profile excluded but ID 35 preserves existing feedback.
-- Request narrative fields already exist in Production; external flow initializes them,
-  app edits them, and intentional human edits/clearing must not be overwritten.
+- Request narrative schema was provisioned in Production. The current one-field
+  Summary integration and accepted exceptional intake-rerun overwrite risk are in
+  Stream C; the original two-field rollout is not the current release scope.
 - Inherited D7/D8: Offramped is Phase II status `682090001`; Workbench is Research-only.
 
 ### Testing and milestone determination
@@ -324,155 +324,41 @@ build/type/DAL/security gates and browser verification before readiness claims.
 No DEVELOPMENT_LOG entry required: no new Production capability shipped in this
 roster work. CLAUDE.md unchanged. This main landing contains documentation only.
 
-## Stream C — Request narratives (Codex, Session 669)
+## Stream C — Executive Summary (Codex, 2026-11-16)
 
-Copied from Codex's handoff at `7b7e483b0`; headings lowered one level, text
-unchanged. Its references to "this session" mean Session 669, and its
-concurrent-stream notes are as of that close.
-The production metadata probe in its Testing section needs the owner's
-explicit authorization each time it is run; its presence here is not one.
+Current branch: `codex/executive-summary-integration-2026-11-16`, based on main
+`a3b9c748e`. Worktree `/private/tmp/wmkf-summary-integration-20261116`.
+Read `docs/plans/REQUEST_NARRATIVES_HANDOFF_2026-11-09.md` for the current contract.
+Original November 9 two-field handoff remains in git history, not the resume boundary.
 
-This is a **docs-only handoff on main**. Runtime implementation remains on
-`codex/request-narratives-2026-11-09` at `06e1ba6a4`, pushed and verified.
-The prior complete handoff is retrievable with
-`git show a046f8a22487a81666fb126bf4c81cf571020a6d:SESSION_PROMPT.md`.
-Concurrent-session details below are dated resume boundaries, not authority to
-change their checkouts, fixtures, deployment settings or branches.
+### Completed / accepted
 
-#### What Was Completed
+- Recovered the newer one-field Executive Summary editor from the PA branch at
+  `db00e33ba` and integrated it with current J27 Overview. Stable storage/API:
+  `wmkf_layabstract` / `lay_abstract`. Initial Assessment is not exposed by this slice.
+- Connor confirms intake generation precedes final `wmkf_readyforreview`; failed
+  processing halts intake and notifies check-in staff. Subsequent staff editing
+  belongs in our app; he offered to hide the field on the Akoya form.
+- Justin accepts exceptional intake reruns overwriting staff edits or clears.
+  Persistent staff-edit markers and external once-only/If-Match guarantees are not
+  prerequisites. This supersedes older Summary plans on the PA branch, whose
+  disconnected experimental helpers remain untouched.
+- Source stays the Submission-Documents project narrative. No further source choice
+  is needed for the editor. Combined Narrative–Bibliography remains reviewer input.
+- 104 focused/Overview/J27 tests and the webpack production build passed. Independent
+  code review found no material findings. See current handoff for evidence limits.
 
-1. **Two optional Request text fields implemented on the feature branch.**
-   `lay_abstract` maps to `akoya_request.wmkf_layabstract` (Lay Abstract);
-   `initial_assessment` maps to `wmkf_initialassessment` (Initial Assessment).
-   Both are plain-text Memo columns with a 100,000-character limit. No in-app
-   generation: Power Automate supplies the initial values. The new assessment
-   text is separate from the governed Initial Assessment document and pointer.
-2. **Production schema provisioned after explicit owner approval.**
-   [VERIFIED via wave `36-request-narratives` apply and independent
-   `scripts/probe-request-narrative-fields.js --target=prod --verify` on the
-   feature branch] Both fields have exact names, labels, type, optional status,
-   length and read/update capability. A zero-row runtime projection accepted
-   both columns. No Request content was read or changed during verification.
-3. **Explicit staff editing implemented and tested, not promoted.** Overview
-   hosts one new card (three-line integration). GET/PATCH
-   `/api/workbench/request-narratives` reads both fields and saves only changed
-   keys. Writes require lead PD or linked superuser, enabled staff impersonation,
-   trusted DAL context and concrete ETag; stale/concurrent edits fail without
-   retry. Dirty drafts survive errors and navigation asks before discarding.
-4. **Verification.** 33 focused tests plus 18 existing Overview regression tests
-   passed; production build and affected gates passed. Full lint: zero errors,
-   190 warnings. Independent review found tab-navigation draft loss; it was
-   fixed and the reviewer verified the regression test. Feature worktree clean.
-5. **Connor memo drafted in chat, not sent.** It names both production fields and
-   the external flow's required one-time initialization / concurrency safeguards.
-   Detailed evidence and rollout limits:
-   `docs/plans/REQUEST_NARRATIVES_HANDOFF_2026-11-09.md`.
+### Remaining
 
-#### Commits
-
-Feature branch (both pushed):
-- `7b5305a7c` — Add editable Request lay abstract and initial assessment fields.
-- `06e1ba6a4` — Verify production Request narrative fields and record provisioning.
-
-Milestone determination: no DEVELOPMENT_LOG entry required. This session
-provisioned additive schema and built branch code; the end-to-end production
-capability is not deployed. CLAUDE.md stays unchanged: feature inventory belongs
-in the Atlas and handoff, not the root instructions.
-
-### Next Items
-
-#### Verified Open
-
-1. **Power Automate initialization contract.** The external flow is not in this
-   repository and was not changed. Connor must verify durable once-per-Request
-   initialization, concrete `If-Match`, refusal on conflict, and no refill after
-   intentional human clearing. A blank field is not an initialization marker.
-   Evidence: feature handoff's Power Automate owner contract and owner direction
-   in this chat. Flow implementation/status must be checked with its owner.
-2. **J27 integration and app promotion.** The Request text card is built on its
-   own branch; the owner authorized only a small integration pending merge review
-   with Claude's active J27 work. Evidence: branch `06e1ba6a4` and main's
-   `docs/plans/J27_CYCLE_PAGE_BUILD_PLAN_2026-11-09.md` section 7. Review the
-   Overview placement against that branch before deliberate runtime promotion.
-3. **Approved staff save/readback rehearsal.** Mocked tests and live metadata
-   verification do not prove an actual staff save. Choose an owner-approved
-   test Request and environment, verify impersonation, then exercise initial
-   fill, save/reload, clearing, stale form and external-flow retry behavior.
-   Local sandbox URL is absent and local impersonation was disabled; no
-   environment setting was changed.
-
-#### Owner Decision Needed
-
-1. Runtime deployment timing and approved test Request/environment for the new
-   fields. Schema provisioning approval did not authorize arbitrary record writes
-   or feature promotion.
-2. Inherited unresolved J27 decisions: where offramp justification lives; who
-   sets Offramped; retention of the original First Cut answer; fit-flag meaning,
-   remaining intake outputs/owners, staff queues, Chairs materials and calendar
-   changes. These were recorded in the prior handoff and were not resolved by
-   creating these two text fields. Recheck the active alignment log with Claude.
-
-#### Parked
-
-Inherited scope boundaries (not reauthorized): Southern California as a separate
-suite; real J27 readiness readback after December 8; bulk edits, queues and packet
-exports. Re-open only with owner direction and current-plan verification.
-
-#### Verify Before Acting
-
-1. **J27 cycle page is already branch-built.** Do not restart its design/build
-   from the prior session prompt. Main commit `a046f8a22` records the built slices
-   on `claude/j27-cycle-page`, including `4038e8ace`; that was the observed local
-   tip at handoff preparation. Staff-flow audit and remaining details belong to
-   Claude's current plan and should be rechecked there.
-2. **Preview alias and branch-scoped environment settings.** The prior handoff
-   records a sandbox-backed Preview and an owner-controlled restore. Current alias
-   was not probed here. Do not restore, retire settings or deploy based on that
-   inherited snapshot.
-3. **Preserve dirty work.** Main checkout contains the unrelated untracked
-   `docs/plans/J27_WORKBENCH_DEVELOPMENT_BRIEF_2026-11-06.md`; Claude's active J27
-   checkout has a modified `package-lock.json`. Both were observed and untouched.
-   Re-inventory before any future reuse or cleanup; no teardown is authorized.
-4. **Existing test fixtures stay.** No fixture deletion or status change occurred
-   or was authorized in this session. Historical cleanup ideas require live
-   caller/ownership checks and a new decision.
-5. **Claim-evidence pilot report unavailable.** The required current-session
-   report returned unavailable; this Codex environment has no usable current
-   report context. No observation row was invented or borrowed from another
-   session. No memory-router edits or growth occurred in this session.
-
-#### Do Not Reopen Without New Decision
-
-- Both new columns are already provisioned in production. Re-probe before any
-  schema operation; do not recreate or backfill them automatically.
-- External Power Automate owns initial generation; the app only reads/edits/saves.
-- Preserve intentional staff edits and clearing; no automatic overwrite/refill.
-- Inherited D7/D8: Offramped is Phase II status `682090001`; Workbench read model
-  is Research-only. This session does not revise those decisions.
-
-### Key Files Reference
-
-| File / location | Purpose |
-|---|---|
-| `docs/plans/REQUEST_NARRATIVES_HANDOFF_2026-11-09.md` (main) | Production schema evidence, feature contract, external-flow safeguards |
-| `docs/atlas/dataverse-akoya-request.md` (main) | Live new fields; app consumer explicitly branch-only |
-| Feature branch schema wave `36-request-narratives` | Reproducible additive schema definition |
-| Feature branch `request-narratives-service.js` and `request-narratives.js` API | Conditional staff read/save path |
-| Feature branch `RequestNarrativesCard.js` | Request-scoped editor and dirty-draft navigation guard |
-| `docs/plans/J27_CYCLE_PAGE_BUILD_PLAN_2026-11-09.md` (main) | Current J27 cycle-page build record |
-
-### Testing
-
-Run in the feature worktree; these files are intentionally not on main:
-
-```bash
-npx jest tests/unit/request-narratives-service.test.js tests/unit/request-narratives-card.test.js tests/unit/request-narratives-route.test.js --runInBand
-DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-request-narrative-fields.js --target=prod --verify
-```
-
-The metadata probe is read-only and does not return Request content. Full build,
-lint and affected gates passed on the feature branch. Handoff changes on main are
-documentation only; they do not deploy the new route or editor.
+- Production candidate is locally verified: Chromium J27 rehearsal, all 30 scoped
+  gate/self-test commands and scoped lint pass. Browser APIs were synthetic; no
+  external write was performed. The candidate awaits explicit owner promotion approval.
+- Owner approval for production promotion and a bounded staff save/readback test:
+  edit, reload, clear, stale-form refusal, restore original on a marked test Request.
+- Actual generation and Akoya form hiding are not independently verified. Separate
+  Short Title submit/poll results and machine Summary activation are not part of
+  the editor release. Do not infer a working generation flow from Connor's contract.
+- No other stream's worktree, fixture, settings or deployment is changed.
 
 ## Other streams (not worked on 2026-11-09 or 2026-11-10)
 

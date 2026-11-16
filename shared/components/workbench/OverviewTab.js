@@ -8,6 +8,7 @@ import { useEffect } from 'react';
 import { Card } from '../Layout';
 import { StatusBadge } from './StatusTab';
 import J27Overview from './J27Overview';
+import RequestNarrativesCard from './RequestNarrativesCard';
 import useReviewerProgress from './useReviewerProgress';
 
 const USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
@@ -169,7 +170,7 @@ export default function OverviewTab({ context, requestId, onSelectTab, j27Handof
       </Section>
     </div>
   );
-  if (!j27Handoffs) return details;
+  if (!j27Handoffs) return <div className="space-y-4"><RequestNarrativesCard requestId={requestId} />{details}</div>;
 
   return (
     <div className="space-y-4">
@@ -177,6 +178,7 @@ export default function OverviewTab({ context, requestId, onSelectTab, j27Handof
         reviewerProgress={reviewerProgress} onJ27Facts={onJ27Facts}
         onOpenReports={onSelectTab ? () => onSelectTab('reviews') : null}
         initialRationaleEnabled={initialRationaleEnabled} chairsRecommendationEnabled={chairsRecommendationEnabled} meetingRosterEnabled={meetingRosterEnabled} />
+      <RequestNarrativesCard requestId={requestId} />
       <details className="rounded-xl border border-gray-200 bg-white p-4">
         <summary className="cursor-pointer text-sm font-semibold">Request details</summary>
         <div className="mt-4">{details}</div>
