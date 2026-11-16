@@ -32,6 +32,8 @@ export function TestRequestsWorkspace() {
         description="Who may receive email about a test request, for testing and training. Everyone else is refused."
         scope="Global setting"
         dataverseFields={TEST_REQUEST_EMAIL_ALLOWLIST_DATAVERSE_FIELDS}
+        collapsible
+        defaultOpen={false}
       >
         <TestRequestEmailAllowlistSection />
       </AdminEditorPanel>

@@ -176,8 +176,8 @@ const EXPECTED_HEADINGS = {
   ],
   'test-requests:preview': [
     'Create a test Request',
+    'Previous runs (0)',
     'Test-request email allowlist',
-    'Your runs',
   ],
   'ai:usage': [
     'API Usage',

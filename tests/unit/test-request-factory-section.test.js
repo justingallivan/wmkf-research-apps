@@ -258,7 +258,7 @@ describe('confirm', () => {
     const reservedLine = screen.getByText('Nothing has been created in Dataverse yet. Start it from the run panel below.');
     // Owner, 2026-11-15: the run panel (with its start button) sits directly under the reserved line, above "Your runs".
     const panelHeading = screen.getByRole('heading', { name: 'My test' });
-    const runsHeading = screen.getByRole('heading', { name: 'Your runs' });
+    const runsHeading = screen.getByRole('heading', { name: /^Previous runs/ });
     const FOLLOWING = Node.DOCUMENT_POSITION_FOLLOWING;
     expect(reservedLine.compareDocumentPosition(panelHeading) & FOLLOWING).toBeTruthy();
     expect(panelHeading.compareDocumentPosition(runsHeading) & FOLLOWING).toBeTruthy();
@@ -746,6 +746,20 @@ describe('write target and consequence', () => {
     expect(screen.queryByText(/This run has no continuation action/)).toBeNull();
     expect(screen.queryByText(/command-line tool/)).toBeNull();
     expect(screen.getAllByText('Created').length).toBeGreaterThan(0);
+  });
+});
+
+describe('previous runs (owner, 2026-11-15)', () => {
+  test('sit behind a closed caret with their count; a list error stays visible outside it', async () => {
+    const server = makeServer();
+    await renderSection(server, [makeRun()]);
+    const heading = screen.getByRole('heading', { name: 'Previous runs (1)' });
+    expect(heading.closest('details').open).toBe(false);
+    const failed = makeServer();
+    failed.on('GET', BASE, { status: 500, body: { error: 'x' } });
+    render(<TestRequestFactorySection />);
+    const alert = await screen.findByRole('alert');
+    expect(alert.closest('details')).toBeNull();
   });
 });
 

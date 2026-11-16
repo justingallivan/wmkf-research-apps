@@ -6,7 +6,7 @@ import TestRequestFactoryIntake from './TestRequestFactoryIntake';
 import TestRequestFactoryRunPanel from './TestRequestFactoryRunPanel';
 import { messageFor } from './test-request-factory-copy';
 import {
-  ERROR_BAND, OUTLINE_BUTTON, TABLE_WRAP, TH, formatTime,
+  ERROR_BAND, OUTLINE_BUTTON, SUMMARY_CLASS, TABLE_WRAP, TH, formatTime,
 } from './test-request-factory-ui';
 
 const BASE = '/api/admin/test-requests/runs';
@@ -293,12 +293,25 @@ export default function TestRequestFactorySection({ onTarget }) {
         />
       ) : null}
 
-      <section aria-labelledby="factory-runs-heading" className="space-y-3 border-t border-gray-200 pt-6">
-        <div className="flex items-center justify-between gap-3">
-          <h3 id="factory-runs-heading" className="text-base font-semibold text-gray-950">Your runs</h3>
+      {/* Owner, 2026-11-15: previous runs sit behind a caret; a list error stays visible outside it. */}
+      {list.state === 'error' ? (
+        <div className="space-y-3">
+          <div role="alert" className={ERROR_BAND}>{list.text}</div>
           <button type="button" className={OUTLINE_BUTTON} onClick={loadList}>Reload list</button>
         </div>
-        {list.state === 'error' ? <div role="alert" className={ERROR_BAND}>{list.text}</div> : null}
+      ) : null}
+      <details className="border-t border-gray-200 pt-3">
+        <summary className={SUMMARY_CLASS}>
+          <h3 id="factory-runs-heading" className="inline text-base font-semibold text-gray-950">
+            {list.state === 'ready' ? `Previous runs (${list.runs.length})` : 'Previous runs'}
+          </h3>
+        </summary>
+        <section aria-labelledby="factory-runs-heading" className="space-y-3 pb-2">
+        {list.state === 'error' ? null : (
+          <div className="flex justify-end">
+            <button type="button" className={OUTLINE_BUTTON} onClick={loadList}>Reload list</button>
+          </div>
+        )}
         <div className={TABLE_WRAP}>
           <table className="min-w-full divide-y divide-gray-200 text-left text-sm">
             <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-600">
@@ -337,7 +350,8 @@ export default function TestRequestFactorySection({ onTarget }) {
             </tbody>
           </table>
         </div>
-      </section>
+        </section>
+      </details>
     </div>
   );
 }
