@@ -3,7 +3,9 @@
 Status: implementation in the isolated feature branch; no deployment or live policy,
 prompt, Request or credential changes. Connor’s test remains on its existing immutable
 Preview. Executive Summary uses the Submission-Documents narrative by owner decision;
-first-event eligibility and staff-edit protection remain unimplemented.
+the separate [bounded Summary integration](PA_EXECUTIVE_SUMMARY_INTEGRATION_2026-11-16.md) is branch-built and default-off.
+Its exact Sandbox enrollment does not require a staff-edit marker; no Summary live
+activation or deployment is claimed here.
 
 ## Scope and owner decision
 
@@ -85,7 +87,12 @@ this source change. Existing permanent task/initialization/publication receipts 
 hashes are reused. Browser/editor behavior is unchanged; downstream readers still read
 their own named physical fields and need review when a destination is changed.
 
-## Opus plan review adjudication
+## Historical review and verification receipts (November 13)
+
+The following receipts cover the configurable Short Title destination slice only,
+not the later Summary integration.
+
+### Opus plan review adjudication
 
 Opus 5.5 tool-free OAuth review recommended exact single grant, no legacy fallback
 with a grant, exact status comparison, destination-aware blankness, generic bypass
@@ -100,7 +107,7 @@ Tests use synthetic provider/DAL data and a new loopback-only PostgreSQL contain
 on port 55441/database pa_proof, with isolated schemas. They do not touch the existing
 roster-import container, Neon, Dataverse, Connor’s scope, provider APIs or Vercel.
 
-## Opus build review adjudication
+### Opus build review adjudication
 
 The build review's proposed blocker (generic guard blocking the durable worker) was
 refuted by the early `executeProfiledPrompt` return and by running the actual worker
@@ -115,7 +122,7 @@ publication leaves no dispatched operation; a later race at pre-PATCH remains fe
 as unknown. Actual candidate metadata (including exact plain-Text format) must pass
 before a live grant is approved. No candidate field is enabled by this change.
 
-## Final verification and review
+### Final verification and review
 
 [VERIFIED via local commands] 531 tests passed across 19 suites, including real
 PostgreSQL worker/store, shared Executor and staff-draft integration. Scoped ESLint,
@@ -139,5 +146,5 @@ remain authoritative for machine initialization.
 Owner: Codex. Branch: `codex/power-automate-integration-2026-11-11`.
 Next action: separately approve an actual destination/policy and bounded live trial
 if needed. No deployment, prompt publication, credentials or Connor test changed.
-Summary source is settled; see the Summary worker plan for the proposed staff-edit
-Boolean and open event contract. This destination slice adds no migration or persisted enum/status.
+Summary source and final readiness ordering are settled; see the [bounded Summary integration](PA_EXECUTIVE_SUMMARY_INTEGRATION_2026-11-16.md)
+for the accepted intake contract and bounded test setup. This destination slice adds no migration or persisted enum/status.

@@ -1,10 +1,13 @@
 # Executive Summary uses the existing Lay Abstract field
 
-Owner: Codex, branch `codex/power-automate-integration-2026-11-11`.
-Status: owner-approved field reuse; Sandbox schema verified; staff implementation on this branch, not deployed.
-Summary source is the owner-selected Submission-Documents project narrative.
-Automatic initialization and the proposed staff-edit marker remain unimplemented. Connor’s Short Title
-Preview, policy, credentials, Request and ledger are not changed by this work.
+Owner: Codex. Current Summary integration branch:
+`codex/executive-summary-generation-2026-11-16`.
+Status: existing Lay Abstract storage is retained. The bounded machine integration
+is branch-built, default-off and not deployed or activated; see [bounded Summary integration](PA_EXECUTIVE_SUMMARY_INTEGRATION_2026-11-16.md).
+No persistent staff-edit marker is required by the accepted intake contract.
+The staff editor was merged at `1037d2dbd`, deployed and live-tested on Request
+1003518 with its original Summary restored; the
+[editor handoff](REQUEST_NARRATIVES_HANDOFF_2026-11-09.md) retains that release evidence.
 
 ## Decision and verified connections
 
@@ -23,7 +26,7 @@ the literal `wmkf_layabstract`. This census does not enumerate external flows,
 Dataverse forms, tenant roles, dynamically constructed targets or existing field text.
 The retained metadata evidence contains no Request or proposal content.
 
-[VERIFIED via git/source search] Main at `146980bc6` has no literal runtime reader or
+[HISTORICAL 2026-11-13 via git/source search] Main at `146980bc6` has no literal runtime reader or
 writer for this field. The original narrative implementation at `7b5305a7c` was on
 `codex/request-narratives-2026-11-09`; its docs-only handoff had reached main. It is
 cherry-picked here with its history, then narrowed to an explicit one-field allowlist.
@@ -37,9 +40,9 @@ Do not widen the allowlist during a later merge without checking Sandbox schema.
 | GET/PATCH `/api/workbench/request-narratives` | Workbench access, trusted DAL context, session-derived identity; stable `lay_abstract` key |
 | `request-narratives-service.js` | Reads only the enabled narrative field plus Request/lead-PD identity; linked lead PD or superuser saves with concrete ETag and no actor fallback |
 | `shared/config/requestNarratives.js` | Existing column, 100,000-character manual limit, explicit enabled-field allowlist |
-| `proposal.executive-summary` | Existing `summary` output, 200-word cap, destination null; staff draft only |
+| `proposal.executive-summary` | Existing `summary` output, 200-word cap; staff draft remains destination-free, exact machine Summary scope binds Lay Abstract |
 | Shared Executor / Admin prompt publish | Reject configurable persistence to Lay Abstract before provider dispatch/publication; dedicated staff saves do not use this path |
-| Machine endpoint/worker/store | Remain Short Title-only; no Summary adapter, admission grant, prompt publication, schedule or source policy added |
+| Machine endpoint/worker/store | Separate default-off Summary admission/status/policy/worker; exact Sandbox enrollment, frozen narrative/PI, audit and original-ETag publication; no live activation |
 | Legacy AI Summary / dossier / Pre-Site | Unchanged. No mapping from Executive Summary to `aiContent.summary`, dossier input or governed document sections |
 | Dynamics Explorer | Source exposes read/export tools, not mutation tools. No nonexistent mutation path was added or claimed guarded |
 
@@ -54,7 +57,7 @@ Do not widen the allowlist during a later merge without checking Sandbox schema.
 | Correct staff identity | Fresh lead-PD comparison or superuser, linked actor, impersonation enabled, Preview-to-Production read-only, noFallback |
 | No stale UI response | Request-keyed editor, generation guard on success/error/reload, dirty-navigation confirmation |
 | No prompt-row bypass | Reserved-target check at Admin validation, Executor pre-dispatch and persistence; forceOverwrite and jsonPath regression tests |
-| No machine Summary activation | Destination remains null; machine scopes rejected; existing title admission/delivery tests |
+| Bounded machine Summary only | Separate exact Sandbox policy; generic and Short Title admission cannot initialize Summary; no activated enrollment |
 | Connor unchanged | No deployment, environment, credentials, jobs, Requests or worker calls in this slice |
 
 ## Sandbox schema
@@ -75,36 +78,34 @@ See [metadata and binding receipt](evidence/executive-summary-binding-2026-11-13
 The inherited metadata description mentions external Power Automate initialization;
 it is preserved for parity and does not establish an active flow.
 
-## Automatic delivery remains gated
+## Automatic delivery and accepted intake ordering
 
-Source and output field are settled; first-submission eligibility and staff-edit
-protection remain unimplemented.
-No paid Summary call, automatic writer or new policy is enabled. The existing draft
-prompt/profile is unchanged. Future delivery must:
+[OWNER CONFIRMED] Intake uses the Submission-Documents narrative. All required
+AI/document steps must succeed before Power Automate sets `wmkf_readyforreview`;
+failures halt intake and notify check-in staff. The backend does not set the flag.
+Connor intends no post-intake flow writes, and staff edit through the app. Justin
+accepts the rare broken-intake rerun edge case, so the proposed persistent staff-edit
+Boolean is not a prerequisite.
 
-1. Use the owner-selected project narrative in `Submission-Documents` (2026-11-13).
-   The combined Narrative-Bibliography PDF is for reviewer matching, not Summary.
-   No dependency on its creation, Phase I staff version or opportunistic fallback. Preserve required stored PI name unless
-   separately changed. Freeze source identities/revisions/hashes and configuration.
-2. Name the authoritative first-submission event and readiness ordering. Implement
-   the proposed monotonic staff-edit Boolean atomically with every staff Summary
-   save/clear, including explicit blank clears; missing/true marker denies machine
-   initialization. Specify its schema and cover all external writers before enabling
-   a new intake cohort. False/default cannot establish existing records’ edit history.
-   The [worker plan](PA_EXECUTIVE_SUMMARY_AND_WORKER_PLAN_2026-11-12.md#staff-edit-protection-and-initialization-eligibility)
-   owns details and remaining decisions. No tenant-wide guarantee is claimed.
-3. Use a separate exact machine grant and initialize operation, with the existing
-   durable per-Request/physical-field reservation and publication receipts. Preserve
-   receipts across expiry and edits/clearing; no automatic refill or relocation to
-   evade receipts. Keep staff draft mode destination-free and title grants separate.
-4. Sequence after Short Title settles, capture original Request ETag, and stop on
-   any 412. Retain uncertain provider/audit/PATCH outcomes for operator reconciliation;
-   never refresh an ETag or automatically regenerate to recover.
-5. Test the integrated ledger/source/writer flow with fake providers and isolated SQL,
-   then obtain bounded live-trial approval. A conditional adapter alone would not
-   prove one-time initialization, so it is deliberately not added now.
+[VERIFIED via branch source] Dedicated Summary admission freezes source, PI,
+prompt/profile and policy. The worker retains permanent Request/field reservations,
+protects existing nonblank text and uses the original ETag for conditional delivery.
+A staff edit after capture conflicts; replay after a later clear does not refill.
+There is no general overwrite, reset or automatic regeneration path. Staff drafts
+remain destination-free and Short Title grants cannot select Lay Abstract.
 
-## Review and reconciliation
+The owner selected bounded test Requests first. Actual narrative filename/upload
+completion, metadata/permissions and prompt/profile enrollment must be verified in
+bounded setup. See [bounded Summary integration](PA_EXECUTIVE_SUMMARY_INTEGRATION_2026-11-16.md) for the implementation and
+remaining live checks. No Summary deployment or paid live run occurred in this build.
+
+## Historical evidence boundary
+
+The review, sweep and build receipts below describe the November 13 field/editor
+slice. Their branch-only release status and marker proposals are historical, not
+current Summary integration prerequisites. They do not certify this new build.
+
+## Historical review and reconciliation
 
 Opus 5.5 reviewed the plan through Claude Code subscription OAuth with tools disabled.
 Applied: reuse original implementation history and narrow with an allowlist; preserve
@@ -120,7 +121,7 @@ contents and first-event activation remain unknown or open. Source intent is now
 settled by the owner; the dedicated source adapter is built and synthetic-tested
 offline without admission wiring. Staff-edit protection remains planned. Build review and test results are recorded after verification below.
 
-## Build verification and release boundary
+## Historical build verification and release boundary
 
 282 tests across 14 suites passed: field identity and draft-only scope, staff service,
 route and UI, Executor/publish guards, legacy output delivery, title admission/policy,

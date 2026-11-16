@@ -7,11 +7,13 @@ test('Executive Summary retains the existing column and stable API key', () => {
   expect(EXECUTIVE_SUMMARY_FIELD).toBe('wmkf_layabstract');
   expect(REQUEST_NARRATIVE_FIELDS).toEqual({ lay_abstract: { label: 'Executive Summary', column: EXECUTIVE_SUMMARY_FIELD } });
 });
-test('Summary remains a destination-free draft; no machine scope or source is enabled', () => {
+test('Summary defaults to a destination-free draft; only the dedicated Sandbox machine scope is enabled', () => {
   expect(getTaskCapability(EXECUTIVE_SUMMARY_TASK)).toMatchObject({ kind: 'proposal', outputName: 'summary', destinationField: null, maxWords: 200 });
-  for (const prefix of ['pa-short-title:', 'pa-executive-summary:']) {
+  for (const prefix of ['pa-short-title:', 'pa-executive-summary:bad']) {
     expect(isTaskEnabled(EXECUTIVE_SUMMARY_TASK, { environment: 'preview-sandbox', authorizationScope: prefix + '11111111-1111-4111-8111-111111111111' })).toBe(false);
   }
+  expect(isTaskEnabled(EXECUTIVE_SUMMARY_TASK, { environment: 'preview-sandbox', authorizationScope: 'pa-executive-summary:11111111-1111-4111-8111-111111111111' })).toBe(true);
+  expect(isTaskEnabled(EXECUTIVE_SUMMARY_TASK, { environment: 'local-production', authorizationScope: 'pa-executive-summary:11111111-1111-4111-8111-111111111111' })).toBe(false);
 });
 test('reserving Summary leaves legacy summary and pass-through outputs available', () => {
   expect(() => assertNoExecutiveSummaryTarget([

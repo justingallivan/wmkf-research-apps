@@ -1,7 +1,7 @@
 ---
 title: Shared Executor job ledger
 status: branch-built
-last_verified: 2026-11-13
+last_verified: 2026-11-16
 ---
 
 # Shared Executor job ledger
@@ -18,7 +18,7 @@ settled at `needs_attention`. A separately approved second cohort used both v2 t
 | `prompt_jobs` | Environment, authenticated principal key, separate authorization scope, Request ID, caller-command hash, source-event ID, retention, snapshot hash/reference, original Request ETag, and monotonic version. Unique environment/principal/idempotency key. |
 | `prompt_job_tasks` | Frozen prompt/profile/configuration hashes, reviewed model, task key, generation and writeback states, and validated-result reference. One row per task key in a job. |
 | `prompt_job_attempts` | Durable dispatch intent, attempt number, stable audit-run ID, response and audit references, numeric usage and completeness, and safe error code. Uncertain attempts remain fenced. |
-| `prompt_job_initializations` | One active slot per environment/Request/approved destination field. Captures blankness and content hash under the job's original ETag. A known terminal pre-publication failure can release a synthetic fixture slot while preserving history; non-synthetic slots remain reserved (Summary retention tested offline; Summary admission still disabled). |
+| `prompt_job_initializations` | One active slot per environment/Request/approved destination field. Captures blankness and content hash under the job's original ETag. A known terminal pre-publication failure can release a synthetic fixture slot while preserving history; non-synthetic slots remain reserved (including bounded machine Summary receipts). |
 | `prompt_job_publications` | One physical operation per initialization job, with original ETag, immutable payload hash/reference, contributing task and reservation IDs, and dispatch outcome. |
 | `prompt_job_content` | Bounded temporary JSON payloads for configuration, source, normalized response, validated result, audit and exact publication. Stores the SHA-256, byte count and expiry for each immutable row. |
 
@@ -26,7 +26,7 @@ settled at `needs_attention`. A separately approved second cohort used both v2 t
 
 The server-only `createPromptJobStore(pool)` requires an injected PostgreSQL pool. The caller owns principal, Request, source and destination authorization, including replay. Synthetic admission accepts the two fixture tasks in the `test` environment. The Executive Summary and Methodology task keys bind to the synthetic fields `fixture_summary` and `fixture_methodology`; these are fixture labels. The store computes canonical prompt and profile hashes, checks the pinned profile identity, and binds the same authorization scope and Request ID into all configurations and the snapshot. The job, task configurations and any initialization reservations commit together.
 
-The staff proposal trial admits both proposal task keys together in `generate-draft` only. It binds a trial UUID, one current Superuser, one Request and an allowed target/deployment class. Within the shared database an advisory lock serializes the cohort across environments and principals. The transaction checks exact idempotency replay before rejecting a second job in that cohort. Proposal jobs carry no destination field, initialization reservation, or publication command. Task configurations retain the exact profile/prompt pins, actor, and a source manifest of IDs and hashes. The source snapshot contains the bounded extracted proposal and PI name.
+The staff proposal trial admits both proposal task keys together in `generate-draft` only. It binds a trial UUID, one current Superuser, one Request and an allowed target/deployment class. Within the shared database an advisory lock serializes the cohort across environments and principals. The transaction checks exact idempotency replay before rejecting a second job in that cohort. Staff proposal draft jobs carry no destination field, initialization reservation, or publication command. Task configurations retain the exact profile/prompt pins, actor, and a source manifest of IDs and hashes. The source snapshot contains the bounded extracted proposal and PI name.
 
 Staff status and result reads require environment, principal, authorization scope and Request, plus the job ID for individual reads. The status projection exposes safe states, error codes and availability. The separate result projection checks integrity and expiry and returns only available validated draft text. Reads leave leases and job versions unchanged. The server-selected worker rechecks policy and actor and uses the same provider, response and audit fences. It can write a content-free Dataverse AI-run via required actor impersonation. It does not write Request fields.
 
@@ -34,7 +34,7 @@ Claim uses a transaction advisory lock plus a partial unique per-Request lease i
 
 A second initialization job cannot capture its Request ETag while an earlier initialized job has pending writeback, including a different field or a slot released by a failed sibling. It waits across worker ticks and captures the new ETag after the earlier publication settles.
 
-Audit exceptions are unknown unless the adapter explicitly proves a definitive rejection. Neither unknown nor failed delivery is automatically resent, and both block publication. A publication waits for all tasks to reach a known terminal generation state and cannot proceed while a contributing audit dispatch is in flight or uncertain. It coalesces eligible validated outputs into one immutable command and records the contributing IDs. Confirmed outcomes update all contributing task receipts together. Draft-only work has no Request writeback. Known pre-dispatch or validation failures release only eligible synthetic fixture slots before a physical publication exists. Only registered synthetic tasks in the test environment may release; all other slots remain reserved, including after known failure and content expiry. Summary retention is verified with hypothetical receipts constructed directly in isolated local SQL; no runtime Summary admission or publication is enabled. A field already holding staff content stays protected.
+Audit exceptions are unknown unless the adapter explicitly proves a definitive rejection. Neither unknown nor failed delivery is automatically resent, and both block publication. A publication waits for all tasks to reach a known terminal generation state and cannot proceed while a contributing audit dispatch is in flight or uncertain. It coalesces eligible validated outputs into one immutable command and records the contributing IDs. Confirmed outcomes update all contributing task receipts together. Draft-only work has no Request writeback. Known pre-dispatch or validation failures release only eligible synthetic fixture slots before a physical publication exists. Only registered synthetic tasks in the test environment may release; all other slots remain reserved, including after known failure and content expiry. Summary retention and the separately enrolled machine Summary path are verified with isolated local SQL; deployment and activation remain pending. A field already holding staff content stays protected.
 
 ## Default-off machine Short Title pilot
 
@@ -65,6 +65,32 @@ one provider attempt and delivered one audit and conditional field publication.
 Same-key replay reused the receipt and a different key received 429. The final
 ledger read counted one job, one attempt and one applied publication. The worker
 is unscheduled. [Activation and handoff](../plans/POWER_AUTOMATE_PROMPT_HANDOFF_2026-11-11.md#hosted-sandbox-setup).
+
+## Default-off machine Executive Summary pilot
+
+[VERIFIED via branch source and isolated PostgreSQL tests, 2026-11-16] The separate
+`PROMPT_JOB_SUMMARY_PILOT` binds one Sandbox Request/event/application, prompt/profile
+hashes, database identity and expiring cohort. It cannot enable Production or change
+the Short Title policy. `/api/automation/summary-jobs` admits only
+`proposal.executive-summary` plus `initialize`; status is scoped and content-free.
+The unscheduled POST Summary drain selects that one job. Existing store entry points
+`admitMachineTitle` / `verifyMachineTitleDatabase` now also accept this explicit
+Summary policy; generic admission and staff draft paths cannot create machine jobs.
+
+Source manifests freeze the Submission-Documents narrative and stored PI name;
+sealed snapshots and prompt configuration use the existing content table. The
+shared Executor returns destination-free validated text (maximum 200 words), then
+separate audit and publication stages conditionally initialize `wmkf_layabstract`.
+The field must be blank at capture. Original Request ETag and narrative currentness
+are rechecked before publication; a changed narrative can transition an undispatched
+publication directly to conflict. No new persisted status or table is introduced.
+Receipt retention, 24-hour source/response expiry and seven-day other-content expiry
+are unchanged. Retained reservations survive failures, clears and expiry. No staff
+marker is required by the accepted intake contract. The application never sets
+`wmkf_readyforreview`; Power Automate owns final readiness and failure notifications.
+
+[Integration and bounded test procedure](../plans/PA_EXECUTIVE_SUMMARY_INTEGRATION_2026-11-16.md).
+No live Summary job, activation, schedule or production policy is claimed.
 
 ## Typed recommendations fixture
 

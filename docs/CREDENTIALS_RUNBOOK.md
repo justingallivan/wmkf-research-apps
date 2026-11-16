@@ -249,6 +249,38 @@ a dedicated Neon branch created from schema only. The authorized hosted trial
 completed one Short Title write. Scheduling and operational retention verification
 remain pending. [Sandbox handoff](plans/POWER_AUTOMATE_PROMPT_HANDOFF_2026-11-11.md#hosted-sandbox-setup).
 
+### Optional — Shared Executor machine Executive Summary pilot
+
+**[BRANCH-BUILT, DEFAULT OFF; no activation or deployment]**
+`PROMPT_JOB_SUMMARY_PILOT` is non-secret server-owned JSON configuration, stored
+readably when enrolled. It is separate from `PROMPT_JOB_MACHINE_PILOT`; setting one
+does not enable the other. Unset/empty disables Summary admission and drain;
+malformed configuration fails closed. Its exact keys are `enabled`, `pilotId`,
+`requestId`, `sourceEventId`, `tenantId`, `audience`, `clientId`,
+`servicePrincipalId`, `role`, `promptId`, `promptVersion`, `promptHash`,
+`profileHash`, `databaseIdentity`, `databaseEndpoint`, and `expiresAt`.
+No `destinationGrant` is accepted: Summary's code-owned destination is
+`wmkf_layabstract`, while its prompt output target is `none`.
+
+The policy pins one approved Sandbox Request/event, app principal, prompt/profile,
+and database endpoint/identity; derives `pa-executive-summary:<pilotId>` scope; and
+requires literal-on DAL/target enforcement, registered Sandbox target, stable
+`PROMPT_JOB_NONCE_SECRET` of at least 32 UTF-8 bytes, and an active expiry within
+seven days. Production deployment/target combinations are refused. The owner
+selected bounded test Requests first. Neither non-secret enrollment nor this
+runbook authorizes a deployment or live provider/write trial.
+
+POST `/api/automation/summary-jobs` and GET
+`/api/automation/summary-jobs/[jobId]` use app-only Entra authentication. POST
+`/api/cron/drain-summary-prompt-jobs` is unscheduled and requires the exact
+`CRON_SECRET` bearer even in development; never give that secret to Power Automate.
+The existing migration 097 stores bounded content and permanent reservations;
+keep exact policy pins available for status and authorized cleanup. Do not move
+Requests to another database or reset receipts to evade initialization protection.
+Verify narrative filename/upload completion, metadata/permissions, source and
+prompt/profile pins during the bounded setup in the
+[Summary integration runbook](plans/PA_EXECUTIVE_SUMMARY_INTEGRATION_2026-11-16.md).
+
 ### Optional — Shared Executor staff draft trial
 
 **[VERIFIED via branch source, 2026-11-11]** The staff proposal draft trial

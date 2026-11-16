@@ -91,31 +91,37 @@ body to 4 KiB and admission to one job per pilot, and returns `private, no-store
 with authenticated status location/polling interval. The status route uses the real ledger status projection; the isolated proof
 facade remains test-only.
 
-## Next planning slice
+## Executive Summary integration
 
-The [Executive Summary and worker automation plan](PA_EXECUTIVE_SUMMARY_AND_WORKER_PLAN_2026-11-12.md)
-records the next proposed slice while Connor tests. Summary remains draft-only;
-the source is the Submission-Documents project narrative and the destination is
-Lay Abstract (`wmkf_layabstract`). Staff-edit marker implementation, intake event,
-audience and activation remain open; combined Narrative-Bibliography is for matching. The plan separates supervised sandbox stage advancement from eventual
-Production scheduling. Its bounded operator driver passed a
-[separate live trial on Request 1000389](PA_BOUNDED_LIVE_TRIAL_APPROVAL_2026-11-13.md#automatic-worker-trial--passed):
-five sequential ticks, one generation/audit/publication, exact output readback and
-same-key replay without another write. The new Preview has its own scope and
-operator credentials; Connor’s original Request, job, deployment and credentials
-are unchanged. Both deployed worker durations were verified as ≤300 seconds.
-No unattended schedule is active; Connor’s Power Automate submit/poll result remains pending.
+The [bounded Summary integration](PA_EXECUTIVE_SUMMARY_INTEGRATION_2026-11-16.md) is built on
+`codex/executive-summary-generation-2026-11-16`, default-off and not deployed or
+activated. The owner selected bounded exact Sandbox Requests first. Separate
+`/api/automation/summary-jobs` submit/status routes and an unscheduled Summary drain
+use their own `PROMPT_JOB_SUMMARY_PILOT`; no Short Title policy changes are required.
+
+Summary uses the `Submission-Documents` narrative and stored PI name, with validated
+output delivered to `wmkf_layabstract` through the original Request ETag. Permanent
+field reservations preserve replay protection. Staff draft behavior stays unchanged.
+Connor confirmed `wmkf_readyforreview` is the final handoff after AI/document success;
+Power Automate halts failures and notifies check-in staff. Justin accepts the rare
+broken-intake rerun edge case; a persistent staff-edit marker is not a prerequisite.
+Actual filename/upload completion, metadata and enrollment pins remain bounded live
+setup checks. No broad production enrollment or live Summary call is claimed.
+
+The separate Short Title driver trial and Connor submit/poll test retain their own
+historical receipts below. Completed trial pins are not a new execution approval.
 
 ## Prompt-to-field handoff inventory
 
 The workbook requirements in the dated discovery handoff are inputs for review,
 not approval of every audience, keyword list or overwrite rule. Current registered
-proposal capabilities deliberately have `destinationField: null`.
+staff proposal capabilities retain `destinationField: null`; the separate exact
+machine Summary scope resolves Lay Abstract in its server capability.
 
 | Desired output | Existing key or implementation | Required handoff work |
 | --- | --- | --- |
 | Short title/objective | New `preflight.short-title`; legacy `grantee-title.generate` preserved | D37 approves `akoya_request.wmkf_wmkfprojectdescription`. Pilot initializes once with original ETag. The isolated Preview pins the published Sandbox v1 definition. |
-| Executive summary | `proposal.executive-summary`; 200-word draft capability | Use the Submission-Documents narrative and existing Lay Abstract field per the [field contract](PA_EXECUTIVE_SUMMARY_FIELD_CONTRACT_2026-11-13.md); staff-edit marker, event, audience and activation remain open. |
+| Executive summary | `proposal.executive-summary`; 200-word cap | Separate branch-built bounded Sandbox integration; narrative → Lay Abstract, frozen PI/source, original ETag and permanent reservation. Verify live setup before activation; no staff marker prerequisite. |
 | Methodology | `proposal.methodology`; draft capability | Approve the destination and write policy; wording/length optimization is deferred. |
 | Personnel | Workbook P4, existing analog discovery | Approve task instructions, output shape and exact destination. |
 | Intake rationale | Workbook P5 | Define versioned storage/write contract, not an unconditional overwrite. |
@@ -216,7 +222,8 @@ and replay protection. Blankness alone never authorizes refilling a staff-cleare
 field. Runtime binding must use the normal grant-request DAL adapter, current
 machine permission and target interlock; this helper adds no bypass or human
 impersonation. The new title capability permits only its approved field under the pinned machine
-pilot. Other proposal and expertise tasks still carry no real destination.
+pilot. Staff proposal and expertise tasks carry no real destination; the separate
+bounded machine Summary path uses its own fixed Lay Abstract writer.
 
 Tests exercise the real Dynamics write-core serialization with its physical HTTP
 seam replaced, and the real PostgreSQL `captureTarget` contract. The latter uses
@@ -274,6 +281,9 @@ for replay/quota. Deployment environment changes require a redeploy; offline
 policy-change tests do not prove instantaneous production revocation.
 
 ## Hosted Sandbox setup
+
+Historical November 12–13 Short Title receipt. The following setup, instructions
+and review results do not activate or approve the new Summary path.
 
 [VERIFIED 2026-11-12 via Vercel deployment, Neon identity and row-count probes,
 Sandbox Dataverse readback, Entra token issuance and hosted HTTP requests]

@@ -271,7 +271,8 @@ suite('offline Summary composition: real worker/ledger, synthetic capability and
   test('missing narrative never substitutes the present combined PDF or applicant abstract', async () => {
     const f = await fixture();
     delete f.files[f.filename];
-    await expect(f.tick()).rejects.toMatchObject({ code: 'summary_source_changed' });
+    await expect(f.tick()).resolves.toEqual({ stage: 'failed_pre_dispatch' });
+    expect((await f.read()).tasks[0].error_code).toBe('summary_source_changed');
     expect(f.executePrompt).not.toHaveBeenCalled();
     expect(f.writer).not.toHaveBeenCalled();
     expect((await f.read()).job.snapshot_content_id).toBeNull();

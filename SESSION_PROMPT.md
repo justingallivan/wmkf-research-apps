@@ -13,7 +13,7 @@ yours to change.
 |---|---|---|---|---|
 | **A. J27 Workbench** | Claude, Session 678 (2026-11-14 to 2026-11-15) | `main` (clean). Worktree `/Users/gallivan/Code/WMKF_Apps-claude-factory-j27-files` (merged, kept until cleanup); `claude/j27-read-model` (sandbox Preview) at `2adc6dfb0` | Stream A below; alignment log D70, D71 | Ask the owner. Candidates: note to Connor about broken bibliographies (Verified Open 1); intake checks around 2026-12-05 |
 | **B. Expertise roster** | Codex, Session 670; Codex again 2026-11-10 and 2026-11-11 | **Observed 2026-11-12 by Claude, not Codex's own record:** `codex/expertise-roster-import-2026-11-10` last commit 2026-11-11 15:37 ("record reviewed native output schema build"), worktree `/Users/gallivan/Code/WMKF_Apps-codex-roster-import`. Codex's own section below still names the 2026-11-09 branch | Stream B below; `docs/plans/EXPERTISE_ROSTER_HANDOFF_2026-11-09.md`; that branch's own handoff commits | Ask Codex or the owner for the current boundary; do not resume from the 2026-11-09 text alone |
-| **C. Executive Summary** | Codex, 2026-11-16 | `main`, runtime commit `1037d2dbd` | Stream C below; current Request-narratives handoff | Editor deployed and live-tested; generation/form hiding remain separate |
+| **C. Executive Summary** | Codex, 2026-11-16 | `codex/executive-summary-generation-2026-11-16` | Stream C below; Summary integration runbook | Bounded machine integration branch; no deployment/activation |
 
 **Other Codex work seen 2026-11-12 (observed by Claude; not a handoff, not
 Claude's to change; not rechecked 2026-11-14):**
@@ -363,6 +363,27 @@ Original November 9 two-field handoff remains in git history, not the resume bou
 - Earlier local verification: Chromium fixture rehearsal, all 30 scoped gate/self-test
   commands and scoped lint passed. The authenticated Safari test supplies the live
   persistence evidence that the synthetic rehearsal could not.
+
+### Generation build — branch only, 2026-11-16
+
+Owner authorized implementation and selected **bounded test Requests first**.
+Worktree: `/private/tmp/wmkf-summary-generation-20261116`; branch:
+`codex/executive-summary-generation-2026-11-16`. Based on saved PA work
+`db00e33ba`, with current main `57eb7c40f` merged at `8e9a615bc`.
+The main session notes were pushed at `57eb7c40f`; this build does not promote main.
+
+[VERIFIED via source/local tests] Separate Summary submit/status/drain, exact Sandbox
+policy, narrative+PI snapshot, shared Executor, audit and original-ETag publication
+are implemented over migration 097. Staff drafts and Short Title retain separate
+scopes. No staff marker or schema migration is added. The inherited PA branch has
+additional unpromoted Executor/Admin/draft/recommendation work; review that release
+delta before any merge. This is not a narrow patch on production main.
+
+853 distinct tests, scoped gates/lint/types and the webpack fallback production
+build passed. The feature branch is committed locally, not pushed or deployed.
+See `docs/plans/PA_EXECUTIVE_SUMMARY_INTEGRATION_2026-11-16.md` for evidence,
+activation prerequisites and the remaining bounded live test. No real provider,
+Graph, Dataverse, cloud DB, deployment, environment or Connor flow changed here.
 
 ### Remaining
 

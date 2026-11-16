@@ -163,3 +163,15 @@ test('expiry during snapshot persistence terminates preparation instead of downl
  f.store.saveSnapshot=jest.fn(async()=>{throw Object.assign(new Error('expired'),{code:'prompt_job_source_expired'});});
  expect(await f.tick()).toEqual({stage:'expired'});expect(await f.tick()).toEqual({stage:'needs_attention'});expect(f.args.prepareSnapshot).toHaveBeenCalledTimes(1);
 });
+
+test('invocation deadline caps provider execution before a longer lease ends',async()=>{
+  const f=fixture();f.args.invocationDeadlineMs=Date.now()+10000;
+  await f.tick();
+  expect(f.executePrompt.mock.calls[0][0].deadlineMs).toBe(f.args.invocationDeadlineMs);
+});
+test('expired invocation deadline prevents provider dispatch and releases its lease',async()=>{
+  const f=fixture();f.args.invocationDeadlineMs=Date.now()-1;
+  await expect(f.tick()).rejects.toThrow('deadline');
+  expect(f.executePrompt).not.toHaveBeenCalled();expect(f.store.markDispatching).not.toHaveBeenCalled();
+  expect(f.store.releaseClaim).toHaveBeenCalledTimes(1);
+});

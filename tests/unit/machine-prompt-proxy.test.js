@@ -17,3 +17,9 @@ test('dedicated test deployment denial happens before machine pass-through',asyn
  decideMeetingTranscriptionTestRequest.mockReturnValueOnce({dedicated:true,identityVerified:true,enabled:true,allowed:false});
  expect((await proxy(req('/api/automation/prompt-jobs','POST'))).status).toBe(404);
 });
+
+test.each(['prompt-jobs','summary-jobs'])('only exact %s paths bypass session gate',async base=>{
+ expect(await proxy(req(`/api/automation/${base}`,'POST'))).toEqual({passed:true});
+ expect(await proxy(req(`/api/automation/${base}/${id}`))).toEqual({passed:true});
+ for(const suffix of ['/', '/nope', `/${id}/results`]) expect(await proxy(req(`/api/automation/${base}${suffix}`))).toEqual({shared:true});
+});

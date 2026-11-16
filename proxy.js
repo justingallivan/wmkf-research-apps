@@ -41,8 +41,8 @@ const PRESENTATION_UPLOAD_PAGE = /^\/meeting-tracker\/visits\/[^/]+\/?$/;
 const TRANSCRIPTION_PILOT_PAGE = /^\/admin\/transcription-pilot(?:\/|$)/;
 const PRESENTATION_MATERIALS_PAGE = /^\/external\/presentation\/[^/]+\/?$/;
 export function isMachinePromptRoute(pathname = '') {
-  return pathname === '/api/automation/prompt-jobs' ||
-    /^\/api\/automation\/prompt-jobs\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pathname);
+  return pathname === '/api/automation/prompt-jobs' || pathname === '/api/automation/summary-jobs' ||
+    /^\/api\/automation\/(?:prompt-jobs|summary-jobs)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pathname);
 }
 
 // Outside-facing and auth surfaces; every other page is a staff page.
