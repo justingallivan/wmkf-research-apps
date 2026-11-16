@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## November 2026 — Workbench offramp control; Factory makes reviewable J27 test requests (Sessions 677–678)
+
+**Milestone:** Staff set and undo "Phase II Offramped" with a justification in the Workbench (D70), and anyone with admin access can make a J27 test request and put it in the Workbench from the admin page (D71).
+**Sessions:** Session 678 (Claude, 2026-11-14 to 2026-11-15), building on Session 677.
+**Ship state:**
+- Offramp control (`0a1d90492` to `6094ecd6e`), `WORKBENCH_OFFRAMP_READY=on`; wave 42 `wmkf_phaseiistatusbeforeofframp` applied to Production by the owner; owner-tested on #1003456.
+- Factory: J27 test requests get `AI Materials/Narrative-Bibliography_N.pdf` (D60, migration 099), source PDFs are checked, Phase II originals preferred (`c7ebedc1f` to `cd874469a`).
+- Admin **Prepare for review** (Phase I Invited, Phase II Pending Committee Review, ready) replaces the owner CLI for test requests (`29999733c` to `80cf7a628`); readiness route proved on 1003517, the one-button flow on 1003518.
+- Test Requests admin page redesigned; the sandbox-only clone preview panel removed (`8d000bc7f` to `c49d91384`).
+**Why it matters:** The offramp is recorded where staff work, and colleagues (Connor) can make their own J27 test requests without the owner.
+**Pointers:** `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md` (D70, D71), `docs/TEST_REQUEST_FACTORY_FORM_RUNBOOK.md`, `lib/services/workbench/offramp-service.js`, `lib/services/test-requests/readiness-finalizer.js`.
+
 ## November 2026 — J27 Workbench in Production (Sessions 675–676)
 
 **Milestone:** The J27 Workbench line (phase-organized cycle page, request-page phase layout and its new staff fields) is on `main` and live in Production, and since 2026-11-14 the request page's phase layout is on for every 2027-or-later request.
