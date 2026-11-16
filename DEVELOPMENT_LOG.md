@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## November 2026 — Return PA work to prompt delivery (Session 679)
+
+**Milestone:** Owner stopped backend integration for Power Automate and returned the deliverable to Dataverse prompts compatible with Connor's existing flows.
+**Sessions:** Session 679, two Codex chats coordinated into one handoff on 2026-11-16.
+**Ship state:**
+- Executive Summary staff editor remains deployed (`1037d2dbd`), live-tested with original Summary restored.
+- Bounded backend Summary test succeeded in Sandbox; implementation and receipts preserved on the feature branch, not promoted.
+- Submit/poll adoption, worker scheduling and backend rollout parked; Connor's example prompt is pending.
+**Why it matters:** A successful backend test does not establish that existing Power Automate execution needs replacing; one future session will complete the prompt handoff.
+**Pointers:** `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md`, `SESSION_PROMPT.md`; parked runtime `6d6a7c724`, trial receipt `8e98afb03`.
+
 ## November 2026 — Workbench offramp control; Factory makes reviewable J27 test requests (Sessions 677–678)
 
 **Milestone:** Staff set and undo "Phase II Offramped" with a justification in the Workbench (D70), and anyone with admin access can make a J27 test request and put it in the Workbench from the admin page (D71).
