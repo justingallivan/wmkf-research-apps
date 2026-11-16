@@ -15,6 +15,8 @@ const TEST_REQUEST_EMAIL_ALLOWLIST_DATAVERSE_FIELDS = [
 export function TestRequestsWorkspace() {
   // The Factory section learns the deployment's target from its own runs request.
   const [factoryTarget, setFactoryTarget] = useState(null);
+  // The allowlist panel starts collapsed; a load-time problem shows in its summary instead (Codex, 2026-11-15).
+  const [allowlistAttention, setAllowlistAttention] = useState('');
   const factoryScope = factoryTarget ? `${factoryTarget === 'production' ? 'Production' : 'Sandbox'} data · Writes` : 'Writes';
   return (
     <div className="space-y-6">
@@ -29,13 +31,18 @@ export function TestRequestsWorkspace() {
       <AdminEditorPanel
         id="test-request-email-allowlist"
         title="Test-request email allowlist"
-        description="Who may receive email about a test request, for testing and training. Everyone else is refused."
+        description={allowlistAttention ? (
+          <>
+            Who may receive email about a test request, for testing and training. Everyone else is refused.{' '}
+            <span role="alert" className="font-semibold text-amber-800">{allowlistAttention}</span>
+          </>
+        ) : 'Who may receive email about a test request, for testing and training. Everyone else is refused.'}
         scope="Global setting"
         dataverseFields={TEST_REQUEST_EMAIL_ALLOWLIST_DATAVERSE_FIELDS}
         collapsible
         defaultOpen={false}
       >
-        <TestRequestEmailAllowlistSection />
+        <TestRequestEmailAllowlistSection onAttention={setAllowlistAttention} />
       </AdminEditorPanel>
     </div>
   );
