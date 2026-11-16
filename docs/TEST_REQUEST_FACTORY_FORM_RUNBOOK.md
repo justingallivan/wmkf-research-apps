@@ -39,7 +39,7 @@ A variable change takes effect only in a new deployment. Details and rotation: `
 1. **Look up** the source Request number. The form reads the Request and its documents from production and saves a bundle. Limits (`TEST_REQUEST_PREVIEW_READ_LIMITS`, `admin-preview-service.js`): at most 7 documents, 25 MB each, 50 MB in total; PDF and XLSX only.
 2. **Confirm and reserve run.** Writes the bundle and manifest to the Blob store and one row to the ledger. Nothing exists in Dynamics yet.
 3. **Start production run.** One request per step; the form keeps going until the run is ready or a step stops. `copy_file` runs once per document. `observe` waits about a minute.
-4. **Status:** available once the run is `ready` (clone provisioning complete).
+4. **Status:** available once the run is `ready` (clone provisioning complete). The form labels this state **Created**, not "Ready", because it does not mean ready for review. [Page layout 2026-11-15: for a created run the clone steps collapse to one line and the status control comes next, above Recorded steps and Run tools.]
    For prepared J27+ reviewer fixtures, Phase I Invited followed by Phase II
    Pending Committee Review and readiness finalization are required.
    Earlier-cycle clone behavior is unchanged.
@@ -53,7 +53,7 @@ A variable change takes effect only in a new deployment. Details and rotation: `
    or `POST /api/admin/test-requests/runs/[runId]/readiness`, which runs the same
    checks as the CLI's `--finalize-readiness --confirm` against the stored manifest.
    Any answer other than complete stops the flow; **Continue** resumes the same open
-   status change or readiness attempt and never sends a second PATCH. A Request whose
+   status change or readiness attempt and never sends a second PATCH. After a reload, a step whose change was sent but not confirmed shows **Sent, not confirmed** (a journaled but unsent change shows **Planned, not sent**, which Continue sends), with a sentence saying what Continue will do. A Request whose
    Phase II was set before Phase I was Invited is reported as unpreparable (create a
    new test Request). The general status menus stay under **More options**. An
    attempt that needs attention, or a run whose stored files are gone, still needs
