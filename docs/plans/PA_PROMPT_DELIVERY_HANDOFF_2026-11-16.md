@@ -98,6 +98,21 @@ be separate prompts. Compliance and broader expertise matching scope are unresol
   its settings still exist and the content rows are present. Out of scope: the two
   earlier Short Title jobs in the same database, and fixture removal (test PI link on
   1000389 and the TEST-folder PDF), which stay until the owner decides.
+- **Batch 1 ran 2026-11-17 19:00 UTC.** The Entra credential file
+  `/private/tmp/wmkf-pa-entra-credential-20261112.json` was gone, and the old `tick`
+  mode refuses finished jobs and expired policies. Owner chose option A: parked-branch
+  commit `d86870146` adds `expire` mode, which needs only the OIDC token and cron secret
+  and accepts only `succeeded`/`disabled`. One POST returned 200 `{"stage":"succeeded"}`
+  [VERIFIED via runner output and `http-state.json`: ticks 6 of 8, no pending intent].
+  The response does not report a deleted-row count; deletion is inferred from the
+  worker code path, not read back from the database.
+- **Batch 2 (after 2026-11-23 18:31:58 UTC):** from the parked worktree, refresh the
+  token with `vercel env pull --environment=development --yes
+  /private/tmp/wmkf-summary-live-20261116/development.env` (run from the linked main
+  checkout; it writes only that file), then run `node scripts/run-summary-sandbox-http.cjs
+  expire` once. After the Nov 18 policy expiry, expect `disabled`. That result is
+  ambiguous: it is also what the worker returns if the Preview's pilot setting were
+  missing, in which case nothing is deleted.
 - Private credentials/source/receipts under `/private/tmp/wmkf-summary-live-20261116`
   are not in Git and do not transfer between Macs. Do not copy credential files into
   handoff artifacts. Worktree directories are volatile; pushed branches preserve code.
