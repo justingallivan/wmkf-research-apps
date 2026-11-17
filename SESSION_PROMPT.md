@@ -35,7 +35,8 @@ example prompt from Connor; response pending. Preserve existing work and receipt
   `docs/plans/J27_WORKBOOK_FIELD_MAP_2026-11-16.md`.
 - **Next prompts:** Rationale, Flags, Keywords and Open questions, which wait on Beth's
   answers and the field decisions in the field map. Connor still to change the AI Team
-  Info description in Dynamics. First test run of the three prompts through Connor's flow.
+  Info description in Dynamics. Connor's 11-17 test flow used no real proposal; review the first real-proposal
+  run with `scripts/probe-intake-prompt-outputs.cjs --request=<number>` (owner-run).
 - **Owner decisions needed:** missing prompt content, controlled lists/rubrics,
   unassigned destinations and versioned storage (Methodology length settled: 2
   sentences to 100 words). See the field map.

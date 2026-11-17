@@ -57,8 +57,11 @@ From Connor's note `pa-prompt-format-answers-2026-11-17.md` (not in this repo):
   variable. Connor first suggested marking it untrusted; the decision was to keep it
   trusted, because he screens the roster another way.
 - **Short title:** the flow uses the existing `grantee-title.generate` v2 as it is.
-- **First test:** Connor tested the intake prompts on Request 1003372, 2026-11-17.
-  Outputs not yet reviewed here.
+- **First test:** Connor ran a test flow on Request 1003372, 2026-11-17, without a
+  real proposal, so its outputs say nothing about quality. Review the outputs of the
+  first real-proposal run with `scripts/probe-intake-prompt-outputs.cjs` (owner-run,
+  read-only): it prints the four intake fields with word and sentence counts, and the
+  request's AI run records.
 
 - **AI Team Info description:** Connor changed it in Dynamics to "Summary of key
   personnel and expertise" (2026-11-17, per Connor; not re-read here).
@@ -83,7 +86,7 @@ From Connor's note `pa-prompt-format-answers-2026-11-17.md` (not in this repo):
 - **Collaboration Letters:** the flow does not pass them to the Personnel prompt
   (owner, 2026-11-17), so collaborators come from the narrative only.
 
-Still open with Connor: the outputs of his test on Request 1003372.
+Next: review the first real-proposal run (which request, from Connor).
 
 ## Shared instructions (all proposal tasks)
 
