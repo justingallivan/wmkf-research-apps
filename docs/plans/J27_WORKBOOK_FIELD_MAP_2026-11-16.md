@@ -101,6 +101,28 @@ Unless noted, fields are on the Request (`akoya_request`).
 | AR | East/West | Derived from existing records | ✅ |
 | AS | Institution type | Derived from existing records | ✅ |
 
+## Applicant summary answers from the J27 form
+
+Not workbook columns, but available inputs for the remaining prompts. Applicants fill
+these in on the J27 portal application form (owner, November 17); they were added to
+the Request by hand on October 22.
+
+| Field | Label | Could inform |
+|---|---|---|
+| `wmkf_summaryscientificquestion` | Scientific Question | Flag: unclear basic science question |
+| `wmkf_summarypotentialimpact` | Potential Impact | Flag: limited impact; Rationale |
+| `wmkf_summaryrisks` | Risks | Flag: feasibility |
+| `wmkf_summaryenablingadvances` | Enabling Advances | Rationale |
+| `wmkf_summarynewarea` | New Area | Flag: unclear basic science question; Rationale |
+| `wmkf_summarypeergroups` | Peer Groups | Keywords; reviewer and PD matching |
+| `wmkf_summarypriorsupport` | Prior Support | Flags: overlap with existing funding or a recent Keck award |
+| `wmkf_summaryaiuse` | AI Use | Possibly a staff flag or note |
+
+The "could inform" column is a suggestion, not a decision. These are the applicant's
+own claims, so prompts should weigh them against the proposal rather than repeat them.
+`wmkf_pipublications` (PI Publications) and `wmkf_iacucanimalmodels` (IACUC Animal
+Models) were added at the same time; their purpose is not yet confirmed.
+
 ## Decisions needed before adding fields
 
 1. **Rationale versions.** The workbook keeps four: Intake, Field Analysis, After

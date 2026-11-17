@@ -66,7 +66,10 @@ From Connor's note `pa-prompt-format-answers-2026-11-17.md` (not in this repo):
   `wmkf_ai_keywords`, `wmkf_ai_methodologies` or `wmkf_ai_riskflags`, and no flow
   writes them yet; the new intake flows will (per Connor, 2026-11-17).
 
-Still open with Connor: the purpose and source of the Oct 22 `wmkf_summary…` fields; who creates the remaining
+- **Oct 22 `wmkf_summary…` fields:** applicant answers on the J27 portal form (owner,
+  2026-11-17). Possible inputs for Rationale, Flags and Keywords; see the field map.
+
+Still open with Connor: who creates the remaining
 intake fields (Open questions, Rationale, Flags); Production's audit retention setting;
 and whether all three prompts run before `wmkf_readyforreview` with a failed run
 stopping intake.

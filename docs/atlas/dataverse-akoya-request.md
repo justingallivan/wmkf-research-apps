@@ -77,6 +77,14 @@ People (lookups):
 Content / abstract:
 - `wmkf_abstract` (full proposal abstract; added by WMKF, not in vendor schema)
 - `wmkf_excludedreviewers` (free-form names)
+- J27 application summary answers (Memo; applicant-entered on the J27 portal form,
+  per owner 2026-11-17): `wmkf_summaryscientificquestion`, `wmkf_summarypotentialimpact`,
+  `wmkf_summaryrisks`, `wmkf_summaryenablingadvances`, `wmkf_summarynewarea`,
+  `wmkf_summarypeergroups`, `wmkf_summarypriorsupport`, `wmkf_summaryaiuse`. Created by
+  hand in Production 2026-10-22 (W. M. Keck Foundation solution; owner-run metadata audit
+  2026-11-16); no app code reads them. Also added then, purpose not confirmed:
+  `wmkf_pipublications`, `wmkf_iacucanimalmodels`. Applicant text: treat as untrusted
+  if passed to prompts.
 - `wmkf_layabstract` and `wmkf_initialassessment` (optional plain-text Memo,
   100,000 characters each) — **[SCHEMA LIVE: historical owner-approved probe,
   2026-11-09; Executive Summary editor deployed at `1037d2dbd` and authenticated
