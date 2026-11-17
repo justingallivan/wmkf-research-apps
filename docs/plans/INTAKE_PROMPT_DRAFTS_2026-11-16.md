@@ -29,9 +29,32 @@ account (the person is not recorded). What it shows:
 - **Output:** JSON with named keys; output targets are `none`, so the flow parses the
   JSON and writes the fields itself. One call can return several outputs.
 
-Open with Connor: whether the flow can pass the full proposal narrative text; one
-prompt per field or combined; plain text versus JSON for single outputs; the format
-of the PI/co-PI roster input.
+The example is only an example; it was created directly through the Dataverse API
+(not Admin), and the owner chose to leave it as is.
+
+### Connor's answers (2026-11-17)
+
+From Connor's note `pa-prompt-format-answers-2026-11-17.md` (not in this repo):
+
+- **Proposal documents** are attached by the flow, not templated: the Project
+  Narrative as the PDF itself, and bibliography, biosketches and Other Support as
+  text (up to 100,000 characters each, wrapped as untrusted). All prompts in a run
+  share one cached copy. Prompts refer to "the attached application documents".
+- **No placeholders in the system prompt** in this shared-document mode; it is sent
+  after the documents and the flow refuses templated values there. All placeholders
+  go in the body.
+- **Single output:** plain text is fine, with `parseMode: "raw"` and one output.
+  JSON is for several outputs from one call.
+- **One prompt per field or combined:** both work; because documents are cached,
+  separate prompts cost little extra.
+- **Variables:** `source.kind` must be `override`; `prepared_context` and
+  `frozen_record` are refused for now, so the published Executive Summary and
+  Methodology v2 rows cannot run in the flow as they are. Untrusted variables need
+  `dataClass` and `maxChars`. Output targets must be `none`.
+- **Model:** `sonnet` / `opus` / `haiku` map to the 5.5 models; temperature is
+  omitted; max tokens include thinking.
+- **Roster:** one line per person, from the personnel table, declared as an untrusted
+  `team_roster` variable (`crm_record_text`, up to 5,000 characters).
 
 ## Shared instructions (all proposal tasks)
 
@@ -106,22 +129,26 @@ examples.
 > named collaborators who have a defined role. For each person, give their name,
 > their role (PI, co-PI or collaborator), their academic rank and department when
 > stated, their relevant expertise, and what they will contribute to this project.
-> Give an institution only when it differs from the applicant institution and the
-> proposal states it.
+> Give an institution only when it differs from the applicant institution.
 >
 > The team roster below is authoritative for the PI and co-PIs: use every name and
 > role exactly as given, in that order, and do not add, remove or reclassify them.
-> Take collaborators, expertise and contributions from the proposal.
+> Use each person's stated responsibilities as the main source for their
+> contribution. Take collaborators and expertise from the attached application
+> documents.
 >
 > Use only the abbreviations PI and co-PI, written in that form. Do not include
-> degrees. Do not invent titles, affiliations, credentials or responsibilities.
+> degrees or honorifics such as Dr. Do not invent titles, affiliations, credentials
+> or responsibilities.
 >
 > Return only the paragraph as plain text, with no heading.
 >
-> Team roster: {{team_roster}}
-> Proposal: {{proposal_text}}
+> Team roster:
+> {{team_roster}}
 
-Placeholder syntax is provisional until Connor's example.
+The proposal is not a placeholder: Connor's flow attaches the application documents
+(see "Connor's answers" above). The roster arrives one line per person in form
+order, for example `PI: <name>, <title>, <institution>. Responsibilities: <text>.`
 
 Owner decisions (2026-11-17, with Connor present):
 - **Collaborators:** include named collaborators with a defined role, as in the
@@ -130,9 +157,12 @@ Owner decisions (2026-11-17, with Connor present):
   whether the team covers the needed expertise; the owner chose to leave it out.
 - **Length:** about 15–20 words per person, at most 200 words. The workbook's 23
   examples run 42–82 words. The writeup's 140–180 words is for the Board writeup body.
-- **Roster input:** Connor's intake flow can pass the PI (the Request's Project
-  Leader) and the co-PI records, so names come from Dynamics exactly. Exact roster
-  format to be confirmed with Connor's example.
+- **Roster input:** Connor's intake flow passes the personnel table
+  (`wmkf_apprequestperson` plus contact): role, form order, name, title,
+  institution and the applicant's stated project responsibilities, so names come
+  from Dynamics exactly.
+- **No degrees or honorifics** (owner, 2026-11-17): Connor's sample roster lines
+  begin with "Dr.", so the prompt says so explicitly.
 
 Not yet done: packaging for Connor's flow; a test run on real proposals (needs owner
 approval for model calls); publication as a new prompt version.
