@@ -66,3 +66,53 @@ the target style, not what a model can produce from the proposal alone.
 
 Not yet done: packaging for Connor's flow; a test run on real proposals (needs owner
 approval for model calls); publication as a new prompt version.
+
+## Personnel — agreed 2026-11-17
+
+Destination: `akoya_request.wmkf_ai_teaminfo`, repurposed from a JSON object to
+readable text; new description "Summary of key personnel and expertise" (repo
+updated; Dynamics description to be changed by Connor). Workbook column K:
+"Claude P4: scaled by team size"; overwrite; all staff and Chairs.
+
+Built from the Draft writeup prompt's personnel rules
+(`shared/config/prompts/pre-site-visit-proposal-core.js`: roster authority, exact
+names, no degrees, PI/co-PI only), in the format of the workbook's Personnel
+examples.
+
+> Write a Personnel summary of the project team: one paragraph of about 15–20 words
+> per person, at most 200 words in total.
+>
+> Introduce each investigator in this order: the PI first, then each co-PI, then any
+> named collaborators who have a defined role. For each person, give their name,
+> their role (PI, co-PI or collaborator), their academic rank and department when
+> stated, their relevant expertise, and what they will contribute to this project.
+> Give an institution only when it differs from the applicant institution and the
+> proposal states it.
+>
+> The team roster below is authoritative for the PI and co-PIs: use every name and
+> role exactly as given, in that order, and do not add, remove or reclassify them.
+> Take collaborators, expertise and contributions from the proposal.
+>
+> Use only the abbreviations PI and co-PI, written in that form. Do not include
+> degrees. Do not invent titles, affiliations, credentials or responsibilities.
+>
+> Return only the paragraph as plain text, with no heading.
+>
+> Team roster: {{team_roster}}
+> Proposal: {{proposal_text}}
+
+Placeholder syntax is provisional until Connor's example.
+
+Owner decisions (2026-11-17, with Connor present):
+- **Collaborators:** include named collaborators with a defined role, as in the
+  workbook examples.
+- **No closing assessment:** the workbook examples end with a sentence judging
+  whether the team covers the needed expertise; the owner chose to leave it out.
+- **Length:** about 15–20 words per person, at most 200 words. The workbook's 23
+  examples run 42–82 words. The writeup's 140–180 words is for the Board writeup body.
+- **Roster input:** Connor's intake flow can pass the PI (the Request's Project
+  Leader) and the co-PI records, so names come from Dynamics exactly. Exact roster
+  format to be confirmed with Connor's example.
+
+Not yet done: packaging for Connor's flow; a test run on real proposals (needs owner
+approval for model calls); publication as a new prompt version.
