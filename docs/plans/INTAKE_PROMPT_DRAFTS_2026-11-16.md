@@ -13,6 +13,26 @@ flows. Resume context: [PA prompt delivery handoff](PA_PROMPT_DELIVERY_HANDOFF_2
 reflects what Beth (CSO) has in mind. It is weighed seriously but is not canon;
 each section records where a draft departs from it and who decided.
 
+## Connor's format example (`pa.format-example` v1)
+
+[VERIFIED via owner-run read-only Production read of `wmkf_ai_prompts`, 2026-11-17]
+Published and current; created 2026-11-17 12:49 pm MST, saved under the app's service
+account (the person is not recorded). What it shows:
+
+- **Placeholders:** `{{name}}`, in the system prompt and the body. Spaces inside the
+  braces are allowed (confirmed by the owner; the apps' substitution pattern
+  `\{\{\s*(\w+)\s*\}\}` in `lib/services/prompt-store.js:74` accepts them too).
+- **Inputs:** declared in the variables field, with optional defaults (for example
+  audience, word limit, an empty staff note). The example passes title and abstract
+  text (abstract up to 5,000 characters), not a proposal document.
+- **Model and settings** are stored on the row: `sonnet`, temperature 0, max tokens 1024.
+- **Output:** JSON with named keys; output targets are `none`, so the flow parses the
+  JSON and writes the fields itself. One call can return several outputs.
+
+Open with Connor: whether the flow can pass the full proposal narrative text; one
+prompt per field or combined; plain text versus JSON for single outputs; the format
+of the PI/co-PI roster input.
+
 ## Shared instructions (all proposal tasks)
 
 Carried over unchanged from the published v2 shared profile:
