@@ -107,8 +107,8 @@ Evidence: the workbook's 23 examples (rows 5–27) run 75–181 words, most 140�
 They came from D26 final write-ups written by staff after full review, so they show
 the target style, not what a model can produce from the proposal alone.
 
-Not yet done: packaging for Connor's flow; a test run on real proposals (needs owner
-approval for model calls); publication as a new prompt version.
+Published 2026-11-17 as a new prompt (see [Admin entries](INTAKE_PROMPT_ADMIN_ENTRIES_2026-11-17.md)).
+Not yet done: a test run on real proposals through Connor's flow.
 
 ## Personnel — agreed 2026-11-17
 
@@ -164,5 +164,5 @@ Owner decisions (2026-11-17, with Connor present):
 - **No degrees or honorifics** (owner, 2026-11-17): Connor's sample roster lines
   begin with "Dr.", so the prompt says so explicitly.
 
-Not yet done: packaging for Connor's flow; a test run on real proposals (needs owner
-approval for model calls); publication as a new prompt version.
+Published 2026-11-17 as a new prompt (see [Admin entries](INTAKE_PROMPT_ADMIN_ENTRIES_2026-11-17.md)).
+Not yet done: a test run on real proposals through Connor's flow.

@@ -28,9 +28,15 @@ example prompt from Connor; response pending. Preserve existing work and receipt
 
 ### Next items
 
-- **Verified open:** when Connor's example arrives, compare its fields, source input,
-  substitution, model/settings and output parsing against the worksheet baseline.
-  Produce one gap checklist, beginning with Short Title and Executive Summary.
+- **Done (Session 680, 2026-11-17):** Connor's example (`pa.format-example`) and his
+  format answers were reviewed. `intake.executive-summary` v1 and `intake.personnel` v1
+  were published through Admin and verified against the agreed text. See
+  `docs/plans/INTAKE_PROMPT_ADMIN_ENTRIES_2026-11-17.md`, the drafts doc and
+  `docs/plans/J27_WORKBOOK_FIELD_MAP_2026-11-16.md`.
+- **Next prompts:** Methodology (page 1) draft awaits owner review (destination
+  `wmkf_ai_methodologysummary`); then Rationale, Flags, Keywords and Open questions,
+  which wait on Beth's answers and the field decisions in the field map. Connor still
+  to change the AI Team Info description in Dynamics.
 - **Owner decisions needed:** Methodology length; missing prompt content, controlled
   lists/rubrics, unassigned destinations and versioned storage. See handoff.
 - **Parked:** backend adoption/scheduling/rollout; no new AI calls or prompt

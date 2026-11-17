@@ -2,8 +2,14 @@
 
 Prepared November 17, 2026. Content agreed with the owner is in
 [the intake prompt drafts](INTAKE_PROMPT_DRAFTS_2026-11-16.md); the packaging follows
-Connor's Power Automate format answers recorded there. **Nothing here is published.**
-Publishing writes to Production and needs the owner's go-ahead.
+Connor's Power Automate format answers recorded there.
+
+**Published 2026-11-17** by the owner through Admin → Add prompt (form filled in by
+the agent): `intake.executive-summary` v1 and `intake.personnel` v1. [VERIFIED via
+owner-run read-only Production comparison: one current Published v1 row each; title,
+group, usage, model `sonnet`, max tokens 2048, no temperature, system prompt, body
+and output schema identical to the text below; variables none / `team_roster` only.]
+Neither runs until Connor's flow calls it by name.
 
 ## Why these are new prompts, not new versions
 
@@ -126,4 +132,3 @@ The roster arrives one line per person in form order, for example
    Connor screens the roster another way.
 3. **Max output tokens:** 2048 for both.
 
-Ready to publish with **Add prompt**. Neither runs until Connor's flow calls it by name.
