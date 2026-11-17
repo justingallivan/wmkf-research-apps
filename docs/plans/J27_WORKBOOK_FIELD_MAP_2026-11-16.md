@@ -100,9 +100,18 @@ Unless noted, fields are on the Request (`akoya_request`).
 ## Decisions needed before adding fields
 
 1. **Rationale versions.** The workbook keeps four: Intake, Field Analysis, After
-   review and Final. Options:
-   - four separate text fields on the Request (simplest), or
-   - a separate table with one row per version.
+   review and Final. **Waiting on Beth** (discussed with Connor, November 17): does
+   anyone need to read earlier versions in normal use, for example side by side or
+   by the Chairs, or only look them up occasionally? Options:
+   - one Rationale field plus a Rationale stage field, overwritten at each stage,
+     with Dynamics audit history keeping earlier versions. Least work, but earlier
+     versions are hard to show in the apps, views or flows, and depend on the audit
+     retention setting (not yet checked in Production);
+   - four separate text fields on the Request, each version always readable; or
+   - a separate table with one row per version, keeping full history.
+
+   Also open: whether workbook column Q ("Staff notes = Rationale, AI drafted,
+   human edited") is the staff-edited Intake Rationale or a separate note.
 2. **Flag detail.** The Flags sheet holds one row per proposal per flag. Each row has
    three settings (Claude at intake, Claude at Field Analysis, PD final), a reason
    of at most 25 words, two quotes each with page and section, and a PD comment.
