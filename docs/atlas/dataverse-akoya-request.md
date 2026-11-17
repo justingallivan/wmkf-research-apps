@@ -82,9 +82,11 @@ Content / abstract:
   `wmkf_summaryrisks`, `wmkf_summaryenablingadvances`, `wmkf_summarynewarea`,
   `wmkf_summarypeergroups`, `wmkf_summarypriorsupport`, `wmkf_summaryaiuse`. Created by
   hand in Production 2026-10-22 (W. M. Keck Foundation solution; owner-run metadata audit
-  2026-11-16); no app code reads them. Also added then, purpose not confirmed:
-  `wmkf_pipublications`, `wmkf_iacucanimalmodels`. Applicant text: treat as untrusted
-  if passed to prompts.
+  2026-11-16); no app code reads them. Also applicant-entered, added the same day:
+  `wmkf_pipublications` (up to 5 relevant team publications with DOIs) and
+  `wmkf_iacucanimalmodels` (animal models requiring IACUC approval). Applicant text:
+  treat as untrusted if passed to prompts. Definitions: J27 application instructions
+  (see `docs/plans/J27_WORKBOOK_FIELD_MAP_2026-11-16.md`).
 - `wmkf_layabstract` and `wmkf_initialassessment` (optional plain-text Memo,
   100,000 characters each) — **[SCHEMA LIVE: historical owner-approved probe,
   2026-11-09; Executive Summary editor deployed at `1037d2dbd` and authenticated

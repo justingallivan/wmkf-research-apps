@@ -101,27 +101,42 @@ Unless noted, fields are on the Request (`akoya_request`).
 | AR | East/West | Derived from existing records | ✅ |
 | AS | Institution type | Derived from existing records | ✅ |
 
-## Applicant summary answers from the J27 form
+## Applicant answers from the J27 form
 
 Not workbook columns, but available inputs for the remaining prompts. Applicants fill
 these in on the J27 portal application form (owner, November 17); they were added to
-the Request by hand on October 22.
+the Request by hand on October 22. Definitions and limits are from the
+[Research Program application instructions](https://www.wmkeck.org/wp-content/uploads/2026/08/WMKF_Research_Application_Instructions_260826.pdf)
+(dated August 26, 2026).
 
-| Field | Label | Could inform |
-|---|---|---|
-| `wmkf_summaryscientificquestion` | Scientific Question | Flag: unclear basic science question |
-| `wmkf_summarypotentialimpact` | Potential Impact | Flag: limited impact; Rationale |
-| `wmkf_summaryrisks` | Risks | Flag: feasibility |
-| `wmkf_summaryenablingadvances` | Enabling Advances | Rationale |
-| `wmkf_summarynewarea` | New Area | Flag: unclear basic science question; Rationale |
-| `wmkf_summarypeergroups` | Peer Groups | Keywords; reviewer and PD matching |
-| `wmkf_summarypriorsupport` | Prior Support | Flags: overlap with existing funding or a recent Keck award |
-| `wmkf_summaryaiuse` | AI Use | Possibly a staff flag or note |
+| Field | Form item | What the applicant is asked | Limit | Could inform |
+|---|---|---|---|---|
+| `wmkf_summaryscientificquestion` | Scientific Question | The motivating question, accessible to a scientist outside the field; no methods or frameworks | 300 characters | Flag: unclear basic science question |
+| `wmkf_summarypotentialimpact` | Potential Impact | If the question is answered, what changes? Two distinct downstream consequences | 600 characters each | Flag: limited impact; Rationale |
+| `wmkf_summaryrisks` | Risks | Potential risks to success (mitigation goes in the narrative) | 300 characters | Flag: feasibility |
+| `wmkf_summaryenablingadvances` | Enabling Advances | Novel advances that make the research possible or timely | 300 characters | Rationale |
+| `wmkf_summarynewarea` | New Area | If new for the team, how it differs from the team's prior work | 600 characters | Rationale |
+| `wmkf_summarypeergroups` | Peer Groups | 2–4 peer groups, what they do and how this differs | 300 characters each | Keywords; flag: overlap with existing funding |
+| `wmkf_summarypriorsupport` | Prior Support | If preliminary data are included, all prior funding used to generate them | 600 characters | Flags: overlap with existing funding or a recent Keck award |
+| `wmkf_summaryaiuse` | AI Use | How generative AI was used in preparing the proposal | 300 characters | **Nothing.** The instructions say applications will not be evaluated on this answer |
+| `wmkf_pipublications` | Publications (Project Info) | Up to 5 team publications most relevant to the project, with DOI and one sentence on how each relates to and differs from it | 300 characters each | Personnel; flag: limited impact or incremental |
+| `wmkf_iacucanimalmodels` | Animal Models (Project Info) | Whether the project uses animal models requiring IACUC approval, and which | — | Staff note; not a flag in the workbook |
 
 The "could inform" column is a suggestion, not a decision. These are the applicant's
 own claims, so prompts should weigh them against the proposal rather than repeat them.
-`wmkf_pipublications` (PI Publications) and `wmkf_iacucanimalmodels` (IACUC Animal
-Models) were added at the same time; their purpose is not yet confirmed.
+
+Other facts from the instructions that matter for the prompts:
+- **Key personnel** are the PI and co-PIs only (institutional PI status), each with a
+  project role of up to 150 characters. Collaborators who are not key personnel appear
+  only in the narrative and the optional **Collaboration Letters** PDF.
+- **Project Narrative**: six pages, with three required sections in this order: State
+  of the Field and the Gap; Approach; Feasibility.
+- **Project Abstract** (`wmkf_abstract`): written for a general audience and published
+  on the Foundation website if funded.
+- The program description (page 1) lists what the Foundation does not fund
+  (disease-specific, translational or applied work; optimization of existing
+  techniques; incremental extensions) and says overlap with recently funded Keck
+  projects is held to a higher standard. These match the workbook's flags 1, 2 and 6.
 
 ## Decisions needed before adding fields
 
