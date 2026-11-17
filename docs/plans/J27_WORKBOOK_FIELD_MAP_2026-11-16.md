@@ -45,7 +45,7 @@ Unless noted, fields are on the Request (`akoya_request`).
 | H | Short title | `wmkf_wmkfprojectdescription` | ✅ |
 | I | Executive Summary (at most 200 words) | `wmkf_layabstract`, created by the apps Nov 9, 2026; staff editor live | ✅ |
 | J | Methodology, page 1 (2 sentences to 100 words) | `wmkf_ai_methodologysummary`, created by Connor Nov 16, 2026 | ✅ |
-| K | Personnel (length scales with team size) | `wmkf_ai_teaminfo`, created by the apps May 2026; repurposed for readable text (same team information, new format) | ⚠️ New description "Summary of key personnel and expertise" is in the repo; still to be changed in Dynamics |
+| K | Personnel (length scales with team size) | `wmkf_ai_teaminfo`, created by the apps May 2026; repurposed for readable text (same team information, new format) | ✅ Description changed to "Summary of key personnel and expertise" in the repo and, per Connor, in Dynamics |
 | L | Rationale (Intake), kept as a version | `wmkf_ai_fitrationale` exists, but is paired with a fit rating from the older Phase I tool | ⚠️ See decision 1 |
 | M | Field keywords, from a list | `wmkf_ai_keywords` (JSON list), created by the apps May 2026 | ✅ Controlled list still a placeholder |
 | N | Methods keywords, from a list | `wmkf_ai_methodologies` (JSON list), created by the apps May 2026 | ✅ Controlled list still a placeholder |
@@ -127,7 +127,7 @@ Unless noted, fields are on the Request (`akoya_request`).
 ## Summary of what is missing
 
 **Intake (needed for the prompts now):**
-- Personnel: no new field; repurpose `wmkf_ai_teaminfo`; change its Dynamics description
+- Personnel: no new field; `wmkf_ai_teaminfo` repurposed (description changed)
 - Open questions
 - Rationale (Intake), once decision 1 is made
 - The flag structure, once decision 2 is made
@@ -143,8 +143,9 @@ Unless noted, fields are on the Request (`akoya_request`).
 
 ## Not yet checked
 
-- Whether the existing fields above already hold data, or are written by Connor's
-  Power Automate flows.
+- Whether the other existing fields above already hold data. (Per Connor, 2026-11-17:
+  the four May `wmkf_ai_` fields hold no data and no flow writes them yet; the new
+  intake flows will.)
 - The *(likely)* matches, which need confirmation from the people who use them.
 - The controlled keyword lists and the flag rubric, which the workbook marks as
   placeholders.

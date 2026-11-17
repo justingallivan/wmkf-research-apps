@@ -60,10 +60,13 @@ From Connor's note `pa-prompt-format-answers-2026-11-17.md` (not in this repo):
 - **First test:** Connor tested the intake prompts on Request 1003372, 2026-11-17.
   Outputs not yet reviewed here.
 
-Still open with Connor: changing the AI Team Info description in Dynamics; whether
-existing requests hold old JSON in `wmkf_ai_teaminfo`, `wmkf_ai_keywords`,
-`wmkf_ai_methodologies` or `wmkf_ai_riskflags`, and whether his flows write them; the
-purpose and source of the Oct 22 `wmkf_summary…` fields; who creates the remaining
+- **AI Team Info description:** Connor changed it in Dynamics to "Summary of key
+  personnel and expertise" (2026-11-17, per Connor; not re-read here).
+- **Existing data:** no requests hold old JSON in `wmkf_ai_teaminfo`,
+  `wmkf_ai_keywords`, `wmkf_ai_methodologies` or `wmkf_ai_riskflags`, and no flow
+  writes them yet; the new intake flows will (per Connor, 2026-11-17).
+
+Still open with Connor: the purpose and source of the Oct 22 `wmkf_summary…` fields; who creates the remaining
 intake fields (Open questions, Rationale, Flags); Production's audit retention setting;
 and whether all three prompts run before `wmkf_readyforreview` with a failed run
 stopping intake.
