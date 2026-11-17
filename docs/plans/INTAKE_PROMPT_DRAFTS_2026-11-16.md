@@ -77,8 +77,10 @@ From Connor's note `pa-prompt-format-answers-2026-11-17.md` (not in this repo):
 
 - **Audit retention:** Production keeps audit history forever (owner, 2026-11-17).
 
-Still open with Connor: whether all three
-prompts run before `wmkf_readyforreview` with a failed run stopping intake; whether the
+- **Intake order:** all three intake prompts run before `wmkf_readyforreview` is set,
+  and a failed run stops intake (owner, 2026-11-17).
+
+Still open with Connor: whether the
 flow passes the Collaboration Letters (attached to the staff version) to the Personnel
 prompt; and the outputs of his test on Request 1003372.
 

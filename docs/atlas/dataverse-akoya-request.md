@@ -98,9 +98,10 @@ Content / abstract:
   Workbench users read; linked lead PD/superuser saves with the original ETag.
   `wmkf_initialassessment` remains outside this editor and separate from the
   governed Initial Assessment document pointer below.
-  Connor's intake contract (reported by Justin 2026-11-16): Summary generation
-  precedes final `wmkf_readyforreview`; any failed run halts intake and notifies
-  check-in staff. No later flow is intended to write Summary. Justin accepts
+  Connor's intake contract (reported by Justin 2026-11-16; extended 2026-11-17 to all
+  intake prompts — `intake.executive-summary`, `intake.methodology`, `intake.personnel`):
+  generation precedes final `wmkf_readyforreview`; any failed run halts intake and
+  notifies check-in staff. No later flow is intended to write Summary. Justin accepts
   exceptional intake reruns overwriting later staff edits/clears; no staff-edit
   marker is required. External flow/form behavior is not independently verified.
   See `docs/plans/REQUEST_NARRATIVES_HANDOFF_2026-11-09.md`.
