@@ -11,12 +11,15 @@ const OUT='/private/tmp/wmkf-summary-live-20261116';
 const BASE='https://wmkfresearchapps-ad6zvrmhv-justin-gallivans-projects.vercel.app';
 const env=JSON.parse(fs.readFileSync(`${OUT}/deployment-env.json`));
 const policy=JSON.parse(env.PROMPT_JOB_SUMMARY_PILOT);
-if(policy.requestId!=='a92c0f69-90ec-4c24-bc19-f26a0bfc18b6'||policy.pilotId!=='ff774f17-bbe0-4bc7-ab7b-9989dd85fc17'||Date.parse(policy.expiresAt)<=Date.now())throw Error('Trial policy mismatch/expired');
-const oidc=req('dotenv').parse(fs.readFileSync(`${OUT}/development.env`)).VERCEL_OIDC_TOKEN;
-const credential=JSON.parse(fs.readFileSync('/private/tmp/wmkf-pa-entra-credential-20261112.json')).secretText;
-if(!oidc||!credential)throw Error('Private credentials unavailable');
 const file=`${OUT}/http-state.json`,mode=process.argv[2]||'status';
-if(!['auth','admit','tick','status','replay','wrong-request'].includes(mode))throw Error('Invalid mode');
+if(!['auth','admit','tick','status','replay','wrong-request','expire'].includes(mode))throw Error('Invalid mode');
+// 'expire' (owner-approved 2026-11-16) only triggers the worker's scoped expired-content
+// deletion for the finished job; it needs no app credential and runs after policy expiry.
+const expireOnly=mode==='expire';
+if(policy.requestId!=='a92c0f69-90ec-4c24-bc19-f26a0bfc18b6'||policy.pilotId!=='ff774f17-bbe0-4bc7-ab7b-9989dd85fc17'||(!expireOnly&&Date.parse(policy.expiresAt)<=Date.now()))throw Error('Trial policy mismatch/expired');
+const oidc=req('dotenv').parse(fs.readFileSync(`${OUT}/development.env`)).VERCEL_OIDC_TOKEN;
+const credential=expireOnly?null:JSON.parse(fs.readFileSync('/private/tmp/wmkf-pa-entra-credential-20261112.json')).secretText;
+if(!oidc||(!expireOnly&&!credential))throw Error('Private credentials unavailable');
 const state=fs.existsSync(file)?JSON.parse(fs.readFileSync(file)):{idempotencyKey:'6b154270-c56d-4475-b062-4f257ba68e5e',ticks:0,events:[]};
 const save=()=>fs.writeFileSync(file,JSON.stringify(state,null,2),{mode:0o600});
 async function call(path,{method='GET',token,body,key,expectedStatus}={}){
@@ -29,6 +32,12 @@ async function call(path,{method='GET',token,body,key,expectedStatus}={}){
  console.log(JSON.stringify(result));return bodyResult;
 }
 (async()=>{
+ if(expireOnly){
+  if(!state.jobId||state.ticks>=8)throw Error('No job or tick bound reached');
+  state.ticks++;save();const result=await call('/api/cron/drain-summary-prompt-jobs',{method:'POST',token:env.CRON_SECRET,expectedStatus:[200]});
+  // A finished job returns its terminal state; after policy expiry the worker reports disabled. Anything else means it advanced work.
+  if(!['succeeded','disabled'].includes(result.stage))throw Error(`Worker requires attention: ${result.stage}`);return;
+ }
  const response=await fetch(`https://login.microsoftonline.com/${policy.tenantId}/oauth2/v2.0/token`,{method:'POST',redirect:'error',signal:AbortSignal.timeout(30000),body:new URLSearchParams({client_id:policy.clientId,client_secret:credential,scope:`api://${policy.audience}/.default`,grant_type:'client_credentials'})});
  if(!response.ok)throw Error(`Entra HTTP ${response.status}`);const token=(await response.json()).access_token;if(!token)throw Error('No app token');
  if(mode==='auth'){
