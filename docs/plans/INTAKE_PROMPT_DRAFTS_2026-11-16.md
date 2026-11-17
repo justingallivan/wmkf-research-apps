@@ -190,5 +190,6 @@ Owner decisions (2026-11-17):
 - **Content:** concrete methods in the accessible voice of the workbook examples
   (23 examples, 48–84 words), without repeating the background.
 
-Packaged as `intake.methodology` in the
-[Admin entries](INTAKE_PROMPT_ADMIN_ENTRIES_2026-11-17.md).
+Published 2026-11-17 as `intake.methodology` v1 (see
+[Admin entries](INTAKE_PROMPT_ADMIN_ENTRIES_2026-11-17.md)).
+Not yet done: a test run on real proposals through Connor's flow.

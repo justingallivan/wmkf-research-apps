@@ -5,7 +5,7 @@ Prepared November 17, 2026. Content agreed with the owner is in
 Connor's Power Automate format answers recorded there.
 
 **Published 2026-11-17** by the owner through Admin → Add prompt (form filled in by
-the agent): `intake.executive-summary` v1 and `intake.personnel` v1. [VERIFIED via
+the agent): `intake.executive-summary` v1, `intake.personnel` v1 and `intake.methodology` v1. [VERIFIED via
 owner-run read-only Production comparison: one current Published v1 row each; title,
 group, usage, model `sonnet`, max tokens 2048, no temperature, system prompt, body
 and output schema identical to the text below; variables none / `team_roster` only.]
@@ -159,7 +159,7 @@ Return only the text, with no heading.
 {"parseMode": "raw", "outputs": [{"name": "methodology", "target": {"kind": "none"}}], "rawOutputRetention": "full"}
 ```
 
-Approved by the owner 2026-11-17; not yet published.
+Published 2026-11-17 and verified with the other two.
 
 ---
 
