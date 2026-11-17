@@ -15,10 +15,14 @@ review process. It is a strong guide, not a final specification.
 - ❌ **Missing**: no field found.
 - *(likely)*: the best available match, not yet confirmed with the people who use it.
 
-"Created by Connor" and "created by the apps" come from a Production metadata
-audit on November 16. Dynamics records the creator of these fields only as SYSTEM.
-Fields made by the apps are defined in this repository and were added through its
-schema files; fields not defined here were most likely added by Connor by hand.
+"Created by Connor" and "created by the apps" for fields added since October 16
+come from a Production metadata audit on November 16. Dynamics records the
+creator of these fields only as SYSTEM. Fields made by the apps are defined in
+this repository and were added through its schema files; fields not defined here
+were most likely added by Connor by hand. The May 2026 `wmkf_ai_` fields (keywords,
+methodologies, risk flags, team info) predate that audit; they are defined in
+`lib/dataverse/schema/wave2-existing/akoya_request-ai-extensions.json` and were
+built on the apps side under Connor's May 6 delegation.
 
 Unless noted, fields are on the Request (`akoya_request`).
 
@@ -41,11 +45,11 @@ Unless noted, fields are on the Request (`akoya_request`).
 | H | Short title | `wmkf_wmkfprojectdescription` | ✅ |
 | I | Executive Summary (at most 200 words) | `wmkf_layabstract`, created by the apps Nov 9, 2026; staff editor live | ✅ |
 | J | Methodology, page 1 (2 sentences to 100 words) | `wmkf_ai_methodologysummary`, created by Connor Nov 16, 2026 | ✅ |
-| K | Personnel (length scales with team size) | Only `wmkf_ai_teaminfo`, which is JSON, not readable text | ❌ Needs a text field |
+| K | Personnel (length scales with team size) | `wmkf_ai_teaminfo`, created by the apps May 2026; repurposed for readable text (same team information, new format) | ⚠️ Update its description, which still says JSON for reviewer matching |
 | L | Rationale (Intake), kept as a version | `wmkf_ai_fitrationale` exists, but is paired with a fit rating from the older Phase I tool | ⚠️ See decision 1 |
-| M | Field keywords, from a list | `wmkf_ai_keywords` (JSON list), created by Connor May 2026 | ✅ Controlled list still a placeholder |
-| N | Methods keywords, from a list | `wmkf_ai_methodologies` (JSON list), created by Connor May 2026 | ✅ Controlled list still a placeholder |
-| O | Flags (Claude, intake) | `wmkf_ai_riskflags` (JSON list), created by Connor May 2026 | ⚠️ See decision 2 |
+| M | Field keywords, from a list | `wmkf_ai_keywords` (JSON list), created by the apps May 2026 | ✅ Controlled list still a placeholder |
+| N | Methods keywords, from a list | `wmkf_ai_methodologies` (JSON list), created by the apps May 2026 | ✅ Controlled list still a placeholder |
+| O | Flags (Claude, intake) | `wmkf_ai_riskflags` (JSON list), created by the apps May 2026 | ⚠️ See decision 2 |
 | P | Open questions, with page and section, added to by every prompt | none | ❌ Missing |
 | Q | Staff notes / rationale (AI drafted, staff edited) | `wmkf_initialassessmentrationale`, created by the apps Nov 13, 2026 *(likely)* | ⚠️ Confirm it is the same thing |
 
@@ -123,7 +127,7 @@ Unless noted, fields are on the Request (`akoya_request`).
 ## Summary of what is missing
 
 **Intake (needed for the prompts now):**
-- Personnel, as readable text
+- Personnel: no new field; repurpose `wmkf_ai_teaminfo` and update its description
 - Open questions
 - Rationale (Intake), once decision 1 is made
 - The flag structure, once decision 2 is made
