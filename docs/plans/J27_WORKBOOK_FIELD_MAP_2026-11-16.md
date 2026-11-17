@@ -128,7 +128,10 @@ own claims, so prompts should weigh them against the proposal rather than repeat
 Other facts from the instructions that matter for the prompts:
 - **Key personnel** are the PI and co-PIs only (institutional PI status), each with a
   project role of up to 150 characters. Collaborators who are not key personnel appear
-  only in the narrative and the optional **Collaboration Letters** PDF.
+  only in the narrative and the optional **Collaboration Letters** PDF. When present,
+  the letters are attached to the staff version of the application (owner, November 17).
+  Connor's list of documents passed to prompts does not include them, so the Personnel
+  prompt finds collaborators in the narrative unless the flow also passes the letters.
 - **Project Narrative**: six pages, with three required sections in this order: State
   of the Field and the Gap; Approach; Feasibility.
 - **Project Abstract** (`wmkf_abstract`): written for a general audience and published
