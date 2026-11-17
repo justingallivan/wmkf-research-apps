@@ -75,7 +75,9 @@ From Connor's note `pa-prompt-format-answers-2026-11-17.md` (not in this repo):
   and any others), as he did `wmkf_ai_methodologysummary` (owner, 2026-11-17). The
   apps side does not write schema files for them.
 
-Still open with Connor: Production's audit retention setting; whether all three
+- **Audit retention:** Production keeps audit history forever (owner, 2026-11-17).
+
+Still open with Connor: whether all three
 prompts run before `wmkf_readyforreview` with a failed run stopping intake; whether the
 flow passes the Collaboration Letters (attached to the staff version) to the Personnel
 prompt; and the outputs of his test on Request 1003372.

@@ -149,8 +149,8 @@ Other facts from the instructions that matter for the prompts:
    by the Chairs, or only look them up occasionally? Options:
    - one Rationale field plus a Rationale stage field, overwritten at each stage,
      with Dynamics audit history keeping earlier versions. Least work, but earlier
-     versions are hard to show in the apps, views or flows, and depend on the audit
-     retention setting (not yet checked in Production);
+     versions are hard to show in the apps, views or flows. Production keeps audit
+     history forever (owner, November 17), so earlier versions are not lost;
    - four separate text fields on the Request, each version always readable; or
    - a separate table with one row per version, keeping full history.
 
