@@ -29,16 +29,16 @@ example prompt from Connor; response pending. Preserve existing work and receipt
 ### Next items
 
 - **Done (Session 680, 2026-11-17):** Connor's example (`pa.format-example`) and his
-  format answers were reviewed. `intake.executive-summary` v1 and `intake.personnel` v1
-  were published through Admin and verified against the agreed text. See
-  `docs/plans/INTAKE_PROMPT_ADMIN_ENTRIES_2026-11-17.md`, the drafts doc and
+  format answers were reviewed. `intake.executive-summary`, `intake.personnel` and
+  `intake.methodology` v1 were published through Admin and verified against the agreed
+  text. See `docs/plans/INTAKE_PROMPT_ADMIN_ENTRIES_2026-11-17.md`, the drafts doc and
   `docs/plans/J27_WORKBOOK_FIELD_MAP_2026-11-16.md`.
-- **Next prompts:** Methodology (page 1) draft awaits owner review (destination
-  `wmkf_ai_methodologysummary`); then Rationale, Flags, Keywords and Open questions,
-  which wait on Beth's answers and the field decisions in the field map. Connor still
-  to change the AI Team Info description in Dynamics.
-- **Owner decisions needed:** Methodology length; missing prompt content, controlled
-  lists/rubrics, unassigned destinations and versioned storage. See handoff.
+- **Next prompts:** Rationale, Flags, Keywords and Open questions, which wait on Beth's
+  answers and the field decisions in the field map. Connor still to change the AI Team
+  Info description in Dynamics. First test run of the three prompts through Connor's flow.
+- **Owner decisions needed:** missing prompt content, controlled lists/rubrics,
+  unassigned destinations and versioned storage (Methodology length settled: 2
+  sentences to 100 words). See the field map.
 - **Parked:** backend adoption/scheduling/rollout; no new AI calls or prompt
   publication authorized by closeout. No new prompt drafts created during stop.
 - **Approved cleanup (Session 680):** batch 1 ran Nov 17 (200, `succeeded`).
