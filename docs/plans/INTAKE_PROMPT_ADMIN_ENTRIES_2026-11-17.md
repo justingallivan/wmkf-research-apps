@@ -20,9 +20,8 @@ keep them. So the entries below are **new prompts** created with Add prompt:
 - `intake.executive-summary` has no placeholders, so it has no variables at all.
 - `intake.personnel` has one placeholder, `{{team_roster}}`. Add prompt will declare it
   as `{"name": "team_roster", "source": {"kind": "override"}, "required": true}`.
-  Connor suggested also marking it untrusted (`"untrusted": true`,
-  `"dataClass": "crm_record_text"`, `"maxChars": 5000`) because the roster is
-  applicant-entered. Admin cannot set that; see the open decision at the end.
+  That plain declaration is what is wanted: Connor screens the roster another way,
+  so it is not marked untrusted (decided 2026-11-17).
 
 No application on `main` reads `proposal.executive-summary` or any `intake.*` name
 [VERIFIED via repository search, 2026-11-17]; only the parked backend branch uses the
@@ -119,13 +118,12 @@ The roster arrives one line per person in form order, for example
 
 ---
 
-## Open decisions before publishing
+## Decisions (owner with Connor, 2026-11-17)
 
-1. **Names.** New `intake.*` prompts (above), leaving the parked `proposal.*` rows
-   untouched; or new versions of the `proposal.*` rows, which needs the variables JSON
-   replaced outside Admin.
-2. **Marking the roster untrusted.** Publish `intake.personnel` through Admin with the
-   plain declaration, then have the variables JSON updated outside Admin (Connor's
-   tool, or a developer script); or accept the plain declaration for now.
-3. **Max output tokens.** 2048 leaves room for thinking; Connor's example used 1024.
-   Adjust if Connor prefers.
+1. **Names:** new prompts `intake.executive-summary` and `intake.personnel`; the
+   parked `proposal.*` rows stay untouched.
+2. **Roster input is trusted:** keep Admin's plain declaration of `{{team_roster}}`;
+   Connor screens the roster another way.
+3. **Max output tokens:** 2048 for both.
+
+Ready to publish with **Add prompt**. Neither runs until Connor's flow calls it by name.
