@@ -124,6 +124,45 @@ The roster arrives one line per person in form order, for example
 
 ---
 
+## 3. Methodology (page 1)
+
+| Admin field | Value |
+|---|---|
+| Name | `intake.methodology` |
+| Title | Methodology (intake) |
+| Description | Two-to-four-sentence summary of the proposed methods, written at intake from the attached application documents. |
+| Group | Pre-flight |
+| Usage | Power Automate flow |
+| Used by | Power Automate intake flow → Request AI Methodology Summary (`wmkf_ai_methodologysummary`) |
+| Model | `sonnet` tier |
+| Max output tokens | 2048 |
+
+**System prompt:** the same text as the Executive Summary above.
+
+**Prompt body:**
+
+```text
+Using the attached application documents, describe the proposal's methodology in 2 to 4 sentences and no more than 100 words, aiming for 55–80.
+
+Say what the team will build, measure or do, the key methods or systems, and how the results will answer the research question. Name specific techniques, and the first time a specialist term appears, explain it briefly in plain words.
+
+Do not repeat the background or the research question; the Executive Summary covers those.
+
+Refer to the investigators only as "the team". Do not include names, institutions or biographical details. Describe only what the proposal states, and present proposed work as proposed.
+
+Return only the text, with no heading.
+```
+
+**Output schema:**
+
+```json
+{"parseMode": "raw", "outputs": [{"name": "methodology", "target": {"kind": "none"}}], "rawOutputRetention": "full"}
+```
+
+Approved by the owner 2026-11-17; not yet published.
+
+---
+
 ## Decisions (owner with Connor, 2026-11-17)
 
 1. **Names:** new prompts `intake.executive-summary` and `intake.personnel`; the

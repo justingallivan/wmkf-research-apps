@@ -166,3 +166,29 @@ Owner decisions (2026-11-17, with Connor present):
 
 Published 2026-11-17 as a new prompt (see [Admin entries](INTAKE_PROMPT_ADMIN_ENTRIES_2026-11-17.md)).
 Not yet done: a test run on real proposals through Connor's flow.
+
+## Methodology (page 1) — agreed 2026-11-17
+
+Destination: `akoya_request.wmkf_ai_methodologysummary` (created by Connor
+2026-11-16). Workbook column J: "Claude P3: 2 sentences to 100 words"; overwrite; all
+staff and Chairs. The workbook's separate Methodology (body), column AB, 225–275 words,
+is a First Cut output and is not drafted here.
+
+> Using the attached application documents, describe the proposal's methodology in 2 to 4 sentences and no more than 100 words, aiming for 55–80.
+>
+> Say what the team will build, measure or do, the key methods or systems, and how the results will answer the research question. Name specific techniques, and the first time a specialist term appears, explain it briefly in plain words.
+>
+> Do not repeat the background or the research question; the Executive Summary covers those.
+>
+> Refer to the investigators only as "the team". Do not include names, institutions or biographical details. Describe only what the proposal states, and present proposed work as proposed.
+>
+> Return only the text, with no heading.
+
+Owner decisions (2026-11-17):
+- **Length:** the workbook's 2 sentences to 100 words, replacing the 300–350 words of
+  the published `proposal.methodology` v2, which matched the later body version.
+- **Content:** concrete methods in the accessible voice of the workbook examples
+  (23 examples, 48–84 words), without repeating the background.
+
+Packaged as `intake.methodology` in the
+[Admin entries](INTAKE_PROMPT_ADMIN_ENTRIES_2026-11-17.md).
