@@ -303,7 +303,7 @@ Both expand to real child entities post-pilot. Narrowing the 2026-05-06 set keep
 | `wmkf_ai_keywords` | Memo (JSON array) |
 | `wmkf_ai_methodologies` | Memo (JSON array) |
 | `wmkf_ai_riskflags` | Memo (JSON array) |
-| `wmkf_ai_teaminfo` | Memo (JSON) |
+| `wmkf_ai_teaminfo` | Memo (originally JSON; repurposed 2026-11-17 as readable text: "Summary of key personnel and expertise") |
 | `wmkf_ai_budgetsummary` | Multi-line text |
 | `wmkf_ai_timeline` | Multi-line text |
 

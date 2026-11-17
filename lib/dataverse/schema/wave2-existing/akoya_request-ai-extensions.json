@@ -29,7 +29,7 @@
       "type": "Memo",
       "schemaName": "wmkf_ai_TeamInfo",
       "displayName": "AI Team Info",
-      "description": "JSON object summarizing the proposal team (PI, co-PIs, key personnel, affiliations). Cached so reviewer-matching prompts don't have to re-parse the proposal.",
+      "description": "Summary of key personnel and expertise",
       "maxLength": 8000
     },
     {

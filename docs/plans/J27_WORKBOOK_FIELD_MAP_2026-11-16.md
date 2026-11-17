@@ -45,7 +45,7 @@ Unless noted, fields are on the Request (`akoya_request`).
 | H | Short title | `wmkf_wmkfprojectdescription` | ✅ |
 | I | Executive Summary (at most 200 words) | `wmkf_layabstract`, created by the apps Nov 9, 2026; staff editor live | ✅ |
 | J | Methodology, page 1 (2 sentences to 100 words) | `wmkf_ai_methodologysummary`, created by Connor Nov 16, 2026 | ✅ |
-| K | Personnel (length scales with team size) | `wmkf_ai_teaminfo`, created by the apps May 2026; repurposed for readable text (same team information, new format) | ⚠️ Update its description, which still says JSON for reviewer matching |
+| K | Personnel (length scales with team size) | `wmkf_ai_teaminfo`, created by the apps May 2026; repurposed for readable text (same team information, new format) | ⚠️ New description "Summary of key personnel and expertise" is in the repo; still to be changed in Dynamics |
 | L | Rationale (Intake), kept as a version | `wmkf_ai_fitrationale` exists, but is paired with a fit rating from the older Phase I tool | ⚠️ See decision 1 |
 | M | Field keywords, from a list | `wmkf_ai_keywords` (JSON list), created by the apps May 2026 | ✅ Controlled list still a placeholder |
 | N | Methods keywords, from a list | `wmkf_ai_methodologies` (JSON list), created by the apps May 2026 | ✅ Controlled list still a placeholder |
@@ -127,7 +127,7 @@ Unless noted, fields are on the Request (`akoya_request`).
 ## Summary of what is missing
 
 **Intake (needed for the prompts now):**
-- Personnel: no new field; repurpose `wmkf_ai_teaminfo` and update its description
+- Personnel: no new field; repurpose `wmkf_ai_teaminfo`; change its Dynamics description
 - Open questions
 - Rationale (Intake), once decision 1 is made
 - The flag structure, once decision 2 is made
