@@ -53,8 +53,20 @@ From Connor's note `pa-prompt-format-answers-2026-11-17.md` (not in this repo):
   `dataClass` and `maxChars`. Output targets must be `none`.
 - **Model:** `sonnet` / `opus` / `haiku` map to the 5.5 models; temperature is
   omitted; max tokens include thinking.
-- **Roster:** one line per person, from the personnel table, declared as an untrusted
-  `team_roster` variable (`crm_record_text`, up to 5,000 characters).
+- **Roster:** one line per person, from the personnel table, as the `team_roster`
+  variable. Connor first suggested marking it untrusted; the decision was to keep it
+  trusted, because he screens the roster another way.
+- **Short title:** the flow uses the existing `grantee-title.generate` v2 as it is.
+- **First test:** Connor tested the intake prompts on Request 1003372, 2026-11-17.
+  Outputs not yet reviewed here.
+
+Still open with Connor: changing the AI Team Info description in Dynamics; whether
+existing requests hold old JSON in `wmkf_ai_teaminfo`, `wmkf_ai_keywords`,
+`wmkf_ai_methodologies` or `wmkf_ai_riskflags`, and whether his flows write them; the
+purpose and source of the Oct 22 `wmkf_summary…` fields; who creates the remaining
+intake fields (Open questions, Rationale, Flags); Production's audit retention setting;
+and whether all three prompts run before `wmkf_readyforreview` with a failed run
+stopping intake.
 
 ## Shared instructions (all proposal tasks)
 
