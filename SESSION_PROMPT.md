@@ -30,8 +30,9 @@ example prompt from Connor; response pending. Preserve existing work and receipt
 
 - **Done (Session 680, 2026-11-17):** Connor's example (`pa.format-example`) and his
   format answers were reviewed. `intake.executive-summary`, `intake.personnel` and
-  `intake.methodology` v1 were published through Admin and verified against the agreed
-  text. See `docs/plans/INTAKE_PROMPT_ADMIN_ENTRIES_2026-11-17.md`, the drafts doc and
+  `intake.methodology` were published through Admin and verified; now v2 (8,192 max
+  tokens after a local trial on 1003517 cut v1 Methodology off). Connor's flow should
+  skip Personnel when there is no PI row. See `docs/plans/INTAKE_PROMPT_ADMIN_ENTRIES_2026-11-17.md`, the drafts doc and
   `docs/plans/J27_WORKBOOK_FIELD_MAP_2026-11-16.md`.
 - **Next prompts:** Rationale, Flags, Keywords and Open questions, which wait on Beth's
   answers and the field decisions in the field map. Connor still to change the AI Team

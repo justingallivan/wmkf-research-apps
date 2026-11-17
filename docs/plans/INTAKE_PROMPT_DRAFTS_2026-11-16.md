@@ -86,6 +86,12 @@ From Connor's note `pa-prompt-format-answers-2026-11-17.md` (not in this repo):
 - **Collaboration Letters:** the flow does not pass them to the Personnel prompt
   (owner, 2026-11-17), so collaborators come from the narrative only.
 
+- **v2 (2026-11-17):** a local trial on test Request 1003517 (no Dynamics writes) cut
+  Methodology off at 2,048 tokens, because Sonnet 5.5 thinks by default. All three are
+  now v2 with 8,192 max tokens; Executive Summary also gains "Do not add risks or
+  limitations." Connor's flow should skip Personnel when there is no PI row. Details in
+  the [Admin entries](INTAKE_PROMPT_ADMIN_ENTRIES_2026-11-17.md).
+
 Next: review the first real-proposal run (which request, from Connor).
 
 ## Shared instructions (all proposal tasks)
@@ -116,7 +122,8 @@ column I: "Claude P2: at most 200 words"; overwrite; all staff and Chairs.
 > 2. Say what is known and what gap or puzzle remains.
 > 3. State the team's central idea or hypothesis and what is new about it.
 > 4. Describe the approach: the key methods or systems and what they will test.
-> 5. End with what the team will test or what success would make possible.
+> 5. End with what the team will test or what success would make possible. Do not
+>    add risks or limitations (added in v2).
 >
 > Refer to the investigators only as "the team". Do not include names,
 > institutions or biographical details. Describe only what the proposal states,

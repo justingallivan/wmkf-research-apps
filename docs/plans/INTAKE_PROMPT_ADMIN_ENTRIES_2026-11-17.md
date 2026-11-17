@@ -8,8 +8,17 @@ Connor's Power Automate format answers recorded there.
 the agent): `intake.executive-summary` v1, `intake.personnel` v1 and `intake.methodology` v1. [VERIFIED via
 owner-run read-only Production comparison: one current Published v1 row each; title,
 group, usage, model `sonnet`, max tokens 2048, no temperature, system prompt, body
-and output schema identical to the text below; variables none / `team_roster` only.]
+and output schema identical to the v1 text; variables none / `team_roster` only.]
 Neither runs until Connor's flow calls it by name.
+
+**v2 (agreed 2026-11-17, after a local trial on test Request 1003517):** max output
+tokens 2048 → 8192 on all three, because Sonnet 5.5 thinks by default and thinking
+counts toward the limit (v1 Methodology was cut off mid-sentence; Executive Summary
+used 1,669 of 2,048). Executive Summary step 5 gains "Do not add risks or
+limitations." The text below is v2. Published 2026-11-17 by the owner through
+Admin → Edit (form filled in by the agent), which keeps the variables. [VERIFIED via
+owner-run read-only Production comparison: two rows each, v2 current and Published,
+max tokens 8192, bodies identical to the text below, variables unchanged.]
 
 ## Why these are new prompts, not new versions
 
@@ -46,7 +55,7 @@ No application on `main` reads `proposal.executive-summary` or any `intake.*` na
 | Usage | Power Automate flow |
 | Used by | Power Automate intake flow → Request Executive Summary (`wmkf_layabstract`) |
 | Model | `sonnet` tier |
-| Max output tokens | 2048 |
+| Max output tokens | 8192 |
 
 **System prompt** (no placeholders, as Connor's flow requires):
 
@@ -66,7 +75,7 @@ Follow this order:
 2. Say what is known and what gap or puzzle remains.
 3. State the team's central idea or hypothesis and what is new about it.
 4. Describe the approach: the key methods or systems and what they will test.
-5. End with what the team will test or what success would make possible.
+5. End with what the team will test or what success would make possible. Do not add risks or limitations.
 
 Refer to the investigators only as "the team". Do not include names, institutions or biographical details. Describe only what the proposal states, and present proposed work as proposed, not as established.
 
@@ -92,7 +101,7 @@ Return only the paragraph, with no heading.
 | Usage | Power Automate flow |
 | Used by | Power Automate intake flow → Request AI Team Info (`wmkf_ai_teaminfo`) |
 | Model | `sonnet` tier |
-| Max output tokens | 2048 |
+| Max output tokens | 8192 |
 
 **System prompt:** the same text as the Executive Summary above.
 
@@ -135,7 +144,7 @@ The roster arrives one line per person in form order, for example
 | Usage | Power Automate flow |
 | Used by | Power Automate intake flow → Request AI Methodology Summary (`wmkf_ai_methodologysummary`) |
 | Model | `sonnet` tier |
-| Max output tokens | 2048 |
+| Max output tokens | 8192 |
 
 **System prompt:** the same text as the Executive Summary above.
 
@@ -169,5 +178,10 @@ Published 2026-11-17 and verified with the other two.
    parked `proposal.*` rows stay untouched.
 2. **Roster input is trusted:** keep Admin's plain declaration of `{{team_roster}}`;
    Connor screens the roster another way.
-3. **Max output tokens:** 2048 for both.
+3. **Max output tokens:** 2048 in v1; 8192 from v2 (owner, 2026-11-17), since
+   thinking counts toward the limit.
+4. **Empty roster:** Connor's flow should not run `intake.personnel` when the
+   personnel table has no PI row; in the trial, an empty roster produced a note
+   asking for the roster, which raw mode would save as the summary (owner chose a
+   flow guard over a prompt change, 2026-11-17).
 
