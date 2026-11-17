@@ -71,10 +71,14 @@ From Connor's note `pa-prompt-format-answers-2026-11-17.md` (not in this repo):
   2026-11-17). Definitions and limits from the application instructions are in the
   field map. AI Use must not inform any evaluation.
 
-Still open with Connor: who creates the remaining
-intake fields (Open questions, Rationale, Flags); Production's audit retention setting;
-and whether all three prompts run before `wmkf_readyforreview` with a failed run
-stopping intake.
+- **Remaining intake fields:** Connor creates them (Open questions, Rationale, Flags
+  and any others), as he did `wmkf_ai_methodologysummary` (owner, 2026-11-17). The
+  apps side does not write schema files for them.
+
+Still open with Connor: Production's audit retention setting; whether all three
+prompts run before `wmkf_readyforreview` with a failed run stopping intake; whether the
+flow passes the Collaboration Letters (attached to the staff version) to the Personnel
+prompt; and the outputs of his test on Request 1003372.
 
 ## Shared instructions (all proposal tasks)
 

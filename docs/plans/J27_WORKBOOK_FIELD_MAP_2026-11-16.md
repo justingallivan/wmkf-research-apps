@@ -166,6 +166,8 @@ Other facts from the instructions that matter for the prompts:
 
 ## Summary of what is missing
 
+Connor creates the missing fields (owner, November 17).
+
 **Intake (needed for the prompts now):**
 - Personnel: no new field; `wmkf_ai_teaminfo` repurposed (description changed)
 - Open questions
