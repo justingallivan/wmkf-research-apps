@@ -36,8 +36,8 @@ The canary now flags Sonnet 5.5, which remains excluded from automatic selection
 Production effective models were not directly re-probed.**
 
 **Fable 5.2 review [VERIFIED via source and Anthropic's Fable 5.2 overview,
-pricing, and migration-guide pages, 2026-11-18]:** On
-`claude/fable-5-2-registry-review`, `claude-fable-5-2` has explicit reviewed
+pricing, and migration-guide pages, 2026-11-18]:** Landed on `main` 2026-11-18
+from `claude/fable-5-2-registry-review`: `claude-fable-5-2` has explicit reviewed
 capability and pricing entries ($8/$40 per million input/output tokens; cache
 reads 0.025× input). Capability fields match Fable 5.1 per Anthropic's
 migration guide. Once deployed, the `fable` tier resolves to 5.2 when the live
