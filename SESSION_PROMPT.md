@@ -1,62 +1,92 @@
-# Session 680 Prompt: Connor prompt delivery — one consolidated resume point
+# Session 681 Prompt: Connor prompt delivery — after Beth's answers
 
-## Session 679 summary — coordinated Codex stop, 2026-11-16
+## Session 680 summary — 2026-11-16 to 11-17
 
-Read [the consolidated handoff](docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md)
-first. It combines **Contracts for PA flows** and **Clarify PA prompt test purpose**.
-The implementation chat led closeout; the discovery chat supplied its read-only
-packet and is idle. Resume this work in one session, not two parallel chats.
-
-**Owner direction:** deliver prompts in Dataverse usable by Connor's existing
-Power Automate flows. Backend integration is stopped/parked. Submit/poll adoption,
-worker scheduling and backend rollout are NOT next steps. Justin has requested an
-example prompt from Connor; response pending. Preserve existing work and receipts.
+**Owner direction (unchanged):** deliver prompts in Dataverse that Connor's existing
+Power Automate intake flows can run. Backend integration stays parked. Intake prompts
+start from Beth's (CSO) J27 Review Workbook, weighed seriously but not canon.
 
 ### Completed
 
-- Executive Summary staff editor deployed from `1037d2dbd`; Production test on
-  1003518 passed and original blank restored. It stays deployed.
-- Separate bounded Sandbox backend trial on 1000389 passed one generation, audit,
-  field publication and replay. Original blank restored; replay did not refill it.
-  Backend remains on `codex/executive-summary-generation-2026-11-16`, with
-  runtime `ac7cac093` / `6d6a7c724`, receipt `8e98afb03`. No runtime promotion.
-- Other chat audited Production prompt rows read-only: Short Title v2, Summary v2,
-  Methodology v2, PD-match v1. The handoff distinguishes published rows from
-  compatibility with Connor's actual flow and preserves the workbook requirements.
-- Stop changes are documentation only. Claim-evidence reports unavailable; no
-  observation invented. Milestone: return to prompt delivery, backend parked.
+1. **Three intake prompts live, now v2.** `intake.executive-summary` →
+   `wmkf_layabstract`, `intake.personnel` (input `team_roster`) → `wmkf_ai_teaminfo`,
+   `intake.methodology` → `wmkf_ai_methodologysummary`. New `intake.*` names, not
+   `proposal.*` versions, because Admin cannot replace the variables JSON. v2: max
+   tokens 2048 → 8192 (Sonnet 5.5 thinks by default; v1 Methodology was cut off in a
+   local trial) and "Do not add risks or limitations." in Executive Summary. Owner
+   published through Admin; owner-run read-only comparison passed all checks.
+   [VERIFIED 2026-11-17] Text and decisions:
+   `docs/plans/INTAKE_PROMPT_ADMIN_ENTRIES_2026-11-17.md`,
+   `docs/plans/INTAKE_PROMPT_DRAFTS_2026-11-16.md`.
+2. **Local trial on test Request 1003517** (owner-approved model calls; no Dynamics
+   writes). v2: Executive Summary 179 words, on target; Methodology 81 words but 5
+   sentences (prompt says 2–4; watch on real proposals); Personnel untested because
+   1003517 has no personnel rows. The clone has only narrative + bibliography.
+   Estimated cost per application for the three prompts: about $0.27 uncached,
+   $0.16 cached; about $0.51 / $0.27 for a full J27 application (estimate).
+3. **Field map** `docs/plans/J27_WORKBOOK_FIELD_MAP_2026-11-16.md`: every workbook
+   column mapped; applicant answer fields and instruction facts; Connor creates the
+   missing fields. `wmkf_ai_teaminfo` repurposed ("Summary of key personnel and
+   expertise", changed in Dynamics by Connor per Connor).
+4. **Connor answers recorded** (drafts doc): flow attaches the documents, no
+   placeholders in system prompts, `override` variables only, all three prompts run
+   before `wmkf_readyforreview` and a failure stops intake, no Collaboration Letters,
+   Production audit retention forever.
+5. **Read-only probe** `scripts/probe-intake-prompt-outputs.cjs --request=<n>` for
+   Connor's first real-proposal run (owner-run).
+6. **Trial cleanup batch 1** ran Nov 17 (`succeeded`), via parked-branch `expire`
+   mode `d86870146`.
 
-### Next items
+### Commits
+`2ee70d500` … `3fe41956a` on `main` (docs, memory, probe); `d86870146` on the parked
+branch `codex/executive-summary-generation-2026-11-16`.
 
-- **Done (Session 680, 2026-11-17):** Connor's example (`pa.format-example`) and his
-  format answers were reviewed. `intake.executive-summary`, `intake.personnel` and
-  `intake.methodology` were published through Admin and verified; now v2 (8,192 max
-  tokens after a local trial on 1003517 cut v1 Methodology off). Connor's flow should
-  skip Personnel when there is no PI row. See `docs/plans/INTAKE_PROMPT_ADMIN_ENTRIES_2026-11-17.md`, the drafts doc and
-  `docs/plans/J27_WORKBOOK_FIELD_MAP_2026-11-16.md`.
-- **Next prompts:** Rationale, Flags, Keywords and Open questions, which wait on Beth's
-  answers and the field decisions in the field map. Connor still to change the AI Team
-  Info description in Dynamics. Connor's 11-17 test flow used no real proposal; review the first real-proposal
-  run with `scripts/probe-intake-prompt-outputs.cjs --request=<number>` (owner-run).
-- **Owner decisions needed:** missing prompt content, controlled lists/rubrics,
-  unassigned destinations and versioned storage (Methodology length settled: 2
-  sentences to 100 words). See the field map.
-- **Parked:** backend adoption/scheduling/rollout; no new AI calls or prompt
-  publication authorized by closeout. No new prompt drafts created during stop.
-- **Approved cleanup (Session 680):** batch 1 ran Nov 17 (200, `succeeded`).
-  Batch 2 is due after Nov 23 18:32 UTC: refresh the Preview OIDC token, then run the
-  parked runner's new `expire` mode once. Exact commands are in the handoff's
-  preservation section. Fixture removal is not approved; receipts stay.
-- **Verify before acting:** relevant current prompt versions/consumers.
-- **Do not reopen without owner decision:** replacing Connor's existing runner,
-  requiring staff-edit flags, or merging the broad backend branch into main.
+## Next Items
 
-### Preservation and other streams
+### Verified Open
 
-Full prior multi-stream handoff is retrievable with
-`git show 57eb7c40f:SESSION_PROMPT.md` (verified at stop). It preserves prior
-constraints, decisions, fixtures and local-only evidence; historical observations
-are not fresh permission or live state. No other workstream resumed here.
+1. **Note to Connor (owner to send):** prompts are v2 (8192 tokens), and the flow
+   should skip `intake.personnel` or stop intake when there is no PI row; an empty
+   roster produces a note that raw mode would save as the summary. Evidence: entries
+   doc decision 4.
+2. **Review Connor's first real-proposal run** with
+   `DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-intake-prompt-outputs.cjs --target=prod --request=<n>`
+   (owner-run). Check Personnel quality and the Methodology sentence count.
+3. **Trial cleanup batch 2** after 2026-11-23 18:31:58 UTC: refresh the Preview OIDC
+   token, then run the parked runner's `expire` mode once; expect `disabled`. Exact
+   commands: `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md` (batch 2).
+   Fixture removal is not approved; receipts stay.
+
+### Owner Decision Needed (owner meeting Beth 2026-11-17)
+
+1. Rationale versions: one field + audit history, four fields, or a table; and
+   whether column Q is the staff-edited Intake Rationale. Field map decision 1.
+2. Flags: JSON per run vs child table; is the flag list final. Field map decision 2.
+3. Keyword controlled lists (Field, Methods), still placeholders.
+4. Open questions: one running list added to by every prompt; page/section required.
+   After answers: draft Rationale, Flags, Keywords and Open questions prompts; Connor
+   creates their fields.
+
+### Parked
+
+1. Backend adoption/scheduling/rollout (parked branch). Re-open only on owner decision.
+
+### Verify Before Acting
+
+1. Current prompt versions/consumers before any new version. The local trial script
+   (`try-intake-prompts.mjs`) and verifier lived in the session scratchpad and are not
+   in Git; recreate if needed.
+
+### Do Not Reopen Without New Decision
+
+1. Replacing Connor's runner, requiring staff-edit flags, or merging the backend
+   branch into main.
+
+## Preservation and other streams
+
+Prior handoffs: `git show b8b2cb7a1:SESSION_PROMPT.md` (Session 679) and
+`git show 57eb7c40f:SESSION_PROMPT.md` (full multi-stream). Historical observations
+are not fresh permission or live state.
 
 | Stream | Owner / resume source | Boundary |
 |---|---|---|
@@ -65,19 +95,16 @@ are not fresh permission or live state. No other workstream resumed here.
 | J27 Factory / reports | Prior handoff Other streams | Preserve worktrees, fixtures, private exports and branches; no cleanup here |
 | Prompt/backend historical trials | Parked Summary branch and its live-trial receipt | Retain code/receipts and exact cleanup scope; no scheduler or production enablement |
 
-Main `.env.local` may target Production; never infer Sandbox isolation from a
-Preview/worktree. Do not touch other streams' dirty files, migrations, fixture
-records, aliases or settings. `/private/tmp` paths are volatile; code travels via
-Git, private credentials and evidence do not.
+Never set `DATAVERSE_ALLOW_PROD_READS` yourself; hand Production reads to the owner.
+Never touch main `.env.local`. The owner clicks publish for prompts. `/private/tmp`
+paths are volatile; code travels via Git, credentials and evidence do not.
 
-### Key files and verification
+## Key Files Reference
 
-- `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md`: sole current prompt resume point.
-- `docs/plans/REQUEST_NARRATIVES_HANDOFF_2026-11-09.md`: deployed staff editor evidence.
-- Parked branch `docs/plans/PA_EXECUTIVE_SUMMARY_LIVE_TRIAL_2026-11-16.md`: bounded
-  backend test, exact pins and retention obligations.
-
-Earlier implementation verification: 853 distinct local tests, scoped gates/build;
-PDF correction 44 focused tests plus types/lint, independent review and hosted build.
-Those are backend evidence, not proof that Connor needs this architecture. Stop
-verification is scoped documentation/secret checks, with no new model or cloud writes.
+| File | Purpose |
+|------|---------|
+| `docs/plans/INTAKE_PROMPT_ADMIN_ENTRIES_2026-11-17.md` | Published v2 prompt text, settings, decisions |
+| `docs/plans/INTAKE_PROMPT_DRAFTS_2026-11-16.md` | Agreed content and Connor's answers |
+| `docs/plans/J27_WORKBOOK_FIELD_MAP_2026-11-16.md` | Workbook → Dynamics fields, open decisions |
+| `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md` | Delivery handoff, cleanup batches |
+| `scripts/probe-intake-prompt-outputs.cjs` | Read-only intake output probe |

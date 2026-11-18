@@ -153,7 +153,7 @@ Not yet done: a test run on real proposals through Connor's flow.
 
 Destination: `akoya_request.wmkf_ai_teaminfo`, repurposed from a JSON object to
 readable text; new description "Summary of key personnel and expertise" (repo
-updated; Dynamics description to be changed by Connor). Workbook column K:
+updated; Dynamics description changed by Connor 2026-11-17, per Connor). Workbook column K:
 "Claude P4: scaled by team size"; overwrite; all staff and Chairs.
 
 Built from the Draft writeup prompt's personnel rules
