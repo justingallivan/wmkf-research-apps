@@ -192,7 +192,7 @@ export default function TestRequestFactoryRunPanel({
           {production ? (
             // Owner, 2026-11-18: a test Request this page finishes creating is prepared for review on its own.
             <p className="text-sm leading-6 text-gray-700">
-              For a J27 or later cycle, the form then prepares the test Request for review, so it appears in the Workbench. That can&apos;t be undone. Leave this page open until it finishes.
+              For a J27 or later cycle, the form then prepares the test Request for review, so it appears in the Workbench. Setting Phase I to Invited may create a draft email and a GoApply tracking row, and marking it ready can&apos;t be undone. Leave this page open until it finishes.
             </p>
           ) : null}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
