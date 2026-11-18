@@ -250,3 +250,36 @@ describe('a paused run reads from the server after a reload (1003518, 2026-11-15
     expect(chipOf('Mark ready for review')).toContain('Not started');
   });
 });
+
+describe('starts on its own when this page just created the test Request (owner, 2026-11-18)', () => {
+  test('runs all three steps without the question and reports the Workbench', async () => {
+    const calls = serve({
+      status: [
+        body(),
+        body({ current: { phase1: INVITED, phase2: null } }),
+        body({ current: PAIR }),
+        body({ current: PAIR, r: readiness({ ready: true, attemptStatus: 'complete' }) }),
+      ],
+      posts: { [STATUS]: [complete], [READINESS]: [{ status: 200, body: { outcome: 'complete', ready: true, written: true } }] },
+    });
+    render(<TestRequestStatusControl run={run} writeBlock="" getScope={scope} autoPrepare />);
+    expect(await screen.findByText('Request 1003517 is ready for review. It now appears in the Workbench.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Yes, prepare it' })).toBeNull();
+    expect(posts(calls)).toEqual(['phase1:Invited', 'phase2:Phase II Pending Committee Review', 'readiness']);
+  });
+
+  test('a run already begun sends nothing on its own and waits for Continue', async () => {
+    const calls = serve({ status: [body({ current: { phase1: INVITED, phase2: null } })] });
+    render(<TestRequestStatusControl run={run} writeBlock="" getScope={scope} autoPrepare />);
+    await screen.findByLabelText('Status field');
+    expect(await screen.findByRole('button', { name: 'Continue' })).toBeTruthy();
+    expect(posts(calls)).toEqual([]);
+  });
+
+  test('a write block keeps it from starting', async () => {
+    const calls = serve({ status: [body()] });
+    render(<TestRequestStatusControl run={run} writeBlock="The form is off." getScope={scope} autoPrepare />);
+    await screen.findByLabelText('Status field');
+    expect(posts(calls)).toEqual([]);
+  });
+});

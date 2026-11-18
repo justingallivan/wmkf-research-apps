@@ -21,7 +21,10 @@ import { buttonProps, focusAndShow } from './test-request-factory-ui';
  * Props: `data` is the status GET (options with the server's own verdicts,
  * current pair, journal, readiness); `reload(scope)` re-reads it and returns the
  * fresh data or null; `openChangeBody(data)` gives the resume body for the
- * journal's open status change (null when none or ambiguous).
+ * journal's open status change (null when none or ambiguous). `autoStart`
+ * (owner, 2026-11-18): this page just created the test Request, so the action
+ * starts on its own, without the question, but only from a clean start; a run
+ * already begun, stopped or finished still waits for Continue.
  */
 const STEP_LABELS = ['Set Phase I to Invited', 'Set Phase II to Phase II Pending Committee Review', 'Mark ready for review'];
 // The one status failure readiness tolerates (readiness-finalizer.js): a 412 that wrote nothing.
@@ -80,7 +83,7 @@ export function preparationState(data) {
 }
 
 export default function TestRequestPrepareForReview({
-  run, data, writeBlock, busy, setBusy, liveScope, reload, openChangeBody,
+  run, data, autoStart = false, writeBlock, busy, setBusy, liveScope, reload, openChangeBody,
 }) {
   const [confirming, setConfirming] = useState(false);
   const [working, setWorking] = useState(-1);
@@ -88,6 +91,7 @@ export default function TestRequestPrepareForReview({
   const [confirmed, setConfirmed] = useState(false);
   const questionRef = useRef(null);
   const stopRef = useRef(null);
+  const autoStartedRef = useRef(false);
 
   useEffect(() => { if (confirming) focusAndShow(questionRef.current); }, [confirming]);
   useEffect(() => { if (stop) focusAndShow(stopRef.current); }, [stop]);
@@ -158,6 +162,15 @@ export default function TestRequestPrepareForReview({
       if (scope.alive()) { setBusy(false); setWorking(-1); }
     }
   }
+
+  useEffect(() => {
+    if (!autoStart || autoStartedRef.current || writeBlock || busy) return;
+    const view = preparationState(data);
+    const clean = !view.blocked && !view.finished && !view.done.some(Boolean) && !view.openChange && !view.readinessResumable;
+    autoStartedRef.current = true;
+    if (clean) prepare();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart, data, writeBlock, busy]);
 
   const reason = (() => {
     if (writeBlock) return writeBlock;

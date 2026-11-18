@@ -392,6 +392,41 @@ describe('advance loop', () => {
     expect(server.count('GET', `${BASE}/${RUN_A}`)).toBeGreaterThanOrEqual(2);
   });
 
+  // Owner, 2026-11-18: a test Request this page just finished creating is prepared for review on its own.
+  const prepareStatus = {
+    status: 200,
+    body: {
+      runId: RUN_A, runStatus: 'ready', current: { phase1: null, phase2: null }, changes: [],
+      options: { phase1: [{ value: 3, label: 'Invited', blocked: null }], phase2: [{ value: 2, label: 'Phase II Pending Committee Review', blocked: null }] },
+      readiness: { applies: true, manifestStored: true, ready: false, attemptStatus: null, requiredPair: { phase1: 3, phase2: 2 } },
+    },
+  };
+  const statusPath = `${BASE}/${RUN_A}/status`;
+
+  test('finishing the run here starts Prepare for review on its own', async () => {
+    const server = await setup();
+    // The last step answers `advanced` with status ready; `ready` alone means it was already finished.
+    server.on('POST', advancePath(), reply('advanced', { status: 'ready', currentStep: 'verify', stepIndex: 6, destinationRequestNumber: '1004000' }));
+    server.on('GET', `${BASE}/${RUN_A}`, runBody(makeRun({ status: 'ready', currentStep: 'verify', stepIndex: 6, destinationRequestNumber: '1004000' })));
+    server.on('GET', statusPath, prepareStatus);
+    server.on('POST', statusPath, { status: 202, body: { outcome: 'in_progress', message: 'Still waiting for background jobs.' } });
+    start();
+    await waitFor(() => expect(server.count('POST', statusPath)).toBe(1));
+    expect(server.bodies('POST', statusPath)[0]).toEqual({ field: 'phase1', optionLabel: 'Invited' });
+    expect(screen.queryByRole('button', { name: 'Yes, prepare it' })).toBeNull();
+  });
+
+  test('opening a run that is already created does not start Prepare for review', async () => {
+    const run = makeRun({ status: 'ready', currentStep: 'verify', stepIndex: 6, destinationRequestNumber: '1004000' });
+    const server = makeServer();
+    server.on('GET', `${BASE}/${RUN_A}`, runBody(run));
+    server.on('GET', statusPath, prepareStatus);
+    await renderSection(server, [run]);
+    await selectRun(run.testLabel);
+    expect(await screen.findByRole('button', { name: 'Prepare for review' })).toBeTruthy();
+    expect(server.count('POST', statusPath)).toBe(0);
+  });
+
   test('needs_attention stops, shows the step and error text, and follows the server diagnosis; the text is kept nowhere', async () => {
     const server = await setup();
     server.on('POST', advancePath(), reply('needs_attention', { step: 'copy_file', status: 'needs_attention', currentStep: 'copy_file', stepIndex: 4, errorMessage: 'Graph said no to file X' }));
@@ -711,6 +746,8 @@ describe('write target and consequence', () => {
       ? `Writes to ${where} Dataverse and SharePoint: creates the test Request in its Grant Cycle, sets its meeting date, makes its document folder and copies its documents.`
       : `The remaining steps write to ${where} Dataverse and SharePoint.`;
     expect(screen.getByText(line)).toBeTruthy();
+    const prepares = screen.queryByText(/the form then prepares the test Request for review/);
+    expect(Boolean(prepares)).toBe(env === 'production');
   });
 
   test('a ready sandbox run says status changes are production only; a ready production run links to the Workbench by its Request id', async () => {

@@ -68,7 +68,7 @@ function Reason({ id, children }) {
  * await below checks it, and the component's own mounted flag, before it
  * touches state.
  */
-export default function TestRequestStatusControl({ run, writeBlock, getScope, initialStuck = null, onStuck }) {
+export default function TestRequestStatusControl({ run, writeBlock, getScope, initialStuck = null, onStuck, autoPrepare = false }) {
   const [load, setLoad] = useState({ state: 'loading', data: null });
   const [fieldKey, setFieldKey] = useState('');
   const [optionValue, setOptionValue] = useState('');
@@ -499,6 +499,7 @@ export default function TestRequestStatusControl({ run, writeBlock, getScope, in
         <TestRequestPrepareForReview
           run={run}
           data={data}
+          autoStart={autoPrepare}
           writeBlock={writeBlock}
           busy={busy}
           setBusy={setBusy}

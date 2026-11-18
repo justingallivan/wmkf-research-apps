@@ -52,6 +52,13 @@ A variable change takes effect only in a new deployment. Details and rotation: `
    allowed only while Phase II is empty). Each step uses the existing status route
    or `POST /api/admin/test-requests/runs/[runId]/readiness`, which runs the same
    checks as the CLI's `--finalize-readiness --confirm` against the stored manifest.
+   [SOURCE, branch `claude/factory-auto-prepare`, 2026-11-18, not yet deployed] When
+   this page has just finished the run (the last step answered `advanced` with
+   status `ready`), Prepare for review starts on its own without the question; the
+   Start/Resume line for a production run says so beforehand. It starts only from a
+   clean state: opening an existing run, or a run already begun or stopped, still
+   waits for the button or **Continue**. Owner, 2026-11-18: Connor does not need
+   unprepared Factory requests to test his intake flows.
    Any answer other than complete stops the flow; **Continue** resumes the same open
    status change or readiness attempt and never sends a second PATCH. After a reload, a step whose change was sent but not confirmed shows **Sent, not confirmed** (a journaled but unsent change shows **Planned, not sent**, which Continue sends), with a sentence saying what Continue will do. A Request whose
    Phase II was set before Phase I was Invited is reported as unpreparable (create a

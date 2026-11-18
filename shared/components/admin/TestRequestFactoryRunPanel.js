@@ -73,7 +73,7 @@ function recheckAdvisory(capturedIso, now = Date.now()) {
  * stale guard.
  */
 export default function TestRequestFactoryRunPanel({
-  view, advancing, stopRequested, note, writeBlock, onAdvance, onStop, recheck, onRecheck, artifacts, onArtifacts, getScope, epoch, initialStuck, onStuck,
+  view, advancing, stopRequested, note, writeBlock, onAdvance, onStop, recheck, onRecheck, artifacts, onArtifacts, getScope, epoch, initialStuck, onStuck, autoPrepare = false,
 }) {
   const { run } = view;
   const headingRef = useRef(null);
@@ -146,7 +146,7 @@ export default function TestRequestFactoryRunPanel({
 
       {run.status === 'ready' && production ? (
         <section aria-label="Phase I and Phase II status" className="space-y-3">
-          <TestRequestStatusControl key={`${run.runId}:${epoch}`} run={run} writeBlock={writeBlock} getScope={getScope} initialStuck={initialStuck} onStuck={onStuck} />
+          <TestRequestStatusControl key={`${run.runId}:${epoch}`} run={run} writeBlock={writeBlock} getScope={getScope} initialStuck={initialStuck} onStuck={onStuck} autoPrepare={autoPrepare} />
         </section>
       ) : null}
 
@@ -189,6 +189,12 @@ export default function TestRequestFactoryRunPanel({
               ? `Writes to ${envName(run)} Dataverse and SharePoint: creates the test Request in its Grant Cycle, sets its meeting date, makes its document folder and copies its documents.`
               : `The remaining steps write to ${envName(run)} Dataverse and SharePoint.`}
           </p>
+          {production ? (
+            // Owner, 2026-11-18: a test Request this page finishes creating is prepared for review on its own.
+            <p className="text-sm leading-6 text-gray-700">
+              For a J27 or later cycle, the form then prepares the test Request for review, so it appears in the Workbench. That can&apos;t be undone. Leave this page open until it finishes.
+            </p>
+          ) : null}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <button type="button" disabled={advanceDisabled} aria-describedby={writeBlock ? 'factory-advance-reason' : (!diagnosisAllowsExistingAdvance ? 'factory-run-diagnosis' : undefined)} onClick={onAdvance} {...buttonProps(!attention)}>
               {buttonText}

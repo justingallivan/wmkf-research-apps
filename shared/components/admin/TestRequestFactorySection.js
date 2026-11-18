@@ -63,6 +63,9 @@ export default function TestRequestFactorySection({ onTarget }) {
   const [recheck, setRecheck] = useState(IDLE_RECHECK);
   const [artifacts, setArtifacts] = useState(IDLE_ARTIFACTS);
   const [epoch, setEpoch] = useState(0);
+  // The run whose test Request this page just finished creating: its Prepare for review starts on its own
+  // (owner, 2026-11-18). Selecting or reopening a run never sets it, so an older run is never prepared unasked.
+  const [autoPrepareRunId, setAutoPrepareRunId] = useState(null);
   const scopeRef = useRef(null);
   const stopRef = useRef(false);
   // Bumped by every selection change (selectRun, abortActive); a late Confirm may select its run only if it is unchanged.
@@ -137,6 +140,7 @@ export default function TestRequestFactorySection({ onTarget }) {
     setNote(null);
     setRecheck(IDLE_RECHECK);
     setArtifacts(IDLE_ARTIFACTS);
+    setAutoPrepareRunId(null);
     setEpoch((value) => value + 1);
   };
 
@@ -207,6 +211,7 @@ export default function TestRequestFactorySection({ onTarget }) {
       if (!isLive(scope)) return;
       mergeRun(runId, reply);
       if (reply.outcome !== 'advanced' || reply.status === 'ready') {
+        if (reply.status === 'ready' && reply.outcome === 'advanced') setAutoPrepareRunId(runId);
         finalNote = noteFor(reply.status === 'ready' && reply.outcome === 'advanced' ? { ...reply, outcome: 'ready' } : reply);
         break;
       }
@@ -290,6 +295,7 @@ export default function TestRequestFactorySection({ onTarget }) {
           initialStuck={stuckMapRef.current.get(view.run.runId) || null}
           onStuck={(record) => { if (record) stuckMapRef.current.set(view.run.runId, record); else stuckMapRef.current.delete(view.run.runId); }}
           epoch={epoch}
+          autoPrepare={autoPrepareRunId === view.run.runId}
         />
       ) : null}
 
