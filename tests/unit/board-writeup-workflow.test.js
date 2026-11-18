@@ -316,3 +316,11 @@ test('active cycle save requires President and succeeds after assignment', async
   president = true;
   await expect(saveCycle(actor, value, 'etag', '', deps)).resolves.toMatchObject({ value });
 });
+
+test('an already-sent notice returns before the calendar read, so a calendar failure cannot alert on it', async () => {
+  const { state, d } = fixture();
+  state.emails['president:batch'] = { kind: 'president', acceptedAt: '2026-10-31T03:01:03Z' };
+  const cycleDates = jest.fn(async () => { throw Object.assign(new Error('calendar down'), { code: 'board_calendar_unavailable' }); });
+  await expect(deliverNotice('D26', { key: 'president:batch', kind: 'president' }, { ...d, cycleDates })).resolves.toBeUndefined();
+  expect(cycleDates).not.toHaveBeenCalled();
+});
