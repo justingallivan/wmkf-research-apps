@@ -1,0 +1,302 @@
+{
+  "observedAt": "2026-11-18T22:50:18.684Z",
+  "postgres": {
+    "host": "ep-frosty-credit-afovxswa-pooler.c-2.us-west-2.aws.neon.tech",
+    "identity": [
+      {
+        "database": "neondb",
+        "schema": "public",
+        "read_only": "on",
+        "version": "PostgreSQL 17.12 (14c6cec) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit"
+      }
+    ],
+    "tables": [
+      {
+        "table_name": "consultant_feedback"
+      },
+      {
+        "table_name": "expertise_matches"
+      },
+      {
+        "table_name": "expertise_roster"
+      }
+    ],
+    "roster": [
+      {
+        "role_type": "Board",
+        "is_active": true,
+        "rows": 9,
+        "linked_contacts": 4
+      },
+      {
+        "role_type": "Consultant",
+        "is_active": true,
+        "rows": 26,
+        "linked_contacts": 6
+      },
+      {
+        "role_type": "Research Program Staff",
+        "is_active": true,
+        "rows": 4,
+        "linked_contacts": 0
+      }
+    ],
+    "rosterDates": [
+      {
+        "rows": 39,
+        "first_created": "2026-04-10T03:11:28.197Z",
+        "last_created": "2026-09-15T12:43:31.694Z",
+        "last_updated": "2026-09-15T12:43:31.694Z",
+        "highest_id": 39
+      }
+    ],
+    "duplicateLinks": [
+      {
+        "duplicate_contact_groups": 0
+      }
+    ],
+    "duplicateNames": [
+      {
+        "duplicate_name_groups": 0
+      }
+    ],
+    "rosterTriggers": [],
+    "feedback": [
+      {
+        "total": 7,
+        "roster_references": 7,
+        "distinct_roster_ids": 5,
+        "excluded_placeholder_references": 1
+      }
+    ],
+    "feedbackForeignKeys": [
+      {
+        "conname": "consultant_feedback_consultant_roster_id_fkey",
+        "definition": "FOREIGN KEY (consultant_roster_id) REFERENCES expertise_roster(id)"
+      },
+      {
+        "conname": "consultant_feedback_created_by_fkey",
+        "definition": "FOREIGN KEY (created_by) REFERENCES user_profiles(id)"
+      },
+      {
+        "conname": "consultant_feedback_updated_by_fkey",
+        "definition": "FOREIGN KEY (updated_by) REFERENCES user_profiles(id)"
+      }
+    ],
+    "matchHistory": [
+      {
+        "rows": 344,
+        "latest": "2026-04-10T21:03:55.276Z"
+      }
+    ],
+    "migrations": [
+      {
+        "name": "004_expertise_finder.sql",
+        "applied_at": "2026-05-25T17:29:31.812Z"
+      },
+      {
+        "name": "020_reviewer_find_roster.sql",
+        "applied_at": "2026-06-06T00:12:33.584Z"
+      },
+      {
+        "name": "023_reviewer_find_roster_coi_dropped.sql",
+        "applied_at": "2026-07-03T18:48:43.150Z"
+      },
+      {
+        "name": "025_reviewer_find_roster_candidate_key.sql",
+        "applied_at": "2026-07-19T10:22:54.332Z"
+      },
+      {
+        "name": "027_reviewer_find_roster_ineligible.sql",
+        "applied_at": "2026-07-20T08:42:10.709Z"
+      },
+      {
+        "name": "029_reviewer_find_roster_blocked.sql",
+        "applied_at": "2026-07-30T04:01:24.391Z"
+      },
+      {
+        "name": "050_expertise_roster_contact_link.sql",
+        "applied_at": "2026-09-15T05:32:13.169Z"
+      }
+    ]
+  },
+  "dataverse": {
+    "target": "sandbox",
+    "host": "orgd9e66399.crm.dynamics.com",
+    "entities": [
+      {
+        "logicalName": "wmkf_expertiseprofile",
+        "entitySet": "wmkf_expertiseprofiles",
+        "auditing": true,
+        "optimisticConcurrency": true
+      }
+    ],
+    "keys": [
+      {
+        "name": "wmkf_expertiseprofile_creationkey",
+        "fields": [
+          "wmkf_creationkey"
+        ],
+        "status": "Active"
+      },
+      {
+        "name": "wmkf_expertiseprofile_contact",
+        "fields": [
+          "wmkf_contactguid"
+        ],
+        "status": "Active"
+      },
+      {
+        "name": "wmkf_expertiseprofile_user",
+        "fields": [
+          "wmkf_staffuser"
+        ],
+        "status": "Active"
+      }
+    ],
+    "attributes": [
+      {
+        "name": "wmkf_affiliation",
+        "type": "String",
+        "auditing": true
+      },
+      {
+        "name": "wmkf_category",
+        "type": "Picklist",
+        "auditing": true
+      },
+      {
+        "name": "wmkf_contactguid",
+        "type": "String",
+        "auditing": true
+      },
+      {
+        "name": "wmkf_creationkey",
+        "type": "String",
+        "auditing": true
+      },
+      {
+        "name": "wmkf_distinctions",
+        "type": "Memo",
+        "auditing": true
+      },
+      {
+        "name": "wmkf_expertise",
+        "type": "Memo",
+        "auditing": true
+      },
+      {
+        "name": "wmkf_expertiseprofileid",
+        "type": "Uniqueidentifier",
+        "auditing": false
+      },
+      {
+        "name": "wmkf_keckaffiliation",
+        "type": "String",
+        "auditing": true
+      },
+      {
+        "name": "wmkf_keckaffiliationdetails",
+        "type": "Memo",
+        "auditing": true
+      },
+      {
+        "name": "wmkf_keywords",
+        "type": "Memo",
+        "auditing": true
+      },
+      {
+        "name": "wmkf_leadpdeligible",
+        "type": "Boolean",
+        "auditing": true
+      },
+      {
+        "name": "wmkf_methodstechniques",
+        "type": "Memo",
+        "auditing": true
+      },
+      {
+        "name": "wmkf_name",
+        "type": "String",
+        "auditing": true
+      },
+      {
+        "name": "wmkf_orcid",
+        "type": "String",
+        "auditing": true
+      },
+      {
+        "name": "wmkf_preferredemail",
+        "type": "String",
+        "auditing": true
+      },
+      {
+        "name": "wmkf_primaryfields",
+        "type": "Memo",
+        "auditing": true
+      },
+      {
+        "name": "wmkf_role",
+        "type": "String",
+        "auditing": true
+      },
+      {
+        "name": "wmkf_staffuser",
+        "type": "Lookup",
+        "auditing": true
+      },
+      {
+        "name": "wmkf_staffusername",
+        "type": "String",
+        "auditing": true
+      },
+      {
+        "name": "wmkf_staffuseryominame",
+        "type": "String",
+        "auditing": true
+      },
+      {
+        "name": "wmkf_subfieldsspecialties",
+        "type": "Memo",
+        "auditing": true
+      }
+    ],
+    "profiles": {
+      "total": 46,
+      "active": 40,
+      "inactive": 6,
+      "importedLegacy": 38,
+      "interactive": 5,
+      "direct": 3,
+      "missingCreationKey": 0,
+      "contactLinks": 5,
+      "userLinks": 4,
+      "leadEligible": 3,
+      "latestModified": "2026-11-11T17:24:58Z"
+    },
+    "sourceComparison": {
+      "sourceRows": 39,
+      "recognizedLegacyRows": 38,
+      "distinctLegacyIds": 38,
+      "sourceIdsNotImported": [
+        35
+      ],
+      "importedIdsAbsentFromSource": [],
+      "textMismatches": [],
+      "legacyInactive": [
+        13
+      ],
+      "legacyLeadEligible": [
+        12,
+        1,
+        14
+      ],
+      "legacyUserLinked": [
+        11,
+        12,
+        1,
+        14
+      ]
+    }
+  }
+}
