@@ -416,6 +416,19 @@ describe('advance loop', () => {
     expect(screen.queryByRole('button', { name: 'Yes, prepare it' })).toBeNull();
   });
 
+  test('Stop pressed during the last step withholds automatic preparation (Codex)', async () => {
+    const server = await setup();
+    const gate = deferred();
+    server.on('POST', advancePath(), async () => { await gate.promise; return reply('advanced', { status: 'ready', currentStep: 'verify', stepIndex: 6, destinationRequestNumber: '1004000' }); });
+    server.on('GET', `${BASE}/${RUN_A}`, runBody(makeRun({ status: 'ready', currentStep: 'verify', stepIndex: 6, destinationRequestNumber: '1004000' })));
+    server.on('GET', statusPath, prepareStatus);
+    start();
+    fireEvent.click(await screen.findByRole('button', { name: 'Stop after this step' }));
+    await act(async () => { gate.resolve(); });
+    expect(await screen.findByRole('button', { name: 'Prepare for review' })).toBeTruthy();
+    expect(server.count('POST', statusPath)).toBe(0);
+  });
+
   test('opening a run that is already created does not start Prepare for review', async () => {
     const run = makeRun({ status: 'ready', currentStep: 'verify', stepIndex: 6, destinationRequestNumber: '1004000' });
     const server = makeServer();

@@ -211,7 +211,8 @@ export default function TestRequestFactorySection({ onTarget }) {
       if (!isLive(scope)) return;
       mergeRun(runId, reply);
       if (reply.outcome !== 'advanced' || reply.status === 'ready') {
-        if (reply.status === 'ready' && reply.outcome === 'advanced') setAutoPrepareRunId(runId);
+        // A Stop pressed during the last step also withholds automatic preparation (Codex); the button stays.
+        if (reply.status === 'ready' && reply.outcome === 'advanced' && !stopRef.current) setAutoPrepareRunId(runId);
         finalNote = noteFor(reply.status === 'ready' && reply.outcome === 'advanced' ? { ...reply, outcome: 'ready' } : reply);
         break;
       }
