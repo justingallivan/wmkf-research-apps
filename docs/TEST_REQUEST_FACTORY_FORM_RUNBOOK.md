@@ -52,7 +52,7 @@ A variable change takes effect only in a new deployment. Details and rotation: `
    allowed only while Phase II is empty). Each step uses the existing status route
    or `POST /api/admin/test-requests/runs/[runId]/readiness`, which runs the same
    checks as the CLI's `--finalize-readiness --confirm` against the stored manifest.
-   [SOURCE, branch `claude/factory-auto-prepare`, 2026-11-18, not yet deployed] When
+   [DEPLOYED 2026-11-18, merged from `claude/factory-auto-prepare`] When
    this page has just finished the run (the last step answered `advanced` with
    status `ready`), Prepare for review starts on its own without the question; the
    Start/Resume line for a production run says so beforehand. It starts only from a
