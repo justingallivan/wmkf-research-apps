@@ -62,7 +62,9 @@ branch `codex/executive-summary-generation-2026-11-16`.
 1. Rationale versions: one field + audit history, four fields, or a table; and
    whether column Q is the staff-edited Intake Rationale. Field map decision 1.
 2. Flags: JSON per run vs child table; is the flag list final. Field map decision 2.
-3. Keyword controlled lists (Field, Methods), still placeholders.
+3. Keyword lists (Field, Methods): the authoritative list is the Keywords table
+   `wmkf_programlevel3` (Connor via owner, 2026-11-18), not seeded yet, with columns for
+   grouping keywords for reporting. Open: its columns and seeding.
 4. Open questions: one running list added to by every prompt; page/section required.
    After answers: draft Rationale, Flags, Keywords and Open questions prompts; Connor
    creates their fields.

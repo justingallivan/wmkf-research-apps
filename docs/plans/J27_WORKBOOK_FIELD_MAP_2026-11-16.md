@@ -47,8 +47,8 @@ Unless noted, fields are on the Request (`akoya_request`).
 | J | Methodology, page 1 (2 sentences to 100 words) | `wmkf_ai_methodologysummary`, created by Connor Nov 16, 2026 | ✅ |
 | K | Personnel (length scales with team size) | `wmkf_ai_teaminfo`, created by the apps May 2026; repurposed for readable text (same team information, new format) | ✅ Description changed to "Summary of key personnel and expertise" in the repo and, per Connor, in Dynamics |
 | L | Rationale (Intake), kept as a version | `wmkf_ai_fitrationale` exists, but is paired with a fit rating from the older Phase I tool | ⚠️ See decision 1 |
-| M | Field keywords, from a list | `wmkf_ai_keywords` (JSON list), created by the apps May 2026 | ✅ Controlled list still a placeholder |
-| N | Methods keywords, from a list | `wmkf_ai_methodologies` (JSON list), created by the apps May 2026 | ✅ Controlled list still a placeholder |
+| M | Field keywords, from a list | `wmkf_ai_keywords` (JSON list), created by the apps May 2026 | ✅ List source: the Keywords table `wmkf_programlevel3` (not seeded yet) |
+| N | Methods keywords, from a list | `wmkf_ai_methodologies` (JSON list), created by the apps May 2026 | ✅ List source: the Keywords table `wmkf_programlevel3` (not seeded yet) |
 | O | Flags (Claude, intake) | `wmkf_ai_riskflags` (JSON list), created by the apps May 2026 | ⚠️ See decision 2 |
 | P | Open questions, with page and section, added to by every prompt | none | ❌ Missing |
 | Q | Staff notes / rationale (AI drafted, staff edited) | `wmkf_initialassessmentrationale`, created by the apps Nov 13, 2026 *(likely)* | ⚠️ Confirm it is the same thing |
@@ -189,8 +189,13 @@ Connor creates the missing fields (owner, November 17).
   the four May `wmkf_ai_` fields hold no data and no flow writes them yet; the new
   intake flows will.)
 - The *(likely)* matches, which need confirmation from the people who use them.
-- The controlled keyword lists and the flag rubric, which the workbook marks as
-  placeholders.
+- The flag rubric, which the workbook marks as a placeholder.
+- The keyword lists: per Connor (relayed by the owner, 2026-11-18), the authoritative list is the
+  Keywords table `wmkf_programlevel3`. It is not seeded yet and has columns for
+  categorizing and grouping keywords for reporting. An older table catalog
+  (`docs/archive/DATAVERSE_CUSTOM_TABLES_2026-06-05.md`) lists its display name as
+  "Program Service Area". Its columns and how Field and Methods map onto them are
+  not yet read.
 
 ## Sources
 

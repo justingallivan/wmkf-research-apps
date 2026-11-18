@@ -59,7 +59,7 @@ sheet `1 Review (staff master)`.
 | P | Open questions with page/section references, accumulated across prompts |
 | Q | AI-drafted, human-edited staff notes/rationale |
 
-Keyword lists were placeholders; flag rubric/audience provisional. P/Q need not
+Keyword lists come from the Keywords table `wmkf_programlevel3` (Connor via owner, 2026-11-18; not seeded yet); flag rubric/audience provisional. P/Q need not
 be separate prompts. Compliance and broader expertise matching scope are unresolved.
 
 ## Completed work and preservation boundary
