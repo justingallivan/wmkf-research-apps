@@ -44,7 +44,9 @@ migration guide. Once deployed, the `fable` tier resolves to 5.2 when the live
 model list is available, and the canary's unreviewed-model alert for it should
 auto-resolve on the next run. As with Opus 5.5, `TIER_FALLBACK_IDS` and the
 global discovery cutoff are unchanged, and the review-panel seat stays pinned to
-`claude-fable-5-1`. Not yet merged to `main`.
+`claude-fable-5-1`. The same change sets Fable 5.1's cache-read multiplier to
+0.025× ($0.25/MTok), which the pricing page lists for Fable 5.1; Fable 5 stays at
+the default 0.1× ($1/MTok).
 
 **Historical production baseline (2026-08-23):** tier overrides resolved
 `sonnet` to `claude-sonnet-5` and `opus` to `claude-opus-5`; the source
@@ -251,6 +253,14 @@ deployment configuration and still rely on the pre-deploy registry/pricing check
 9. Only then advance the tier fallback or remove a concrete pin.
 
 ## §5 — "Anthropic shipped a new model" runbook
+
+Start with `node scripts/draft-model-registry-entry.js --model=<id>`. It reads the
+model from `/v1/models/{id}` (or a saved object via `--model-json=<file>`), fills
+the fields the Models API answers, copies the rest from the most recently reviewed
+entry in the same family marked CONFIRM, and prints doc links. It never edits
+source: an exact key in both registries lets a tier resolve to the model, so paste
+only after every CONFIRM is checked. Its `reviewedAt: 'UNREVIEWED'` fails
+`check:model-registry` until replaced with the review date.
 
 Add capability entry → add/confirm pricing prefix → run `check:model-registry` +
 pricing self-test → run §4 replay if reviewer-finder is affected → record reviewed
