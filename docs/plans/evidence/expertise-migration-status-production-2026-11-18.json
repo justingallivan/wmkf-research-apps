@@ -1,0 +1,138 @@
+{
+  "observedAt": "2026-11-18T23:02:38.931Z",
+  "postgres": {
+    "host": "ep-frosty-credit-afovxswa-pooler.c-2.us-west-2.aws.neon.tech",
+    "identity": [
+      {
+        "database": "neondb",
+        "schema": "public",
+        "read_only": "on",
+        "version": "PostgreSQL 17.12 (14c6cec) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit"
+      }
+    ],
+    "tables": [
+      {
+        "table_name": "consultant_feedback"
+      },
+      {
+        "table_name": "expertise_matches"
+      },
+      {
+        "table_name": "expertise_roster"
+      }
+    ],
+    "roster": [
+      {
+        "role_type": "Board",
+        "is_active": true,
+        "rows": 9,
+        "linked_contacts": 4
+      },
+      {
+        "role_type": "Consultant",
+        "is_active": true,
+        "rows": 26,
+        "linked_contacts": 6
+      },
+      {
+        "role_type": "Research Program Staff",
+        "is_active": true,
+        "rows": 4,
+        "linked_contacts": 0
+      }
+    ],
+    "rosterDates": [
+      {
+        "rows": 39,
+        "first_created": "2026-04-10T03:11:28.197Z",
+        "last_created": "2026-09-15T12:43:31.694Z",
+        "last_updated": "2026-09-15T12:43:31.694Z",
+        "highest_id": 39
+      }
+    ],
+    "duplicateLinks": [
+      {
+        "duplicate_contact_groups": 0
+      }
+    ],
+    "duplicateNames": [
+      {
+        "duplicate_name_groups": 0
+      }
+    ],
+    "rosterTriggers": [],
+    "feedback": [
+      {
+        "total": 7,
+        "roster_references": 7,
+        "distinct_roster_ids": 5,
+        "excluded_placeholder_references": 1
+      }
+    ],
+    "feedbackForeignKeys": [
+      {
+        "conname": "consultant_feedback_consultant_roster_id_fkey",
+        "definition": "FOREIGN KEY (consultant_roster_id) REFERENCES expertise_roster(id)"
+      },
+      {
+        "conname": "consultant_feedback_created_by_fkey",
+        "definition": "FOREIGN KEY (created_by) REFERENCES user_profiles(id)"
+      },
+      {
+        "conname": "consultant_feedback_updated_by_fkey",
+        "definition": "FOREIGN KEY (updated_by) REFERENCES user_profiles(id)"
+      }
+    ],
+    "matchHistory": [
+      {
+        "rows": 344,
+        "latest": "2026-04-10T21:03:55.276Z"
+      }
+    ],
+    "migrations": [
+      {
+        "name": "004_expertise_finder.sql",
+        "applied_at": "2026-05-25T17:29:31.812Z"
+      },
+      {
+        "name": "020_reviewer_find_roster.sql",
+        "applied_at": "2026-06-06T00:12:33.584Z"
+      },
+      {
+        "name": "023_reviewer_find_roster_coi_dropped.sql",
+        "applied_at": "2026-07-03T18:48:43.150Z"
+      },
+      {
+        "name": "025_reviewer_find_roster_candidate_key.sql",
+        "applied_at": "2026-07-19T10:22:54.332Z"
+      },
+      {
+        "name": "027_reviewer_find_roster_ineligible.sql",
+        "applied_at": "2026-07-20T08:42:10.709Z"
+      },
+      {
+        "name": "029_reviewer_find_roster_blocked.sql",
+        "applied_at": "2026-07-30T04:01:24.391Z"
+      },
+      {
+        "name": "050_expertise_roster_contact_link.sql",
+        "applied_at": "2026-09-15T05:32:13.169Z"
+      }
+    ]
+  },
+  "dataverse": {
+    "target": "prod",
+    "host": "wmkf.crm.dynamics.com",
+    "entities": [],
+    "absenceChecks": [
+      {
+        "path": "/EntityDefinitions(LogicalName='wmkf_expertiseprofile')?$select=LogicalName,EntitySetName",
+        "httpStatus": 404
+      },
+      {
+        "path": "/wmkf_expertiseprofiles?$top=1&$select=wmkf_creationkey",
+        "httpStatus": 404
+      }
+    ]
+  }
+}

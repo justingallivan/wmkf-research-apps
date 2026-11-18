@@ -64,7 +64,14 @@ async function dataverse(target) {
   };
   const meta = await get("/EntityDefinitions?$select=LogicalName,EntitySetName,IsAuditEnabled,IsOptimisticConcurrencyEnabled&$filter=LogicalName eq 'wmkf_expertiseprofile'");
   base.entities = meta.value.map(r => ({logicalName:r.LogicalName,entitySet:r.EntitySetName,auditing:r.IsAuditEnabled?.Value,optimisticConcurrency:r.IsOptimisticConcurrencyEnabled}));
-  if (!meta.value.length) return base;
+  if (!meta.value.length) {
+    base.absenceChecks = [];
+    for (const path of ["/EntityDefinitions(LogicalName='wmkf_expertiseprofile')?$select=LogicalName,EntitySetName", '/wmkf_expertiseprofiles?$top=1&$select=wmkf_creationkey']) {
+      const response = await client.getWithOptions(path, {}, { timeoutMs: 30000 });
+      base.absenceChecks.push({ path, httpStatus: response.status });
+    }
+    return base;
+  }
   base.keys = (await get("/EntityDefinitions(LogicalName='wmkf_expertiseprofile')/Keys?$select=LogicalName,KeyAttributes,EntityKeyIndexStatus")).value.map(r=>({name:r.LogicalName,fields:r.KeyAttributes,status:r.EntityKeyIndexStatus}));
   base.attributes = (await get("/EntityDefinitions(LogicalName='wmkf_expertiseprofile')/Attributes?$select=LogicalName,AttributeType,IsAuditEnabled")).value.filter(r=>r.LogicalName.startsWith('wmkf_')&&r.AttributeType!=='Virtual').map(r=>({name:r.LogicalName,type:r.AttributeType,auditing:r.IsAuditEnabled?.Value}));
   const rows = [];
