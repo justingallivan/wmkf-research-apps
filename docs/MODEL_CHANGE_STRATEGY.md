@@ -35,6 +35,17 @@ check completed with 15 comparisons and no drift; the pricing alert auto-resolve
 The canary now flags Sonnet 5.5, which remains excluded from automatic selection.
 Production effective models were not directly re-probed.**
 
+**Fable 5.2 review [VERIFIED via source and Anthropic's Fable 5.2 overview,
+pricing, and migration-guide pages, 2026-11-18]:** On
+`claude/fable-5-2-registry-review`, `claude-fable-5-2` has explicit reviewed
+capability and pricing entries ($8/$40 per million input/output tokens; cache
+reads 0.025× input). Capability fields match Fable 5.1 per Anthropic's
+migration guide. Once deployed, the `fable` tier resolves to 5.2 when the live
+model list is available, and the canary's unreviewed-model alert for it should
+auto-resolve on the next run. As with Opus 5.5, `TIER_FALLBACK_IDS` and the
+global discovery cutoff are unchanged, and the review-panel seat stays pinned to
+`claude-fable-5-1`. Not yet merged to `main`.
+
 **Historical production baseline (2026-08-23):** tier overrides resolved
 `sonnet` to `claude-sonnet-5` and `opus` to `claude-opus-5`; the source
 `reviewer-finder` fallback was `claude-opus-4-8`. This dated observation does not
