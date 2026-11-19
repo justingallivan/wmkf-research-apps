@@ -55,6 +55,13 @@ production tooling and target/write interlock when execution is approved.
 
 ### Data and identities
 
+**Contact-link preservation (owner-confirmed November 19):** copy every existing
+`dataverse_contact_id` to the migrated profile's Contact reference, retaining the
+exact same production Contact GUID. Do not rematch by name/email, replace the
+Contact, or clear the link during category changes or deactivation. Unlinked people
+remain unlinked. Report any invalid/conflicting link or linked row proposed for
+exclusion before cutover; resolve it explicitly rather than silently dropping it.
+
 Reuse the earlier `wmkf_expertiseprofile` schema and useful importer/adapter pieces
 after checking them against current main. Carry all existing roster content,
 including inactive people and email behavior; keep audit provenance in the private
@@ -179,6 +186,10 @@ current main; this planning change is documentation only.
 
 Acceptance checks:
 
+- Compare every source roster ID → Contact GUID pair with the imported mapping:
+  no existing link is lost or changed. Confirm the Admin editor shows the same
+  linked Contact and ordinary edits/deactivation/reactivation retain that link.
+  Linked-contact email resolution continues to use that Contact's current email.
 - Admin list/add/edit/deactivate/reactivate persists after reload; inactive people
   remain findable. A non-admin cannot mutate via either new or legacy routes, and an
   admin without Expertise Finder access can edit and use identity pickers.
