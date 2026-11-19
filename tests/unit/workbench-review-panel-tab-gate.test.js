@@ -15,7 +15,7 @@ let mockAccess = { isSuperuser: false, hasAccess: () => false };
 jest.mock('next/router', () => ({ useRouter: () => ({ query: mockQuery, pathname: '/workbench/[requestId]', push: mockPush }) }));
 jest.mock('next-auth/react', () => ({ useSession: () => ({ data: { user: { dynamicsSystemuserId: 'user-1' } } }) }));
 jest.mock('next/link', () => function LinkStub({ href, children, ...props }) { return <a href={typeof href === 'string' ? href : '#'} {...props}>{children}</a>; });
-jest.mock('../../shared/components/Layout', () => ({ __esModule: true, default: ({ children }) => <div>{children}</div>, Card: ({ children }) => <div>{children}</div> }));
+jest.mock('../../shared/components/Layout', () => ({ __esModule: true, default: ({ children }) => <div>{children}</div>, Card: ({ children }) => <div>{children}</div>, Button: ({ children, ...props }) => <button {...props}>{children}</button> }));
 jest.mock('../../shared/components/RequireAppAccess', () => function Stub({ children }) { return children; });
 jest.mock('../../shared/context/AppAccessContext', () => ({ useAppAccess: () => mockAccess }));
 jest.mock('../../shared/context/ProfileContext', () => ({ useProfile: () => ({ preferences: {} }) }));
