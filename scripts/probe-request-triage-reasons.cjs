@@ -76,14 +76,33 @@ async function probe(get, emit = console.log) {
   const records = new Map();
   const { eq } = require('../lib/dataverse/core/odata.js');
   const filter = encodeURIComponent([...EXPECTED.keys()].map(n => eq('akoya_requestnum', n)).join(' or '));
-  for (let i = 0; i < fields.length; i += 30) {
-    const select = [...new Set(['akoya_requestid', 'akoya_requestnum', ...fields.slice(i, i + 30)])].join(',');
-    for (const row of await all(`/akoya_requests?$select=${select}&$filter=${filter}`)) {
+  const rejected = new Set();
+  // Verify the filter and identity columns first: a base-query failure is fatal,
+  // rather than incorrectly attributing it to every optional field.
+  async function readFields(batch) {
+    const select = [...new Set(['akoya_requestid', 'akoya_requestnum', ...batch])].join(',');
+    let rows;
+    try { rows = await all(`/akoya_requests?$select=${select}&$filter=${filter}`); }
+    catch (error) {
+      if (error.status !== 400 || !batch.length) throw error;
+      if (batch.length === 1) {
+        rejected.add(batch[0]);
+        emit(JSON.stringify({ field: batch[0], excluded: true, error: 'HTTP 400 selecting this field' }));
+        return;
+      }
+      const middle = Math.ceil(batch.length / 2);
+      await readFields(batch.slice(0, middle));
+      await readFields(batch.slice(middle));
+      return;
+    }
+    for (const row of rows) {
       if (!EXPECTED.has(String(row.akoya_requestnum))) throw new Error('Unexpected request returned; probe incomplete');
       records.set(row.akoya_requestid, { ...records.get(row.akoya_requestid), ...row });
     }
   }
-  emit(`\n# Coverage: ${EXPECTED.size} workbook requests; ${records.size} rows; ${fields.length} readable text/choice fields`);
+  await readFields([]);
+  for (let i = 0; i < fields.length; i += 30) await readFields(fields.slice(i, i + 30));
+  emit(`\n# Coverage: ${EXPECTED.size} workbook requests; ${records.size} rows; ${fields.length - rejected.size} fields read; ${rejected.size} fields excluded`);
   const unique = new Map();
   for (const [number] of EXPECTED) {
     const rows = [...records.values()].filter(r => String(r.akoya_requestnum) === number);
@@ -91,7 +110,14 @@ async function probe(get, emit = console.log) {
     else unique.set(number, rows[0]);
   }
   for (const field of fields) {
+    if (rejected.has(field)) continue;
     const results = [...unique].map(([number, row]) => ({ request: number, result: classify(row, field, EXPECTED.get(number)) }));
+    if (candidates.has(field) && ['Picklist', 'MultiSelectPicklist'].includes(choiceType(metadata.get(field)))) {
+      emit(JSON.stringify({ field, storedChoices: [...unique].map(([number, row]) => ({
+        request: number, expected: EXPECTED.get(number), value: row[field] ?? null,
+        label: row[`${field}@OData.Community.Display.V1.FormattedValue`] ?? null,
+      })) }));
+    }
     const matches = results.filter(r => ['exact', 'multi-value', 'embedded-text'].includes(r.result));
     if (!candidates.has(field) && !matches.length) continue;
     emit(JSON.stringify({ field, display: labels(metadata.get(field)?.DisplayName), counts: results.reduce((counts, r) => {
@@ -115,16 +141,20 @@ async function main() {
       if (path.includes('/Attributes?')) return { value: [
         { LogicalName: 'wmkf_unknownflag', AttributeType: 'Picklist', IsValidForRead: true },
         { LogicalName: 'wmkf_unrelated', AttributeType: 'Memo', IsValidForRead: true },
+        { LogicalName: 'wmkf_bad', AttributeType: 'String', IsValidForRead: true },
       ] };
       if (path.includes('.PicklistAttributeMetadata')) return { value: [{ LogicalName: 'wmkf_unknownflag',
         OptionSet: { Options: [{ Value: 42, Label: { LocalizedLabels: [{ Label: REASONS[1] }] } }] } }] };
       if (path.includes('/Attributes/')) return { value: [] };
+      if (path.startsWith('/akoya_requests?') && path.includes('wmkf_bad')) throw Object.assign(new Error('Fixture 400'), { status: 400 });
       if (path.startsWith('/akoya_requests?')) return { value: [{ akoya_requestid: 'fixture', akoya_requestnum: '1002808',
         wmkf_unknownflag: 42, 'wmkf_unknownflag@OData.Community.Display.V1.FormattedValue': REASONS[1],
         wmkf_unrelated: 'PRIVATE UNRELATED PROSE' }] };
       throw new Error('Unexpected fixture URL');
     }, line => output.push(line));
     assert(output.some(line => line.includes('"exact":1')));
+    assert(output.some(line => line.includes('"field":"wmkf_bad","excluded":true')));
+    assert(!output.some(line => line.includes('"field":"wmkf_bad"') && line.includes('counts')));
     assert(output.some(line => line.includes('"rows":0')));
     assert(!output.join('\n').includes('PRIVATE UNRELATED PROSE'));
     console.log('PASS: 36 supplied requests; comparison cases, metadata discovery, missing requests and unrelated-prose suppression.');
@@ -144,7 +174,7 @@ async function main() {
     const url = new URL(path.startsWith('/') ? `${resourceUrl.replace(/\/$/, '')}/api/data/v9.2${path}` : path);
     if (!url.href.startsWith(base)) throw new Error('Unexpected pagination target');
     const result = await client.get(url.href, { Prefer: 'odata.include-annotations="OData.Community.Display.V1.FormattedValue"' });
-    if (!result.ok) throw new Error(`HTTP ${result.status}; probe incomplete`);
+    if (!result.ok) throw Object.assign(new Error(`HTTP ${result.status}; probe incomplete`), { status: result.status });
     return result.body;
   });
 }
