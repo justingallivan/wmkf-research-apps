@@ -42,14 +42,16 @@ owner's go.
    makes roster operations return a clear configuration error. It must not throw in
    shared paths such as sign-in or upload staging. Set per Vercel environment. Unset by
    default, so the branch can merge without changing Production.
-2. **Target.** The Dataverse target is the deployment's `DYNAMICS_URL` hostname, and it
-   must be in the tracked target registry. Bindings are looked up by that host. The local
+2. **Target.** The Dataverse target is the deployment's `DYNAMICS_URL` hostname, the same
+   URL `DynamicsService` reads and writes (`read-ops.js`, `write-core.js`). It must be a
+   registered Production host: Dataverse mode refuses the sandbox, because sandbox
+   bindings never go in the shared Postgres. Sandbox work uses local rehearsal. Bindings are looked up by that host. The local
    rehearsal mode stays as it is.
 3. **Cutover marker for legacy writes.** Once `expertise_roster_binding` has a row for
    the Production host (`wmkf.crm.dynamics.com`), the legacy Postgres roster write paths
    refuse with "The roster has moved to Dynamics." Those paths are the API
-   POST/PATCH/DELETE (`roster.js:252,364,398`), `seed-expertise-roster.js:106` and
-   `link-roster-contacts.js:213`. Keying on the Production host rather than "any identity
+   POST/PATCH/DELETE in `pages/api/expertise-finder/roster.js`, `seedRoster` in
+   `scripts/seed-expertise-roster.js`, and `--apply` in `scripts/link-roster-contacts.js`. Keying on the Production host rather than "any identity
    row" means a stray sandbox row can't freeze Production. It is one query, it covers
    Preview deployments sharing the database, and it needs no setting. The marker turns on
    as soon as the import writes bindings, which freezes legacy edits through the cutover
@@ -59,11 +61,14 @@ owner's go.
    `id = nextval('expertise_roster_id_seq')` plus its binding for the current host, and
    reuse the existing row on a unique conflict. Continuing the old `SERIAL` sequence
    avoids any high-water bookkeeping, and the IDs stay valid if the old table is ever
-   restored. Production saves bypass `lifecycle.withRosterWrite` (`roster-service.js:32`);
-   rehearsal keeps it. [VERIFIED: `expertise_roster.id` is `SERIAL` (`scripts/setup-database.js:2023`);
+   restored. Production saves bypass `lifecycle.withRosterWrite` (`withWrite` in
+   `roster-service.js`); rehearsal keeps it. Only app-created profiles (`app_` creation
+   key) allocate a new ID; an unbound `legacy_`, `direct_` or unkeyed profile is refused
+   for reconciliation, so an imported ID's history is never orphaned. The importer's
+   `setval` runs on every import in the same transaction (`import-store.cjs:96-123`). [VERIFIED: `expertise_roster.id` is `SERIAL` (`scripts/setup-database.js:2023`);
    the sequence is `public.expertise_roster_id_seq` in the rehearsal database.] No advisory locks, no pending intents. If the bind fails after the
    Dataverse save, return an error; a retry finds the profile by creation key and binds
-   it (existing replay logic, `roster-service.js:44-50`, which today runs inside the lease).
+   it (existing creation-key replay in `saveRoster`).
 5. **Prompt.** With the switch on, matching uses `expertise-finder.match.roster-v2` and
    its bundled fallback through `resolveToolPrompt` (`match.js:114-115`). The legacy row is
    untouched. Publishing the live row needs `seed-tool-prompts.js:153` to allow the
@@ -139,7 +144,8 @@ row.
    `ensureProfileBinding`; `roster-service.js` uses it through a direct lease in Dataverse
    mode and keeps the lifecycle lease in rehearsal. Tests: `roster-mode`,
    `roster-cutover-marker`, `roster-binding`, `roster-service-dataverse-mode`, plus the
-   route marker cases in `expertise-roster-route`. Full Jest, all gates and the seven pg
+   route marker cases in `expertise-roster-route`; real-SQL bind test
+   `tests/integration/roster-binding.pg.test.js` (disposable schema). Full Jest, all gates and the seven pg
    suites pass. Not deployed; the setting is unset everywhere.
 3. Inert numbered migration for the two bridge tables.
 4. Production-capable cutover script and rollback script (dry-run default).

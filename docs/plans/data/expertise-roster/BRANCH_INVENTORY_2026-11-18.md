@@ -19,6 +19,11 @@ Plan: `docs/plans/EXPERTISE_ROSTER_DATAVERSE_MIGRATION_PLAN_2026-11-09.md` (§6 
 
 ## Behaviour with rehearsal off (merge-dark question)
 
+**Dated, pre-build.** Since the 2026-11-18 build, consumers branch on `rosterMode()` in
+`lib/services/expertise-finder/roster-mode.js` (rehearsal, `EXPERTISE_ROSTER_BACKEND=dataverse`
+for a Production host, or legacy). With both settings unset the behaviour below still
+holds. Line citations below may have shifted.
+
 **[RE-VERIFIED 11-18 by source reading]** Rehearsal requires `EXPERTISE_ROSTER_REHEARSAL=on`
 (`roster-rehearsal-target.cjs`); it refuses Production, any target but sandbox
 `orgd9e66399`, and any Postgres but loopback `127.0.0.1:55439/roster_rehearsal`. Browser
@@ -47,7 +52,7 @@ rehearsal additionally requires local non-Vercel `localhost:3000`.
 |---|---|---|
 | 1 | Schema spec + inventory | **[RECORDED]** spec `wmkf_expertiseprofile.json`; sandbox provisioned with three Active keys, audit, concurrency (**[RE-VERIFIED 11-18 via work-Mac probe]**). Production absent (**[RE-VERIFIED 11-18]**). |
 | 2 | DAL/service + identity bridge + recovery | **[RECORDED]** adapter, roster/consumer services, allocator, write admission, disposable-schema phase commands, rollback reconciliation; Opus READY. `identity-bridge.sql` is unnumbered and outside migrations. |
-| 3 | Editor + dependent read/write paths | **[RECORDED]** roster API, editor, matching, feedback, recipient directory on the rehearsal seam; signed-in browser walkthrough and linked-Contact run. **[RE-VERIFIED 11-18]** No non-rehearsal Dataverse path exists: each consumer branches on `rehearsal.enabled()` and then `assertTarget()` pins sandbox (`roster.js:107-108`, `match.js:57,85`, `batch-match-service.js:68,154`, `consultant-feedback-service.js:51`, `recipient-directory-service.js:30`, `roster-service.js:20`). |
+| 3 | Editor + dependent read/write paths | **[RECORDED]** roster API, editor, matching, feedback, recipient directory on the rehearsal seam; signed-in browser walkthrough and linked-Contact run. **[RE-VERIFIED 11-18, before the build; superseded]** No non-rehearsal Dataverse path existed then; `roster-mode.js` now adds one behind `EXPERTISE_ROSTER_BACKEND=dataverse`: each consumer branches on `rehearsal.enabled()` and then `assertTarget()` pins sandbox (`roster.js:107-108`, `match.js:57,85`, `batch-match-service.js:68,154`, `consultant-feedback-service.js:51`, `recipient-directory-service.js:30`, `roster-service.js:20`). |
 | 4 | Sandbox import, E2E, rollback rehearsal | **[RECORDED]** full import 39 profiles, stable replay; rollback on disposable schemas only. Old-code writer freeze, admission/drain, interrupted-import and refresh scenarios: not recorded as run. |
 | 5 | Production release | Not started. Needs owner go. |
 

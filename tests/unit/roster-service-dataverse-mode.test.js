@@ -31,7 +31,7 @@ test('create binds the confirmed profile for this deployment host without the li
   profiles.create.mockResolvedValue();
   const result = await saveRoster({ name: 'Synthetic Board', role_type: 'Board', is_active: true, mutation_id: MUTATION }, ACTOR, { create: true });
   expect(result.success).toBe(true);
-  expect(ensureProfileBinding).toHaveBeenCalledWith('wmkf.crm.dynamics.com', ID);
+  expect(ensureProfileBinding).toHaveBeenCalledWith('wmkf.crm.dynamics.com', ID, `app_${MUTATION}`);
   expect(lifecycle.withRosterWrite).not.toHaveBeenCalled();
 });
 

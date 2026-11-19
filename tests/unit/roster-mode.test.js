@@ -35,11 +35,8 @@ describe('rosterTarget in dataverse mode', () => {
     expect(rosterTarget(env(`${PROD}/`))).toEqual({ host: 'wmkf.crm.dynamics.com' });
   });
 
-  test('uses the registered sandbox host', () => {
-    expect(rosterTarget(env(SANDBOX))).toEqual({ host: 'orgd9e66399.crm.dynamics.com' });
-  });
-
   test.each([
+    ['sandbox host (sandbox bindings never go in shared Postgres)', SANDBOX],
     ['unregistered host', 'https://other.crm.dynamics.com'],
     ['http', 'http://wmkf.crm.dynamics.com'],
     ['path', `${PROD}/api/data`],
