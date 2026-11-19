@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## November 2026 — Proposal list pages for Chairs and Board members (Session 684)
+
+**Milestone:** Staff can give each Program Chair or Board member a personal no-login page listing every submitted proposal in a cycle, live in Production.
+**Sessions:** Session 684, Claude, 2026-11-18/19.
+**Ship state:**
+- Staff create, highlight and switch off lists at `/proposal-lists`; each list is a frozen snapshot behind one link that lasts until the Board meeting.
+- Proposals are grouped by the discipline branch and group of the intake keyword (`wmkf_programareaserved`); each title opens the staff-version PDF.
+- Owner applied migrations 101 and 102 and set `PROPOSAL_LIST_SCHEMA_READY=on`. First Production run on a test list passed; a PDF opening and the two-level sections are not yet proven live. Email send is not built.
+**Why it matters:** Chairs and Board experts can read the J27 proposals arriving December 7 without a login or a hand-built packet.
+**Pointers:** `docs/plans/J27_PROPOSAL_LIST_EMAILS_PLAN_2026-11-18.md`, `docs/atlas/postgres-proposal-list-links.md`, `lib/services/proposal-lists/`; merges `ec077d3fa`, `dceef11e4`, `cbee390fa`.
+
 ## November 2026 — Initial Assessment saves decision and rationale together (Session 683)
 
 **Milestone:** Initial Assessment now supports scoring-specific details and one explicit Save assessment action in Production.
