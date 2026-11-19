@@ -194,8 +194,11 @@ Connor creates the missing fields (owner, November 17).
   Keywords table `wmkf_programlevel3`. It is not seeded yet and has columns for
   categorizing and grouping keywords for reporting. An older table catalog
   (`docs/archive/DATAVERSE_CUSTOM_TABLES_2026-06-05.md`) lists its display name as
-  "Program Service Area". Its columns and how Field and Methods map onto them are
-  not yet read.
+  "Program Service Area". Per Connor (2026-11-19), `wmkf_KeywordDisciplineBranch` and
+  `wmkf_KeywordDisciplineGroup` define the taxonomy tree and `wmkf_KeywordType`
+  separates Disciplines, Methods and Objects of Study. The columns have not been read
+  from Dataverse, and how a Request points at its keywords is not known; the owner-run
+  `node scripts/probe-keyword-taxonomy.cjs --target=prod` reports both.
 
 ## Sources
 
