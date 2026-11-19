@@ -8,7 +8,7 @@ const endpoint = '/api/workbench/initial-assessment-rationale';
 const read = requestId => requestJson(`${endpoint}?mode=assessment&requestId=${encodeURIComponent(requestId)}`);
 
 // Keyed by request and kept mounted across tabs. Choices only change local drafts.
-export default function AssessmentForm({ requestId, canManage, proposalHref, onSaved }) {
+export default function AssessmentForm({ requestId, canManage, onSaved }) {
   const [record, setRecord] = useState(null);
   const [draft, setDraft] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -93,10 +93,7 @@ export default function AssessmentForm({ requestId, canManage, proposalHref, onS
       {!record.decisionEditable && <p className="text-sm text-gray-600">Scoring is closed.</p>}
       {record.decisionEditable && !canManage && <p className="text-sm text-gray-600">Only the lead Program Director or a superuser can change the scoring decision.</p>}
       {draft.decision === 'yes' && <section aria-label="Staff rationale" className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-lg font-semibold">Staff rationale</h3>
-          {proposalHref && <a href={proposalHref} target="_blank" rel="noopener noreferrer" className="rounded-lg border px-3 py-2 text-sm">View proposal<span className="sr-only"> (opens in a new tab)</span></a>}
-        </div>
+        <h3 className="text-lg font-semibold">Staff rationale</h3>
         <p id="assessment-guidance" className="text-sm text-gray-600">Describe the strengths of this proposal and any questions staff should carry forward.</p>
         <label className="sr-only" htmlFor="assessment-rationale">Staff rationale</label>
         <textarea id="assessment-rationale" aria-describedby="assessment-guidance" className="w-full rounded-lg border p-3"

@@ -269,15 +269,7 @@ test('J27 Initial Assessment hides the Word option and keeps the rationale draft
       }),
     });
   });
-  const link = screen.getByRole('link', { name: /View proposal/ });
-  expect(link.closest('section')).toBe(screen.getByRole('region', { name: 'Staff rationale' }));
-  expect(link).toHaveAttribute('target', '_blank');
-  const url = new URL(link.getAttribute('href'), 'https://example.test');
-  expect(url.pathname).toBe('/api/workbench/download-proposal-document');
-  expect(Object.fromEntries(url.searchParams)).toEqual({
-    requestId: 'request-a', library: 'akoya_request', folder: 'request-a/AI Materials',
-    filename: 'Project-Narrative_1000369.pdf', disposition: 'inline',
-  });
+  expect(screen.queryByRole('link', { name: /View proposal/ })).toBeNull();
   expect(screen.getByText('Proposal and AI intake findings').closest('details')).not.toHaveAttribute('open');
   fireEvent.change(editor, { target: { value: 'Unsaved rationale' } });
 
