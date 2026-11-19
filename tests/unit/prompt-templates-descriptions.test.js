@@ -261,7 +261,9 @@ test('searches workflow and subgroup labels, expands matching groups, and hides 
 
 
 test('all audited prompts appear once across the proposed workflow groups and their subgroups', async () => {
-  serve(Object.keys(ADMIN_PROMPT_CATALOG).map(name => prompt(name, name !== 'phase-i.checkin')));
+  // Branch-only rehearsal prompts stay out of the audited layout (expertise roster migration branch).
+  const unreleasedRehearsalPrompts = ['expertise-finder.match.roster-v2'];
+  serve(Object.keys(ADMIN_PROMPT_CATALOG).filter(name => !unreleasedRehearsalPrompts.includes(name)).map(name => prompt(name, name !== 'phase-i.checkin')));
   render(<PromptTemplatesSection />);
   await screen.findByLabelText('Search prompts');
   for (const label of [

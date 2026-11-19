@@ -82,6 +82,12 @@ index: `docs/plans/data/expertise-roster/README.md`.
   shared Production Postgres. Never modify main `.env.local`.
 - Preserve old roster/match history and placeholder feedback identity (ID 35). No
   deletion, table retirement, fixture cleanup or Production promotion is authorized.
+- `expertise-finder.match.roster-v2` is in the static `shared/config/adminPromptCatalog.js`,
+  so merging this branch would list a sandbox rehearsal prompt in Production Admin. Two
+  tests exclude it via an unreleased-rehearsal list (`tests/unit/admin-prompt-catalog.test.js`,
+  `tests/unit/prompt-templates-descriptions.test.js`); at cutover, add it to
+  `docs/audits/prompt-descriptions-and-callers-2026-10-29.md` (or its successor) and
+  remove the exclusion.
 - Local rehearsal Postgres needs Docker: container/volume
   `wmkf-roster-full-import17-20261110`, loopback port 55439. Docker was not running on
   2026-11-18; tests needing it were not exercised.
