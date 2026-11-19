@@ -18,8 +18,8 @@ related:
 # J27 proposal list emails to Program Chairs and Board experts
 
 Nothing in this plan is built. State labels: `[VERIFIED via X]` was read in source this
-session (2026-11-18), `[REPORTED]` came from a read-only search and was not re-read,
-`[ASSUMED]` is unconfirmed, `[PLANNED]` is this plan's intent.
+session (2026-11-18), `[ASSUMED]` is unconfirmed (including findings from a read-only
+search that were not re-read), `[PLANNED]` is this plan's intent.
 
 ## What the owner asked for (2026-11-18)
 
@@ -32,6 +32,16 @@ Soon after proposals arrive on December 7:
 2. **Expert emails.** Optionally, separate personalized emails to Board members with
    domain expertise, each carrying a shorter list curated to that person. Who the
    experts are and which proposals they match is being worked out on another branch.
+
+## Earlier decisions this builds on
+
+From `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md` [VERIFIED via lines 19, 70]:
+
+- D34 (2026-10-28): Program Chairs and Board members get proposals through magic links;
+  the mechanism was left to design. This plan is that design.
+- Jan 14 "First Cut" packet: about 50 summaries to the Program Committee, personalized
+  by expertise. That is a later, smaller list. This plan covers the full list right
+  after submission; the same list mechanism could carry the First Cut packet later.
 
 ## Owner decisions (2026-11-18)
 
@@ -47,37 +57,43 @@ Soon after proposals arrive on December 7:
 - **Proposal list.** `lib/services/workbench/dashboard-service.js` selects title
   (`akoya_title`), applicant, project leader and program area for cycle rows
   [VERIFIED via `dashboard-service.js:70-87`]. J27 rows appear once Power Automate sets
-  `wmkf_readyforreview` [REPORTED: `shared/config/workbenchVisibility.js:69-107`].
+  `wmkf_readyforreview` [VERIFIED via `shared/config/workbenchVisibility.js:74,106`].
 - **Staff version.** The Workbench resolves it by the name suffix
   `_staff-version_{number}.pdf` at the root of the request's SharePoint folder and
   requires exactly one match [VERIFIED via `lib/services/workbench-proposal-documents.js:211-229`].
   Connor's flow builds the file. It was missing on an earlier test request
-  [REPORTED: alignment log D58].
+  [ASSUMED: from the alignment log, not re-read].
 - **No-login Board links.** The deliberation briefing page gives Board members a
   no-login link. Each link is tied to one request, not to a person; the token digest
   and sealed token are stored in Postgres `deliberation_briefing_links` with one live
   link per request [VERIFIED via `lib/db/migrations/038*.sql`]. It serves the reviewer
-  copy, streamed through the app from SharePoint [REPORTED: `briefing-page-service.js:365-388`].
+  copy, `Reviewer Materials/Proposal_{Request#}.pdf`
+  [VERIFIED via `lib/services/deliberation-briefing/briefing-page-service.js:365-369`],
+  streamed through the app from SharePoint [ASSUMED].
 - **Token helper.** `mintScopedToken({subject, audience, ops, expiresAt})` signs a JWT
   [VERIFIED via `lib/services/external-token.js:125`].
 - **Email.** Sends go out as Dynamics email activities, as the staff member, after an
   exact preview. The reviewer invite send is the model for per-person emails with a
-  per-recipient link minted at send time [REPORTED: `lib/services/review-manager/send-emails-service.js`].
+  per-recipient link minted at send time [ASSUMED: `lib/services/review-manager/send-emails-service.js`
+  not re-read]. Sending as the staff member needs `DYNAMICS_IMPERSONATION_ENABLED` [ASSUMED].
 - **Board roster.** Postgres `expertise_roster`, `role_type` 'Board'
   [VERIFIED via `lib/db/migrations/004_expertise_finder.sql:8`]. Codex is migrating it to
   Dataverse `wmkf_expertiseprofile` on `codex/expertise-roster-import-2026-11-10`; that
-  table exists only in the sandbox [REPORTED: branch handoff 2026-11-18].
+  table exists only in the sandbox [ASSUMED: from the branch handoff of 2026-11-18].
 - **Matching.** The Expertise Finder already produces `board_interest[]` per proposal
-  and stores it in Postgres `expertise_matches` [REPORTED: `shared/config/expertise-finder-output-schema.js`].
+  [VERIFIED via `shared/config/expertise-finder-output-schema.js:83`] and stores it in
+  Postgres `expertise_matches` [ASSUMED].
 
 ## Gaps
 
 1. **Keywords.** No flow writes keywords yet, the Keywords table `wmkf_programlevel3`
    is not seeded, no Keywords prompt exists, and nothing marks one keyword as the main
-   one [REPORTED: `docs/plans/J27_WORKBOOK_FIELD_MAP_2026-11-16.md`]. Decision 1 makes
+   one [ASSUMED: from `docs/plans/J27_WORKBOOK_FIELD_MAP_2026-11-16.md`, not re-read]. Decision 1 makes
    this feature depend on that work.
-2. **Chairs.** No chair marker exists anywhere.
-3. **Links.** No link is tied to a person, and no link serves the staff version.
+2. **Chairs.** No chair marker was found in code, migrations or schema [ASSUMED: search
+   result]. Whether every Program Chair has a Board row on the roster is [ASSUMED].
+3. **Links.** No Board-facing link is tied to a person (reviewer links are, but they
+   are bound to reviewer records), and no no-login link serves the staff version.
 
 ## Design [PLANNED]
 
@@ -110,8 +126,10 @@ An expert list holds a staff-chosen subset.
 - Read the keyword Connor's flow writes and group by the Keywords table's grouping column.
 - **Needed from Connor before build:** which field holds the keywords, how the main
   keyword is marked, and the grouping column in `wmkf_programlevel3`.
-- Staff can move a proposal to another section before sending. Proposals with no
-  keyword go in an "Unassigned" section that staff must clear or accept.
+- Proposals with no keyword are listed in an "Unassigned" section.
+- **Proposed, awaiting the owner's yes:** let staff move a proposal to another section
+  before sending. The owner chose Connor's keywords as the source; this control is extra
+  build and is left out unless approved.
 
 ### Chairs marker
 
@@ -144,13 +162,16 @@ An expert list holds a staff-chosen subset.
 | 2 | Curated expert lists and personalized email | Stage 1 |
 | 3 | Pre-fill expert lists from matching | Codex's matching output |
 
-Stage 1 can be built and tested with staff-assigned sections on test requests while the
-keyword flow is finished; the keyword read is then a small swap.
+**Smallest slice for December 7 (19 days from this plan):** list tables, per-person
+links, the public route that serves the staff version, and a previewed send of the
+Chairs email. Sections need Connor's keyword field; until it is known, the slice can be
+tested on test requests with one unsectioned list. Expert emails (Stage 2) can follow.
 
 ## Dependencies and risks
 
-- **Connor's keyword flow before Dec 7.** Without it there are no sections. Fallback:
-  staff assign sections on the compose page.
+- **Connor's keyword flow before Dec 7.** Without it there are no sections. Possible
+  fallbacks, for the owner to choose if needed: send one unsectioned list, or add staff
+  section assignment (extra build).
 - **Staff version on every proposal.** Depends on Connor's flow; the compose page shows
   what is missing.
 - **Staff version contents.** The owner chose this file for Board eyes. Confirm once on
@@ -163,8 +184,8 @@ keyword flow is finished; the keyword read is then a small swap.
 
 - Run `/contract-reconcile` on this plan (new table, new public routes, outbound email).
 - Add the routes to `docs/API_ROUTE_SECURITY_MATRIX.md`; add an Atlas page for the tables.
-- Claim the migration number off `main` at build time (097 is unused on `main`, 099 is
-  the highest today; check other branches first).
+- Claim the migration number at build time after checking all local and remote branches
+  and the manifest. Do not use 097: it is missing on `main` and may be claimed on a branch.
 - Test with a capture or test-recipient send before any Board address is used.
 - Runtime work: build on a branch and promote deliberately.
 
