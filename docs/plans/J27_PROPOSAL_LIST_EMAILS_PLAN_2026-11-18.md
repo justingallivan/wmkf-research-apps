@@ -70,10 +70,20 @@ the staff route answers 503 and the public routes 404.
 
 **Verification so far.** Unit tests cover the services, verifier and routes; all check
 gates pass. A Codex adversarial review (2026-11-18) found two medium defects, both fixed
-with regression tests. Migration 101 and the store's SQL statements were run by hand against a
-throwaway local Postgres container [VERIFIED via psql, 2026-11-18]. The feature has
-**not** been run in a browser, through the app's database driver, or against SharePoint
-or Dynamics.
+with regression tests.
+
+First Production run, 2026-11-19, driven in the owner's browser on a J27 test list
+[VERIFIED via the live site]: the staff page loads; creating a test list works (one
+proposal, test request 1003518, which exercised the keyword-table read); the recipient
+page opens and its data requests succeed without login cookies; saving a highlight moves
+the proposal to the top; switching the link off makes the page say the link is no longer
+active. The run found three defects, fixed and re-checked live the same day: a title
+whose staff version is missing opened raw JSON (now a readable page), an empty "All
+other proposals" heading, and a missing staff page title.
+
+**Not yet proven in Production:** a staff-version PDF actually opening (1003518 has
+none), the two-level discipline sections (no J27 test request has a keyword; only
+"Unassigned" appeared), and a list for a real Board member.
 
 ### The recipient's page
 
