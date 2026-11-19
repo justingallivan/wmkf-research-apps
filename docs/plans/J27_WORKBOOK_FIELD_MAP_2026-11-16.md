@@ -62,7 +62,7 @@ Unless noted, fields are on the Request (`akoya_request`).
 | T | Certified date | none | ❌ Missing |
 | U | Flags (Claude, Field Analysis) | see decision 2 | ⚠️ |
 | V | Flags (PD final) | see decision 2 | ⚠️ |
-| W | Triage reason | `wmkf_declinereason` (Decline Reason), with `wmkf_denialnotes` (Invite/Decline Notes) for Other text | ✅ Existing fields verified by owner-run probes, 2026-11-19; three additional options pending provisioning |
+| W | Triage reason | `wmkf_declinereason` (Decline Reason), with `wmkf_denialnotes` (Invite/Decline Notes) for Other text | ✅ Existing fields verified by owner-run probes, 2026-11-19; owner confirmed all eight options provisioned |
 | X | Field Analysis (one-page document) | `wmkf_ai_fieldprimer` *(likely)* | ✅ |
 | Y | PD notes, added to over time | none | ❌ Missing |
 | Z | Rationale (Field Analysis), kept as a version | none | ❌ See decision 1 |
@@ -176,7 +176,6 @@ Connor creates the missing fields (owner, November 17).
 
 **Later stages (can wait until those stages are built):**
 - Certified by and Certified date
-- Triage reason: no new field; add two overlap options and Other to `wmkf_declinereason` (owner, November 19). Keep Limited impact and Continuation/incremental separate. Preserve existing `wmkf_denialnotes`; edit it only for Other.
 - PD notes
 - Advance questions sent (date)
 - Offramp reason (from a list)
@@ -212,11 +211,24 @@ requests have a Decline Reason matching the workbook category after label mappin
 two Implementation/risk and one Basic science question unclear. Thirteen have
 Invite/Decline Notes. The notes are private and are not copied into this document.
 
-Owner decision: keep all five existing values; add Overlap with existing funding,
-Overlap with a recent Keck award and Other. Branch implementation uses the existing
-fields, staff-attributed ETag saves and live metadata validation; no live provisioning
-or deployment is claimed. Scored proposals show Staff rationale; Not Scored proposals
-show Reason, with a text box for Other and preserved existing notes for other choices.
+The owner confirmed all eight options provisioned after running
+`scripts/extend-request-decline-reasons.mjs`: the five existing values remain separate,
+including Limited impact and Continuation/incremental; the additions are Overlap with
+existing funding, Overlap with a recent Keck award and Other. No new field is needed.
+The scoring-specific editors deployed to Production on November 19 (PR #644,
+`2ab19cd5d`; Vercel Ready verified in the release session). Scored proposals show
+Staff rationale; Not Scored proposals show Reason, with a text box for Other and
+preserved existing notes for other choices.
+
+**Single-save follow-up [verified in branch source/tests, not deployed]:** the
+Initial Assessment form switches between those fields immediately without saving
+on selection. One **Save assessment** writes the decision and selected details in
+one staff-attributed, ETag-conditional Dataverse update. Changing the decision still
+requires the lead Program Director or a superuser; same-decision staff annotation
+edits retain their existing permissions. Hidden notes and rationale are omitted from
+the write, drafts survive choice/tab switches, and conflicts preserve drafts until
+explicit reload. Live metadata still validates the reasons and Other-text limit.
+No additional provisioning is required for this follow-up.
 
 ## Sources
 

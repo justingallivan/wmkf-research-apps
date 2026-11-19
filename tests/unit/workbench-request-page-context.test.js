@@ -245,8 +245,8 @@ test('J27 Initial Assessment hides the Word option and keeps the rationale draft
     });
   });
   await act(async () => {
-    pending.get('/api/workbench/initial-assessment-rationale?requestId=request-a')({
-      ok: true, json: async () => ({ rationale: 'Saved rationale', version: 'W/"123"' }),
+    pending.get('/api/workbench/initial-assessment-rationale?mode=assessment&requestId=request-a')({
+      ok: true, json: async () => ({ decision: 'yes', decisionEditable: true, notes: '', reason: null, options: [], rationale: 'Saved rationale', version: 'W/"123"' }),
     });
   });
 
@@ -327,14 +327,14 @@ test.each([null, 100000004, 100000005])('Initial Assessment selects the editor f
     ok: true, json: async () => ({ success: true, requestId: 'request-a', cycleCode: 'J27', phaseLayout: true, phaseIStatus }),
   }));
   if (phaseIStatus === 100000004) {
-    await act(async () => pending.get('/api/workbench/initial-assessment-rationale?requestId=request-a')({
-      ok: true, json: async () => ({ rationale: 'Saved staff rationale', version: 'W/"1"' }),
+    await act(async () => pending.get('/api/workbench/initial-assessment-rationale?mode=assessment&requestId=request-a')({
+      ok: true, json: async () => ({ decision: 'yes', decisionEditable: true, notes: '', reason: null, options: [], rationale: 'Saved staff rationale', version: 'W/"1"' }),
     }));
     expect(screen.getByRole('textbox', { name: 'Staff rationale' })).toBeVisible();
     expect(screen.queryByRole('combobox', { name: 'Reason' })).toBeNull();
   } else if (phaseIStatus === 100000005) {
-    await act(async () => pending.get('/api/workbench/initial-assessment-rationale?mode=not-scored&requestId=request-a')({
-      ok: true, json: async () => ({ reason: 682090000, notes: 'Existing notes', version: 'W/"1"', editable: true,
+    await act(async () => pending.get('/api/workbench/initial-assessment-rationale?mode=assessment&requestId=request-a')({
+      ok: true, json: async () => ({ decision: 'no', decisionEditable: true, rationale: '', reason: 682090000, notes: 'Existing notes', version: 'W/"1"', editable: true,
         maxLength: 2000, options: [{ value: 682090000, label: 'Limited impact', available: true }] }),
     }));
     expect(screen.getByRole('combobox', { name: 'Reason' })).toBeVisible();
