@@ -56,10 +56,14 @@ function makeDeps(overrides = {}) {
       })));
       return row;
     }),
-    replaceItems: jest.fn(async (id, linkItems) => {
-      items.set(id, linkItems.map((i) => ({
+    // Like the real store: marks are read at replacement time, not passed in.
+    replaceItems: jest.fn(async (id, snapshot) => {
+      const before = new Map((items.get(id) || []).map((i) => [i.request_id, i]));
+      items.set(id, snapshot.map((i) => ({
         request_id: i.requestId, request_number: i.requestNumber, title: i.title, institution: i.institution,
-        project_leader: i.projectLeader, section: i.section, highlighted: i.highlighted, own_institution: i.ownInstitution,
+        project_leader: i.projectLeader, section: i.section,
+        highlighted: before.get(i.requestId)?.highlighted === true,
+        own_institution: before.get(i.requestId)?.own_institution === true,
       })));
       return true;
     }),
@@ -226,6 +230,19 @@ describe('marks, rebuild, revoke, overview', () => {
     expect(link.url).toBe('https://apps.example.org/external/proposal-list/jwt-1');
     expect(after.map((i) => [i.requestNumber, i.highlighted])).toEqual([['1002', true], ['1003', false]]);
     expect(deps.mint).toHaveBeenCalledTimes(1);
+  });
+
+  test('marks saved while the cycle is being re-read survive the rebuild', async () => {
+    const { deps, items } = await withList();
+    // Another staff member highlights REQ_A during the slow snapshot read.
+    deps.loadSnapshot.mockImplementation(async () => {
+      items.get(LINK_ID)[0].highlighted = true;
+      return [snapshotItem(REQ_A, '1001'), snapshotItem(REQ_B, '1002', 'MIT')];
+    });
+    const { items: after } = await rebuildProposalList({ linkId: LINK_ID, actor: ACTOR }, deps);
+    expect(after.find((i) => i.requestNumber === '1001').highlighted).toBe(true);
+    // The service hands the store the bare snapshot; it never supplies marks of its own.
+    expect(deps.store.replaceItems.mock.calls[0][1].every((i) => !('highlighted' in i) && !('ownInstitution' in i))).toBe(true);
   });
 
   test('revoke switches the link off once; a second revoke is a 404', async () => {

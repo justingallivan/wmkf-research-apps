@@ -219,6 +219,13 @@ export default function ProposalLists() {
     return () => controller.abort();
   }, [load]);
 
+  // A create, revoke or mark save can finish after staff have moved to another
+  // cycle or list type. Its follow-up read must be for what the page shows now,
+  // not for the selection the action started under.
+  const loadRef = useRef(load);
+  useEffect(() => { loadRef.current = load; }, [load]);
+  const reloadCurrent = useCallback(() => loadRef.current(), []);
+
   // A new cycle or list type starts from a clean page before its read lands.
   const resetFor = (apply) => {
     setOverview(null);
@@ -234,7 +241,7 @@ export default function ProposalLists() {
     setError(null);
     try {
       const data = await requestJson(API, { method: 'POST', body });
-      await load();
+      await reloadCurrent();
       return data;
     } catch (e) {
       setError(e.message);
@@ -404,7 +411,7 @@ export default function ProposalLists() {
                       </div>
                     </div>
                   )}
-                  {openLinkId === link.id && <ListEditor key={link.id} linkId={link.id} onChanged={() => load()} />}
+                  {openLinkId === link.id && <ListEditor key={link.id} linkId={link.id} onChanged={reloadCurrent} />}
                 </li>
               ))}
             </ul>
