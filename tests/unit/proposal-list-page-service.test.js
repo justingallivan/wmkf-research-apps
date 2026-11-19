@@ -39,6 +39,26 @@ describe('buildProposalListContext', () => {
     expect(context.sections.map((s) => s.name)).toEqual(['Neuroscience', 'Physics']);
     expect(context.sections[1].proposals.map((p) => p.requestNumber)).toEqual(['1002']);
     expect(context.sections[1].proposals[0].ownInstitution).toBe(true);
+    // Lists built before subsections existed have one unnamed group per section.
+    expect(context.sections[1].groups).toEqual([{ name: null, proposals: context.sections[1].proposals }]);
+  });
+
+  test('branches hold their discipline groups in name order; ungrouped proposals and Unassigned come last', async () => {
+    const rows = [
+      item({ request_number: '1001', section: 'Unassigned', subsection: null }),
+      item({ request_number: '1002', section: 'Life Sciences', subsection: null }),
+      item({ request_number: '1003', section: 'Life Sciences', subsection: 'Neuroscience' }),
+      item({ request_number: '1004', section: 'Life Sciences', subsection: 'Microbiology and Immunology' }),
+      item({ request_number: '1005', section: 'Physical Sciences', subsection: 'Physics' }),
+    ];
+    const context = await buildProposalListContext({ link: LINK }, { listItems: jest.fn(async () => rows) });
+    expect(context.sections.map((s) => s.name)).toEqual(['Life Sciences', 'Physical Sciences', 'Unassigned']);
+    expect(context.sections[0].groups.map((g) => [g.name, g.proposals.map((p) => p.requestNumber)])).toEqual([
+      ['Microbiology and Immunology', ['1004']],
+      ['Neuroscience', ['1003']],
+      [null, ['1002']],
+    ]);
+    expect(context.sections[0].proposals.map((p) => p.requestNumber)).toEqual(['1004', '1003', '1002']);
   });
 
   test('never exposes the request GUID to the page', async () => {

@@ -143,7 +143,7 @@ function ListEditor({ linkId, onChanged }) {
                     <td className="px-3 py-2">
                       <span className="font-medium text-gray-900">{item.title}</span>
                       <span className="block text-gray-600">
-                        {[item.requestNumber, item.institution, item.projectLeader].filter(Boolean).join(' · ')}
+                        {[item.requestNumber, item.institution, item.projectLeader, item.subsection].filter(Boolean).join(' · ')}
                       </span>
                     </td>
                   </tr>

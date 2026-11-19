@@ -65,6 +65,23 @@ function ProposalRows({ proposals, hrefFor }) {
   );
 }
 
+/** A section's proposals under its discipline groups; flat when it has none. */
+function SectionGroups({ section, hrefFor }) {
+  const groups = section.groups || [];
+  if (!groups.some((group) => group.name)) {
+    return <ProposalRows proposals={section.proposals} hrefFor={hrefFor} />;
+  }
+  return groups.map((group) => (
+    <div key={group.name || 'other'} className="pt-3">
+      <h3 className="text-sm font-semibold text-gray-700">
+        {group.name || 'Other'}{' '}
+        <span className="font-normal text-gray-500">({countLabel(group.proposals.length)})</span>
+      </h3>
+      <ProposalRows proposals={group.proposals} hrefFor={hrefFor} />
+    </div>
+  ));
+}
+
 export default function ProposalListPage() {
   const router = useRouter();
   const { token } = router.query;
@@ -132,7 +149,7 @@ export default function ProposalListPage() {
                 <span className="font-normal text-gray-500">({countLabel(section.proposals.length)})</span>
               </summary>
               <div className="border-t border-gray-100 px-5">
-                <ProposalRows proposals={section.proposals} hrefFor={hrefFor} />
+                <SectionGroups section={section} hrefFor={hrefFor} />
               </div>
             </details>
           ))}

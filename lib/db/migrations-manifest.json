@@ -97,6 +97,7 @@
     "096_j27_integrity_jobs.sql",
     "098_test_request_j27_file_names.sql",
     "099_test_request_narrative_bibliography.sql",
-    "101_proposal_list_links.sql"
+    "101_proposal_list_links.sql",
+    "102_proposal_list_item_subsection.sql"
   ]
 }
