@@ -22,6 +22,7 @@ const KNOWN_GUARDS = [
   'verifyGranteeToken',
   'verifyBriefingToken',
   'verifyPresentationToken',
+  'verifyProposalListToken',
   'getServerSession',
   'NextAuth',
 ];
