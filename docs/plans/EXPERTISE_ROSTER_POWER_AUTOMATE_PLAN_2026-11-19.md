@@ -1,6 +1,8 @@
 # Expertise Roster Access for Power Automate
 
-**Discussion draft — November 19, 2026; awaiting Connor’s review**  
+**Status: ON HOLD — awaiting Connor’s review (owner instruction, November 19, 2026).**
+
+This is a discussion draft. Do not begin implementation, connector/authentication setup, or migration work until Connor has reviewed it and the owner directs the next step.
 **Purpose:** Let Connor use the expertise roster in his existing proposal-processing Claude call without migrating Postgres data or adding another Claude call.
 
 ## Recommended approach

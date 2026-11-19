@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## November 2026 — Initial Assessment saves decision and rationale together (Session 683)
+
+**Milestone:** Initial Assessment now supports scoring-specific details and one explicit Save assessment action in Production.
+**Sessions:** Session 683, Codex, 2026-11-19.
+**Ship state:**
+- Scored shows Staff rationale; Not Scored shows eight distinct decline reasons, with Invite/Decline Notes editable for Other. Owner reported all eight Dataverse options verified.
+- Choice changes are local; one staff-attributed, ETag-conditional PATCH saves the decision and selected details, preserving hidden notes/rationale and advanced statuses.
+- PRs #644–#646 passed CI and deployed Ready; the redundant View proposal button was removed. Authenticated Production save rehearsal remains unverified.
+**Why it matters:** Staff can choose a reason immediately, without waiting for a separate scoring save, while existing content and conflict protection are preserved.
+**Pointers:** `lib/services/workbench/assessment-service.js`, `shared/components/workbench/AssessmentForm.js`, `docs/atlas/dataverse-akoya-request.md`; release merges `2ab19cd5d`, `755e4a96d`, `1882697dc`.
+
 ## November 2026 — Return PA work to prompt delivery (Session 679)
 
 **Milestone:** Owner stopped backend integration for Power Automate and returned the deliverable to Dataverse prompts compatible with Connor's existing flows.

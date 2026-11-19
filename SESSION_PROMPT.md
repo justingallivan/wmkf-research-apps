@@ -1,148 +1,160 @@
-# Session 683 Prompt: Expertise roster cutover item 4, or Recommendation to Chairs Stage 1
+# Session 684 Prompt: Await Connor’s expertise-plan review; Initial Assessment shipped
 
-> **Expertise roster work lives on branch `codex/expertise-roster-import-2026-11-10`**
-> (pushed; tip `754acf09a`). Its own handoff is that branch's `SESSION_PROMPT.md`. Private
-> materials for the work Mac: WMKF OneDrive `Research/Shuttle/Justin/` (`RESTORE.md`).
-
-## Session 682 Summary — 2026-11-18 (Claude, home Mac)
+## Session 683 Summary — 2026-11-19 (Codex)
 
 ### What Was Completed
 
-1. **Expertise roster work recovered and pushed.** The Postgres→Dataverse roster branch
-   `codex/expertise-roster-import-2026-11-10` had never been pushed, which is why the work
-   Mac could not find it (newest pushed roster ref was `e90babb2a`). It held 41 commits past
-   that point, including `a29c30826`. Merged current `main`, fixed the secret-scan
-   placeholder and two prompt-catalog tests, cherry-picked the work Mac's probe and evidence
-   (from `origin/codex/session-start-2026-11-18`), and pushed. Branch inventory:
-   `docs/plans/data/expertise-roster/BRANCH_INVENTORY_2026-11-18.md` (on the branch).
-2. **Production cutover simplified (owner decision).** The roster runs about twice a year,
-   by one person or flow, and race protection is not wanted. The addendum
-   `docs/plans/data/expertise-roster/PRODUCTION_CUTOVER_SIMPLIFICATION_2026-11-18.md`
-   replaces admission/drain, the writer freeze, the phase machine and automated rollback
-   reconciliation with a read switch, a cutover marker, a direct bind and a one-shot
-   quiet-window script. `/contract-reconcile`: READY WITH NAMED CHANGES (applied). Codex
-   adversarial review of the build: approve, no findings. Memory:
-   `feedback-scale-safety-machinery-to-usage`.
-3. **Roster items 1–3 built on the branch (not deployed, not applied):**
-   `EXPERTISE_ROSTER_BACKEND` read switch (`roster-mode.js`, Production host only),
-   legacy cutover marker (`roster-cutover-marker.cjs`), direct bind through
-   `expertise_roster_id_seq` (`roster-binding.js`, app-key-only allocation), and inert
-   migration `100_expertise_roster_identity_bridge.sql`. Full Jest, all gates and the eight
-   roster pg suites pass on the branch.
-4. **Dependabot security fixes shipped to Production.** PR #642 (merge `8f8202223`):
-   in-range bumps (next 16.4.6 and others), scoped undici/postcss-selector-parser
-   overrides, global zod 4.6.7 override (owner-approved), and an npm 10–compatible
-   lockfile regeneration (CI uses Node 22/npm 10; this Mac has npm 11). Production
-   deployment succeeded; sign-in pages return 200. 21 of 22 alerts closed.
-5. **Owner-run tracker read:** app database `schema_migrations` ends at 099. **096 is
-   applied** (closes Session 682 item 2). `097_shared_prompt_jobs.sql` is applied although
-   that file exists only on the parked backend branch.
+1. **Initial Assessment shipped to Production.** PR #644 (`2ab19cd5d`) added the
+   existing Decline Reason choices and Invite/Decline Notes for Other. Owner-run
+   probes identified the fields; the owner subsequently reported all eight options
+   verified after provisioning the two overlap reasons and Other. Existing Limited
+   impact and Continuation/incremental remain separate. No new memo field was added.
+2. **Single Save assessment shipped.** PR #645 (`755e4a96d`) makes Scored/Not Scored
+   selection local and immediate, then saves the decision and selected details in
+   one staff-attributed, ETag-conditional Dataverse PATCH. Hidden notes and rationale
+   are not overwritten. Drafts survive choice/tab switches and save conflicts.
+   Changing the decision still requires lead PD or superuser; staff annotation
+   permissions and advanced Phase I statuses are preserved.
+3. **Redundant View proposal button removed.** PR #646 (`1882697dc`) removed the
+   link from the current assessment form. Latest runtime deployment verified Ready:
+   `dpl_E3LsnFC1BwUZFuXZA9Qo5HBKEoNA`, with `applications.wmkeck.org` aliased to it.
+   Public sign-in returned 200. Authenticated Production save/readback was not run.
+4. **Connor discussion plan saved on main.** `8f5c23fc8` added
+   `docs/plans/EXPERTISE_ROSTER_POWER_AUTOMATE_PLAN_2026-11-19.md`.
+   Proposed approach: read-only roster API feeding Connor’s existing Claude call,
+   retaining Postgres as source of truth. No extra Claude call and no migration are
+   proposed for that use case. This is a discussion draft, not approved architecture.
+5. **Owner explicitly parked expertise integration pending Connor’s review.** No API,
+   authentication setup, connector, migration, synchronization, or flow changes are
+   authorized to proceed from this draft. The older roster migration branch is
+   preserved; reconcile its direction with Connor’s feedback and the owner before
+   resuming any expertise integration work.
 
 ### Commits
-- `main`: PR #642 merge `8f8202223` (`85f611a43`, `7d1caa7b0`, `dd145e152`, `7d3991744`); this handoff.
-- Roster branch: `c8cd8bee3` merge, `f972ec899`, `c24fa9007`, `f47699637`, `b19d11527`,
-  `0e14f8fc5`, `e25a8244a`, `4e72a73d2`, `03602cb23`, `21a920c3d`, `97a4bc8c6`,
-  `644c3f42b`, `85ccd0e75`, `7e39d87cd`, `754acf09a`.
 
-No DEVELOPMENT_LOG entry: dependency maintenance and unreleased branch work; no milestone.
+- `1320e432a`, `8cc840ad0`, `c09353afe`: owner-run read-only triage/notes probes.
+- `691b3b1be`: scoring-specific rationale and decline reasons; `33a40063c`: main integration.
+- `9525a8580`, `f6cd77f13`: navigation fixture corrections; released via `2ab19cd5d` (PR #644).
+- `85dd02c57`: combined assessment form/service; released via `755e4a96d` (PR #645).
+- `c1e755150`: remove redundant button; released via `1882697dc` (PR #646).
+- `8f5c23fc8`: Connor’s expertise access discussion plan.
+- This handoff is a docs-only update; runtime changes above were already promoted.
+
+### Verification and Release Evidence
+
+- PRs #644, #645 and #646 passed their complete GitHub checks before merge;
+  their Production deployments were verified Ready through Vercel.
+- Single-save local verification: 100 Workbench/J27 suites, 1,457 tests; TypeScript;
+  relevant API/DAL/security/status/documentation gates and sequential self-tests.
+- Independent review found a post-save conflict draft-loss edge case; it was fixed
+  and regression-tested, then re-reviewed without remaining blockers.
+- Synthetic browser fixture checked Scored and Not Scored/Other at desktop and
+  390px width; no horizontal overflow. This is not authenticated Production UAT.
+- Button-removal change: 31 affected tests passed, then complete PR CI passed.
+- Initial deployment error scans for #644/#645 returned no errors. No claim of
+  a long observation window or live Dataverse save rehearsal.
+- Prior runtime rollback target for the button removal:
+  `https://wmkfresearchapps-lyymk42dm-justin-gallivans-projects.vercel.app`.
+  Code rollback does not undo saved assessment data or additive Dataverse options.
 
 ## Next Items
 
 ### Verified Open
 
-1. **Roster item 4: Production-capable cutover and rollback scripts.** Evidence: the
-   addendum's "Remaining work" list (on the branch). Includes extending the import tool to
-   the Production target and the shared database, the feedback FK retarget, rollback, and
-   Production schema and editor-role setup tools. Then items 5–7 (release items, docs,
-   end-to-end rehearsal) and the owner's go. Resume in
-   `/Users/gallivan/Code/WMKF_Apps-codex-roster-import` (home Mac); on the work Mac, fetch
-   the branch and restore private files per OneDrive `RESTORE.md`.
-2. **Recommendation to Chairs in Production, Stage 1** (PDs record recommendations Dec 9
-   to Feb 3). Evidence: `docs/plans/J27_CHAIRS_RECOMMENDATION_PRODUCTION_PLAN_2026-11-18.md`.
-   Run `/contract-reconcile` on it, then build Stage 1 on a branch. Untouched this session.
-3. **Trial cleanup batch 2** after 2026-11-23 18:31:58 UTC: refresh the Preview OIDC token,
-   run the parked runner's `expire` mode once; expect `disabled`. Commands:
-   `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md` (batch 2).
-4. **Review Connor's first real-proposal run** (owner-run):
-   `DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-intake-prompt-outputs.cjs --target=prod --request=<n>`.
-5. **Dependabot leftovers:** superseded PRs #567, #566, #515 still open (Dependabot may
-   close them); #639 was replaced by grouped PR #643 (22 updates, needs its own review).
+- None assigned by the owner at stop. Await the next instruction.
 
-### Owner Decision Needed
+### Parked — Owner Instruction
 
-1. **Minimatch alert #144** (medium, opened after the #642 merge): fix is 11.0.1, a major
-   jump for 10.x consumers. Override, or wait for upstream.
-2. Optional: add `.nvmrc` = `22` so local Node/npm match CI (prevents npm 11 lockfiles CI
-   rejects).
-3. Intake prompts (Beth meeting 2026-11-17): rationale versions, flags JSON vs child
-   table, open questions; keywords from `wmkf_programlevel3` (not seeded). Evidence:
-   `docs/plans/J27_WORKBOOK_FIELD_MAP_2026-11-16.md`.
-4. Stage 3 go: automatic Integrity Screen makes paid search and model calls; owner
-   authorizes before `AUTOMATIC_INTEGRITY_SCREENING=on`.
-5. With Connor/Sarah: on Feb 24 does the Grants Manager set Phase II Status or only
-   Request Status (D39 vs `lib/services/workbench/j27-read-model.js:239-241`).
-6. Note to Connor (owner to send): prompts are v2 (8192 tokens); skip `intake.personnel` or
-   stop intake when there is no PI row. Not confirmed sent.
+1. **Expertise integration until Connor reviews the plan.** Evidence: owner’s explicit
+   stop request, 2026-11-19; discussion draft linked above. Reopen only after Connor’s
+   feedback and owner direction. Confirm roster fields, lead-PD eligibility,
+   identity mapping, connector/authentication, and existing caching arrangement then.
+2. **Older roster migration/cutover stream.** Preserve
+   `origin/codex/expertise-roster-import-2026-11-10` (fetched tip `754acf09a`). Its
+   `SESSION_PROMPT.md` and cutover addendum remain the historical resume sources.
+   Do not treat the old “item 4” carryover as an active task while expertise work is
+   on hold. No migration, backend switch, or Production cutover authorization is implied.
+3. **Backend prompt adoption/scheduling.** Prior owner-parked stream
+   `codex/executive-summary-generation-2026-11-16`; no new authorization this session.
 
-### Parked
+### Owner Decisions Preserved — Not Resolved This Session
 
-1. Backend prompt adoption/scheduling (`codex/executive-summary-generation-2026-11-16`).
-   The roster's Power Automate recommendations slices 2–5 depend on it. Re-open only on
-   owner decision.
+- Recommendation to Chairs Production stages and paid automatic Integrity Screen:
+  each needs its own owner go; do not enable `AUTOMATIC_INTEGRITY_SCREENING` from this handoff.
+- Intake prompt choices: rationale versions, flags representation, keywords, and
+  open questions in the J27 workbook field map. Connor notification about v2 prompts
+  and missing-PI handling was not confirmed sent by this session.
+- Feb 24 Grants Manager Phase II Status versus Request Status decision (D39).
+- Prior minimatch alert #144 / dependency-upgrade decision and optional local
+  Node-version pin: recheck current alerts/source before planning work.
 
 ### Verify Before Acting
 
-1. Branch hygiene: `claude/dependabot-security-2026-11-18` (merged, still on origin) and
-   `origin/codex/session-start-2026-11-18` (work-Mac handoff; its two content commits are
-   cherry-picked onto the roster branch, its prompt folded into the roster handoff). The
-   Session 681 local branches (`claude/fable-5-2-registry-review`,
-   `claude/board-notice-alert-hygiene`, `claude/factory-auto-prepare`) are not on this Mac;
-   check the work Mac. Deleting any needs the owner's go (list and confirm first).
-2. Test request 1003528 is at Phase I Invited / Phase II Pending Committee Review; moving
-   Phase I back is untried with Phase II set. Factory runs in `managed-ledger/ledger_prod`
-   [ASSUMED from the Production form's ledger; not re-read].
-3. 43 local-only branches exist on the home Mac; the Nov 10–11 `codex/executor-*` and
-   `codex/staff-draft-*` ones match pushed backend commits by subject. The rest are older
-   and unreviewed. Preserve.
-4. `commit-times-exact.txt` is untracked in the main checkout; not from this session.
+- Prior Chairs Stage 1, trial batch-2 expiry, real-proposal prompt review, and
+  Dependabot/branch-hygiene items are preserved at `8f5c23fc8:SESSION_PROMPT.md`.
+  They were not advanced here; verify current source, owner direction, dates, and
+  deployment state before treating them as actionable.
+- Request 1003528’s status in older handoffs is stale: owner screenshots this session
+  showed Scored. No live row probe was run at stop; do not infer its present status
+  or run a reset. No Factory run or test-record status mutation was performed by this agent.
+- Shared main checkout has unrelated untracked `commit-times-exact.txt` (verified at
+  stop). Preserve it. Other agents may have independent worktrees; do not switch or
+  clean those checkouts. No worktree or branch deletion is authorized.
 
 ### Do Not Reopen Without New Decision
 
-1. Roster Production cutover is simplified (owner, 2026-11-18): no admission/drain, writer
-   freeze, phase machine or automated rollback reconciliation in Production.
-2. Factory auto-prepare target pair (Invited + Phase II Pending Committee Review) stays.
-3. Replacing Connor's runner, requiring staff-edit flags, merging the backend branch.
+- Do not replace Connor’s existing proposal-processing flow or add a second Claude
+  matching call; the proposed integration supplies roster data to his current call.
+- Do not migrate all Postgres data as a consequence of this discussion.
+- Preserve the older owner decision simplifying roster cutover (no admission/drain,
+  writer freeze, phase machine, or automated rollback machinery) if that separate
+  direction is later resumed. The current draft does not silently supersede it.
+- Factory auto-prepare target remains Invited plus Phase II Pending Committee Review;
+  this session did not change that contract.
 
-## Preservation and other streams
+## Concurrent Workstreams and Preservation
 
-Prior handoffs: `git show ac2aacaa9:SESSION_PROMPT.md` (Session 682 prompt, Claude),
-`git show 0cb02f2d0:SESSION_PROMPT.md` (work-Mac Codex roster parking note),
-`git show 281ef706b:SESSION_PROMPT.md` (681). Historical observations are not fresh
-permission or live state.
+The prior complete handoff is retrievable with
+`git show 8f5c23fc8:SESSION_PROMPT.md` (verified at stop). Historical paths and
+observations are not current permission or live-state evidence.
 
-| Stream | Resume source | Boundary |
+| Stream | Owning reference | Latest recorded boundary |
 |---|---|---|
-| Expertise roster | Roster branch `SESSION_PROMPT.md` + cutover addendum | Production writes, migration apply and the switch each need owner go |
-| J27 Workbench | `docs/plans/J27_CHAIRS_RECOMMENDATION_PRODUCTION_PLAN_2026-11-18.md` | Each Production stage needs owner go |
-| Intake prompts (Connor PA) | `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md` | Owner publishes prompts; backend parked |
-| J27 Factory / reports | Prior multi-stream handoff | Preserve worktrees, fixtures, exports, branches |
+| Initial Assessment | PRs #644–#646; `assessment-service.js`, `AssessmentForm.js` | Production-live; authenticated save acceptance still unverified |
+| Connor roster access | `docs/plans/EXPERTISE_ROSTER_POWER_AUTOMATE_PLAN_2026-11-19.md` | Parked pending Connor review and owner direction |
+| Older roster cutover | `origin/codex/expertise-roster-import-2026-11-10:SESSION_PROMPT.md` | Preserve branch/private inputs; reconcile direction before resuming |
+| Chairs Production stages | `docs/plans/J27_CHAIRS_RECOMMENDATION_PRODUCTION_PLAN_2026-11-18.md` | Not changed here; owner approval per stage |
+| Intake prompt delivery | `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md` | Owner-run flow/prompt work; backend adoption remains parked |
+| Proposal lists / other agent | Current main and that agent’s owning plans | No ownership assumed; preserve concurrent changes |
 
-Never set `DATAVERSE_ALLOW_PROD_READS` yourself. Never read main `.env.local`. Local
-containers here run on Colima (`colima start`), not Docker Desktop.
+Session-owned worktree: `/private/tmp/wmkf-coordinated-start-20261119`.
+Documentation destination: main via an isolated docs branch/PR, without changing
+another agent’s checkout. Feature branches and artifacts are preserved.
+
+Never set `DATAVERSE_ALLOW_PROD_READS` yourself. Never read main `.env.local`.
+Prior private roster inputs remain in owner-managed storage; do not commit them.
+Local containers use Colima, not Docker Desktop.
 
 ## Key Files Reference
 
 | File | Purpose |
-|------|---------|
-| `docs/plans/data/expertise-roster/PRODUCTION_CUTOVER_SIMPLIFICATION_2026-11-18.md` (branch) | Simplified roster cutover plan and remaining work |
-| `lib/services/expertise-finder/roster-mode.js` (branch) | `EXPERTISE_ROSTER_BACKEND` read switch |
-| `docs/plans/J27_CHAIRS_RECOMMENDATION_PRODUCTION_PLAN_2026-11-18.md` | Recommendation to Chairs Production plan |
-| `scripts/probe-meeting-migration-filenames.cjs` | Owner-run read-only migration tracker probe |
+|---|---|
+| `shared/components/workbench/AssessmentForm.js` | Local drafts and single Save assessment |
+| `lib/services/workbench/assessment-service.js` | Selected-field atomic write, ETag and decision authorization |
+| `pages/api/workbench/initial-assessment-rationale.js` | Assessment mode plus preserved legacy editor modes |
+| `scripts/extend-request-decline-reasons.mjs` | Owner-run additive choice provisioning, already reported complete |
+| `docs/plans/EXPERTISE_ROSTER_POWER_AUTOMATE_PLAN_2026-11-19.md` | Parked Connor review draft |
 
-## Testing
+## Testing and Session Close
 
 ```bash
-cd /Users/gallivan/Code/WMKF_Apps-codex-roster-import
-npx jest tests/unit/roster-mode.test.js tests/unit/roster-binding.test.js tests/unit/roster-cutover-marker.test.js
-ROSTER_LIVE_SQL_TEST_ENV=~/.local/share/wmkf-roster/full-import-20261110/full.env npx jest --runInBand tests/integration/roster-*.pg.test.js
+npx jest --runInBand --silent --testPathPatterns='tests/unit/(workbench|j27-)'
+npm run check:types
 ```
+
+Milestone determination: **entry required and added** to DEVELOPMENT_LOG.md,
+“Initial Assessment saves decision and rationale together” (Session 683).
+CLAUDE.md needs no change: no new root operating convention or API route was introduced.
+Claim-evidence pilot report was attempted with `--current`; local observation state
+was unavailable. No observation-table row was fabricated. No memory router edits
+were made in this session.
