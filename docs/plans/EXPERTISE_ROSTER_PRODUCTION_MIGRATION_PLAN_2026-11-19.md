@@ -1,6 +1,6 @@
 # Expertise roster: production migration and Admin editor
 
-**Status: PLANNED — Claude Opus 5.5 reviewed the initial draft: READY WITH CHANGES. Findings incorporated below; see the [verbatim review and disposition](EXPERTISE_ROSTER_OPUS_5_5_REVIEW_2026-11-19.md). The revised text has not had a second review. No build or production execution authorized by this planning task.**
+**Status: PLANNED — two Claude Opus 5.5 OAuth adversarial reviews completed. Second verdict: READY WITH CHANGES; all earlier findings closed, with two Contact-preservation corrections incorporated below. See [review 1](EXPERTISE_ROSTER_OPUS_5_5_REVIEW_2026-11-19.md) and [review 2 with disposition](EXPERTISE_ROSTER_OPUS_5_5_REVIEW_2_2026-11-19.md). No third review or implementation verification claimed. No build or production execution authorized by this planning task.**
 
 Owner direction, November 19, 2026: move the small, infrequently used roster from
 Postgres to Dataverse and move its editor into Admin. Treat the roster as static
@@ -61,6 +61,16 @@ exact same production Contact GUID. Do not rematch by name/email, replace the
 Contact, or clear the link during category changes or deactivation. Unlinked people
 remain unlinked. Report any invalid/conflicting link or linked row proposed for
 exclusion before cutover; resolve it explicitly rather than silently dropping it.
+
+Required changes to the parked importer/contract before reuse:
+- Set `wmkf_contactguid` directly from the source `dataverse_contact_id` (the same
+  lowercase canonical GUID, or null). Per-target mappings must not override or null
+  it. A mapping mismatch or exclusion of a linked source row is a blocking dry-run
+  error before any import writes, not the parked importer's warning.
+- Remove the Staff ⇒ no-Contact restriction from both the import planner and shared
+  roster contract. Staff may retain a Contact reference alongside a staff User link.
+  Category changes must never require clearing an existing Contact. Include a
+  linked Consultant → Staff case in importer and Admin-editor tests.
 
 Reuse the earlier `wmkf_expertiseprofile` schema and useful importer/adapter pieces
 after checking them against current main. Carry all existing roster content,
@@ -143,7 +153,9 @@ current main; this planning change is documentation only.
 
 1. **Prepare:** finish the bounded code change and focused tests; record the previous
    deployment and rollback command. Recheck the production roster, table metadata,
-   referenced IDs, owner mappings, and migration ledger. Inventory references to
+   referenced IDs, owner mappings, and migration ledger. Explicitly check John
+   E. Sader's (ID 1) Contact link and duplicate Contact links across active AND
+   inactive rows. Inventory references to
    changed IDs 1, 13, and 35 in feedback (including shared briefing entries), Site
    Visit identity maps, meeting attendee maps, and proposal-list provenance. Record
    deliberate eligibility changes; repair any affected editable attendee selection
@@ -165,6 +177,7 @@ current main; this planning change is documentation only.
    The first production binding activates the legacy write marker, so Postgres-mode
    roster reads remain available but edits refuse until completion or rollback.
    Explain this short import window in the UI; no concurrency coordination is needed.
+   Change the reused marker message to point to Admin, not Expertise Finder.
 4. **Compare:** verify every expected field, active/category value, Contact/User link,
    numeric mapping, and feedback reference, accounting explicitly for overrides and
    exclusions, and check the source still matches the export. Include changed saved
@@ -226,7 +239,9 @@ the old feedback FK if changed, switch to the tested Postgres-mode deployment, a
 finally clear production bindings/the write marker to restore edits. Use the same
 order when backing out a partial import. Include the inverse FK SQL and sequence
 check in the short rollback runbook. A setting change alone is not rollback. Keep
-Dataverse records for diagnosis; no automated reconciliation or table drops.
+Dataverse records for diagnosis; no automated reconciliation or table drops. A later
+re-import reuses the original export dataset ID/creation keys, or explicitly resolves
+retained profiles first; do not generate a new dataset identity and collide with them.
 
 ## 6. Separate later work
 
@@ -243,12 +258,14 @@ unverified-until-checked and requires a separate implementation decision.
 
 ## 7. Review and documentation reconciliation
 
-Claude Opus 5.5 reviewed the initial saved draft through the owner's Claude Code
-OAuth session, read-only. The returned model metadata confirms `claude-opus-5-5`;
-verdict READY WITH CHANGES. The companion document preserves every finding and its
-disposition. Required corrections are incorporated in this revision; no second
-review or implementation verification is claimed. No API-key session or Ultrareview
-was used.
+Claude Opus 5.5 reviewed the initial draft and then the revised Contact-preserving
+plan through the owner's Claude Code OAuth session, read-only. Both CLI responses
+confirm `claude-opus-5-5`. Review 2 closed all prior findings and returned READY WITH
+CHANGES for two exact-preservation conflicts in parked code; the required importer
+and category-rule changes are now explicit above. Its stated readiness condition
+was inclusion of those corrections. Both verbatim reports and author dispositions
+are saved alongside this plan. No third review, API-key session, Ultrareview, live
+probe, or implementation verification is claimed.
 
 Sweep Mode A: the changed fact is owner direction, not deployed storage. This plan
 supersedes the Postgres-plus-HTTP proposal in
