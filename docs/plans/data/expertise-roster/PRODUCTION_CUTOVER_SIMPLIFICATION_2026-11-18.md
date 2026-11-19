@@ -151,9 +151,11 @@ row.
    `lib/db/migrations/100_expertise_roster_identity_bridge.sql` (DDL identical to the
    reviewed `identity-bridge.sql`), manifest, fresh-install mirror in
    `scripts/setup-database.js` and Atlas entry in `docs/atlas/postgres-infra-tables.md`.
-   Applied twice cleanly in a disposable schema. **Number 100 is provisional:** highest on
-   any branch is 099 (097 only on the parked backend branch); the live `schema_migrations`
-   tracker is unread (owner-run). Not applied to any shared database.
+   Applied twice cleanly in a disposable schema. **Number 100 is free:** owner-run read-only
+   probe (`scripts/probe-meeting-migration-filenames.cjs`, 2026-11-18) shows the app
+   database tracker ends at `099_test_request_narrative_bibliography.sql`; 096 is applied,
+   and `097_shared_prompt_jobs.sql` is applied although that file exists only on the parked
+   backend branch. Not applied to any shared database.
 4. Production-capable cutover script and rollback script (dry-run default).
 5. Release items: Admin prompt-catalog entry; rehearsal-flag fail mode in shared paths;
    `seed-tool-prompts.js` Production support for `roster-v2`; Production schema and

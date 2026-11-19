@@ -178,7 +178,8 @@ migration-035 column exact; zero preferred-email values before staff population.
 **Source of truth:** Postgres (numeric identity only); Dataverse `wmkf_expertiseprofile`
 owns roster values. **[PLANNED — migration 100 exists only on branch
 `codex/expertise-roster-import-2026-11-10`; not on `main`; not applied to the shared
-database; number provisional until the live `schema_migrations` tracker is read.]**
+database. Number 100 confirmed free by an owner-run tracker read on 2026-11-18 (tracker
+ends at 099).]**
 `expertise_roster_identity(id)` holds every numeric roster ID ever issued and becomes the
 `consultant_feedback.consultant_roster_id` FK target at cutover.
 `expertise_roster_binding(roster_id, target_host, dataverse_profile_guid)` maps a numeric ID

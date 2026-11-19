@@ -73,8 +73,9 @@ index: `docs/plans/data/expertise-roster/README.md`.
    of items 1–2 below. Contract-reconcile review done (READY WITH NAMED CHANGES, applied).
    Remaining-work items 1–3 (read switch, cutover marker, direct bind, migration 100) are
    built; Codex adversarial review approved items 1–2. Next is item 4, the Production-capable
-   cutover and rollback scripts. Owner-run read needed: Production `schema_migrations`, to
-   confirm 100 is free (and whether 096 is applied, per `main`'s handoff).
+   cutover and rollback scripts. Owner-run tracker read (2026-11-18): app database ends at
+   099, so 100 is free; 096 is applied; 097 (`shared_prompt_jobs`, parked backend branch
+   only) is applied off-main. `main`'s handoff item about 096 can close at the next `/stop`.
 
 1. **Inventory before building.** Compare this branch with the work-Mac plan
    (`0cb02f2d0` handoff steps 2–3) and current `main`; list what is built/tested
