@@ -253,8 +253,8 @@ proposal link in the email body.
   title, institution and PI, with the own-institution flag where it applies. The title
   opens that proposal's staff version.
 - **Links.** Still one personal link per recipient. The proposal links on the page are
-  that same personal link plus the request number, so access, revocation and open
-  records stay per person and per proposal (decision 4 holds).
+  that same personal link plus the request number, so access and revocation stay per
+  person and per proposal (decision 4 holds). Open records are not built; see Build status.
 - **What this removes.** Email size is no longer a concern, so Contract review item 1's
   short-token requirement is dropped and the existing signed-token helper can be used.
   A mail scanner fetches one page, not 300 links, so item 2's intermediate page is not
@@ -279,6 +279,40 @@ proposal link in the email body.
   before sending.
 
 Contract review items 3 to 9 are unchanged.
+
+## Build status (2026-11-18)
+
+**[BRANCH-BUILT]** on `claude/proposal-list-pages`; not merged, not deployed, migration
+101 not applied, `PROPOSAL_LIST_SCHEMA_READY` not set anywhere.
+
+Built in this slice:
+
+- Migration `101_proposal_list_links.sql` (links and frozen items). Atlas:
+  `docs/atlas/postgres-proposal-list-links.md`.
+- The no-login list page `/external/proposal-list/{token}`: highlighted proposals on
+  top, every other proposal in collapsed sections; each title opens the staff version.
+- The staff page `/proposal-lists`: choose a cycle, create a Board member's list, choose
+  highlights and own-institution marks, copy or open the link, refresh the proposals,
+  switch a link off.
+- A `test` list type that holds Factory test requests only and is always addressed to
+  the signed-in staff member, for checking the page without a Board address.
+
+Differences from the design above, decided during the build:
+
+- **No open records.** The earlier text said opens would be recorded per person and
+  proposal. The owner did not ask for that, so it is not built.
+- **No extend action.** A link's end date is fixed when the list is created. If the
+  Board Meeting Date moves, switch the link off and create a new list.
+- **Recipients come from Board rows on the roster** that have an email address. There is
+  no chair marker yet; staff pick the two chairs by name.
+- **Sections are a labeled placeholder** (the request's program area) until Connor's
+  keyword field and grouping are known. The staff page says so.
+- **Own-institution marks are suggested** by an exact institution-name match and staff
+  confirm or change them.
+
+Not built: the email itself (staff copy the link for now), the chair marker, keyword
+sections, pre-filled highlights from matching, and a link to this page from the
+Workbench navigation.
 
 ## Before building
 
