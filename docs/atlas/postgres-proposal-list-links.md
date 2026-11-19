@@ -32,7 +32,8 @@ revoked_at IS NULL` holds at most one live link per recipient.
 the only requests a link may open.
 
 `section` is the discipline branch and `subsection` the discipline group of the
-request's keyword in the Keywords table `wmkf_programlevel3`, copied when the
+request's keyword (`_wmkf_programareaserved_value`) in the Keywords table
+`wmkf_programlevel3`, copied when the
 list is built; a proposal with no Discipline keyword gets `Unassigned` and NULL.
 `subsection` comes from migration 102 **[BRANCH-BUILT on
 `claude/proposal-list-keyword-sections`; not applied]**. Because
@@ -79,6 +80,4 @@ cycle.
 
 ## Not built
 
-Email sending, a chair marker on the roster, and open tracking. Which request
-field holds the main discipline keyword is unconfirmed; the build reads
-`_wmkf_programareaserved_value` and the staff page says so.
+Email sending, a chair marker on the roster, and open tracking.

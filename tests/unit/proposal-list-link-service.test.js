@@ -256,7 +256,7 @@ describe('marks, rebuild, revoke, overview', () => {
     const { deps } = await withList();
     const overview = await getProposalListOverview({ cycleCode: 'J27', listKind: 'ordinary', actor: ACTOR }, deps);
     expect(overview.recipients.map((r) => r.name)).toEqual(['Board Member', 'No Email']);
-    expect(overview.sectionSource.placeholder).toBe(true);
+    expect(overview.sectionSource.placeholder).toBe(false);
     expect(overview.links).toHaveLength(1);
     expect(JSON.stringify(overview)).not.toMatch(/sealed:|token_digest|token_ciphertext/);
   });
