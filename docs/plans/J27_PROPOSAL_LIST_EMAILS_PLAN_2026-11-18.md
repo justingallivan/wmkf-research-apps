@@ -222,10 +222,9 @@ The changes below replace the matching parts of the Design section.
    by name, and a failed recipient can be retried alone. A resend reuses the same link
    (from the sealed copy) so an earlier email's links keep working. Replacing a link is
    a separate, deliberate "revoke and reissue" action.
-6. **Late arrivals.** A list is frozen when sent, so a proposal that becomes ready
-   afterwards is not on it. The compose page shows how many ready proposals are not yet
-   on each recipient's list and offers an update email. Owner to confirm this over a
-   list that grows on its own.
+6. **Late arrivals: not a concern (owner, 2026-11-18).** Late submissions are not
+   allowed, and the emails are sent after intake is complete, not as proposals arrive.
+   A list is frozen when sent; no update-email feature is built.
 7. **Own-institution flag.** The roster holds institution as free text
    [VERIFIED via `lib/db/migrations/004_expertise_finder.sql:10`], while the applicant
    is a Dynamics account. Name matching can miss. The flag is computed, shown in the
@@ -233,7 +232,7 @@ The changes below replace the matching parts of the Design section.
 8. **Sender.** The Board share path refuses to send unless
    `DYNAMICS_IMPERSONATION_ENABLED` is `true`
    [VERIFIED via `lib/services/pre-site-visit/distribution/send.js:45`]. The Production
-   value is unknown; owner-run check before the first send.
+   value is unknown; the owner will determine it before the first send (2026-11-18).
 9. **Durable surfaces at build:** migration and manifest, Atlas page, route security
    matrix rows for the public and staff routes, route counts in the canonical counts,
    email template setting, cleanup of expired rows, and tests that prove a request
