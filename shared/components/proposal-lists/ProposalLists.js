@@ -8,7 +8,7 @@
  * signed-in staff member. Every mutation is re-checked by the server; this
  * page only mirrors those rules.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { Button, Card } from '../Layout';
 import { requestJson } from '../../utils/api-request';
@@ -196,14 +196,18 @@ export default function ProposalLists() {
   const [openLinkId, setOpenLinkId] = useState(null);
   const [confirmRevoke, setConfirmRevoke] = useState(null);
 
+  // Only the newest read may paint: a slower answer for a cycle or list type
+  // the page has already left is dropped.
+  const readSeq = useRef(0);
   const load = useCallback(async (signal) => {
     if (!cycle) return;
+    const seq = ++readSeq.current;
     setError(null);
     try {
       const data = await requestJson(`${API}?cycle=${encodeURIComponent(cycle)}&kind=${encodeURIComponent(kind)}`, { signal });
-      setOverview(data.overview);
+      if (seq === readSeq.current) setOverview(data.overview);
     } catch (e) {
-      if (e?.name === 'AbortError') return;
+      if (e?.name === 'AbortError' || seq !== readSeq.current) return;
       setOverview(null);
       setError(e.message);
     }

@@ -12,6 +12,7 @@ jest.mock('../../lib/services/workbench/program-scope-service.js', () => ({
   resolveDiscoveryScope: jest.fn(async () => ({ readinessOnlyProgramIds: ['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'] })),
 }));
 
+import { resolveDiscoveryScope } from '../../lib/services/workbench/program-scope-service.js';
 import {
   loadCycleProposalSnapshot,
   PROPOSAL_LIST_MAX_PROPOSALS,
@@ -104,6 +105,15 @@ describe('loadCycleProposalSnapshot', () => {
     const d = deps([request(1)], { isolation: false });
     await expect(loadCycleProposalSnapshot({ cycleCode: 'J27', listKind: 'test' }, d))
       .rejects.toMatchObject({ httpStatus: 409, code: 'proposal_list_test_unavailable' });
+    expect(d.queryRequests).not.toHaveBeenCalled();
+  });
+
+  test('refuses rather than shrinking the list when the readiness scope cannot be read', async () => {
+    // Ready, untriaged J27 rows exist; with an empty scope the legacy filter would hide them all.
+    resolveDiscoveryScope.mockResolvedValueOnce({ readinessOnlyProgramIds: [] });
+    const d = deps([request(1), request(2)]);
+    await expect(loadCycleProposalSnapshot({ cycleCode: 'J27', listKind: 'ordinary' }, d))
+      .rejects.toMatchObject({ httpStatus: 503, code: 'proposal_list_scope_unavailable' });
     expect(d.queryRequests).not.toHaveBeenCalled();
   });
 

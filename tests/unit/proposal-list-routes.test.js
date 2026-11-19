@@ -85,6 +85,8 @@ describe('staff route', () => {
     [{ action: 'create', cycle: 'J27', kind: 'test', recipientEmail: 'someone@example.org' }],
     [{ action: 'revoke', linkId: LINK_ID, cycle: 'J27' }],
     [{ action: 'send', linkId: LINK_ID }],
+    [{ action: 'constructor' }],
+    [{ action: 'toString', linkId: LINK_ID }],
     [[]],
   ])('rejects the unsupported body %j', async (body) => {
     const res = mockRes();

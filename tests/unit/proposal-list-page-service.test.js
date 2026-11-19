@@ -8,7 +8,7 @@ import { buildProposalListContext, resolveProposalListDocument } from '../../lib
 
 const LINK = { id: 'link-a', cycle_code: 'J27', recipient_name: 'Dr. Example', expires_at: new Date('2027-06-10T08:00:00Z') };
 const REQ_A = '11111111-1111-4111-8111-111111111111';
-const PDF = { buffer: Buffer.from('%PDF-1.7'), mimeType: 'application/pdf', filename: 'UNIV_Staff-Version_1001.pdf', size: 8 };
+const PDF = { buffer: Buffer.from('%PDF-1.7'), mimeType: 'application/octet-stream', filename: 'UNIV_Staff-Version_1001.pdf', size: 8 };
 const STAFF_VERSION = { key: 'staffVersion', found: true, library: 'akoya_request', folder: '1001_AAAA', name: 'UNIV_Staff-Version_1001.pdf' };
 
 function item(overrides = {}) {
@@ -98,8 +98,8 @@ describe('resolveProposalListDocument', () => {
     expect(deps.download).not.toHaveBeenCalled();
   });
 
-  test('refuses a non-PDF file under the staff-version name', async () => {
-    const deps = documentDeps({ file: { ...PDF, mimeType: 'text/html' } });
+  test('refuses a file that is not a PDF even when SharePoint reports it as one', async () => {
+    const deps = documentDeps({ file: { ...PDF, buffer: Buffer.from('<html><script>'), mimeType: 'application/pdf' } });
     await expect(resolveProposalListDocument({ link: LINK, requestNumber: '1001' }, deps))
       .rejects.toMatchObject({ httpStatus: 404 });
   });

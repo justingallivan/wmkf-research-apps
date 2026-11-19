@@ -75,7 +75,10 @@ export default async function handler(req, res) {
   }
 
   const body = req.body;
-  const allowed = body && typeof body === 'object' && !Array.isArray(body) ? FIELDS[body.action] : null;
+  const allowed = body && typeof body === 'object' && !Array.isArray(body)
+    && typeof body.action === 'string' && Object.hasOwn(FIELDS, body.action)
+    ? FIELDS[body.action]
+    : null;
   if (!allowed || Object.keys(body).some((key) => !allowed.has(key))) {
     return res.status(400).json({ error: 'The proposal list request contains unsupported fields.' });
   }
