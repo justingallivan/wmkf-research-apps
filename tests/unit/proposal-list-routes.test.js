@@ -175,6 +175,20 @@ describe('external routes', () => {
     expect(refused.send).not.toHaveBeenCalled();
   });
 
+  test('a browser gets a readable page, not JSON, when a proposal cannot be opened', async () => {
+    resolveProposalListDocument.mockRejectedValueOnce(new ServiceHttpError('not ready', { httpStatus: 404, body: { ok: false, reason: 'document_not_ready' } }));
+    const res = mockRes();
+    await documentHandler({ method: 'GET', headers: { accept: 'text/html,application/xhtml+xml' }, query: { token: 't', request: '<script>1001' } }, res);
+    expect(res.statusCode).toBe(404);
+    expect(res.headers['Content-Type']).toBe('text/html; charset=utf-8');
+    const html = res.send.mock.calls[0][0];
+    expect(html).toContain('This proposal is not available yet.');
+    // Fixed text only: nothing from the request reaches the page.
+    expect(html).not.toContain('1001');
+    expect(html).not.toContain('<script');
+    expect(res.json).not.toHaveBeenCalled();
+  });
+
   test('only GET is allowed', async () => {
     const res = mockRes();
     await documentHandler({ method: 'POST', query: { token: 't', request: '1001' } }, res);

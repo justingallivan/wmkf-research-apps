@@ -138,9 +138,11 @@ export default function ProposalListPage() {
       )}
 
       <section className="mt-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
-          {data.highlighted.length > 0 ? 'All other proposals' : 'All proposals'}
-        </h2>
+        {(data.sections.length > 0 || data.highlighted.length === 0) && (
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+            {data.highlighted.length > 0 ? 'All other proposals' : 'All proposals'}
+          </h2>
+        )}
         <div className="mt-2 space-y-2">
           {data.sections.map((section) => (
             <details key={section.name} className="rounded-xl border border-gray-200 bg-white">
