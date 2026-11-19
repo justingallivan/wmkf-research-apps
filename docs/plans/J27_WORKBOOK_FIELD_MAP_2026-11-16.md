@@ -199,8 +199,8 @@ Connor creates the missing fields (owner, November 17).
   `wmkf_keyworddisciplinegroup` is the subcategory (11 under Discipline, 9 under Method,
   8 under Object of Study). A Request reaches the table through two lookups,
   `wmkf_programlevel3` and `wmkf_programareaserved`, and also has the `wmkf_ai_keywords`
-  text field; which one the intake flow fills with the main discipline keyword is not
-  confirmed. An older table catalog (`docs/archive/DATAVERSE_CUSTOM_TABLES_2026-06-05.md`)
+  text field. The one request with any of them filled points to `wmkf_programareaserved`
+  [VERIFIED via the owner-run `node scripts/probe-request-keywords.cjs --target=prod`, 2026-11-19: one request in all of Production has any of the three fields filled, intake test 1003526, whose `wmkf_programareaserved` points at the Discipline keyword "Structural Biology" (Life Sciences / Molecular and Cellular Biology); `wmkf_programlevel3` and `wmkf_ai_keywords` are empty on every request]. An older table catalog (`docs/archive/DATAVERSE_CUSTOM_TABLES_2026-06-05.md`)
   lists the table's display name as "Program Service Area".
 
 ## Sources
