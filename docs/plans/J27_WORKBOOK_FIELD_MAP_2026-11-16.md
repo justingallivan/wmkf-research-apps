@@ -220,7 +220,9 @@ The scoring-specific editors deployed to Production on November 19 (PR #644,
 Staff rationale; Not Scored proposals show Reason, with a text box for Other and
 preserved existing notes for other choices.
 
-**Single-save follow-up [verified in branch source/tests, not deployed]:** the
+**Single-save follow-up [Production-live November 19, 2026]:** PR #645 /
+`755e4a96d` deployed in Vercel `dpl_CNZLeiiDGHsb8HeF6q71tjd4ufKy` (Ready,
+verified in the release session). The
 Initial Assessment form switches between those fields immediately without saving
 on selection. One **Save assessment** writes the decision and selected details in
 one staff-attributed, ETag-conditional Dataverse update. Changing the decision still
@@ -228,7 +230,10 @@ requires the lead Program Director or a superuser; same-decision staff annotatio
 edits retain their existing permissions. Hidden notes and rationale are omitted from
 the write, drafts survive choice/tab switches, and conflicts preserve drafts until
 explicit reload. Live metadata still validates the reasons and Other-text limit.
-No additional provisioning is required for this follow-up.
+No additional provisioning was required. PR #646 / `1882697dc` then removed the
+form's View proposal link in Production (`dpl_E3LsnFC1BwUZFuXZA9Qo5HBKEoNA`,
+Ready verified in the release session). Full CI passed for both releases;
+signed-in saves were not exercised.
 
 ## Sources
 
