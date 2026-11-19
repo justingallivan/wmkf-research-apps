@@ -1,3 +1,4 @@
+import { getNotScoredReason, saveNotScoredReason } from '../../../lib/services/workbench/not-scored-reason-service';
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { actorRefFromSession } from '../../../lib/utils/actor-ref';
 import { isGuid } from '../../../lib/utils/guid';
@@ -31,13 +32,23 @@ export default async function handler(req, res) {
   if (!(await admitted())) return res.status(404).json({ error: UNAVAILABLE });
   return withDalContext('workbench-initial-assessment-rationale', async () => {
     try {
-      if (req.method === 'GET') return res.status(200).json(await getInitialAssessmentRationale(requestId));
+      const mode = (req.method === 'GET' ? req.query.mode : req.body?.mode) ?? 'rationale';
+      if (!['rationale', 'not-scored'].includes(mode)) return res.status(400).json({ error: 'Unknown assessment editor.' });
+      if (req.method === 'GET') return res.status(200).json(await (mode === 'not-scored' ? getNotScoredReason(requestId) : getInitialAssessmentRationale(requestId)));
       const actor = actorRefFromSession(access.session);
       if (!isGuid(actor)) return res.status(403).json({ error: 'A mapped staff identity is required.' });
       if (process.env.DYNAMICS_IMPERSONATION_ENABLED !== 'true') {
         return res.status(503).json({ error: 'Staff-attributed saves are unavailable.' });
       }
       const { rationale, version } = req.body;
+      if (mode === 'not-scored') {
+        if (!Number.isInteger(req.body.reason) || typeof version !== 'string' || !/^W\/"[0-9]+"$/.test(version)) {
+          return res.status(400).json({ error: 'A valid reason and request version are required.' });
+        }
+        await saveNotScoredReason({ requestId, reason: req.body.reason, notes: req.body.notes, version, actor,
+          beforeWrite: async () => { if (!(await admitted())) throw new ServiceHttpError(UNAVAILABLE, { httpStatus: 404 }); } });
+        return res.status(200).json({ success: true });
+      }
       if (typeof rationale !== 'string' || rationale.length > 10000
           || typeof version !== 'string' || !/^W\/"[0-9]+"$/.test(version)) {
         return res.status(400).json({ error: 'A valid rationale and request version are required.' });

@@ -6,7 +6,7 @@ const endpoint = '/api/workbench/initial-assessment-rationale';
 const read = requestId => requestJson(endpoint + '?requestId=' + encodeURIComponent(requestId));
 
 // The Workbench keys this editor by request ID.
-export default function InitialAssessmentRationale({ requestId, proposalHref = null }) {
+export default function InitialAssessmentRationale({ requestId, proposalHref = null, active = true, onSaved }) {
   const [record, setRecord] = useState(null);
   const [draft, setDraft] = useState('');
   const [error, setError] = useState('');
@@ -33,11 +33,11 @@ export default function InitialAssessmentRationale({ requestId, proposalHref = n
   }
 
   useEffect(() => {
-    load();
+    if (active) load();
     return () => { generation.current += 1; };
-    // Mount once for the keyed request. Retry reads through load() below.
+    // Refresh the ETag on activation after a scoring change; keep any draft.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [active]);
 
   async function save(event) {
     event.preventDefault();
@@ -59,6 +59,8 @@ export default function InitialAssessmentRationale({ requestId, proposalHref = n
       const updated = await read(requestId);
       if (generation.current !== current) return;
       setRecord(updated);
+      if (onSaved) await onSaved();
+      if (generation.current !== current) return;
       if (updated.rationale !== rationale) {
         setSaved(false);
         setConflict(true);
@@ -85,8 +87,7 @@ export default function InitialAssessmentRationale({ requestId, proposalHref = n
         )}
       </div>
       <p id="initial-rationale-guidance" className="mt-1 text-sm text-gray-600">
-        Explain why you recommend triaging or advancing this proposal. For proposals you would advance,
-        describe the strengths and any questions staff should carry forward.
+        Describe the strengths of this proposal and any questions staff should carry forward.
       </p>
       {record && (
         <form className="mt-3 space-y-3" onSubmit={save}>

@@ -1,3 +1,4 @@
+import { deriveRecorded } from '../../../lib/services/workbench/j27-read-model';
 import { useEffect, useState } from 'react';
 import { SCORING_STATUS, isScoringEditable, CHAIRS_RECOMMENDATION_STATUS } from '../../config/j27Scoring';
 import { requestEnvelope } from '../../utils/api-request';
@@ -13,7 +14,7 @@ function nextAction(context, handoff, progress, chairsRecommendationEnabled) {
   }
   if (context.phaseIStatus === SCORING_STATUS.no) {
     return { heading: 'Marked Not Scored',
-      detail: 'The decision and staff rationale are in Initial Assessment.' };
+      detail: 'Review the reason for this decision in Initial Assessment.' };
   }
   if (context.phaseIStatus === CHAIRS_RECOMMENDATION_STATUS.no) {
     return { heading: 'Not recommended to Chairs',
@@ -42,7 +43,7 @@ function nextAction(context, handoff, progress, chairsRecommendationEnabled) {
   if (context.phaseIStatus !== SCORING_STATUS.yes) {
     if (handoff.rationale === false && isScoringEditable(context.phaseIStatus)) {
       return { heading: 'Initial assessment pending',
-        detail: 'Read the proposal and record the staff rationale in Initial Assessment.' };
+        detail: 'Read the proposal and record the scoring decision in Initial Assessment.' };
     }
     return { heading: 'Scoring decision to review',
       detail: 'Check the decision and supporting evidence in Initial Assessment.' };
@@ -134,7 +135,7 @@ export default function J27Overview({ context, requestId, reviewerProgress,
           <div>
             <dt className="font-semibold">Initial Assessment</dt>
             <dd className="text-gray-600">{initialAssessmentDecision(context)}</dd>
-            {initialRationaleEnabled && <dd className="text-gray-600">Staff rationale · {savedLabel(handoff.rationale)}</dd>}
+            {initialRationaleEnabled && ['scored', 'inferred-scored'].includes(deriveRecorded(context.phaseIStatus).scoring) && <dd className="text-gray-600">Staff rationale · {savedLabel(handoff.rationale)}</dd>}
           </div>
           {showPeerReview && (
             <div>

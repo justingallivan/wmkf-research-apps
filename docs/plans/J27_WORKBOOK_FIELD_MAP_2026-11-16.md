@@ -62,7 +62,7 @@ Unless noted, fields are on the Request (`akoya_request`).
 | T | Certified date | none | ❌ Missing |
 | U | Flags (Claude, Field Analysis) | see decision 2 | ⚠️ |
 | V | Flags (PD final) | see decision 2 | ⚠️ |
-| W | Triage reason | `wmkf_triagestatus` holds the decision, not the reason | ❌ Missing |
+| W | Triage reason | `wmkf_declinereason` (Decline Reason), with `wmkf_denialnotes` (Invite/Decline Notes) for Other text | ✅ Existing fields verified by owner-run probes, 2026-11-19; three additional options pending provisioning |
 | X | Field Analysis (one-page document) | `wmkf_ai_fieldprimer` *(likely)* | ✅ |
 | Y | PD notes, added to over time | none | ❌ Missing |
 | Z | Rationale (Field Analysis), kept as a version | none | ❌ See decision 1 |
@@ -176,7 +176,7 @@ Connor creates the missing fields (owner, November 17).
 
 **Later stages (can wait until those stages are built):**
 - Certified by and Certified date
-- Triage reason
+- Triage reason: no new field; add two overlap options and Other to `wmkf_declinereason` (owner, November 19). Keep Limited impact and Continuation/incremental separate. Preserve existing `wmkf_denialnotes`; edit it only for Other.
 - PD notes
 - Advance questions sent (date)
 - Offramp reason (from a list)
@@ -199,6 +199,21 @@ Connor creates the missing fields (owner, November 17).
   separates Disciplines, Methods and Objects of Study. The columns have not been read
   from Dataverse, and how a Request points at its keywords is not known; the owner-run
   `node scripts/probe-keyword-taxonomy.cjs --target=prod` reports both.
+
+## Triage reason verification — November 19, 2026
+
+[VERIFIED via owner-run `scripts/probe-request-triage-reasons.cjs` and
+`scripts/probe-request-decline-notes.cjs`, outputs supplied in chat.] All 36 supplied
+requests have a Decline Reason matching the workbook category after label mapping:
+15 Limited impact, 10 Continuation/incremental, eight Too applied/translational,
+two Implementation/risk and one Basic science question unclear. Thirteen have
+Invite/Decline Notes. The notes are private and are not copied into this document.
+
+Owner decision: keep all five existing values; add Overlap with existing funding,
+Overlap with a recent Keck award and Other. Branch implementation uses the existing
+fields, staff-attributed ETag saves and live metadata validation; no live provisioning
+or deployment is claimed. Scored proposals show Staff rationale; Not Scored proposals
+show Reason, with a text box for Other and preserved existing notes for other choices.
 
 ## Sources
 
