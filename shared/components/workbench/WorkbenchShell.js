@@ -14,15 +14,48 @@
  * (a Final writeups or Awardees cycle need not have pending requests) and is
  * rendered as an extra option.
  *
+ * J27 Research layout: for a 2027-or-later cycle of a program the cycle list
+ * names in `stageProgramIds`, the tabs are All requests, the request page's
+ * four phases, and Awardees (docs/plans/J27_CYCLE_PAGE_BUILD_PLAN_2026-11-09.md).
+ * The shell loads the request rows once and hands them to the request tabs.
+ * Every other program and cycle renders exactly as before.
+ *
  * Data: /api/workbench/dashboard (no cycleCode = cycle list for a program).
  */
+
+// A phase tab shows its request list, or today's panel for that phase:
+// Reviewer follow-up, Staff deliberations (temporary, until the J27
+// pre-presentation step is decided) or Final writeups.
+const SECTION_LABEL = { reviewers: 'Reviewers', drafts: 'Drafts', 'writeup-review': 'Writeup review' };
+function SectionSwitch({ section, second, onChange }) {
+  const options = [['', 'Requests'], [second, SECTION_LABEL[second]]];
+  return (
+    <div role="group" aria-labelledby="phase-section-label" className="flex flex-col gap-1.5">
+      <span id="phase-section-label" className="text-sm font-medium text-gray-700">Show</span>
+      <div className={`inline-flex ${TOOLBAR_CONTROL_HEIGHT_CLASS} overflow-hidden rounded-xl border border-gray-300 bg-white`}>
+        {options.map(([key, label], index) => (
+          <button
+            key={label}
+            type="button"
+            onClick={() => onChange(key)}
+            aria-pressed={section === key}
+            className={`px-4 py-2 text-sm font-semibold ${index ? 'border-l border-gray-300 ' : ''}${section === key ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { requestEnvelope } from '../../utils/api-request';
 import Layout from '../Layout';
+import IntegrityAlerts from './IntegrityAlerts';
 import ToolbarSelect from '../ToolbarSelect';
-import WorkbenchViewsNav, { VIEWS } from './WorkbenchViewsNav';
+import WorkbenchViewsNav, { VIEWS, J27_VIEWS } from './WorkbenchViewsNav';
 import { RequestLocator } from './RequestLocator';
 import RequestListPanel from './RequestListPanel';
 import ReviewerFollowUpPanel from './ReviewerFollowUpPanel';
@@ -31,11 +64,20 @@ import AwardeesPanel from './AwardeesPanel';
 import InitialAssessmentsPanel from './InitialAssessmentsPanel';
 import StaffDeliberationsPanel from './StaffDeliberationsPanel';
 import { cycleCodeToLabel } from '../../../lib/utils/cycle-code.js';
-import { WORKBENCH_LOCATION_KEYS, buildWorkbenchHref, readWorkbenchQuery } from './workbench-location';
+import {
+  STAGE_SECTION, WORKBENCH_LOCATION_KEYS, buildWorkbenchHref, readWorkbenchQuery, isStageLayout, isStageLayoutCycle, resolveWorkbenchView,
+} from './workbench-location';
+import J27RequestList from './J27RequestList';
+import { useJ27CycleRows } from './useJ27CycleRows';
+import { tabCounts } from '../../utils/j27CycleRows';
+import { TOOLBAR_CONTROL_HEIGHT_CLASS } from '../ToolbarSelect';
 
 const sameLocation = (a, b) => WORKBENCH_LOCATION_KEYS.every((key) => a[key] === b[key]);
 
-export function WorkbenchShell({ previewReadOnly = false }) {
+// `phaseRelease`: the server's merge-dark admission
+// (lib/utils/workbench-phase-release.js). Without it the shell never chooses
+// or anticipates the J27 layout, so it never reads J27 rows.
+export function WorkbenchShell({ previewReadOnly = false, j27IntegrityEnabled = false, phaseRelease = false }) {
   const router = useRouter();
 
   // URL-mirrored state. Local state is the render source; every change is
@@ -65,6 +107,8 @@ export function WorkbenchShell({ previewReadOnly = false }) {
   routerRef.current = router;
   const navigate = useCallback((patch, { push = false } = {}) => {
     const next = { ...locationRef.current, ...patch };
+    // 'all' is always written to the address, so it always reads back as chosen.
+    if (next.scope === 'all') next.scopeSet = true;
     locationRef.current = next;
     setLocation(next);
     pendingWritesRef.current += 1;
@@ -78,6 +122,7 @@ export function WorkbenchShell({ previewReadOnly = false }) {
   const [cycles, setCycles] = useState([]);
   const [programs, setPrograms] = useState([]);
   const [resolvedProgramId, setResolvedProgramId] = useState('');
+  const [stageProgramIds, setStageProgramIds] = useState([]);
   const [defaultCycleCode, setDefaultCycleCode] = useState(null);
   const [loadingCycles, setLoadingCycles] = useState(true);
   // Which program the loaded list belongs to. Derived readiness (rather than
@@ -113,6 +158,7 @@ export function WorkbenchShell({ previewReadOnly = false }) {
         setCycles(body.cycles || []);
         setPrograms(Array.isArray(body.programs) ? body.programs : []);
         setResolvedProgramId(body.programId || '');
+        setStageProgramIds(Array.isArray(body.stageProgramIds) ? body.stageProgramIds : []);
         setDefaultCycleCode(body.defaultCycleCode || null);
         setLoadedProgramKey(requestedProgramId);
       } catch (e) {
@@ -172,12 +218,53 @@ export function WorkbenchShell({ previewReadOnly = false }) {
   // contracts are cycle-only, not program-scoped), but the select still
   // drives which cycle list loads, so it stays live on those views; the
   // hint explains that the rows themselves are not filtered by program.
-  const programHint = location.view === 'final-writeups'
+  // Layout. Known once the cycle list has loaded; until then a 2027-or-later
+  // (or not yet resolved) cycle is "pending", so the tabs never flash from one
+  // set to the other and an old link is not mapped before the program is known.
+  const stageLayout = phaseRelease && cyclesReady && isStageLayout({ cycleCode, programId, stageProgramIds });
+  const layoutPending = phaseRelease && !cyclesReady && !cyclesError && (!urlCycleCode || isStageLayoutCycle(urlCycleCode));
+  const { view, section } = resolveWorkbenchView(location, stageLayout);
+  const selectedCycle = visibleCycles.find((cycle) => cycle.code === cycleCode);
+  const myCount = cyclesReady ? Math.max(0, Number(selectedCycle?.myCount) || 0) : undefined;
+  // Someone who leads no requests in the cycle opens on "All in program",
+  // unless they chose "Assigned to me" (then the address says so).
+  const stageScope = location.scopeSet ? location.scope : (cyclesReady && myCount === 0 ? 'all' : 'my');
+  const chooseScope = (scope) => navigate({ scope, scopeSet: true });
+  // The explicit program + cycle address starts the row read before the cycle
+  // list returns, as the Request list does; a non-stage program discards it.
+  const rowsState = useJ27CycleRows({
+    enabled: stageLayout || (layoutPending && explicitCycleArm),
+    programId,
+    cycleCode: requestListCycleCode,
+    scope: stageScope,
+  });
+  const counts = stageLayout && rowsState.hasSnapshot ? tabCounts(rowsState.rows) : {};
+
+  // The Final writeups panel ignores the program; the Final Assessment request list does not.
+  const programHint = view === 'final-writeups' || (stageLayout && view === 'final-assessment' && section === 'writeup-review')
     ? 'Not filtered by program'
-    : location.view === 'awardees'
+    : view === 'awardees'
       ? 'Research programs only'
       : undefined;
-  const activeViewMeta = VIEWS[location.view];
+  const activeViewMeta = layoutPending ? null : (stageLayout ? J27_VIEWS : VIEWS)[view];
+  const listProps = {
+    rowsState,
+    loadingCycles: !cyclesReady && !cyclesError && !explicitCycleArm,
+    scope: stageScope,
+    myCount,
+    onScopeChange: chooseScope,
+    search: location.search,
+    onSearchChange: (search) => navigate({ search }),
+    showing: location.showing,
+    onShowingChange: (showing) => navigate({ showing }),
+    showClosed: location.showClosed,
+    onShowClosedChange: (showClosed) => navigate({ showClosed }),
+    standing: location.standing,
+    onStandingChange: (standing) => navigate({ standing }),
+  };
+  const sectionSwitch = stageLayout && STAGE_SECTION[view]
+    ? <SectionSwitch section={section} second={STAGE_SECTION[view]} onChange={(next) => navigate({ view, section: next, search: '' })} />
+    : null;
 
   return (
     <Layout title="Workbench">
@@ -209,7 +296,9 @@ export function WorkbenchShell({ previewReadOnly = false }) {
               onChange={(e) => navigate({ cycleCode: e.target.value, uncycled: false }, { push: true })}
               className="w-48"
             >
-              {cyclesReady && !cycleCode && <option value="">Select a cycle…</option>}
+              {cyclesReady && !cycleCode && (
+                <option value="">{cycleOptions.length ? 'Select a cycle…' : 'No cycles available'}</option>
+              )}
               {cycleOptions.map((c) => (
                 <option key={c.code} value={c.code}>{c.label || c.code}</option>
               ))}
@@ -247,6 +336,8 @@ export function WorkbenchShell({ previewReadOnly = false }) {
         )}
       </div>
 
+      {j27IntegrityEnabled && <IntegrityAlerts />}
+
       {cyclesError && (
         <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm" role="alert">
           {cyclesError}{' '}
@@ -254,7 +345,15 @@ export function WorkbenchShell({ previewReadOnly = false }) {
         </div>
       )}
 
-      <WorkbenchViewsNav activeKey={location.view} cycleCode={cycleCode} programId={location.programId} scope={location.scope} />
+      <WorkbenchViewsNav
+        activeKey={view}
+        cycleCode={cycleCode}
+        programId={location.programId}
+        scope={stageLayout ? stageScope : location.scope}
+        scopeSet={stageLayout ? location.scopeSet : false}
+        counts={counts}
+        layout={layoutPending ? 'pending' : stageLayout ? 'j27' : 'legacy'}
+      />
 
       {activeViewMeta?.description && (
         <p className="mb-5 text-sm text-gray-600">{activeViewMeta.description}</p>
@@ -262,9 +361,34 @@ export function WorkbenchShell({ previewReadOnly = false }) {
 
       {cyclesReady && !cycleCode ? (
         <div className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-600" role="status">
-          Select a grant cycle to view this workspace.
+          {cycleOptions.length
+            ? 'Select a grant cycle to view this workspace.'
+            : 'No grant cycles are available for this program. Use Find and open a request to look up an individual request.'}
         </div>
-      ) : location.view === 'requests' ? (
+      ) : layoutPending ? (
+        <div className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-600" role="status">Loading…</div>
+      ) : stageLayout && (view === 'requests' || view === 'initial-assessment') ? (
+        <J27RequestList key={`${programId}:${view}`} tab={view} {...listProps} />
+      ) : stageLayout && view === 'peer-review' && section !== 'reviewers' ? (
+        <J27RequestList key={`${programId}:${view}`} tab={view} {...listProps} leading={sectionSwitch} />
+      ) : stageLayout && view === 'peer-review' ? (
+        <>
+          <div className="mb-4">{sectionSwitch}</div>
+          <ReviewerFollowUpPanel
+            key={programId}
+            programId={programId}
+            cycleCode={cycleCode}
+            loadingCycles={!cyclesReady && !cyclesError}
+            previewReadOnly={previewReadOnly}
+            scope={stageScope}
+            reviewersView={location.reviewersView}
+            search={location.search}
+            onScopeChange={chooseScope}
+            onReviewersViewChange={(reviewersView) => navigate({ reviewersView })}
+            onSearchChange={(search) => navigate({ search })}
+          />
+        </>
+      ) : view === 'requests' ? (
         <RequestListPanel
           key={programId}
           programId={programId}
@@ -280,7 +404,7 @@ export function WorkbenchShell({ previewReadOnly = false }) {
           cycleMetadataReady={cyclesReady}
           allowRowsWhileCyclesLoading={explicitCycleArm}
         />
-      ) : location.view === 'reviewer-follow-up' ? (
+      ) : view === 'reviewer-follow-up' ? (
         <ReviewerFollowUpPanel
           key={programId}
           programId={programId}
@@ -294,7 +418,11 @@ export function WorkbenchShell({ previewReadOnly = false }) {
           onReviewersViewChange={(reviewersView) => navigate({ reviewersView })}
           onSearchChange={(search) => navigate({ search })}
         />
-      ) : location.view === 'final-writeups' ? (
+      ) : stageLayout && (view === 'deliberations' || view === 'final-assessment') && !section ? (
+        <J27RequestList key={`${programId}:${view}`} tab={view} {...listProps} leading={sectionSwitch} />
+      ) : view === 'final-writeups' || view === 'final-assessment' ? (
+        <>
+        {sectionSwitch && <div className="mb-4">{sectionSwitch}</div>}
         <FinalWriteupsPanel
           cycleCode={cycleCode}
           loadingCycles={!cyclesReady && !cyclesError}
@@ -308,20 +436,24 @@ export function WorkbenchShell({ previewReadOnly = false }) {
           onUncycledChange={(uncycled) => navigate({ uncycled }, { push: true })}
           onCycleChange={(code) => navigate({ cycleCode: code, uncycled: false }, { push: true })}
         />
-      ) : location.view === 'staff-deliberations' ? (
+        </>
+      ) : view === 'staff-deliberations' || view === 'deliberations' ? (
+        <>
+        {sectionSwitch && <div className="mb-4">{sectionSwitch}</div>}
         <StaffDeliberationsPanel
           programId={programId}
           cycleCode={cycleCode}
           loadingCycles={!cyclesReady && !cyclesError}
-          scope={location.scope}
-          onScopeChange={(scope) => navigate({ scope })}
+          scope={stageLayout ? stageScope : location.scope}
+          onScopeChange={stageLayout ? chooseScope : (scope) => navigate({ scope })}
         />
-      ) : location.view === 'awardees' ? (
+        </>
+      ) : view === 'awardees' ? (
         <AwardeesPanel
           cycleCode={cycleCode}
           loadingCycles={!cyclesReady && !cyclesError}
-          scope={location.scope}
-          onScopeChange={(scope) => navigate({ scope })}
+          scope={stageLayout ? stageScope : location.scope}
+          onScopeChange={stageLayout ? chooseScope : (scope) => navigate({ scope })}
           onCycleChange={(code) => navigate({ cycleCode: code }, { push: true })}
         />
       ) : (

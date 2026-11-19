@@ -15,6 +15,8 @@ import {
   isFinalWriteupSignedOff,
 } from '../../config/finalWriteupSignOff';
 
+const OFFRAMP_CODE = 'final_writeup_offramped';
+const OFFRAMP_MESSAGE = 'This request has been offramped and will not go to the Board. Group review and leadership review are unavailable.';
 const POLL_INTERVAL_MS = 2000;
 const POLL_ATTEMPTS = 10;
 const ACKNOWLEDGEMENT_SCHEMA_NOT_READY = 'final_writeup_acknowledgement_schema_not_ready';
@@ -25,12 +27,20 @@ const ACKNOWLEDGEMENT_SCHEMA_NOT_READY = 'final_writeup_acknowledgement_schema_n
 const SITE_VISIT_PREREQUISITE_MESSAGE = 'Final writeup needs a draft writeup first. '
   + 'Check draft writeup preparation in Staff Deliberations. It becomes available after the scheduled research presentation ends.';
 
-function transitionErrorMessage(error) {
+function transitionErrorMessage(error, boardDraftAvailable = false) {
   return error?.code === 'final_writeup_source_missing'
-    ? SITE_VISIT_PREREQUISITE_MESSAGE
+    ? boardDraftAvailable ? 'The Draft Writeup changed. Refresh Final Assessment to see the current draft.' : SITE_VISIT_PREREQUISITE_MESSAGE
     : error?.message;
 }
 // Phases with a current Final row: review tracking loads and the review panel renders.
+const PRESENTATION_SCHEDULE_LABEL = {
+  missing: 'No presentation is scheduled.',
+  upcoming: 'The scheduled presentation has yet to end.',
+  ended: 'The presentation end is verified.',
+  unverified: 'The presentation end could not be verified.',
+  not_checked: 'Timing is checked for staff who can start group review.',
+};
+
 const IN_REVIEW_PHASES = new Set(['group-review', 'leadership-review']);
 const STAGE_PRESENTATION = Object.freeze({
   'group-review': {
@@ -249,12 +259,16 @@ function ReviewerInitial({ reviewer }) {
   );
 }
 
-export default function FinalWriteupTab({ requestId }) {
+export default function FinalWriteupTab({ requestId, renderBoardDraft = null, onJ27Facts = null }) {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(false);
   const [starting, setStarting] = useState(false);
   const [advancing, setAdvancing] = useState(false);
   const [error, setError] = useState(null);
+  const [needsBoardDraft, setNeedsBoardDraft] = useState(false);
+  const [showBoardDraft, setShowBoardDraft] = useState(false);
+  const [statusReload, setStatusReload] = useState(0);
+  const reloadStatus = useCallback(() => setStatusReload(value => value + 1), []);
   // null | 'group' | 'leadership': which governed transition the dialog confirms.
   const [confirming, setConfirming] = useState(null);
   const [acknowledgement, setAcknowledgement] = useState(null);
@@ -267,6 +281,7 @@ export default function FinalWriteupTab({ requestId }) {
   const cancelButtonRef = useRef(null);
   const confirmButtonRef = useRef(null);
 
+  const boardDraftAvailable = Boolean(renderBoardDraft);
   const load = useCallback(async (signal) => {
     if (!requestId) return null;
     return fetchStatus(requestId, signal);
@@ -288,11 +303,19 @@ export default function FinalWriteupTab({ requestId }) {
     if (requestId) {
       load(controller.signal)
         .then((next) => {
-          if (activeController.current === controller) setStatus(next);
+          if (activeController.current === controller) {
+            setStatus(next);
+            setNeedsBoardDraft(false);
+          }
         })
         .catch((loadError) => {
           if (activeController.current === controller && loadError?.name !== 'AbortError') {
-            setError(transitionErrorMessage(loadError));
+            onJ27Facts?.(requestId, { finalWriteup: { error: true, code: loadError?.code || null } }); // step E
+            const draftNeeded = boardDraftAvailable && (
+              loadError.code === 'final_writeup_source_missing' || loadError.code === 'final_writeup_source_ineligible'
+            );
+            setNeedsBoardDraft(draftNeeded);
+            if (!draftNeeded) setError(transitionErrorMessage(loadError));
           }
         })
         .finally(() => {
@@ -303,7 +326,13 @@ export default function FinalWriteupTab({ requestId }) {
       controller.abort();
       acknowledgementController.current?.abort();
     };
-  }, [requestId, load]);
+  }, [requestId, load, boardDraftAvailable, statusReload, onJ27Facts]);
+
+  // Step E (plan C7): every status this tab holds (initial load, polling, start,
+  // advance) reaches the page's stage through one place.
+  useEffect(() => {
+    if (status && requestId && onJ27Facts) onJ27Facts(requestId, { finalWriteup: status });
+  }, [status, requestId, onJ27Facts]);
 
   const acknowledgementArtifactId = IN_REVIEW_PHASES.has(status?.phase)
     ? status?.artifact?.artifactId || null
@@ -420,7 +449,13 @@ export default function FinalWriteupTab({ requestId }) {
       }
     } catch (startError) {
       if (activeController.current === controller && startError?.name !== 'AbortError') {
-        setError(transitionErrorMessage(startError));
+        if (startError.code === OFFRAMP_CODE) {
+          setConfirming(null);
+          setStatus((current) => ({ ...current, canStart: false, canAdvance: false,
+            startBlockedReason: OFFRAMP_CODE, advanceBlockedReason: OFFRAMP_CODE }));
+        } else {
+          setError(transitionErrorMessage(startError, boardDraftAvailable));
+        }
       }
     } finally {
       if (activeController.current === controller) {
@@ -446,7 +481,9 @@ export default function FinalWriteupTab({ requestId }) {
         tolerantBody: true,
       });
       if (!ok) {
-        throw new Error(body.error || `Leadership review transition failed (${httpStatus})`);
+        const failure = new Error(body.error || `Leadership review transition failed (${httpStatus})`);
+        failure.code = body.code || null;
+        throw failure;
       }
       if (activeController.current !== controller) return;
       if (body.artifact?.artifactId !== finalArtifactId) {
@@ -463,7 +500,13 @@ export default function FinalWriteupTab({ requestId }) {
       setAcknowledgementReload((value) => value + 1);
     } catch (advanceError) {
       if (activeController.current === controller && advanceError?.name !== 'AbortError') {
-        setError(advanceError.message);
+        if (advanceError.code === OFFRAMP_CODE) {
+          setConfirming(null);
+          setStatus((current) => ({ ...current, canStart: false, canAdvance: false,
+            startBlockedReason: OFFRAMP_CODE, advanceBlockedReason: OFFRAMP_CODE }));
+        } else {
+          setError(advanceError.message);
+        }
       }
     } finally {
       if (activeController.current === controller) {
@@ -534,6 +577,11 @@ export default function FinalWriteupTab({ requestId }) {
     ? acknowledgement.signOffRoster
     : null;
   const notSignedOff = programDirectorsNotSignedOff(signOffRoster);
+  const draftVisible = status?.sourceFileHidden !== true && Boolean(status?.sourceFile?.webUrl);
+  const presentationSchedule = status?.presentationSchedule
+    || (status?.startBlockedReason ? 'unverified' : 'not_checked');
+  const offramped = status?.startBlockedReason === OFFRAMP_CODE || status?.advanceBlockedReason === OFFRAMP_CODE;
+  const showScheduleLink = presentationSchedule === 'missing' || presentationSchedule === 'unverified';
 
   return (
     <div className="space-y-4">
@@ -542,29 +590,7 @@ export default function FinalWriteupTab({ requestId }) {
           <p>{error}</p>
           <button
             type="button"
-            onClick={() => {
-              activeController.current?.abort();
-              const controller = new AbortController();
-              activeController.current = controller;
-              setError(null);
-              setLoading(true);
-              load(controller.signal)
-                .then((next) => {
-                  if (activeController.current === controller) setStatus(next);
-                })
-                .catch((loadError) => {
-                  if (activeController.current === controller
-                    && loadError?.name !== 'AbortError') {
-                    setError(transitionErrorMessage(loadError));
-                  }
-                })
-                .finally(() => {
-                  if (activeController.current === controller) {
-                    activeController.current = null;
-                    setLoading(false);
-                  }
-                });
-            }}
+            onClick={reloadStatus}
             className="mt-2 font-medium underline decoration-red-300 underline-offset-4 hover:decoration-red-700 focus:outline-none focus:ring-2 focus:ring-red-700 focus:ring-offset-2"
           >
             Try again
@@ -572,11 +598,18 @@ export default function FinalWriteupTab({ requestId }) {
         </div>
       )}
 
+      {offramped && (
+        <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+          {OFFRAMP_MESSAGE}
+        </p>
+      )}
       <Card hover={false}>
         <div className="max-w-3xl">
-          <h2 className="text-xl font-semibold tracking-tight text-gray-900">Final writeup</h2>
+          <h2 className="text-xl font-semibold tracking-tight text-gray-900">{boardDraftAvailable ? 'Draft Writeup' : 'Final writeup'}</h2>
           <p className="mt-2 text-sm leading-6 text-gray-600">
-            The final writeup continues the same editable document prepared as the draft writeup. Starting a review records its current Word version.
+            {boardDraftAvailable
+              ? 'Write the Draft Writeup in Word. Starting group review records its current Word version.'
+              : 'The final writeup continues the same editable document prepared as the draft writeup. Starting a review records its current Word version.'}
           </p>
         </div>
 
@@ -726,42 +759,107 @@ export default function FinalWriteupTab({ requestId }) {
         ) : status?.phase === 'ready' ? (
           <div className="mt-6 flex flex-col gap-5 rounded-xl border border-gray-200 bg-gray-50 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="max-w-2xl">
-              <h3 className="text-lg font-semibold text-gray-900">{status.startBlockedReason ? 'Group review is not available yet' : 'Group review has not started'}</h3>
-              <p className="mt-1 text-sm leading-6 text-gray-600">
-                Mark the writeup ready for group review when colleagues should see it. This records the current Word version.
-                {status.handoffEmailEnabled === true
-                  ? ' The other Program Directors for this grant program get an email from the lead Program Director with a link.'
-                  : ' No email is sent.'}
-              </p>
-              {status.sourceFile?.name && (
-                <p className="mt-2 text-xs text-gray-500">{status.sourceFile.name}</p>
-              )}
-              {status.startCompatibilityReason === 'legacy_review_schedule_unverified' && (
-                <p className="mt-3 text-sm text-amber-800">This uses the existing completed writeup. Presentation timing has not been verified.</p>
-              )}
-              {!status.canStart && (
-                <p className="mt-3 text-sm font-medium text-amber-800">
-                  {status.startBlockedReason === 'final_writeup_site_visit_not_ended'
-                    ? 'Group review becomes available after the scheduled presentation ends.'
-                    : status.startBlockedReason
-                      ? 'The presentation schedule could not be verified. Check Staff Deliberations before starting group review.'
-                      : 'Only the lead Program Director or a superuser can start this stage.'}
+              <h3 className="text-lg font-semibold text-gray-900">{offramped ? 'Group review is unavailable' : status.startBlockedReason ? 'Group review is not available yet' : 'Group review has not started'}</h3>
+              {!offramped && (!boardDraftAvailable || status.canStart) && (
+                <p className="mt-1 text-sm leading-6 text-gray-600">
+                  Mark the writeup ready for group review when colleagues should see it. This records the current Word version.
+                  {status.handoffEmailEnabled === true
+                    ? ' The other Program Directors for this grant program get an email from the lead Program Director with a link.'
+                    : ' No email is sent.'}
                 </p>
               )}
+              {boardDraftAvailable ? (
+                <dl className="mt-4 grid gap-3 text-sm">
+                  <div>
+                    <dt className="font-semibold text-gray-900">Word draft</dt>
+                    <dd className="text-gray-700">{draftVisible
+                      ? (status.sourceFile.name || 'Available to open.')
+                      : status.sourceFileHidden ? 'The draft is unavailable to you.' : 'No Word link is available.'}</dd>
+                  </div>
+                  {!offramped && <div>
+                    <dt className="font-semibold text-gray-900">Presentation schedule</dt>
+                    <dd className="text-gray-700">
+                      {PRESENTATION_SCHEDULE_LABEL[presentationSchedule] || PRESENTATION_SCHEDULE_LABEL.not_checked}
+                      {showScheduleLink && (
+                        <> <a className="font-medium text-blue-800 underline underline-offset-2"
+                          href={`/meeting-tracker/visits/${encodeURIComponent(requestId)}`}>Open meeting record</a></>
+                      )}
+                    </dd>
+                  </div>}
+                  <div>
+                    <dt className="font-semibold text-gray-900">Group review</dt>
+                    <dd className="text-gray-700">{offramped ? 'Unavailable for an offramped request.' : status.canStart ? 'Ready to start when the draft is complete.'
+                      : presentationSchedule === 'upcoming' ? 'Waiting for the presentation to end.'
+                        : status.startBlockedReason ? 'Waiting for a verified presentation end.'
+                          : 'The lead Program Director or a superuser can start group review.'}</dd>
+                  </div>
+                </dl>
+              ) : (
+                <>
+                  {status.sourceFile?.name && (
+                    <p className="mt-2 text-xs text-gray-500">{status.sourceFile.name}</p>
+                  )}
+                  {status.startCompatibilityReason === 'legacy_review_schedule_unverified' && (
+                    <p className="mt-3 text-sm text-amber-800">This uses the existing completed writeup. Presentation timing has not been verified.</p>
+                  )}
+                  {!offramped && !status.canStart && (
+                    <p className="mt-3 text-sm font-medium text-amber-800">
+                      {status.startBlockedReason === 'final_writeup_site_visit_not_ended'
+                        ? 'Group review becomes available after the scheduled presentation ends.'
+                        : status.startBlockedReason
+                          ? `The presentation schedule could not be verified. Check ${renderBoardDraft ? 'Deliberations' : 'Staff Deliberations'} before starting group review.`
+                          : 'Only the lead Program Director or a superuser can start this stage.'}
+                    </p>
+                  )}
+                </>
+              )}
             </div>
-            {status.canStart && (
-              <button
-                type="button"
-                disabled={starting}
-                onClick={() => setConfirming('group')}
-                className="min-h-11 shrink-0 rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                Ready for group review
-              </button>
+            {/* The pre-review Word link belongs to the J27 layout only (rollout plan, "Admission to implement"). */}
+            {(status.canStart || (boardDraftAvailable && draftVisible)) && (
+              <div className="flex flex-wrap items-center gap-3 sm:max-w-xs">
+                {boardDraftAvailable && draftVisible && (
+                  <a
+                    href={status.sourceFile.webUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex min-h-11 items-center rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2"
+                  >
+                    Open draft in Word
+                  </a>
+                )}
+                {status.canStart && (
+                  <button
+                    type="button"
+                    disabled={starting}
+                    onClick={() => setConfirming('group')}
+                    className="min-h-11 shrink-0 rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    Ready for group review
+                  </button>
+                )}
+              </div>
             )}
           </div>
         ) : null}
       </Card>
+
+      {boardDraftAvailable && (needsBoardDraft || status) && (
+        needsBoardDraft ? renderBoardDraft({ onDraftChange: reloadStatus, watchForReadyDraft: true }) : (
+          <details className="rounded-lg border bg-white p-4" onToggle={event => {
+            if (event.currentTarget.open) setShowBoardDraft(true);
+          }}>
+            <summary className="cursor-pointer font-semibold">Draft Writeup tools</summary>
+            {showBoardDraft && (
+              <div className="mt-3">
+                {renderBoardDraft({
+                  boardDraftAlreadyLinked: Boolean(status.sourceFile?.webUrl || artifact?.file?.webUrl),
+                  onDraftChange: reloadStatus,
+                })}
+              </div>
+            )}
+          </details>
+        )
+      )}
 
       {confirming && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="presentation">

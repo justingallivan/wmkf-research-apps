@@ -263,6 +263,14 @@ test('binding refuses a request with a December meeting date but no Grant Cycle 
   })).rejects.toMatchObject({ code: 'meeting_transcription_request_ineligible', httpStatus: 404 });
 });
 
+test('binding refuses an Offramped request (D7) even when it is Phase II Pending and in a cycle', async () => {
+  await expect(loadMeetingTranscriptionBinding(REQUEST, VISIT, {
+    getRequest: async () => ({ akoya_requestid: REQUEST, akoya_requeststatus: 'Phase II Pending',
+      wmkf_triagestatus: null, wmkf_phaseiistatus: 682090001, wmkf_GrantCycle: { wmkf_cyclecode: 'J27' } }),
+    findActiveByRequest: async () => ({ records: [{ activityid: VISIT, _regardingobjectid_value: REQUEST }] }),
+  })).rejects.toMatchObject({ code: 'meeting_transcription_request_offramped', httpStatus: 409 });
+});
+
 test('the default binding request read carries the Grant Cycle expand and no meeting date', async () => {
   const restriction = jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {});
   const getRecord = jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({ akoya_requestid: REQUEST,

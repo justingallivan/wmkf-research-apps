@@ -60,7 +60,7 @@ function compilerMetadata() {
 }
 
 function dependencies(overrides = {}) {
-  const bytes = Buffer.from('preview-pdf');
+  const bytes = Buffer.from('%PDF-preview');
   const metadata = {
     id: 'graph-item-1',
     name: 'ProjectDescription.pdf',
@@ -331,7 +331,8 @@ test('re-resolves and hashes the selected file, but strips every executable payl
 
   expect(deps.getRequestById).toHaveBeenCalledWith(SOURCE_ID);
   expect(deps.getFileMetadataById).toHaveBeenCalledTimes(2);
-  expect(deps.downloadFile).toHaveBeenCalledWith('drive-1', 'graph-item-1');
+  // The read is capped at the listed size (a PDF must match it exactly).
+  expect(deps.downloadFile).toHaveBeenCalledWith('drive-1', 'graph-item-1', { maxBytes: Buffer.byteLength('%PDF-preview') });
   expect(result.executionEnabled).toBe(false);
   expect(result.preview.planReady).toBe(false);
   expect(result.preview.executionReady).toBe(false);
@@ -441,7 +442,7 @@ test('rejects MIME drift before downloading selected bytes', async () => {
   deps.getFileMetadataById.mockResolvedValueOnce({
     id: 'graph-item-1',
     name: 'ProjectDescription.pdf',
-    size: Buffer.byteLength('preview-pdf'),
+    size: Buffer.byteLength('%PDF-preview'),
     mimeType: 'text/html',
     eTag: 'etag-1',
     versionId: null,
@@ -463,7 +464,7 @@ test('accepts an eTag without conflating it with a missing publication version',
   const metadataWithoutPublicationVersion = {
     id: 'graph-item-1',
     name: 'ProjectDescription.pdf',
-    size: Buffer.byteLength('preview-pdf'),
+    size: Buffer.byteLength('%PDF-preview'),
     mimeType: 'application/pdf',
     eTag: 'etag-only',
     versionId: null,
@@ -526,11 +527,11 @@ test('a source version change during hashing returns a stale-source conflict', a
   const loaded = await loadTestRequestPreviewSource({ requestNumber: '1002001' }, deps);
   deps.getFileMetadataById
     .mockResolvedValueOnce({
-      id: 'graph-item-1', name: 'ProjectDescription.pdf', size: Buffer.byteLength('preview-pdf'),
+      id: 'graph-item-1', name: 'ProjectDescription.pdf', size: Buffer.byteLength('%PDF-preview'),
       mimeType: 'application/pdf', eTag: 'etag-1', versionId: '1.0',
     })
     .mockResolvedValueOnce({
-      id: 'graph-item-1', name: 'ProjectDescription.pdf', size: Buffer.byteLength('preview-pdf'),
+      id: 'graph-item-1', name: 'ProjectDescription.pdf', size: Buffer.byteLength('%PDF-preview'),
       mimeType: 'application/pdf', eTag: 'etag-2', versionId: '2.0',
     });
 
@@ -551,7 +552,7 @@ test('a source that vanishes after download is still a stale-source conflict, no
   const deps = dependencies();
   const loaded = await loadTestRequestPreviewSource({ requestNumber: '1002001' }, deps);
   const metadata = {
-    id: 'graph-item-1', name: 'ProjectDescription.pdf', size: Buffer.byteLength('preview-pdf'),
+    id: 'graph-item-1', name: 'ProjectDescription.pdf', size: Buffer.byteLength('%PDF-preview'),
     mimeType: 'application/pdf', eTag: 'etag-1', versionId: '1.0', cTag: 'ctag-1',
   };
   // getFileMetadataById answers null on a 404 (graph/files.js).
@@ -573,12 +574,12 @@ test('the stale-source conflict names only the comparison that failed: a short d
   const deps = dependencies();
   const loaded = await loadTestRequestPreviewSource({ requestNumber: '1002001' }, deps);
   const metadata = {
-    id: 'graph-item-1', name: 'ProjectDescription.pdf', size: Buffer.byteLength('preview-pdf'),
+    id: 'graph-item-1', name: 'ProjectDescription.pdf', size: Buffer.byteLength('%PDF-preview'),
     mimeType: 'application/pdf', eTag: 'etag-1', versionId: '1.0', cTag: 'ctag-1',
   };
   deps.getFileMetadataById.mockResolvedValue(metadata);
   deps.downloadFile.mockResolvedValueOnce({
-    buffer: Buffer.from('preview-p'), filename: metadata.name, mimeType: metadata.mimeType, size: metadata.size,
+    buffer: Buffer.from('%PDF-previ'), filename: metadata.name, mimeType: metadata.mimeType, size: metadata.size,
   });
 
   const error = await buildTestRequestAdminPreview({
@@ -590,7 +591,7 @@ test('the stale-source conflict names only the comparison that failed: a short d
   }, deps).catch((caught) => caught);
 
   expect(error).toMatchObject({ httpStatus: 409, code: 'test_request_preview_source_changed' });
-  expect(error.message).toBe('ProjectDescription.pdf changed while its bytes were being verified (content length 11 -> 9; cTag ctag-1 (unchanged)). Reload the source Request.');
+  expect(error.message).toBe('ProjectDescription.pdf changed while its bytes were being verified (content length 12 -> 10; cTag ctag-1 (unchanged)). Reload the source Request.');
   expect(error.message).not.toMatch(/metadata (eTag|versionId|size)/);
-  expect(error.message).not.toMatch(/preview-p/);
+  expect(error.message).not.toMatch(/%PDF-previ/);
 });

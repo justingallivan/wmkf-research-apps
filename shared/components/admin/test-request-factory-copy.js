@@ -57,6 +57,8 @@ export const ERROR_COPY = Object.freeze({
   test_request_preview_total_size_exceeded: SIZE_COPY,
   test_request_preview_file_metadata_unavailable: "I couldn't confirm the size of one of this Request's documents, so nothing was created. Try again, and if it persists, choose another source Request.",
   test_request_preview_file_type_unsupported: "One of this Request's documents isn't a type that can be cloned here, so nothing was created. Choose another source Request.",
+  // A .pdf the run would copy isn't a usable PDF (e.g. 1002912's bibliography held JSON text, 2026-11-15).
+  test_request_preview_source_invalid_pdf: (message) => message || "One of this Request's PDFs isn't a usable PDF, so nothing was created. Choose another source Request.",
   test_request_preview_source_changed: 'The source Request changed while its documents were being read, so nothing was created. Look up the source Request again.',
   status_change_replay: OWNER_REPLAY,
   status_change_noop: 'The Request already has that status, so nothing was sent.',
@@ -102,6 +104,10 @@ export const ATTENTION_COPY = Object.freeze({
   timeout: `A service took too long to answer during this step. ${ATTENTION_TRANSIENT_RETRY}`,
   network: `The connection dropped during this step. ${ATTENTION_TRANSIENT_RETRY}`,
   bundle_stale: `This run's saved copy of the source can't be used any more: it's too old, or the copy rules changed since it was saved. Retrying will stop here again; the run can't continue. ${CANNOT_CONTINUE}`,
+  // A source file failed its type check before anything was written for it: for a J27 run,
+  // a narrative or bibliography that is not a readable PDF, so the combined
+  // Narrative-Bibliography file can't be built (bundle-file-copy.js). Deterministic.
+  file_rejected: `A source file was refused because it isn't the kind of file it should be (for example, a narrative or bibliography that isn't a readable PDF). Nothing was written for it. Retrying will stop here again; the run can't continue. ${CANNOT_CONTINUE}`,
   file_ambiguous_unrecovered: ATTENTION_UNCONFIRMED,
   file_journal_unverified: ATTENTION_UNCONFIRMED,
   goverify_deactivation_uncertain: ATTENTION_WORKFLOW,

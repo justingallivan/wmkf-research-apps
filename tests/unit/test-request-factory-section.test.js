@@ -93,9 +93,9 @@ beforeAll(() => {
 });
 beforeEach(() => { uuidCounter = 0; global.fetch.mockReset(); localStorage.clear(); sessionStorage.clear(); });
 
-async function renderSection(server, runs = [makeRun()], extra = {}) {
+async function renderSection(server, runs = [makeRun()], extra = {}, props = {}) {
   server.on('GET', BASE, listBody(runs, extra));
-  const view = render(<TestRequestFactorySection />);
+  const view = render(<TestRequestFactorySection {...props} />);
   await screen.findByText(runs.length ? runs[0].testLabel : 'No runs yet.');
   return view;
 }
@@ -235,7 +235,10 @@ describe('confirm', () => {
     expect(reasonOf()).toBe('Choose a Grant Cycle.');
     fireEvent.change(screen.getByLabelText('Grant Cycle'), { target: { value: 'J27' } });
     expect(confirmButton().disabled).toBe(false);
-    expect(screen.getByText(/Confirm reserves the run and creates nothing in Dataverse yet/)).toBeTruthy();
+    const next = screen.getByText(/Confirm reserves the run; nothing is created in Dataverse yet/);
+    // The next steps point at the form's own Prepare for review, not the command-line tool (owner, 2026-11-15).
+    expect(next.textContent).toContain('Prepare for review');
+    expect(next.textContent).not.toMatch(/command-line/);
     expect(server.count('POST', BASE)).toBe(0);
   });
 
@@ -252,7 +255,13 @@ describe('confirm', () => {
     expect(server.bodies('POST', BASE)).toEqual([{
       draftId: DRAFT_ID, idempotencyKey: 'key-1', confirmSourceRequestNumber: '1001000', testLabel: 'My test', cycleCode: 'D26',
     }]);
-    expect(screen.getByText('Nothing has been created in Dataverse yet. Start it from the run panel below.')).toBeTruthy();
+    const reservedLine = screen.getByText('Nothing has been created in Dataverse yet. Start it from the run panel below.');
+    // Owner, 2026-11-15: the run panel (with its start button) sits directly under the reserved line, above "Your runs".
+    const panelHeading = screen.getByRole('heading', { name: 'My test' });
+    const runsHeading = screen.getByRole('heading', { name: /^Previous runs/ });
+    const FOLLOWING = Node.DOCUMENT_POSITION_FOLLOWING;
+    expect(reservedLine.compareDocumentPosition(panelHeading) & FOLLOWING).toBeTruthy();
+    expect(panelHeading.compareDocumentPosition(runsHeading) & FOLLOWING).toBeTruthy();
   });
 
   test('a 200 same-key retry also selects the run', async () => {
@@ -381,6 +390,54 @@ describe('advance loop', () => {
     expect(screen.queryByRole('button', { name: /^(Start|Resume)$/ })).toBeNull();
     // The run is refreshed after the loop stops.
     expect(server.count('GET', `${BASE}/${RUN_A}`)).toBeGreaterThanOrEqual(2);
+  });
+
+  // Owner, 2026-11-18: a test Request this page just finished creating is prepared for review on its own.
+  const prepareStatus = {
+    status: 200,
+    body: {
+      runId: RUN_A, runStatus: 'ready', current: { phase1: null, phase2: null }, changes: [],
+      options: { phase1: [{ value: 3, label: 'Invited', blocked: null }], phase2: [{ value: 2, label: 'Phase II Pending Committee Review', blocked: null }] },
+      readiness: { applies: true, manifestStored: true, ready: false, attemptStatus: null, requiredPair: { phase1: 3, phase2: 2 } },
+    },
+  };
+  const statusPath = `${BASE}/${RUN_A}/status`;
+
+  test('finishing the run here starts Prepare for review on its own', async () => {
+    const server = await setup();
+    // The last step answers `advanced` with status ready; `ready` alone means it was already finished.
+    server.on('POST', advancePath(), reply('advanced', { status: 'ready', currentStep: 'verify', stepIndex: 6, destinationRequestNumber: '1004000' }));
+    server.on('GET', `${BASE}/${RUN_A}`, runBody(makeRun({ status: 'ready', currentStep: 'verify', stepIndex: 6, destinationRequestNumber: '1004000' })));
+    server.on('GET', statusPath, prepareStatus);
+    server.on('POST', statusPath, { status: 202, body: { outcome: 'in_progress', message: 'Still waiting for background jobs.' } });
+    start();
+    await waitFor(() => expect(server.count('POST', statusPath)).toBe(1));
+    expect(server.bodies('POST', statusPath)[0]).toEqual({ field: 'phase1', optionLabel: 'Invited' });
+    expect(screen.queryByRole('button', { name: 'Yes, prepare it' })).toBeNull();
+  });
+
+  test('Stop pressed during the last step withholds automatic preparation (Codex)', async () => {
+    const server = await setup();
+    const gate = deferred();
+    server.on('POST', advancePath(), async () => { await gate.promise; return reply('advanced', { status: 'ready', currentStep: 'verify', stepIndex: 6, destinationRequestNumber: '1004000' }); });
+    server.on('GET', `${BASE}/${RUN_A}`, runBody(makeRun({ status: 'ready', currentStep: 'verify', stepIndex: 6, destinationRequestNumber: '1004000' })));
+    server.on('GET', statusPath, prepareStatus);
+    start();
+    fireEvent.click(await screen.findByRole('button', { name: 'Stop after this step' }));
+    await act(async () => { gate.resolve(); });
+    expect(await screen.findByRole('button', { name: 'Prepare for review' })).toBeTruthy();
+    expect(server.count('POST', statusPath)).toBe(0);
+  });
+
+  test('opening a run that is already created does not start Prepare for review', async () => {
+    const run = makeRun({ status: 'ready', currentStep: 'verify', stepIndex: 6, destinationRequestNumber: '1004000' });
+    const server = makeServer();
+    server.on('GET', `${BASE}/${RUN_A}`, runBody(run));
+    server.on('GET', statusPath, prepareStatus);
+    await renderSection(server, [run]);
+    await selectRun(run.testLabel);
+    expect(await screen.findByRole('button', { name: 'Prepare for review' })).toBeTruthy();
+    expect(server.count('POST', statusPath)).toBe(0);
   });
 
   test('needs_attention stops, shows the step and error text, and follows the server diagnosis; the text is kept nowhere', async () => {
@@ -678,26 +735,11 @@ describe('inspect, recheck and files', () => {
 const primaries = () => [...document.querySelectorAll('[data-primary="true"]')].filter((button) => !button.disabled);
 
 describe('write target and consequence', () => {
-  test.each([
-    ['production', 'Writes to production', 'Production'],
-    ['sandbox', 'Writes to sandbox', 'the sandbox'],
-  ])('the band for the %s target names it once the list has answered', async (target, chip, where) => {
+  test.each(['production', 'sandbox'])('the %s target goes to the panel scope label, not a second band', async (target) => {
     const server = makeServer();
-    await renderSection(server, [], { target });
-    expect(screen.getByText(chip)).toBeTruthy();
-    const phase = ' and can change its Phase I or Phase II status';
-    const sentence = `This panel changes real data on ${where}: it creates a test Request step by step${target === 'production' ? phase : ''}.`;
-    expect(screen.getByText(sentence)).toBeTruthy();
-  });
-
-  test('the band is not shown before the list answers, and the form-off banner replaces it', async () => {
-    const server = makeServer();
-    server.on('GET', BASE, { status: 500, body: { error: 'x' } });
-    render(<TestRequestFactorySection />);
-    await screen.findByRole('alert');
-    expect(screen.queryByText('Writes to production')).toBeNull();
-    const off = makeServer();
-    await renderSection(off, [], { formEnabled: false });
+    const onTarget = jest.fn();
+    await renderSection(server, [], { target }, { onTarget });
+    await waitFor(() => expect(onTarget).toHaveBeenCalledWith(target));
     expect(screen.queryByText(/This panel changes real data/)).toBeNull();
   });
 
@@ -717,6 +759,8 @@ describe('write target and consequence', () => {
       ? `Writes to ${where} Dataverse and SharePoint: creates the test Request in its Grant Cycle, sets its meeting date, makes its document folder and copies its documents.`
       : `The remaining steps write to ${where} Dataverse and SharePoint.`;
     expect(screen.getByText(line)).toBeTruthy();
+    const prepares = screen.queryByText(/the form then prepares the test Request for review/);
+    expect(Boolean(prepares)).toBe(env === 'production');
   });
 
   test('a ready sandbox run says status changes are production only; a ready production run links to the Workbench by its Request id', async () => {
@@ -732,6 +776,40 @@ describe('write target and consequence', () => {
     expect(screen.queryByRole('link', { name: 'Open in the Workbench' })).toBeNull();
     await selectRun('Run P');
     expect(screen.getByRole('link', { name: 'Open in the Workbench' }).getAttribute('href')).toBe('/workbench/44444444-4444-4444-8444-444444444444');
+  });
+
+  test('a created production run puts the status control first, collapses the finished clone steps and drops the empty next-step box', async () => {
+    const prod = makeRun({ status: 'ready', currentStep: 'verify', stepIndex: 6, destinationRequestNumber: '1004000' });
+    const server = makeServer();
+    server.on('GET', `${BASE}/${RUN_A}`, runBody(prod, { diagnosis: { nextAction: 'none', message: 'This run has no continuation action.' } }));
+    server.on('GET', `${BASE}/${RUN_A}/status`, { status: 200, body: { runId: RUN_A, runStatus: 'ready', options: { phase1: [], phase2: [] }, current: { phase1: null, phase2: null }, changes: [] } });
+    await renderSection(server, [prod]);
+    await selectRun('Run A');
+    const statusHeading = await screen.findByRole('heading', { name: 'Phase I and Phase II status' });
+    const cloneSummary = screen.getByText('Test Request created · 7 steps done');
+    expect(cloneSummary.closest('details').open).toBe(false);
+    const FOLLOWING = Node.DOCUMENT_POSITION_FOLLOWING;
+    expect(cloneSummary.compareDocumentPosition(statusHeading) & FOLLOWING).toBeTruthy();
+    expect(statusHeading.compareDocumentPosition(screen.getByText(/^Recorded steps/)) & FOLLOWING).toBeTruthy();
+    expect(statusHeading.compareDocumentPosition(screen.getByText('Run tools')) & FOLLOWING).toBeTruthy();
+    expect(screen.queryByText('Suggested next step')).toBeNull();
+    expect(screen.queryByText(/This run has no continuation action/)).toBeNull();
+    expect(screen.queryByText(/command-line tool/)).toBeNull();
+    expect(screen.getAllByText('Created').length).toBeGreaterThan(0);
+  });
+});
+
+describe('previous runs (owner, 2026-11-15)', () => {
+  test('sit behind a closed caret with their count; a list error stays visible outside it', async () => {
+    const server = makeServer();
+    await renderSection(server, [makeRun()]);
+    const heading = screen.getByRole('heading', { name: 'Previous runs (1)' });
+    expect(heading.closest('details').open).toBe(false);
+    const failed = makeServer();
+    failed.on('GET', BASE, { status: 500, body: { error: 'x' } });
+    render(<TestRequestFactorySection />);
+    const alert = await screen.findByRole('alert');
+    expect(alert.closest('details')).toBeNull();
   });
 });
 

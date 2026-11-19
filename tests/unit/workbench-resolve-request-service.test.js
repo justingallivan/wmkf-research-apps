@@ -9,6 +9,13 @@
 
 const getById = jest.fn();
 const findByRequestNumber = jest.fn();
+// The admission policy itself is covered in workbench-phase-admission.test.js; here, only that the
+// context asks it with the fresh cycle and returns its answer.
+const admits = jest.fn(() => false);
+const loadPhaseAdmission = jest.fn(async () => admits);
+jest.mock('../../lib/services/workbench/phase-admission', () => ({
+  loadPhaseAdmission: (...a) => loadPhaseAdmission(...a),
+}));
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
   getById: (...a) => getById(...a),
   findByRequestNumber: (...a) => findByRequestNumber(...a),
@@ -24,6 +31,32 @@ jest.mock('../../lib/dataverse/adapters/operations-grant-cycle', () => ({
   ...jest.requireActual('../../lib/dataverse/adapters/operations-grant-cycle'),
   getCycleDatesById: (...a) => getCycleDatesById(...a),
 }));
+
+const existsAnySuggestionForRequests = jest.fn(async () => new Set());
+jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
+  existsAnySuggestionForRequests: (...a) => existsAnySuggestionForRequests(...a),
+}));
+const readLatestIntegrityStates = jest.fn(async () => new Map());
+jest.mock('../../lib/services/workbench/program-scope-service', () => ({
+  resolveDiscoveryScope: jest.fn(async () => ({ readinessOnlyProgramIds: ['94cab30b-958f-ee11-8179-000d3a341e8f'] })),
+}));
+jest.mock('../../lib/services/workbench/j27-integrity-jobs', () => ({
+  readLatestIntegrityStates: (...a) => readLatestIntegrityStates(...a),
+}));
+
+// The later-phase facts are mocked as one call (three batched Dataverse reads inside it:
+// draft documents, Final documents, presentations; covered in j27-later-facts.test.js).
+const loadJ27LaterFacts = jest.fn();
+jest.mock('../../lib/services/workbench/j27-later-facts', () => ({
+  ...jest.requireActual('../../lib/services/workbench/j27-later-facts'),
+  loadJ27LaterFacts: (...a) => loadJ27LaterFacts(...a),
+}));
+const NO_PRESENTATION_FACTS = {
+  presentation: { status: 'present', exists: false, id: null, ended: null, legacyException: false },
+  roster: { status: 'absent' },
+  boardDraft: { status: 'present', exists: false },
+  transition: { status: 'present', phase: null },
+};
 
 import { resolveWorkbenchRequest } from '../../lib/services/workbench/resolve-request-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
@@ -47,10 +80,14 @@ const RECORD = {
 beforeEach(() => {
   delete process.env.TEST_REQUEST_ISOLATION;
   jest.clearAllMocks();
+  admits.mockReturnValue(false);
   getById.mockResolvedValue(RECORD);
   findByRequestNumber.mockResolvedValue({ records: [RECORD] });
   fetchCoPIs.mockResolvedValue([]);
   getCycleDatesById.mockResolvedValue({ wmkf_grantcycleid: CYCLE_ID, wmkf_cyclecode: 'J26', wmkf_meetingdate: '2026-06-04' });
+  existsAnySuggestionForRequests.mockResolvedValue(new Set());
+  readLatestIntegrityStates.mockResolvedValue(new Map());
+  loadJ27LaterFacts.mockImplementation(async (rows) => new Map(rows.map(r => [String(r.akoya_requestid).toLowerCase(), NO_PRESENTATION_FACTS])));
   // The link helpers check the wmkf_grantcycle restriction (covered in grant-cycle-link.test.js).
   jest.spyOn(DynamicsService, 'checkRestriction').mockImplementation(() => {});
 });
@@ -71,10 +108,10 @@ test('GUID path: adapter getById, DTO projected', async () => {
   expect(body).toMatchObject({ cycleCode: 'J26', cycleLabel: 'June 2026', meetingDate: '2026-06-04' });
 });
 
-test.each(['GUID', 'number'])('%s path: exposes the normalized J27 row version and Phase I status', async (path) => {
+test.each([['GUID', 'J27'], ['number', 'J27'], ['GUID', 'D27']])('%s path: exposes the normalized row version and Phase I status for %s', async (path, cycle) => {
   const row = processAnnotations({
     ...RECORD,
-    wmkf_GrantCycle: { wmkf_cyclecode: 'J27' },
+    wmkf_GrantCycle: { wmkf_cyclecode: cycle },
     wmkf_phaseistatus: 100000004,
     'wmkf_phaseistatus@OData.Community.Display.V1.FormattedValue': 'Scored',
     '@odata.etag': 'W/"123"',
@@ -170,3 +207,148 @@ test('statusClass: unmapped status → UNCLASSIFIED; null status → null', asyn
   expect(body2.statusClass).toBeNull();
   expect(body2.requestStatus).toBeNull();
 });
+
+describe('J27 read model (plan C7)', () => {
+  const j27Row = (over = {}) => processAnnotations({
+    ...RECORD, wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, akoya_requeststatus: 'Phase I Pending', wmkf_readyforreview: true,
+    _wmkf_grantprogram_value: '94cab30b-958f-ee11-8179-000d3a341e8f', ...over,
+  });
+  // Field readiness on (sandbox Preview), so the admitted case can show the fields as present.
+  test.each([[true, 'present'], [false, 'not-provisioned']])('rollout admits %s: the saved fields derive as %s, and no field text is returned', async (admitted, status) => {
+    const saved = process.env;
+    process.env = { ...saved, VERCEL_ENV: 'preview', DYNAMICS_URL: 'https://orgd9e66399.crm.dynamics.com',
+      INITIAL_RATIONALE_SCHEMA_READY: 'on', MEETING_ROSTER_SCHEMA_READY: 'on' };
+    try {
+      admits.mockReturnValue(admitted);
+      getById.mockResolvedValue(j27Row({ wmkf_initialassessmentrationale: 'Saved rationale', wmkf_staffreviewsummary: 'Saved summary',
+        wmkf_staffvisitassessment: 'Saved assessment', wmkf_confirmedmeetingroster: 'Saved roster' }));
+      const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
+      expect(body.phaseLayout).toBe(admitted);
+      const { rationale, reviewSummary, visitAssessment, rosterMemo } = body.j27.input;
+      for (const fact of [rationale, reviewSummary, visitAssessment, rosterMemo]) expect(fact).toEqual({ status });
+      if (!admitted) expect(body.j27.input.roster).toEqual({ status: 'not-provisioned' });
+      expect(JSON.stringify(body)).not.toMatch(/Saved (rationale|summary|assessment|roster)/);
+    } finally {
+      process.env = saved;
+    }
+  });
+  test('a J27 row outside the Research scope carries no read model (plan F1 program gate)', async () => {
+    getById.mockResolvedValue(j27Row({ _wmkf_grantprogram_value: '8dcab30b-958f-ee11-8179-000d3a341e8f' }));
+    const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
+    expect(body).not.toHaveProperty('j27');
+  });
+  test('a failed catalog read yields no read model rather than a wrong one', async () => {
+    const { resolveDiscoveryScope } = require('../../lib/services/workbench/program-scope-service');
+    resolveDiscoveryScope.mockRejectedValueOnce(new Error('catalog down'));
+    getById.mockResolvedValue(j27Row());
+    const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
+    expect(body.success).toBe(true);
+    expect(body).not.toHaveProperty('j27');
+  });
+  test('merge-dark: in a Production deployment without WORKBENCH_PHASE_RELEASE=on a J27 row gets no read model and none of the new reads', async () => {
+    const env = jest.replaceProperty(process, 'env', { ...process.env, VERCEL_ENV: 'production' });
+    try {
+      getById.mockResolvedValue(j27Row());
+      const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
+      expect(body.success).toBe(true);
+      expect(body).not.toHaveProperty('j27');
+      expect(existsAnySuggestionForRequests).not.toHaveBeenCalled();
+      expect(readLatestIntegrityStates).not.toHaveBeenCalled();
+      expect(loadJ27LaterFacts).not.toHaveBeenCalled();
+      expect(require('../../lib/services/workbench/program-scope-service').resolveDiscoveryScope).not.toHaveBeenCalled();
+      process.env.WORKBENCH_PHASE_RELEASE = 'on';
+      expect(await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' })).toHaveProperty('j27');
+    } finally {
+      env.restore();
+    }
+  });
+  test('a pre-2027 row carries no read model and makes neither new read', async () => {
+    const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
+    expect(body).not.toHaveProperty('j27');
+    expect(existsAnySuggestionForRequests).not.toHaveBeenCalled();
+    expect(readLatestIntegrityStates).not.toHaveBeenCalled();
+    expect(loadJ27LaterFacts).not.toHaveBeenCalled();
+  });
+  test('a J27 row adds one suggestion read, one integrity read and one later-facts load, and carries the stage with its tier 1 input', async () => {
+    getById.mockResolvedValue(j27Row({ wmkf_phaseistatus: 707510005 }));
+    getCycleDatesById.mockResolvedValue({ wmkf_grantcycleid: CYCLE_ID, wmkf_cyclecode: 'J27', wmkf_meetingdate: '2027-06-10', wmkf_researchofframpmeetingdate: '2027-03-15', wmkf_researchreviewsduedate: '2027-03-01' });
+    existsAnySuggestionForRequests.mockResolvedValue(new Set([REQ]));
+    readLatestIntegrityStates.mockResolvedValue(new Map([[REQ, { status: 'present', latest: { flagged: true, reviewed: false, provenance: 'automated' } }]]));
+    const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '', today: new Date('2027-03-16T12:00:00Z') });
+    expect(existsAnySuggestionForRequests).toHaveBeenCalledTimes(1);
+    expect(existsAnySuggestionForRequests).toHaveBeenCalledWith([REQ], { concurrency: 4 });
+    expect(readLatestIntegrityStates).toHaveBeenCalledTimes(1);
+    expect(loadJ27LaterFacts).toHaveBeenCalledTimes(1);
+    // Budget: Dataverse reads = suggestions (1) + program catalog (1) + later facts (one load, 3 batched
+    // reads inside: drafts, Finals, presentations) = 5, plus one Postgres read (integrity).
+    // No presentation exists in this setup, so its end is unverified and the stage says so (j27-read-model.js:246).
+    expect(require('../../lib/services/workbench/program-scope-service').resolveDiscoveryScope).toHaveBeenCalledTimes(1);
+    expect(getById).toHaveBeenCalledTimes(1);
+    expect(body.meetingDate).toBe('2027-06-10');
+    // Memo waves are off in this env: their keys are not-provisioned and do not degrade; tier 2 is not loaded, so partial (plan C1, C3).
+    expect(body.j27).toMatchObject({
+      phase: 'peer-review', basis: 'partial', outcome: 'none',
+      recorded: { chairsRecommendation: 'yes', chairsOutcome: 'pending' },
+      blockerKeys: ['chairs-outcome-pending', 'integrity-unreviewed', 'presentation-end-unverified'],
+    });
+    expect(body.j27.taskKeys).toEqual(['review-integrity', 'record-offramp']);
+    expect(body.j27.tasks[1].detail).toEqual({ received: null, pastOfframpDate: true });
+    expect(body.j27.input.reviewers).toEqual({ status: 'present', anySuggestion: true, counts: { status: 'not-loaded' } });
+    expect(body.j27.input.calendar).toEqual({ status: 'present', offrampMeetingDate: '2027-03-15', reviewsDueDate: '2027-03-01', today: '2027-03-16' });
+  });
+  test('the later facts come from the server by one load and the phase follows them', async () => {
+    admits.mockReturnValue(true);
+    const facts = {
+      presentation: { status: 'present', exists: true, id: '77777777-7777-4777-8777-777777777777', ended: false, legacyException: false },
+      roster: { status: 'absent' },
+      boardDraft: { status: 'present', exists: false },
+      transition: { status: 'present', phase: null },
+    };
+    loadJ27LaterFacts.mockResolvedValue(new Map([[REQ, facts]]));
+    getById.mockResolvedValue(j27Row({ wmkf_phaseistatus: 707510005 }));
+    getCycleDatesById.mockResolvedValue({ wmkf_grantcycleid: CYCLE_ID, wmkf_cyclecode: 'J27', wmkf_meetingdate: '2027-06-10' });
+    const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '', today: new Date('2027-03-16T12:00:00Z') });
+    expect(loadJ27LaterFacts).toHaveBeenCalledTimes(1);
+    expect(loadJ27LaterFacts.mock.calls[0][0]).toEqual([expect.objectContaining({ akoya_requestid: REQ })]);
+    const { presentation, roster, boardDraft, transition } = body.j27.input;
+    expect({ presentation, roster, boardDraft, transition }).toEqual(facts);
+    expect(body.j27.phase).toBe('deliberations');
+  });
+  test('failed new reads degrade the stage instead of failing resolution', async () => {
+    getById.mockResolvedValue(j27Row());
+    getCycleDatesById.mockRejectedValue(new Error('calendar 503'));
+    existsAnySuggestionForRequests.mockRejectedValue(new Error('dataverse 503'));
+    readLatestIntegrityStates.mockRejectedValue(new Error('no POSTGRES_URL'));
+    const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
+    expect(body.meetingDate).toBeNull();
+    expect(body.j27).toMatchObject({ phase: 'initial-assessment', basis: 'degraded' });
+    expect(body.j27.input.reviewers.status).toBe('unavailable');
+    expect(body.j27.input.integrity.status).toBe('unavailable');
+    expect(body.j27.input.calendar.status).toBe('unavailable');
+  });
+});
+
+describe('phase layout (request page admission)', () => {
+  test('one admission read; its answer for this request and fresh cycle is the phase layout', async () => {
+    admits.mockReturnValue(true);
+    getById.mockResolvedValue({ ...RECORD, wmkf_GrantCycle: { wmkf_cyclecode: 'J27' } });
+    const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
+    expect(loadPhaseAdmission).toHaveBeenCalledTimes(1);
+    expect(admits).toHaveBeenCalledWith(REQ, 'J27');
+    expect(body.phaseLayout).toBe(true);
+  });
+
+  test('a refusal is phaseLayout false', async () => {
+    admits.mockReturnValue(false);
+    getById.mockResolvedValue({ ...RECORD, wmkf_GrantCycle: { wmkf_cyclecode: 'J27' } });
+    const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
+    expect(body.phaseLayout).toBe(false);
+  });
+
+  test('a request before 2027 makes no admission read', async () => {
+    const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
+    expect(loadPhaseAdmission).not.toHaveBeenCalled();
+    expect(body.phaseLayout).toBe(false);
+  });
+});
+

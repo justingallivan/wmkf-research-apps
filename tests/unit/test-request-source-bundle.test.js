@@ -206,7 +206,8 @@ test('exports after an unchanged strict discovery and metadata pass', async () =
 
   await expect(exportBundle(dependencies)).resolves.toEqual(build({ applicantAbstract: 'Applicant source abstract' }));
   expect(dependencies.discoverDocuments).toHaveBeenCalledTimes(2);
-  expect(dependencies.assertReadLimits).toHaveBeenCalledTimes(2);
+  // Listing, verified sizes after hydration, then the refreshed listing.
+  expect(dependencies.assertReadLimits).toHaveBeenCalledTimes(3);
   expect(dependencies.readSourceRevision).toHaveBeenCalledWith(REQUEST_ID.toLowerCase());
 });
 

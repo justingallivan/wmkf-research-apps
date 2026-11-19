@@ -7,10 +7,16 @@
 
 import RequireAppAccess from '../shared/components/RequireAppAccess';
 import { WorkbenchShell } from '../shared/components/workbench/WorkbenchShell';
+import { j27IntegrityTarget } from '../lib/utils/j27-integrity-readiness';
 import { resolvePreviewReadOnly } from '../lib/services/workbench/preview-read-only';
+import { workbenchPhaseReleaseAdmitted } from '../lib/utils/workbench-phase-release';
 
 export async function getServerSideProps() {
-  return { props: { previewReadOnly: resolvePreviewReadOnly() } };
+  return { props: {
+    previewReadOnly: resolvePreviewReadOnly(),
+    j27IntegrityEnabled: Boolean(j27IntegrityTarget()),
+    phaseRelease: workbenchPhaseReleaseAdmitted(),
+  } };
 }
 
 export default function WorkbenchGuard(props) {

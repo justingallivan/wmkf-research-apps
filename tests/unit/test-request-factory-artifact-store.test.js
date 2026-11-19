@@ -183,6 +183,52 @@ describe('sweepFactoryArtifacts', () => {
     }
   });
 
+  describe('a ready prepared J27+ run waits for readiness (owner, 2026-11-15)', () => {
+    const PREPARED = { values: { preparedFixture: 'j27-reviewer-fixture/v1' } };
+    // Run rows answer the run query; journal rows answer the readiness query.
+    const rowsFor = (journalStatus, { journalThrows = false } = {}) => (text, params) => {
+      if (/test_request_readiness_finalizations/.test(text)) {
+        if (journalThrows) throw new Error('journal down');
+        return journalStatus ? [{ run_id: params[0], attempt: 1, status: journalStatus }] : [];
+      }
+      return [runRow(params[0], 'ready')];
+    };
+    const prepared = (hours) => fakeBlob({ [bundlePath(RUN)]: aged(hours), [manifestPath(RUN)]: aged(hours, PREPARED) });
+
+    test.each([['no readiness attempt yet', null], ['an attempt still open', 'dispatched'], ['an attempt needing attention', 'needs_attention']])(
+      'keeps the files with %s', async (_label, status) => {
+        const { blob, objects } = prepared(48);
+        await sweep(blob, rowsFor(status)).promise;
+        expect(objects.size).toBe(2);
+      },
+    );
+
+    test('deletes once readiness is complete', async () => {
+      const { blob, objects } = prepared(48);
+      await sweep(blob, rowsFor('complete')).promise;
+      expect(objects.size).toBe(0);
+    });
+
+    test('deletes after 30 days even if never readied', async () => {
+      const { blob, objects } = prepared(30 * 24 + 1);
+      await sweep(blob, rowsFor(null)).promise;
+      expect(objects.size).toBe(0);
+    });
+
+    test('a journal read error keeps the files and counts as an error', async () => {
+      const { blob, objects } = prepared(48);
+      const stats = await sweep(blob, rowsFor(null, { journalThrows: true })).promise;
+      expect(objects.size).toBe(2);
+      expect(stats.errors).toBe(1);
+    });
+
+    test('a ready run without the prepared contract is still deleted', async () => {
+      const { blob, objects } = fakeBlob({ [bundlePath(RUN)]: aged(48), [manifestPath(RUN)]: aged(48, { values: {} }) });
+      await sweep(blob, rowsFor(null)).promise;
+      expect(objects.size).toBe(0);
+    });
+  });
+
   test('a run with no ledger row is deleted only when every object is older than 24 h', async () => {
     const { blob, objects } = fakeBlob();
     objects.set(bundlePath(RUN), aged(30));

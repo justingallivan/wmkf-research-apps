@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-10-14
+last_verified: 2026-11-15
 stale_after_days: 60
 owner: platform-security
 source_files:
@@ -77,7 +77,8 @@ not a current authority.
   `/api/webhooks/vercel-log-drain`) verify an HMAC of the RAW body
   (`bodyParser: false`) with a constant-time compare, fail closed on a missing
   secret outside development, and must be (a) exact-match allowlisted in
-  `proxy.js` and (b) recognized via `HMAC_GUARDS` in
+  `proxy.js` (via `isLegacyProxyPassThrough` in
+  `lib/services/transcription-pilot/deployment-policy.js`) and (b) recognized via `HMAC_GUARDS` in
   `scripts/check-api-route-security-matrix.js` plus a matrix row documenting
   the shared-secret boundary. The Vercel drain route additionally never calls
   NotificationService (recursive-alert-loop guard) and persists only
@@ -210,5 +211,9 @@ transactional profile linking, client auth rendering, strict drain bearer check,
 and raw-body webhook signature boundaries. Existing mocked regression tests
 passed; these do not prove current production environment values, Entra app
 registration, external magic-link delivery or an authenticated production write.
+Re-checked against source 2026-11-15 (guards, revocation paths, webhook HMAC
+wiring, legacy-host redirect, Origin derivation, GUID gate); the June 2026
+deployment receipts and `NEXTAUTH_URL`/Entra values above remain historical
+observations that source cannot confirm.
 The API-route and GUID gates cover their registered checks, not every security
 property. Evidence: `docs/audits/AGENT_WIKI_REVERIFICATION_2026-10-14.md`.

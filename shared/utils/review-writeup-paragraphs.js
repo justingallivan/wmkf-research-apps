@@ -45,6 +45,13 @@
 
 import { labelForReviewRating } from '../../lib/external/review-form-schema.js';
 
+export function composeReviewerFacts(reviewers) {
+  const ordered = [...reviewers].sort(compareReviewersByName);
+  const scores = composeScoreSentence(ordered).sentence || 'No reviews received.';
+  const names = composeReviewerSentence(ordered)?.runs.map(run => run.text).join('');
+  return names ? `${scores} ${names}` : scores;
+}
+
 const NUMBER_WORDS = [
   null, 'one', 'two', 'three', 'four', 'five', 'six',
   'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve',

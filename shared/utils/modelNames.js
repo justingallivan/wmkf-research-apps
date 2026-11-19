@@ -6,6 +6,7 @@
 // Map of model IDs to friendly names
 const MODEL_DISPLAY_NAMES = {
   // Fable models (the generic parser below would drop the point release)
+  'claude-fable-5-2': 'Fable 5.2',
   'claude-fable-5-1': 'Fable 5.1',
 
   // Opus models

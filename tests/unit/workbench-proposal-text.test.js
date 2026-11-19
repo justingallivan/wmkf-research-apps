@@ -158,6 +158,8 @@ test('discards bytes when the SharePoint version changes during download', async
       versionId: 'narrative-v1',
     })
     .mockResolvedValueOnce(null)
+    // The third lookup is the Submission-Documents copy.
+    .mockResolvedValueOnce(null)
     .mockResolvedValueOnce({
       id: 'narrative-item',
       name: 'ProposalNarrative_1003109.pdf',
@@ -181,6 +183,8 @@ test('discards bytes when the SharePoint eTag changes without a version-label ch
       versionId: 'narrative-v1',
       eTag: 'etag-before',
     })
+    .mockResolvedValueOnce(null)
+    // The third lookup is the Submission-Documents copy.
     .mockResolvedValueOnce(null)
     .mockResolvedValueOnce({
       id: 'narrative-item',
@@ -208,6 +212,7 @@ test('does not substitute a present reviewer package when the AI narrative is ab
   expect(getFileMetadataByPath.mock.calls).toEqual([
     ['akoya_request', '1003109_GUID/AI Materials', 'ProposalNarrative_1003109.pdf'],
     ['akoya_request', '1003109_GUID/AI Materials', 'Project-Narrative_1003109.pdf'],
+    ['akoya_request', '1003109_GUID/Submission-Documents', 'Project-Narrative_1003109.pdf'],
   ]);
   expect(downloadFile).not.toHaveBeenCalled();
   expect(extractTextFromBuffer).not.toHaveBeenCalled();
@@ -228,6 +233,7 @@ test('ignores an archive narrative when the active narrative is absent', async (
   expect(getFileMetadataByPath.mock.calls).toEqual([
     ['akoya_request', '1003109_GUID/AI Materials', 'ProposalNarrative_1003109.pdf'],
     ['akoya_request', '1003109_GUID/AI Materials', 'Project-Narrative_1003109.pdf'],
+    ['akoya_request', '1003109_GUID/Submission-Documents', 'Project-Narrative_1003109.pdf'],
   ]);
   expect(downloadFile).not.toHaveBeenCalled();
 });
@@ -259,12 +265,16 @@ const J27_META = {
   'Bibliography_1003109.pdf': { id: 'bibliography-item', versionId: 'bibliography-v1' },
 };
 
-test('resolves the J27 GOApply names when they are the only accepted names present', async () => {
-  getFileMetadataByPath.mockImplementation(async (_library, _folder, filename) => (
-    J27_META[filename]
+function j27FilesIn(...folders) {
+  getFileMetadataByPath.mockImplementation(async (_library, folder, filename) => (
+    J27_META[filename] && folders.some((name) => folder === `1003109_GUID/${name}`)
       ? { ...J27_META[filename], name: filename, siteId: 'site-id', driveId: 'drive-id' }
       : null
   ));
+}
+
+test('resolves the J27 GOApply names when they are the only accepted names present', async () => {
+  j27FilesIn('AI Materials');
   downloadFile.mockImplementation(async (_driveId, itemId) => ({
     buffer: Buffer.from(`%PDF-${itemId}`),
     mimeType: 'application/pdf',
@@ -285,6 +295,40 @@ test('fails closed when both the D26 and J27 narrative names are present', async
     driveId: 'drive-id',
     versionId: 'v1',
   }));
+
+  await expect(getAiProposalNarrativeText('request-id', '1003109')).resolves.toBeNull();
+  expect(downloadFile).not.toHaveBeenCalled();
+});
+
+test('reads the J27 narrative and bibliography from Submission-Documents when that is where they are', async () => {
+  j27FilesIn('Submission-Documents');
+  downloadFile.mockImplementation(async (_driveId, itemId) => ({
+    buffer: Buffer.from(`%PDF-${itemId}`),
+    mimeType: 'application/pdf',
+    filename: itemId === 'narrative-item' ? 'Project-Narrative_1003109.pdf' : 'Bibliography_1003109.pdf',
+  }));
+
+  await expect(getAiProposalMaterialsText('request-id', '1003109')).resolves.toMatchObject({
+    narrative: { filename: 'Project-Narrative_1003109.pdf', itemId: 'narrative-item' },
+    bibliography: { filename: 'Bibliography_1003109.pdf', itemId: 'bibliography-item' },
+  });
+  // The post-download recheck goes back to the folder the file was found in.
+  expect(getFileMetadataByPath.mock.calls.at(-1)[1]).toBe('1003109_GUID/Submission-Documents');
+});
+
+test('fails closed when the J27 narrative is in both AI Materials and Submission-Documents', async () => {
+  j27FilesIn('AI Materials', 'Submission-Documents');
+
+  await expect(getAiProposalNarrativeText('request-id', '1003109')).resolves.toBeNull();
+  expect(downloadFile).not.toHaveBeenCalled();
+});
+
+test('does not accept the D26 narrative name in Submission-Documents', async () => {
+  getFileMetadataByPath.mockImplementation(async (_library, folder, filename) => (
+    folder === '1003109_GUID/Submission-Documents' && filename === 'ProposalNarrative_1003109.pdf'
+      ? { id: 'narrative-item', name: filename, siteId: 'site-id', driveId: 'drive-id', versionId: 'v1' }
+      : null
+  ));
 
   await expect(getAiProposalNarrativeText('request-id', '1003109')).resolves.toBeNull();
   expect(downloadFile).not.toHaveBeenCalled();

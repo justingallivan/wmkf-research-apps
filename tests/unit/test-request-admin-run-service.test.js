@@ -20,6 +20,8 @@ import { MANAGED_LEDGER_HOSTS } from '../../lib/db/ledger-registry.js';
 import { TEST_REQUEST_FIXED_FIELDS } from '../../lib/services/test-requests/policy.js';
 import { cloneCycleFromCalendarRow } from '../../lib/services/test-requests/sandbox-clone.js';
 
+// A one-page PDF the lookup's PDF check accepts (narrative and bibliography must open).
+const MINIMAL_PDF = '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 10 10]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n';
 const MANAGED = MANAGED_LEDGER_HOSTS[0];
 const SANDBOX_LEDGER = `postgresql://role:pw@${MANAGED}/ledger?sslmode=require`;
 const PROD_LEDGER = `postgresql://role:pw@${MANAGED}/ledger_prod?sslmode=require`;
@@ -147,6 +149,8 @@ function metadata(production) {
     fields.wmkf_projectleader = lookup('contact', 'wmkf_ProjectLeader');
     fields.akoya_primarycontactid = lookup('contact', 'akoya_primarycontactid');
     fields.wmkf_researchleader = lookup('contact', 'wmkf_ResearchLeader');
+    // Prepared J27 fixtures create with readiness false (prepared-fixture-contract.js).
+    fields.wmkf_readyforreview = { createable: true, requiredLevel: 'None', type: 'Boolean' };
   }
   return { entity: 'akoya_request', fields };
 }
@@ -202,6 +206,8 @@ function harness({ deployment = 'preview', env = {}, preflightTarget = null, dep
     recheckStatusChange: jest.fn(async () => ({ sequence: 1, ok: true })),
     readLiveOptions: jest.fn(async (_client, field) => [{ value: 1, label: `option of ${field}` }]),
     readCurrentStatus: jest.fn(async () => ({ phase1: 100000001, phase2: null })),
+    readReadinessState: jest.fn(async () => null),
+    finalizeReadiness: jest.fn(async () => ({ runId: null, status: 'complete', ready: true, written: true })),
     listGrantCycles: jest.fn(async () => DESTINATION_CYCLES),
     resolveGrantCycle: jest.fn(async (_client, cycleCode) => {
       const row = DESTINATION_CYCLES.find((cycle) => cycle.cycleCode === cycleCode);
@@ -239,6 +245,8 @@ function harness({ deployment = 'preview', env = {}, preflightTarget = null, dep
     recheckStatusChange: spies.recheckStatusChange,
     readLiveOptions: spies.readLiveOptions,
     readCurrentStatus: spies.readCurrentStatus,
+    readReadinessState: spies.readReadinessState,
+    finalizeReadiness: spies.finalizeReadiness,
     ...deps,
   });
   const actorId = deriveActorId(PROFILE);
@@ -377,6 +385,9 @@ describe('Confirm: sandbox and production reservations', () => {
     });
     expect(manifest.createBody['wmkf_GrantCycle@odata.bind']).toBe(`/wmkf_grantcycles(${GRANT_CYCLE_ID})`);
     expect(manifest.createBody.wmkf_meetingdate).toBe('2026-12-01');
+    // A D26 destination keeps the D26 file layout: no layout is bound.
+    expect(manifest.values).not.toHaveProperty('documentLayout');
+    expect(manifest.plannedFiles.every((file) => file.destination.folder !== 'Submission-Documents')).toBe(true);
     expect(h.createClientCalls.map((c) => c.resourceUrl)).toEqual([PRODUCTION_URL, PRODUCTION_URL]);
   });
 
@@ -722,7 +733,7 @@ describe('exportSource / readArtifacts / recheck', () => {
         throw new Error(`unexpected Dataverse read ${path}`);
       },
     });
-    const pdf = Buffer.from('source-pdf');
+    const pdf = Buffer.from(MINIMAL_PDF);
     const graphMetadata = { id: 'graph-item-1', name: 'ProjectDescription.pdf', size: pdf.length, mimeType: 'application/pdf', eTag: 'etag-1', versionId: '1.0' };
     const graphCalls = { listFiles: [] };
     const sourceDependencies = {
@@ -833,7 +844,7 @@ describe('cooperative deadlines (slice 2)', () => {
         throw new Error(`unexpected Dataverse read ${path}`);
       },
     });
-    const pdf = Buffer.from('source-pdf');
+    const pdf = Buffer.from(MINIMAL_PDF);
     const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
     // The seven allowlisted source documents (admin-preview-service DOCUMENT_SPECS).
     const items = [
@@ -1037,6 +1048,7 @@ describe('status setter service (slice 2b)', () => {
       },
       current: { phase1: 100000001, phase2: null },
       changes: [],
+      readiness: null,
     });
     expect(h.spies.readCurrentStatus).toHaveBeenCalledWith(expect.anything(), '12121212-1212-4121-8121-121212121212');
     expect(h.createClientCalls.every((c) => !c.allowTestRequestMarkerWrites)).toBe(true);
@@ -1301,6 +1313,100 @@ describe('status setter service (slice 2b)', () => {
 });
 
 // ---- slice 3 Part 0: contract fixes the form relies on -----------------------
+
+describe('mark ready for review (owner, 2026-11-15)', () => {
+  const MANIFEST = { values: { preparedFixture: 'j27-reviewer-fixture/v1' }, marker: 'stored manifest' };
+  const readyRun = ({ status = 'ready', manifest = MANIFEST, deps = {}, env = {} } = {}) => {
+    const h = harness({ deployment: 'production', deps, env });
+    const { runId } = ids(h.actorId);
+    h.seedRun(runId, { status });
+    if (manifest) h.blobs.objects.set(runPathname('production', runId, 'manifest'), { text: JSON.stringify(manifest), uploadedAt: new Date() });
+    return { h, runId };
+  };
+  const mark = (h, runId, extra = {}) => h.service.markReady({ profileId: PROFILE, runId, deadlineAt: h.clock.t + 280_000, ...extra });
+  const finalizerError = (errorCode, message = 'finalizer detail') => Object.assign(new Error(message), { code: errorCode });
+
+  test('passes the stored manifest, a confirm and a dispatch time check to the finalizer; 200 shape', async () => {
+    const { h, runId } = readyRun();
+    await expect(mark(h, runId)).resolves.toEqual({ outcome: 'complete', ready: true, written: true });
+    const call = h.spies.finalizeReadiness.mock.calls[0][0];
+    expect(call).toMatchObject({ runId, confirm: true, manifest: MANIFEST });
+    expect(typeof call.journal.get).toBe('function');
+    expect(call.completion.deadlineAt).toBe(h.clock.t + 280_000 - 30_000);
+    // The PATCH is not dispatched without a minute left; the attempt then stays only planned.
+    h.clock.t += 280_000 - 59_000;
+    expect(() => call.beforeDispatch()).toThrow(expect.objectContaining({ code: 'factory_deadline_exceeded' }));
+    expect(h.createClientCalls.every((c) => !c.allowTestRequestMarkerWrites)).toBe(true);
+  });
+
+  test.each([
+    ['readiness_jobs_open', 'jobs_open'],
+    ['readiness_unconfirmed', 'unconfirmed'],
+  ])('%s is a check-again answer, not an error', async (errorCode, outcome) => {
+    const { h, runId } = readyRun();
+    h.spies.finalizeReadiness.mockRejectedValueOnce(finalizerError(errorCode));
+    await expect(mark(h, runId)).resolves.toMatchObject({ outcome, code: errorCode });
+  });
+
+  test('a finalizer refusal is a 409 with its message; anything else is not forwarded', async () => {
+    const { h, runId } = readyRun();
+    h.spies.finalizeReadiness.mockRejectedValueOnce(finalizerError('readiness_refused', 'Readiness finalization needs owner inspection; no write was repeated.'));
+    await expect(mark(h, runId)).rejects.toMatchObject({ httpStatus: 409, code: 'readiness_refused', message: expect.stringMatching(/owner inspection/) });
+    const upstream = new Error('upstream secret-host.example');
+    h.spies.finalizeReadiness.mockRejectedValueOnce(upstream);
+    await expect(mark(h, runId)).rejects.toBe(upstream);
+  });
+
+  test('refuses before any finalizer call: not ready, no stored manifest, too little time, switch off, someone else\'s run', async () => {
+    let { h, runId } = readyRun({ status: 'creating' });
+    expect(await code(mark(h, runId))).toBe('factory_run_not_ready');
+    ({ h, runId } = readyRun({ manifest: null }));
+    expect(await code(mark(h, runId))).toBe('factory_recovery_required');
+    ({ h, runId } = readyRun());
+    expect(await code(mark(h, runId, { deadlineAt: h.clock.t + 100_000 }))).toBe('factory_deadline_exceeded');
+    ({ h, runId } = readyRun({ env: { TEST_REQUEST_FACTORY_FORM: 'off' } }));
+    expect(await code(mark(h, runId))).toBe('factory_form_disabled');
+    ({ h, runId } = readyRun());
+    expect(await code(h.service.markReady({ profileId: 99, runId, deadlineAt: h.clock.t + 280_000 }))).toBe('factory_run_not_found');
+    expect(h.spies.finalizeReadiness).not.toHaveBeenCalled();
+  });
+
+  test('the default readiness read: stored manifest decides applies, Dataverse gives ready, the journal gives the attempt', async () => {
+    const gets = [];
+    const client = (ready, cycle = 'J27') => ({ baseUrl: 'x', get: async (path) => { gets.push(path); return { ok: true, status: 200, body: { akoya_requestid: '12121212-1212-4121-8121-121212121212', wmkf_readyforreview: ready, wmkf_GrantCycle: { wmkf_cyclecode: cycle } } }; } });
+    let { h, runId } = readyRun({ deps: { readReadinessState: undefined, createClient: () => client(false) } });
+    expect((await h.service.statusOptions({ profileId: PROFILE, runId })).readiness).toEqual({
+      applies: true, manifestStored: true, ready: false, attemptStatus: null, requiredPair: { phase1: 100000003, phase2: 100000002 },
+    });
+    expect(gets.at(-1)).toMatch(/akoya_requests\(12121212-1212-4121-8121-121212121212\)\?\$select=akoya_requestid,wmkf_readyforreview&\$expand=wmkf_GrantCycle\(\$select=wmkf_cyclecode\)$/);
+    ({ h, runId } = readyRun({ manifest: { values: {} }, deps: { readReadinessState: undefined, createClient: () => client(null) } }));
+    expect((await h.service.statusOptions({ profileId: PROFILE, runId })).readiness).toMatchObject({ applies: false, ready: null });
+    // Stored files gone: a J27 Request still shows the section (to say the CLI is needed); a swept D26 run does not.
+    ({ h, runId } = readyRun({ manifest: null, deps: { readReadinessState: undefined, createClient: () => client(false) } }));
+    expect((await h.service.statusOptions({ profileId: PROFILE, runId })).readiness).toMatchObject({ applies: true, manifestStored: false });
+    ({ h, runId } = readyRun({ manifest: null, deps: { readReadinessState: undefined, createClient: () => client(null, 'D26') } }));
+    expect((await h.service.statusOptions({ profileId: PROFILE, runId })).readiness).toMatchObject({ applies: false, manifestStored: false });
+  });
+
+  test('a readiness read failure leaves status options and history intact (Codex)', async () => {
+    const { h, runId } = readyRun();
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    h.spies.readReadinessState.mockRejectedValueOnce(new Error('blob down'));
+    const result = await h.service.statusOptions({ profileId: PROFILE, runId });
+    expect(result).toMatchObject({ runStatus: 'ready', current: { phase1: 100000001, phase2: null }, changes: [], readiness: { unavailable: true } });
+    warn.mockRestore();
+  });
+
+  test('statusOptions carries the readiness state only for a ready run', async () => {
+    const state = { applies: true, manifestStored: true, ready: false, attemptStatus: null, requiredPair: { phase1: 100000003, phase2: 100000002 } };
+    let { h, runId } = readyRun();
+    h.spies.readReadinessState.mockResolvedValueOnce(state);
+    expect((await h.service.statusOptions({ profileId: PROFILE, runId })).readiness).toEqual(state);
+    ({ h, runId } = readyRun({ status: 'creating' }));
+    expect((await h.service.statusOptions({ profileId: PROFILE, runId })).readiness).toBeNull();
+    expect(h.spies.readReadinessState).not.toHaveBeenCalled();
+  });
+});
 
 describe('slice 3 server contract', () => {
   const exporterFor = (rows, extra = {}) => {
@@ -1584,6 +1690,46 @@ describe('diagnoseFactoryRun fail-closed inputs', () => {
     expect(result.message).toMatch(/repeat its read-only source, Request and file checks/);
   });
 
+  test.each(['timeout', 'network', 'upstream_http (http 503)', 'upstream_http (http 429)'])(
+    'a %s stop after the Request POST was sent offers the readback-first retry',
+    (reason) => {
+      const at = Date.parse('2026-10-03T12:02:00.000Z');
+      const result = diagnoseFactoryRun(run({
+        status: 'needs_attention', currentStep: 'create_request', stepIndex: 1, needsAttentionReason: reason,
+      }), [{
+        step: 'create_request', resourceKind: 'dataverse_request', outcome: 'planned',
+        readback: { createAttemptedAt: '2026-10-03T12:01:00.000Z' },
+      }], at);
+      expect(result.nextAction).toBe('retry');
+      expect(result.message).toMatch(/read the reserved Request GUID first/);
+    },
+  );
+
+  test.each(['upstream_http (http 400)', 'unknown_error', 'preallocated_request_present_not_owned'])(
+    'a %s stop after the Request POST was sent stays blocked',
+    (reason) => {
+      const at = Date.parse('2026-10-03T12:02:00.000Z');
+      const result = diagnoseFactoryRun(run({
+        status: 'needs_attention', currentStep: 'create_request', stepIndex: 1, needsAttentionReason: reason,
+      }), [{
+        step: 'create_request', resourceKind: 'dataverse_request', outcome: 'planned',
+        readback: { createAttemptedAt: '2026-10-03T12:01:00.000Z' },
+      }], at);
+      expect(result.nextAction).toBe('operator_review');
+    },
+  );
+
+  test('a timeout stop with a dispatched GoVerify bypass receipt stays blocked', () => {
+    const at = Date.parse('2026-10-03T12:02:00.000Z');
+    const result = diagnoseFactoryRun(run({
+      status: 'needs_attention', currentStep: 'create_request', stepIndex: 1, needsAttentionReason: 'timeout',
+    }), [
+      { step: 'create_request', resourceKind: 'dataverse_request', outcome: 'planned', readback: { createAttemptedAt: '2026-10-03T12:01:00.000Z' } },
+      { step: 'create_request', resourceKind: 'workflow_bypass', outcome: 'planned', readback: { deactivationPatchAttemptedAt: '2026-10-03T12:00:50.000Z' } },
+    ], at);
+    expect(result.nextAction).toBe('operator_review');
+  });
+
   test('a create dispatch marker does not override an unrelated stopped reason', () => {
     const at = Date.parse('2026-10-03T12:02:00.000Z');
     const result = diagnoseFactoryRun(run({
@@ -1673,6 +1819,34 @@ describe('S1: source display read', () => {
     const result = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
     expect(result.source.cycleCode).toBeNull();
   });
+});
+
+test('a J27 production reservation binds the single-submission layout and plans the narrative into Submission-Documents', async () => {
+  const sourceDoc = (kind, folder, name, id) => ({
+    id, kind, library: 'akoya_request', folder: `9000001_ABC/${folder}`, name,
+    driveId: 'drive-src', graphItemId: `item-${id}`, size: 10,
+    sharePointSite: { key: 'akoyago-shared', hostname: 'appriver3651007194.sharepoint.com', pathname: '/sites/akoyago' }, mimeType: 'application/pdf',
+    eTag: '"etag-1"', versionId: '1.0', contentHash: 'c'.repeat(64),
+  });
+  const j27Bundle = (exportedAt) => {
+    const base = bundleAt(exportedAt);
+    return { ...base, documents: [
+      sourceDoc('proposalNarrative', 'AI Materials', 'ProposalNarrative_9000001.pdf', 'doc-1'),
+      sourceDoc('reviewerProposal', 'Reviewer Materials', 'Proposal_9000001.pdf', 'doc-2'),
+    ] };
+  };
+  const h = harness({ deployment: 'production', deps: {
+    resolveGrantCycle: async () => cloneCycleFromCalendarRow({ grantCycleId: GRANT_CYCLE_ID, cycleCode: 'J27', boardDate: '2027-06-03' }),
+    exportBundle: async ({ exportedAt }) => j27Bundle(exportedAt),
+  } });
+  const draft = await h.service.exportSource({ profileId: PROFILE, sourceRequestNumber: '9000001' });
+  const { run } = await h.service.confirmRun(h.confirmArgs(draft.draftId, { cycleCode: 'J27' }));
+  const manifest = JSON.parse(h.blobs.objects.get(runPathname('production', run.runId, 'manifest')).text);
+  expect(manifest.values).toMatchObject({ cycleCode: 'J27', documentLayout: 'single-submission' });
+  expect(manifest.plannedFiles.map((file) => [file.kind, file.destination.folder, file.destination.filenameTemplate])).toEqual([
+    ['proposalNarrative', 'Submission-Documents', 'Project-Narrative_{new-request-number}.pdf'],
+    ['reviewerProposal', 'Reviewer Materials', 'Proposal_{new-request-number}.pdf'],
+  ]);
 });
 
 test('prepared-package refusal is a preview blocker and typed 409, with no run reserved', async () => {

@@ -63,6 +63,9 @@ const CENSUS = [
     expected: [
       'lib/services/review-manager/export-reviews-service.js',
       'pages/api/review-manager/reviewers.js',
+      // J27 staff review summary handoff reads the request-scoped reviewer facts
+      // (staffReviewEvidenceHash) through getReviewers; a read, not a mutation.
+      'lib/services/workbench/staff-review-summary-service.js',
       // Reviews Tab Writeup Paragraphs plan §4.5 (Slice 4, 2026-09-14):
       // loadPreSiteVisitInputs calls the request-scoped getWriteupRoster
       // export to compose the deterministic [[STAFF:RefereeSection]] fill.

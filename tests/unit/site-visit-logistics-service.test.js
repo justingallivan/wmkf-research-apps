@@ -592,6 +592,22 @@ describe('request-schedulable gate (tracker slice 0)', () => {
     expect(deps.replaceSiteVisitWithParties).not.toHaveBeenCalled();
   });
 
+  test('an Offramped request (D7) is refused with no write even though it is Phase II Pending and in a cycle', async () => {
+    const deps = dependencies({
+      getRequest: jest.fn(async () => ({
+        akoya_requestid: REQUEST_ID,
+        akoya_requeststatus: 'Phase II Pending',
+        wmkf_triagestatus: null,
+        wmkf_phaseiistatus: 682090001,
+        wmkf_GrantCycle: { wmkf_cyclecode: 'J27' },
+      })),
+    });
+    await expect(saveSiteVisitLogistics(input, { actingUserSystemId: ACTOR_ID }, deps))
+      .rejects.toMatchObject({ code: 'site_visit_logistics_request_offramped' });
+    expect(deps.createSiteVisit).not.toHaveBeenCalled();
+    expect(deps.updateSiteVisit).not.toHaveBeenCalled();
+  });
+
   test('a request that is neither Phase II Pending nor advancing is refused with no write', async () => {
     const deps = dependencies({
       getRequest: jest.fn(async () => ({

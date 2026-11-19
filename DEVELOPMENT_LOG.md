@@ -10,6 +10,42 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## November 2026 — Return PA work to prompt delivery (Session 679)
+
+**Milestone:** Owner stopped backend integration for Power Automate and returned the deliverable to Dataverse prompts compatible with Connor's existing flows.
+**Sessions:** Session 679, two Codex chats coordinated into one handoff on 2026-11-16.
+**Ship state:**
+- Executive Summary staff editor remains deployed (`1037d2dbd`), live-tested with original Summary restored.
+- Bounded backend Summary test succeeded in Sandbox; implementation and receipts preserved on the feature branch, not promoted.
+- Submit/poll adoption, worker scheduling and backend rollout parked; Connor's example prompt is pending.
+**Why it matters:** A successful backend test does not establish that existing Power Automate execution needs replacing; one future session will complete the prompt handoff.
+**Pointers:** `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md`, `SESSION_PROMPT.md`; parked runtime `6d6a7c724`, trial receipt `8e98afb03`.
+
+## November 2026 — Workbench offramp control; Factory makes reviewable J27 test requests (Sessions 677–678)
+
+**Milestone:** Staff set and undo "Phase II Offramped" with a justification in the Workbench (D70), and anyone with admin access can make a J27 test request and put it in the Workbench from the admin page (D71).
+**Sessions:** Session 678 (Claude, 2026-11-14 to 2026-11-15), building on Session 677.
+**Ship state:**
+- Offramp control (`0a1d90492` to `6094ecd6e`), `WORKBENCH_OFFRAMP_READY=on`; wave 42 `wmkf_phaseiistatusbeforeofframp` applied to Production by the owner; owner-tested on #1003456.
+- Factory: J27 test requests get `AI Materials/Narrative-Bibliography_N.pdf` (D60, migration 099), source PDFs are checked, Phase II originals preferred (`c7ebedc1f` to `cd874469a`).
+- Admin **Prepare for review** (Phase I Invited, Phase II Pending Committee Review, ready) replaces the owner CLI for test requests (`29999733c` to `80cf7a628`); readiness route proved on 1003517, the one-button flow on 1003518.
+- Test Requests admin page redesigned; the sandbox-only clone preview panel removed (`8d000bc7f` to `c49d91384`).
+**Why it matters:** The offramp is recorded where staff work, and colleagues (Connor) can make their own J27 test requests without the owner.
+**Pointers:** `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md` (D70, D71), `docs/TEST_REQUEST_FACTORY_FORM_RUNBOOK.md`, `lib/services/workbench/offramp-service.js`, `lib/services/test-requests/readiness-finalizer.js`.
+
+## November 2026 — J27 Workbench in Production (Sessions 675–676)
+
+**Milestone:** The J27 Workbench line (phase-organized cycle page, request-page phase layout and its new staff fields) is on `main` and live in Production, and since 2026-11-14 the request page's phase layout is on for every 2027-or-later request.
+**Sessions:** Sessions 675 and 676 (Claude, 2026-11-13 to 2026-11-14), building on Sessions 671 to 674.
+**Ship state:**
+- `cb26082fe` merged the J27 line dark; migration 096 and schema waves 37 to 40 applied to Production by the owner and read back.
+- `e6b6e6b09` added one server admission policy (`workbench.phase_rollout`: off, pilot, on), Production field readiness and manual-only attendance; two Codex reviews; rehearsed off/pilot/on on the sandbox Preview.
+- `WORKBENCH_PHASE_RELEASE` and `WORKBENCH_PRODUCTION_SCHEMA_READY` on in Production (`dpl_7c5JCq8ow5RAP1YQwdyqW2esnsEV`): 2027 cycle pages show the phase lists; request pages stay on the old layout until the pilot (no setting row yet).
+- Session 676 (owner-run script): pilot of test #1003456, where the rationale, review summary and visit assessment saved and reloaded with the owner as editor in AkoyaGO Audit History; then `workbench.phase_rollout` = `on` the same day (no real J27 applications for about three weeks). Attendance waits for a real presentation.
+- Also shipped: the structured integrity news rule (8000-token limit) and the reviewer rollup reading four chunks at a time.
+**Why it matters:** Research staff get the J27 workflow without a big-bang switch; the request page can be piloted on named requests and turned off instantly.
+**Pointers:** `docs/plans/J27_WORKBENCH_PRODUCTION_ROLLOUT_2026-11-07.md` (change record, rollback), `lib/services/workbench/phase-admission.js`, `scripts/set-workbench-phase-rollout.mjs`.
+
 ## November 2026 — J27 First Cut ships in Workbench (Session 667, Codex)
 
 **Milestone:** J27 lead PDs and superusers can save First Cut on the Proposal tab.

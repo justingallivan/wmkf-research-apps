@@ -16,6 +16,11 @@ jest.mock('../../lib/services/dynamics-context', () => ({
 jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: { queryAllRecords: jest.fn(), checkRestriction: jest.fn() },
 }));
+// Plan F2: the Reviewer Finder resolves its readiness-only discovery scope from the live program catalog.
+jest.mock('../../lib/dataverse/adapters/grant-program', () => ({
+  __esModule: true,
+  listActive: jest.fn(async () => ({ records: [{ wmkf_grantprogramid: '94cab30b-958f-ee11-8179-000d3a341e8f', wmkf_name: 'Research' }] })),
+}));
 jest.mock('../../lib/services/program-director-resolver', () => ({
   resolveByEmail: jest.fn(),
 }));
@@ -170,7 +175,8 @@ test.each([true, false])('J27 pending-committee route preserves DTO/counts and r
   resolveByEmail.mockResolvedValue(PD);
   DynamicsService.queryAllRecords.mockImplementation(async (entity, options) => {
     if (entity === 'akoya_requests') {
-      expect(options.filter).toBe("_wmkf_programdirector_value eq pd-1 and wmkf_GrantCycle/wmkf_cyclecode eq 'J27' and akoya_requeststatus eq 'Phase II Pending' and (wmkf_phaseiistatus eq null or wmkf_phaseiistatus eq 100000002)");
+      // Plan F2: admission is the ready-Research branch OR the Phase II Pending gate; the actionable phase rule is applied in code.
+      expect(options.filter).toBe("_wmkf_programdirector_value eq pd-1 and wmkf_GrantCycle/wmkf_cyclecode eq 'J27' and (((_wmkf_grantprogram_value eq 94cab30b-958f-ee11-8179-000d3a341e8f) and wmkf_readyforreview eq true) or (akoya_requeststatus eq 'Phase II Pending'))");
       return { records: [{
         akoya_requestid: 'r-j27', akoya_requestnum: 'J27-example',
         wmkf_GrantCycle: { wmkf_cyclecode: 'J27' }, wmkf_readyforreview: ready,

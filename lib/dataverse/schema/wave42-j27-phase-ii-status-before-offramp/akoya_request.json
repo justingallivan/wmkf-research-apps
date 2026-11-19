@@ -1,0 +1,13 @@
+{
+  "name": "akoya-request-j27-phase-ii-status-before-offramp",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "akoya_request",
+  "attributes": [{
+    "type": "Integer",
+    "schemaName": "wmkf_PhaseIIStatusBeforeOfframp",
+    "displayName": "Phase II Status Before Offramp",
+    "description": "Written by the Workbench when staff mark a request Phase II Offramped: the Phase II Status option value it had just before (blank when it had none). Undoing the offramp restores that value and clears this field.",
+    "minValue": 0,
+    "maxValue": 2147483647
+  }]
+}

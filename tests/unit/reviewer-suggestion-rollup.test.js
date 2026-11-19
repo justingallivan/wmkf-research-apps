@@ -26,7 +26,7 @@ describe('findForRollup', () => {
     expect(spy).toHaveBeenCalledTimes(1);
     const [entitySet, opts] = spy.mock.calls[0];
     expect(entitySet).toBe('wmkf_appreviewersuggestions');
-    expect(opts.select).toBe('_wmkf_request_value,wmkf_selected,wmkf_invited,wmkf_accepted,wmkf_declined,wmkf_emailsentat,wmkf_responsetype,wmkf_reviewstatus');
+    expect(opts.select).toBe('_wmkf_request_value,wmkf_selected,wmkf_invited,wmkf_accepted,wmkf_declined,wmkf_emailsentat,wmkf_responsetype,wmkf_reviewstatus,wmkf_reviewreceivedat');
     expect(opts.filter).toBe(`(${orChain}) and (wmkf_selected eq true or wmkf_declined eq true or wmkf_responsetype eq 100000001) and (wmkf_applicantdisposition eq null or wmkf_applicantdisposition ne 100000001)`);
   });
 });

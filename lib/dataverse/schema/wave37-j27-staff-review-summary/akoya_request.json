@@ -1,0 +1,21 @@
+{
+  "name": "akoya-request-j27-staff-review-summary",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "akoya_request",
+  "attributes": [
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_StaffReviewSummary",
+      "displayName": "Staff Review Summary",
+      "description": "Staff-authored interpretation of peer reviews for the Workbench Reports handoff.",
+      "maxLength": 10000
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_StaffReviewEvidenceHash",
+      "displayName": "Staff Review Evidence Hash",
+      "description": "Fingerprint of the submitted review evidence considered when the staff review summary was saved.",
+      "maxLength": 64
+    }
+  ]
+}

@@ -10,7 +10,11 @@ function toLines(addresses) {
   return (addresses || []).join('\n');
 }
 
-export default function TestRequestEmailAllowlistSection() {
+/**
+ * `onAttention(text)` reports a load-time problem ('' when none) so a collapsed
+ * panel can show it in its summary (owner, 2026-11-15: the panel starts closed).
+ */
+export default function TestRequestEmailAllowlistSection({ onAttention } = {}) {
   const [text, setText] = useState('');
   const [baseline, setBaseline] = useState('');
   const [domain, setDomain] = useState('wmkeck.org');
@@ -21,6 +25,8 @@ export default function TestRequestEmailAllowlistSection() {
   const [details, setDetails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -37,13 +43,24 @@ export default function TestRequestEmailAllowlistSection() {
         setMax(data.maxAddresses || 200);
         setUnavailable(Boolean(data.unavailable));
       } catch (err) {
-        if (active) setError(err.message || 'Failed to load the test-request email allowlist.');
+        if (active) {
+          setError(err.message || 'Failed to load the test-request email allowlist.');
+          setLoadFailed(true);
+        }
       } finally {
         if (active) setLoading(false);
       }
     })();
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    if (!onAttention) return;
+    if (unavailable) onAttention(`The saved list can't be read, so only @${domain} addresses are allowed right now. Open this panel to fix it.`);
+    else if (saveFailed) onAttention("The last change to the allowlist wasn't saved. Open this panel to see why.");
+    else if (loadFailed) onAttention("The allowlist couldn't be loaded. Open this panel to see why.");
+    else onAttention('');
+  }, [onAttention, unavailable, loadFailed, saveFailed, domain]);
 
   const save = async () => {
     setSaving(true);
@@ -61,10 +78,14 @@ export default function TestRequestEmailAllowlistSection() {
       setText(toLines(data.addresses));
       setBaseline(toLines(data.addresses));
       setUnavailable(false);
+      // A successful save establishes the saved list, so earlier load or save failures no longer apply.
+      setLoadFailed(false);
+      setSaveFailed(false);
       setStatus(`Saved ${data.addresses.length} address${data.addresses.length === 1 ? '' : 'es'}.`);
     } catch (err) {
       setError(err.message || 'Failed to save the test-request email allowlist.');
       setDetails(Array.isArray(err.payload?.details) ? err.payload.details : []);
+      setSaveFailed(true);
     } finally {
       setSaving(false);
     }

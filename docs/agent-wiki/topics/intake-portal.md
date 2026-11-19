@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-10-14
+last_verified: 2026-11-15
 stale_after_days: 60
 owner: intake-portal
 source_files:
@@ -109,6 +109,10 @@ membership, draft/attachment persistence and frozen submission payload to the
 drain. Local mocked regression tests cover draft capture, upload tokens,
 attachment handling and submit race guards. The arbitrary `dataverseFields`
 spread remains present in `handleScanning`; the revival hazard above is unresolved.
+Re-checked against source 2026-11-15: the `dataverseFields` spread is still at
+`lib/services/cron/drain-submissions-service.js` (`handleScanning`), the drain still parks
+jobs containing persons (`intake_drain_persons_pending`), `/api/cron/drain-submissions` is
+scheduled in `vercel.json`, and applicant-session routing is still in `proxy.js`.
 No applicant launch, live schema, deployed scan, or production configuration was
 revalidated. Evidence: `docs/audits/AGENT_WIKI_REVERIFICATION_2026-10-14.md`.
 

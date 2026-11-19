@@ -2,7 +2,9 @@
   "generatedFrom": [
     "054_test_request_runs.sql",
     "058_test_request_cast_slot_bindings.sql",
-    "094_test_request_readiness_finalizations.sql"
+    "094_test_request_readiness_finalizations.sql",
+    "098_test_request_j27_file_names.sql",
+    "099_test_request_narrative_bibliography.sql"
   ],
   "fingerprint": {
     "tables": {
@@ -1592,7 +1594,7 @@
         "returnType": "boolean",
         "language": "sql",
         "volatile": "i",
-        "bodyHash": "f2d697a6a73d1c96fa4955f78379d1f639942cb5f3735c4fe2b44a895f405449"
+        "bodyHash": "d290103f0d23c76ebeadc2e949f49632e67b0c5f214e29c85950da2a9af091f1"
       }
     ]
   }

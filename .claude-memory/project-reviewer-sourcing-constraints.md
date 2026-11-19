@@ -1,6 +1,6 @@
 ---
 name: project-reviewer-sourcing-constraints
-description: "Owner-stated reviewer-sourcing realities (Justin, 2026-07-08): applicant-suggested reviewers capped ~1/panel (RECENT reactive policy — a colleague stacked panels with them); reviewer reuse is per-PD practice (Justin: none in ~4 years; a departed colleague reused repeatedly — STRATEGY.md:81 reflects his practice, stale not false). Referral capture is a MULTIPLIER on the engine (tier-1 contact is prerequisite); the Claude-assisted engine is the product; roster-flywheel/applicant-recs-first designs deprioritized."
+description: "Owner-stated reviewer-sourcing realities (Justin, 2026-07-08): applicant-suggested reviewers capped ~1/panel (RECENT reactive policy — a colleague stacked panels with them); reviewer reuse is per-PD practice (Justin: none in ~4 years; a departed colleague reused repeatedly; the old STRATEGY.md passage describing that practice is gone from docs/STRATEGY.md as of 2026-11-15). Referral capture is a MULTIPLIER on the engine (tier-1 contact is prerequisite); the Claude-assisted engine is the product; roster-flywheel/applicant-recs-first designs deprioritized."
 metadata:
   type: project
   status: active
@@ -27,10 +27,10 @@ proposes pool/roster reuse, elevates applicant-suggested reviewers, or plans
 2. **Reviewer reuse is per-PD practice, not an org constant.** Justin has not
    re-used a reviewer in ~4 years (one data point; reasons: sparse data —
    improving with current legibility work; welcome-preservation; field breadth).
-   A former colleague DID reuse reviewers repeatedly, but has departed. So
-   `docs/STRATEGY.md:81` ("good reviewers get called upon repeatedly") reflects
-   the departed colleague's real practice — stale as a description of current
-   staff, not false. No doc fix required; don't cite it as current practice.
+   A former colleague DID reuse reviewers repeatedly, but has departed. A
+   former `docs/STRATEGY.md` line ("good reviewers get called upon repeatedly")
+   reflected that colleague's practice; it is no longer in `docs/STRATEGY.md`
+   (grep 2026-11-15). Don't cite repeated reuse as current practice.
 3. **Referral capture is a MULTIPLIER on the engine, not an independent
    channel.** A declining expert can only suggest alternates if the engine
    found and contacted them in the first place — tier-1 discovery quality

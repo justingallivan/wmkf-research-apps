@@ -80,4 +80,4 @@ verified publication `sourceProvenance.zoom.meetingUuid`, not the newest import.
 rows. It does not add attendance to `selected_recording_files` or this table.
 Receipt persistence is documented in the
 [publication Atlas](postgres-meeting-transcript-publications.md). <!-- drain-table:ignore reason=transcription-atlas-filename-not-retired-table -->
-Migration 078 is reserved and unapplied in this worktree; the import schema is unchanged.
+Migration 078 (merged 2026-10-10; applied to Production per `DEVELOPMENT_LOG.md`, Session 591) extends the publication table only; the import schema is unchanged.

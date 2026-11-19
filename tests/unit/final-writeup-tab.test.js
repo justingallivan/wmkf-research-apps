@@ -118,6 +118,36 @@ test('hides the governed transition from a staff member who is not authorized', 
   expect(screen.queryByRole('button', { name: 'Ready for group review' })).not.toBeInTheDocument();
 });
 
+test('offers the authorized Word draft before group review even when the viewer cannot start review', async () => {
+  const webUrl = 'https://sharepoint.test/draft.docx';
+  global.fetch.mockResolvedValueOnce(response({ ...readyStatus(false), sourceFile: { name: 'Draft.docx', webUrl } }));
+  render(<FinalWriteupTab requestId={REQUEST_ID} renderBoardDraft={() => null} />);
+
+  const link = await screen.findByRole('link', { name: 'Open draft in Word' });
+  expect(link).toHaveAttribute('href', webUrl);
+  expect(link).toHaveAttribute('target', '_blank');
+  expect(screen.queryByRole('button', { name: 'Ready for group review' })).toBeNull();
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+  expect(global.fetch.mock.calls[0][1]?.method).toBe('GET');
+});
+
+test('outside the J27 layout, the pre-review Word draft link is not offered', async () => {
+  const webUrl = 'https://sharepoint.test/draft.docx';
+  global.fetch.mockResolvedValueOnce(response({ ...readyStatus(true), sourceFile: { name: 'Draft.docx', webUrl } }));
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+
+  expect(await screen.findByRole('button', { name: 'Ready for group review' })).toBeEnabled();
+  expect(screen.queryByRole('link', { name: 'Open draft in Word' })).toBeNull();
+});
+
+test('keeps the Word draft link hidden when the status marks the draft private', async () => {
+  global.fetch.mockResolvedValueOnce(response({ ...readyStatus(false), sourceFileHidden: true, sourceFile: null }));
+  render(<FinalWriteupTab requestId={REQUEST_ID} renderBoardDraft={() => null} />);
+
+  expect(await screen.findByText('The draft is unavailable to you.')).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Open draft in Word' })).toBeNull();
+});
+
 test('contains keyboard focus inside the confirmation dialog', async () => {
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
 
@@ -703,4 +733,100 @@ describe('leadership digest copy (group-review Stage 5)', () => {
     expect(dialog).toHaveTextContent(shown);
     expect(dialog).not.toHaveTextContent(absent);
   });
+});
+
+test('J27 prepares the Draft Writeup here and reloads the same Word workflow when preparation completes', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response({
+      error: 'A Draft writeup is required before Final writeup can start.',
+      code: 'final_writeup_source_missing',
+    }, 409))
+    .mockResolvedValueOnce(response({ ...readyStatus(), sourceFile: {
+      name: 'Draft.docx', webUrl: 'https://sharepoint.test/site-visit.docx',
+    } }));
+  render(<FinalWriteupTab requestId={REQUEST_ID} renderBoardDraft={({ onDraftChange }) => (
+    <button type="button" onClick={onDraftChange}>Finish preparing draft</button>
+  )} />);
+
+  expect(screen.getByRole('heading', { name: 'Draft Writeup' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Ready for group review' })).toBeNull();
+  fireEvent.click(await screen.findByRole('button', { name: 'Finish preparing draft' }));
+  expect(await screen.findByRole('link', { name: 'Open draft in Word' })).toHaveAttribute('href', 'https://sharepoint.test/site-visit.docx');
+  expect(screen.getByRole('button', { name: 'Ready for group review' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Finish preparing draft' })).toBeNull();
+  expect(global.fetch.mock.calls.every(([, init]) => init.method === 'GET')).toBe(true);
+});
+
+test('J27 retains Draft Writeup tools when group review setup is inactive', async () => {
+  global.fetch.mockResolvedValueOnce(response({ available: false, phase: 'unavailable' }));
+  render(<FinalWriteupTab requestId={REQUEST_ID} renderBoardDraft={({ boardDraftAlreadyLinked }) => (
+    <p>{boardDraftAlreadyLinked ? 'Draft already linked' : 'Draft preparation available'}</p>
+  )} />);
+  expect(await screen.findByRole('heading', { name: 'Final writeup setup is not active' })).toBeInTheDocument();
+  const tools = screen.getByText('Draft Writeup tools').closest('details');
+  tools.open = true;
+  fireEvent(tools, new Event('toggle'));
+  expect(await screen.findByText('Draft preparation available')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Ready for group review' })).toBeNull();
+});
+
+test('J27 distinguishes the draft link from an unverified schedule and a blocked group review', async () => {
+  global.fetch.mockResolvedValueOnce(response({
+    ...readyStatus(false),
+    presentationSchedule: 'unverified',
+    startBlockedReason: 'final_writeup_site_visit_not_ended',
+    sourceFile: { name: 'Board draft.docx', webUrl: 'https://sharepoint.test/draft.docx' },
+  }));
+  render(<FinalWriteupTab requestId={REQUEST_ID} renderBoardDraft={() => null} />);
+  expect(await screen.findByRole('link', { name: 'Open draft in Word' })).toBeVisible();
+  expect(screen.getByText('Board draft.docx')).toBeVisible();
+  expect(screen.getByText(/The presentation end could not be verified/)).toBeVisible();
+  expect(screen.getByRole('link', { name: 'Open meeting record' })).toHaveAttribute('href', `/meeting-tracker/visits/${REQUEST_ID}`);
+  expect(screen.getByText('Waiting for a verified presentation end.')).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'Ready for group review' })).toBeNull();
+});
+
+test('step E: reports the loaded state, or the coded failure, to the page', async () => {
+  const onJ27Facts = jest.fn();
+  render(<FinalWriteupTab requestId={REQUEST_ID} onJ27Facts={onJ27Facts} />);
+  await waitFor(() => expect(onJ27Facts).toHaveBeenCalledWith(REQUEST_ID, { finalWriteup: expect.objectContaining({ available: true, phase: 'ready', sourceArtifactId: SOURCE_ID }) }));
+  onJ27Facts.mockClear();
+  global.fetch.mockReset().mockResolvedValueOnce(response({ error: 'No source document.', code: 'final_writeup_source_missing' }, 409));
+  render(<FinalWriteupTab requestId={FINAL_ID} onJ27Facts={onJ27Facts} />);
+  await waitFor(() => expect(onJ27Facts).toHaveBeenCalledWith(FINAL_ID, { finalWriteup: { error: true, code: 'final_writeup_source_missing' } }));
+});
+
+
+test.each([false, true])('an offramped draft explains the refusal (Board draft view: %s)', async (renderBoardDraft) => {
+  global.fetch.mockResolvedValue(response({ ...readyStatus(false), startBlockedReason: 'final_writeup_offramped' }));
+  render(<FinalWriteupTab requestId={REQUEST_ID} renderBoardDraft={renderBoardDraft ? () => null : undefined} />);
+  expect(await screen.findByText(/This request has been offramped and will not go to the Board/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Ready for group review' })).not.toBeInTheDocument();
+  expect(screen.queryByText(/Waiting for a verified presentation end/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/schedule could not be verified/)).not.toBeInTheDocument();
+});
+
+test('an offramped group review explains why leadership is unavailable', async () => {
+  global.fetch.mockResolvedValueOnce(response({ ...groupReviewStatus(false), advanceBlockedReason: 'final_writeup_offramped' }))
+    .mockResolvedValue(response(acknowledgementState()));
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+  expect(await screen.findByText(/This request has been offramped and will not go to the Board/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Send to leadership' })).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Edit final writeup in Word' })).toBeInTheDocument();
+});
+
+test.each(['group', 'leadership'])('a %s transition refused for offramp closes confirmation and removes the action', async (stage) => {
+  const buttonName = stage === 'group' ? 'Ready for group review' : 'Send to leadership';
+  global.fetch.mockImplementation(async (url, options) => {
+    if (options?.method === 'POST') return response({ code: 'final_writeup_offramped', error: 'Offramped.' }, 409);
+    if (url.includes('/acknowledgement')) return response(acknowledgementState());
+    return response(stage === 'group' ? readyStatus(true) : groupReviewStatus(true));
+  });
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+  fireEvent.click(await screen.findByRole('button', { name: buttonName }));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: buttonName }));
+  expect(await screen.findByText(/This request has been offramped and will not go to the Board/)).toBeInTheDocument();
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: buttonName })).not.toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });

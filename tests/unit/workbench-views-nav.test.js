@@ -6,7 +6,7 @@ const labels = () => screen.getAllByRole('link').map((link) => link.textContent.
 
 describe('WorkbenchViewsNav view order and cycle-conditional views', () => {
   const D26_ORDER = ['Request list', 'Reviewer follow-up', 'Staff deliberations', 'Final writeups', 'Awardees'];
-  const J27_ORDER = ['Request list', 'Reviewer follow-up', 'Staff deliberations', 'Initial assessments', 'Final writeups', 'Awardees'];
+  const J27_ORDER = ['Initial assessments', 'Request list', 'Reviewer follow-up', 'Staff deliberations', 'Final writeups', 'Awardees'];
 
   test('holds back Initial assessments until the cycle is known, but renders every other view immediately', () => {
     render(<WorkbenchViewsNav activeKey="requests" cycleCode={null} />);
@@ -20,7 +20,7 @@ describe('WorkbenchViewsNav view order and cycle-conditional views', () => {
     expect(screen.queryByRole('link', { name: /Initial assessments/ })).not.toBeInTheDocument();
   });
 
-  test('a later cycle shows Initial assessments after Staff deliberations, carrying the cycle in the link', () => {
+  test('a later cycle shows Initial assessments first, carrying the cycle in the link', () => {
     render(<WorkbenchViewsNav activeKey="requests" cycleCode="J27" />);
     expect(labels()).toEqual(J27_ORDER);
     expect(screen.getByRole('link', { name: 'Initial assessments' })).toHaveAttribute('href', '/workbench?view=initial-assessments&cycleCode=J27');
@@ -44,6 +44,14 @@ describe('WorkbenchViewsNav shell links', () => {
 });
 
 describe('WorkbenchViewsNav scope preservation', () => {
+  test('in the phase layout every request-list tab keeps "All in program", Final Assessment included', () => {
+    render(<WorkbenchViewsNav activeKey="requests" cycleCode="J27" programId="p1" scope="all" scopeSet layout="j27" />);
+    // Dropping the scope on Final Assessment reloaded the shared rows and changed every tab's count (Codex build review 2).
+    for (const name of [/Initial Assessment/, /Peer Review/, /Deliberations/, /Final Assessment/]) {
+      expect(screen.getByRole('link', { name }).getAttribute('href')).toContain('scope=all');
+    }
+  });
+
   test('carries scope for the four scope consumers, but not for Final writeups or Initial assessments', () => {
     render(<WorkbenchViewsNav activeKey="requests" cycleCode="J27" programId="p1" scope="all" />);
     expect(screen.getByRole('link', { name: 'Request list' })).toHaveAttribute('href', '/workbench?programId=p1&cycleCode=J27&scope=all');

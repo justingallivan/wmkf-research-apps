@@ -1,21 +1,19 @@
 /**
- * Request Workbench — per-request shell (tier-3).
- *
- * Renders the request context header + the tab strip. LIVE tabs: Reviewers
- * (Find, Invite Reviewers, Track Reviewers via ReviewerManagePanel; Phase 3
- * applicant-reviewer ingestion + in-panel search), Proposal (documents + AI
- * content + Field Primer, S258/S260), Reviews (read-back of submitted reviews —
- * decoded Q1/Q3/Q10 ratings + file download), and — Group A, S260 — Overview
- * (per-request command center, including read-only request status), Awardee
- * (grantee-deliverables workflow), and Initial Assessment
- * (governed DOCX producer/read model), and Staff Deliberations (S466 merge of
- * the former Pre Site Visit Writeup + Site Visit tabs: durable Word producer,
- * guarded share hand-off, logistics, materials distribution, guarded reopen —
- * old tab keys alias in), plus Final Writeup group-review handoff and Word launch. The
- * default landing is Overview. Tab + sub-tab selection is query-string driven
- * (?tab=reviewers&sub=track) for deep-links.
+ * Request Workbench shell. Sandbox J27 development uses five workflow phases,
+ * with legacy tab links resolved to their existing components. Other targets
+ * retain the existing tab layout. Existing server authorization and storage
+ * contracts are unchanged. Reviewer `sub` navigation remains independent of
+ * phase `section` navigation.
  */
 
+import { j27IntegrityTarget, j27ChairsRecommendationEnabled, j27ChairsRecommendationRehearsalRequestId, j27IntegritySimulationRequestIds } from '../../lib/utils/j27-integrity-readiness';
+import { rationaleFieldReady, reviewSummaryFieldsReady, rosterFieldReady } from '../../lib/utils/workbench-field-readiness';
+import { workbenchPhaseReleaseAdmitted } from '../../lib/utils/workbench-phase-release';
+import InitialAssessmentRationale from '../../shared/components/workbench/InitialAssessmentRationale';
+import MeetingRoster from '../../shared/components/workbench/MeetingRoster';
+import StaffVisitAssessment from '../../shared/components/workbench/StaffVisitAssessment';
+import StaffReviewSummary from '../../shared/components/workbench/StaffReviewSummary';
+import OfframpControl from '../../shared/components/workbench/OfframpControl';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
@@ -23,12 +21,17 @@ import Link from 'next/link';
 import Layout, { Card } from '../../shared/components/Layout';
 import RequireAppAccess from '../../shared/components/RequireAppAccess';
 import TestRequestBadge from '../../shared/components/TestRequestBadge';
+import J27StageStrip from '../../shared/components/workbench/J27StageStrip';
+import useReviewerProgress from '../../shared/components/workbench/useReviewerProgress';
+import { deriveJ27PageStage } from '../../shared/utils/j27PageStage';
+import { isJ27ScopeCycle } from '../../lib/services/workbench/j27-read-model';
 import { useAppAccess } from '../../shared/context/AppAccessContext';
 import { useProfile } from '../../shared/context/ProfileContext';
 import { readEmailSignaturePreference } from '../../shared/config/reviewerFinderPreferences';
 import ReviewersTab from '../../shared/components/reviewers/ReviewersTab';
 import ReviewsTab from '../../shared/components/workbench/ReviewsTab';
-import FirstCutCard from '../../shared/components/workbench/FirstCutCard';
+import { isChairsRecommendationEditable } from '../../shared/config/j27Scoring';
+import ScoringCard from '../../shared/components/workbench/ScoringCard';
 import ProposalTab from '../../shared/components/workbench/ProposalTab';
 import IntegrityTab from '../../shared/components/workbench/IntegrityTab';
 import OverviewTab from '../../shared/components/workbench/OverviewTab';
@@ -69,19 +72,15 @@ const LEGACY_TAB_ALIASES = {
   'site-visit': 'staff-deliberations',
 };
 
-export function WorkbenchRequest({ previewReadOnly = false }) {
+// Preserve the existing section key for saved links.
+const AI_REVIEW_PANEL = { key: 'group-review', label: 'AI Review Panel' };
+
+export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary = false, meetingRosterEnabled = false, initialRationaleEnabled = false, chairsRecommendationEnabled = false, chairsRecommendationRehearsalRequestId = null, integritySimulationIds = [], automaticIntegrityEnabled = false }) {
   const router = useRouter();
   const { data: session } = useSession();
   const { isSuperuser, hasAccess } = useAppAccess();
   const { preferences } = useProfile();
   const { requestId } = router.query;
-
-  const visibleTabs = useMemo(() => visibleTabsFor(hasAccess), [hasAccess]);
-  const visibleTabKeys = useMemo(() => new Set(visibleTabs.map((t) => t.key)), [visibleTabs]);
-  const rawTabParam = typeof router.query.tab === 'string' ? router.query.tab : null;
-  const tabParam = rawTabParam ? (LEGACY_TAB_ALIASES[rawTabParam] || rawTabParam) : null;
-  const activeTab = tabParam && visibleTabKeys.has(tabParam) ? tabParam : 'overview';
-  const reviewerSurfaceReadOnly = previewReadOnly && ['reviewers', 'reviews'].includes(activeTab);
 
   const [ctx, setCtx] = useState(null);
   const [ctxOwnerGeneration, setCtxOwnerGeneration] = useState(-1);
@@ -91,6 +90,29 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
   const tabScrollerRef = useRef(null);
   const routeRequestId = typeof requestId === 'string' && requestId ? requestId : null;
   const routeKey = routeRequestId?.toLowerCase() || '';
+  const [visitEditorRequestId, setVisitEditorRequestId] = useState(null);
+  const [rationaleEditorRequestId, setRationaleEditorRequestId] = useState(null);
+  const [proposalLink, setProposalLink] = useState(null);
+  // Step E (plan C7): facts the tabs already load, keyed by request so a
+  // navigation never carries one request's reads into another's stage.
+  const [j27Facts, setJ27Facts] = useState({ requestId: null });
+  const j27RouteRef = useRef('');
+  j27RouteRef.current = routeKey;
+  // Only the request on the current route may report facts: a late callback from a
+  // previous request is dropped, never merged and never allowed to replace the set.
+  // Each report is stamped with the order it landed in, so the composer can let
+  // the latest report of a shared key win (j27PageStage.js composeJ27PageInput).
+  const j27ReportSeq = useRef(0);
+  const reportJ27Facts = useCallback((factsRequestId, patch) => {
+    const key = String(factsRequestId || '').toLowerCase();
+    if (!key || key !== j27RouteRef.current) return;
+    j27ReportSeq.current += 1;
+    const stamp = Object.fromEntries(Object.keys(patch || {}).map((name) => [name, j27ReportSeq.current]));
+    setJ27Facts((prev) => (prev.requestId === key
+      ? { ...prev, ...patch, order: { ...(prev.order || {}), ...stamp } }
+      : { requestId: key, ...patch, order: stamp }));
+  }, []);
+  useEffect(() => { setJ27Facts({ requestId: routeKey }); }, [routeKey]);
   const routeStateRef = useRef({ key: routeKey, generation: 0 });
   if (routeStateRef.current.key !== routeKey) {
     routeStateRef.current = {
@@ -103,9 +125,112 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
     && typeof ctx?.requestId === 'string'
     && ctx.requestId.toLowerCase() === routeRequestId.toLowerCase();
   const visibleContext = contextMatchesRoute && ctxOwnerGeneration === routeGeneration ? ctx : null;
+  // The strip needs reviewer counts on whichever tab the request opens on (a Peer
+  // Review list row links to the Peer Review tab), so a 2027-or-later page loads the
+  // rollup here and the Overview reads this state (C7 amendment, 2026-11-12).
+  // Each opening of the Overview reads the counts again, as the Overview's own fetch
+  // did on every mount, so guidance is current after invitations or reports.
+  const [overviewVisit, setOverviewVisit] = useState(0);
+  const j27ReviewerProgress = useReviewerProgress(visibleContext?.j27 ? routeRequestId : null, overviewVisit);
+  useEffect(() => {
+    if (visibleContext?.j27 && routeRequestId && j27ReviewerProgress.status !== 'loading') {
+      reportJ27Facts(routeRequestId, { progress: j27ReviewerProgress });
+    }
+  }, [visibleContext, routeRequestId, j27ReviewerProgress, reportJ27Facts]);
+  const j27Stage = useMemo(() => (visibleContext?.j27?.input
+    ? deriveJ27PageStage(visibleContext.j27.input, j27Facts.requestId === routeKey ? j27Facts : {})
+    : null), [visibleContext, j27Facts, routeKey]);
   const visibleError = error && errorRequestId?.toLowerCase() === routeRequestId?.toLowerCase()
     ? error
     : null;
+
+  // The redesigned shell follows the same sandbox boundary as the tested fields.
+  // The server decides per request (phase-admission.js via resolve-request); the prop only says the
+  // deployment could admit any, so a phase address waits for the context instead of flashing the old tabs.
+  const phaseLayout = staffReviewSummary && visibleContext?.phaseLayout === true;
+  const showInitialRationale = phaseLayout && initialRationaleEnabled;
+  const rehearsalIds = chairsRecommendationRehearsalRequestId ? [chairsRecommendationRehearsalRequestId] : integritySimulationIds;
+  const showChairsRecommendation = showInitialRationale && chairsRecommendationEnabled && (rehearsalIds.length
+    ? rehearsalIds.includes(routeKey) : visibleContext.isTestRequest === true);
+  const showAwardee = phaseLayout && visibleContext.statusClass === 'DECIDED_AWARD';
+  const phaseTabs = [
+    { key: 'overview', label: 'Overview' },
+    { key: 'initial-assessment', label: 'Initial Assessment' },
+    { key: 'peer-review', label: 'Peer Review' },
+    { key: 'deliberations', label: 'Deliberations' },
+    { key: 'final-assessment', label: 'Final Assessment' },
+    ...(showAwardee ? [{ key: 'awardee', label: 'Awardee' }] : []),
+  ];
+  const visibleTabs = phaseLayout ? phaseTabs : visibleTabsFor(hasAccess);
+  const visibleTabKeys = useMemo(() => new Set(visibleTabs.map((t) => t.key)), [visibleTabs]);
+  const rawTabParam = typeof router.query.tab === 'string' ? router.query.tab : null;
+  const phaseLinkPending = staffReviewSummary && !visibleContext
+    && ['initial-assessment', 'peer-review', 'deliberations', 'final-assessment', 'overview', 'awardee'].includes(rawTabParam);
+  const tabParam = rawTabParam ? (LEGACY_TAB_ALIASES[rawTabParam] || rawTabParam) : null;
+  const legacySections = {
+    proposal: ['initial-assessment', 'proposal'],
+    integrity: ['initial-assessment', 'integrity'],
+    'initial-writeup': ['initial-assessment', 'assessment'],
+    reviewers: ['peer-review', 'panel'],
+    reviews: ['peer-review', 'reports'],
+    'review-panel': ['peer-review', 'group-review'],
+    'staff-deliberations': ['deliberations', null],
+    'final-writeup': ['final-assessment', null],
+  };
+  const legacy = phaseLayout && tabParam === 'staff-deliberations'
+    && router.asPath?.endsWith('#deliberations-writeup')
+    ? legacySections['final-writeup']
+    : phaseLayout ? legacySections[tabParam] : null;
+  // Preserve the former Overview/Awardee bookmark for requests with an award.
+  const awardeeBookmark = showAwardee && tabParam === 'overview' && router.query.section === 'awardee';
+  const phase = awardeeBookmark ? 'awardee'
+    : legacy?.[0] || (tabParam && visibleTabKeys.has(tabParam) ? tabParam : 'overview');
+  const requestedSection = legacy?.[1] || (typeof router.query.section === 'string' ? router.query.section : null);
+  const sections = !phaseLayout ? [] : phase === 'initial-assessment' ? [
+    { key: 'proposal', label: showInitialRationale ? 'Assessment' : 'Proposal' },
+    ...(hasAccess('integrity-screener') === true ? [{ key: 'integrity', label: 'Integrity' }] : []),
+    // Keep the route for existing document links while staff use the in-app assessment.
+    { key: 'assessment', label: 'Assessment', legacyOnly: showInitialRationale },
+  ] : phase === 'peer-review' ? [
+    { key: 'panel', label: 'Reviewers' }, { key: 'reports', label: 'Reports' },
+    ...(hasAccess('review-panel') === true ? [AI_REVIEW_PANEL] : []),
+  ] : [];
+  const section = sections.some((item) => item.key === requestedSection) ? requestedSection : sections[0]?.key;
+  const visibleSections = sections.filter((item) => !item.legacyOnly);
+  const phaseContent = {
+    'initial-assessment': { proposal: 'proposal', integrity: 'integrity', assessment: 'initial-writeup' },
+    'peer-review': { panel: 'reviewers', reports: 'reviews', 'group-review': 'review-panel' },
+    awardee: { default: 'awardee' },
+    deliberations: { default: 'staff-deliberations' },
+    'final-assessment': { default: 'final-writeup' },
+  };
+  const activeTab = phaseLayout ? (phaseContent[phase]?.[section || 'default'] || 'overview')
+    : (tabParam && visibleTabKeys.has(tabParam) ? tabParam : 'overview');
+  const reviewerSurfaceReadOnly = previewReadOnly && ['reviewers', 'reviews'].includes(activeTab);
+  const editingInitialRationale = showInitialRationale && activeTab === 'proposal';
+  const updateProposalHref = useCallback((href) => {
+    if (routeStateRef.current.generation === routeGeneration) {
+      setProposalLink(href ? { href, generation: routeGeneration } : null);
+    }
+  }, [routeGeneration]);
+
+
+  useEffect(() => {
+    if (editingInitialRationale) setRationaleEditorRequestId(routeRequestId);
+  }, [editingInitialRationale, routeRequestId]);
+
+
+  useEffect(() => {
+    if (activeTab === 'staff-deliberations') setVisitEditorRequestId(routeRequestId);
+  }, [activeTab, routeRequestId]);
+
+  // Returning to the Overview from another tab reads the reviewer counts again;
+  // the first load already reads them, so it is not counted as a return.
+  const previousTabRef = useRef(activeTab);
+  useEffect(() => {
+    if (activeTab === 'overview' && previousTabRef.current !== 'overview') setOverviewVisit((n) => n + 1);
+    previousTabRef.current = activeTab;
+  }, [activeTab]);
 
   useEffect(() => {
     const scroller = tabScrollerRef.current;
@@ -161,9 +286,21 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
     };
   }, [requestId, loadCtx]);
 
-  const selectTab = async (key) => {
+  const refreshPhaseIStatus = () => {
+    if (routeStateRef.current.generation === routeGeneration) return loadCtx(routeRequestId);
+  };
+
+  const selectTab = async (key, nextSection) => {
+    const destination = phaseLayout ? legacySections[key] : null;
+    const destinationPhase = destination?.[0] || key;
+    const openingRoster = key === 'peer-review' && (!nextSection || nextSection === 'panel');
+    const reviewerQuery = phaseLayout && phase === 'peer-review' && destinationPhase === 'peer-review'
+      ? Object.fromEntries(['sub', 'proposalFile', 'repairCandidate', 'repairSuggestion']
+        .filter((name) => (!openingRoster || name === 'proposalFile') && typeof router.query[name] === 'string')
+        .map((name) => [name, router.query[name]]))
+      : {};
     try { await router.push(
-      { pathname: `/workbench/${requestId}`, query: { ...(requestNumber ? { n: requestNumber } : {}), tab: key } },
+      { pathname: `/workbench/${requestId}`, query: { ...reviewerQuery, ...(requestNumber ? { n: requestNumber } : {}), tab: destination?.[0] || key, ...((destination?.[1] || nextSection) ? { section: destination?.[1] || nextSection } : {}) } },
       undefined,
       { shallow: true },
     ); } catch (navigationError) { if (!navigationError?.cancelled) throw navigationError; }
@@ -206,6 +343,8 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
         {visibleError && <p className="text-sm text-amber-600 mt-1">Couldn’t load request details: {visibleError}</p>}
       </div>
 
+      {j27Stage && <J27StageStrip stage={j27Stage} />}
+
       {reviewerSurfaceReadOnly && (
         <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950" role="status">
           <span className="font-semibold">Preview is read-only for reviewer work.</span>{' '}
@@ -214,16 +353,16 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
       )}
 
       {/* Tab strip */}
-      <div ref={tabScrollerRef} className="border-b border-gray-200 mb-6 overflow-x-auto">
+      <div hidden={phaseLinkPending} ref={tabScrollerRef} className="border-b border-gray-200 mb-6 overflow-x-auto">
         <nav className="flex gap-1 min-w-max" aria-label="Request sections">
           {visibleTabs.map((t) => (
             <button
               key={t.key}
               type="button"
               onClick={() => selectTab(t.key)}
-              aria-current={activeTab === t.key ? 'page' : undefined}
+              aria-current={(phaseLayout ? phase : activeTab) === t.key ? 'page' : undefined}
               className={`px-3 py-2 text-sm font-medium border-b-2 whitespace-nowrap ${
-                activeTab === t.key
+                (phaseLayout ? phase : activeTab) === t.key
                   ? 'border-gray-900 text-gray-900'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
@@ -234,12 +373,45 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
         </nav>
       </div>
 
-      {activeTab === 'overview' ? (
+      {visibleSections.length > 0 && (
+        <nav className="flex flex-wrap gap-2 mb-6" aria-label={`${phaseTabs.find((item) => item.key === phase)?.label || 'Phase'} sections`}>
+          {visibleSections.map((item) => (
+            <button key={item.key} type="button" onClick={() => selectTab(phase, item.key)}
+              aria-current={section === item.key ? 'page' : undefined}
+              className={`rounded-lg px-3 py-2 text-sm font-medium ${section === item.key ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+              {item.label}
+            </button>
+          ))}
+        </nav>
+      )}
+
+      {showInitialRationale && (editingInitialRationale || rationaleEditorRequestId === routeRequestId) && (
+        <div hidden={!editingInitialRationale}>
+          <InitialAssessmentRationale key={routeRequestId} requestId={routeRequestId}
+            proposalHref={proposalLink?.generation === routeGeneration ? proposalLink.href : null} />
+        </div>
+      )}
+
+      {phaseLinkPending ? (
+        <Card hover={false}>
+          <p className="text-sm text-gray-600" role="status">
+            {visibleError ? 'Request details are required to open this phase.' : 'Loading request details…'}
+          </p>
+          {visibleError && <button type="button" className="mt-3 text-sm font-medium underline"
+            onClick={() => loadCtx(routeRequestId)}>Retry</button>}
+        </Card>
+      ) : activeTab === 'overview' ? (
         <OverviewTab
           key={routeRequestId || ''}
           context={visibleContext}
           requestId={routeRequestId || ''}
           onSelectTab={selectTab}
+          j27Handoffs={phaseLayout}
+          initialRationaleEnabled={initialRationaleEnabled}
+          chairsRecommendationEnabled={showChairsRecommendation}
+          meetingRosterEnabled={meetingRosterEnabled}
+          onJ27Facts={visibleContext?.j27 ? reportJ27Facts : null}
+          reviewerProgress={visibleContext?.j27 ? j27ReviewerProgress : null}
         />
       ) : activeTab === 'reviewers' ? (
         <ReviewersTab
@@ -256,20 +428,41 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
           canManage={canManage}
           settings={reviewerSettings}
           previewReadOnly={reviewerSurfaceReadOnly}
+          phaseLayout={phaseLayout}
         />
       ) : activeTab === 'proposal' ? (
         <>
-          {visibleContext?.cycleCode === 'J27' && (
-            <FirstCutCard
-              key={routeRequestId}
+          {isJ27ScopeCycle(visibleContext?.cycleCode) && (
+            <ScoringCard
+              key={`scoring:${routeRequestId}`}
               context={visibleContext}
               canManage={canManage && !previewReadOnly}
-              refresh={() => {
-                if (routeStateRef.current.generation === routeGeneration) return loadCtx(routeRequestId);
-              }}
+              previewReadOnly={previewReadOnly}
+              refresh={refreshPhaseIStatus}
+              explicitSave={!phaseLayout}
             />
           )}
-          <ProposalTab key={routeRequestId || ''} context={visibleContext} requestId={routeRequestId || ''} />
+          {showChairsRecommendation && isChairsRecommendationEditable(visibleContext.phaseIStatus) && (
+            <ScoringCard
+              key={`chairs-recommendation:${routeRequestId}`}
+              context={visibleContext}
+              canManage={canManage && !previewReadOnly}
+              refresh={refreshPhaseIStatus}
+              chairsRecommendation
+              automaticIntegrityEnabled={automaticIntegrityEnabled}
+            />
+          )}
+          {showInitialRationale ? (
+            <details key={routeRequestId} open={rawTabParam === 'proposal'}
+              className="rounded-xl border bg-white p-5">
+              <summary className="cursor-pointer font-semibold">Proposal and AI intake findings</summary>
+              <div className="mt-4">
+                <ProposalTab context={visibleContext} requestId={routeRequestId} onProposalHref={updateProposalHref} />
+              </div>
+            </details>
+          ) : (
+            <ProposalTab key={routeRequestId || ''} context={visibleContext} requestId={routeRequestId || ''} />
+          )}
         </>
       ) : activeTab === 'integrity' ? (
         <IntegrityTab key={routeRequestId || ''} requestId={routeRequestId || ''} />
@@ -284,11 +477,13 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
           key={typeof requestId === 'string' ? requestId : ''}
           requestId={typeof requestId === 'string' ? requestId : ''}
           previewReadOnly={reviewerSurfaceReadOnly}
+          showStaffReviewSummary={phaseLayout}
         />
       ) : activeTab === 'review-panel' ? (
         <ReviewPanelTab
           key={typeof requestId === 'string' ? requestId : ''}
           requestId={typeof requestId === 'string' ? requestId : ''}
+          title={phaseLayout ? AI_REVIEW_PANEL.label : undefined}
         />
       ) : activeTab === 'staff-deliberations' ? (
         <StaffDeliberationsTab
@@ -297,12 +492,43 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
           requestNumber={visibleContext?.requestNumber || requestNumber || ''}
           isSuperuser={isSuperuser}
           onSelectTab={selectTab}
+          mode={phaseLayout ? 'presentation' : 'legacy'}
+          presentationContext={phaseLayout ? (
+            <>
+              <StaffReviewSummary key={routeRequestId} requestId={routeRequestId} readOnly
+                onOpenReports={() => selectTab('reviews')} onJ27Facts={visibleContext?.j27 ? reportJ27Facts : null} />
+              <OfframpControl key={`offramp:${routeRequestId}`} requestId={routeRequestId}
+                onStatusChange={refreshPhaseIStatus} />
+            </>
+          ) : null}
         />
       ) : activeTab === 'final-writeup' ? (
-        <FinalWriteupTab
-          key={typeof requestId === 'string' ? requestId : ''}
-          requestId={typeof requestId === 'string' ? requestId : ''}
-        />
+        <>
+          <FinalWriteupTab
+            key={routeRequestId || ''}
+            requestId={routeRequestId || ''}
+            onJ27Facts={visibleContext?.j27 ? reportJ27Facts : null}
+            renderBoardDraft={phaseLayout ? (props) => (
+              <StaffDeliberationsTab
+                requestId={routeRequestId}
+                requestNumber={visibleContext?.requestNumber || requestNumber || ''}
+                isSuperuser={isSuperuser}
+                mode="board-draft"
+                {...props}
+              />
+            ) : null}
+          />
+          {phaseLayout && (
+            <details key={routeRequestId} className="mt-4 rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
+              <summary className="cursor-pointer font-semibold text-gray-900">Supporting evidence</summary>
+              <div className="mt-2 divide-y divide-gray-200">
+                <StaffReviewSummary requestId={routeRequestId} readOnly />
+                {meetingRosterEnabled && <MeetingRoster requestId={routeRequestId} readOnly />}
+                <StaffVisitAssessment requestId={routeRequestId} readOnly />
+              </div>
+            </details>
+          )}
+        </>
       ) : activeTab === 'awardee' ? (
         <AwardeeTab
           key={typeof requestId === 'string' ? requestId : ''}
@@ -314,6 +540,14 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
           <p className="text-sm text-gray-500">This panel is coming in a later update.</p>
         </Card>
       )}
+
+      {phaseLayout && (activeTab === 'staff-deliberations' || visitEditorRequestId === routeRequestId) && (
+        <div hidden={activeTab !== 'staff-deliberations'} className="mt-4">
+          {meetingRosterEnabled && <MeetingRoster key={`meeting-roster-editor:${routeRequestId}`} requestId={routeRequestId} />}
+          <StaffVisitAssessment key={`staff-visit-editor:${routeRequestId}`} requestId={routeRequestId} />
+        </div>
+      )}
+
     </Layout>
   );
 }
@@ -321,7 +555,16 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
 export async function getServerSideProps() {
   const previewReadOnly = process.env.VERCEL_ENV === 'preview'
     && classifyTarget(process.env.DYNAMICS_URL) !== 'sandbox';
-  return { props: { previewReadOnly } };
+  // Whether this deployment could admit any request to the phase layout; each request's
+  // admission comes from the request context.
+  const staffReviewSummary = workbenchPhaseReleaseAdmitted() && reviewSummaryFieldsReady();
+  return { props: {
+    previewReadOnly, staffReviewSummary, meetingRosterEnabled: rosterFieldReady(),
+    initialRationaleEnabled: rationaleFieldReady(), chairsRecommendationEnabled: j27ChairsRecommendationEnabled(),
+    chairsRecommendationRehearsalRequestId: j27ChairsRecommendationRehearsalRequestId(),
+    integritySimulationIds: j27IntegritySimulationRequestIds(),
+    automaticIntegrityEnabled: Boolean(j27IntegrityTarget()),
+  } };
 }
 
 export default function WorkbenchRequestGuard(props) {

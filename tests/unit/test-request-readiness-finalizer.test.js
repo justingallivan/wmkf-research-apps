@@ -174,3 +174,25 @@ test('readiness recovery also passes the same prior-PDF evidence to its prerequi
   expect(recheckFoundationTransition).toHaveBeenLastCalledWith(expect.objectContaining({ previousGoVerifyPdf: 'synthetic-prior-evidence' }));
   expect(f.client.patchWithOptions).not.toHaveBeenCalled();
 });
+
+// Admin form (owner, 2026-11-15): codes tell refusals from check-again answers; the time check runs before dispatch.
+test('a refused beforeDispatch journals nothing and sends nothing; the next call dispatches', async () => {
+  const f = fixture();
+  const late = Object.assign(new Error('not enough time'), { code: 'factory_deadline_exceeded' });
+  await expect(finalizeReadiness({ ...f, confirm: true, beforeDispatch: () => { throw late; } })).rejects.toBe(late);
+  expect(f.journal.plan).not.toHaveBeenCalled();
+  expect(f.journal.dispatch).not.toHaveBeenCalled();
+  expect(f.client.patchWithOptions).not.toHaveBeenCalled();
+  await finalizeReadiness({ ...f, confirm: true, beforeDispatch: () => {} });
+  expect(f.client.patchWithOptions).toHaveBeenCalledTimes(1);
+});
+
+test('failures carry codes: unknown outcome and pending readback are check-again; others are refusals', async () => {
+  let f = fixture();
+  f.client.patchWithOptions.mockRejectedValue(Error('network'));
+  await expect(finalizeReadiness({ ...f, confirm: true })).rejects.toMatchObject({ code: 'readiness_unconfirmed' });
+  await expect(finalizeReadiness({ ...f, confirm: true })).rejects.toMatchObject({ code: 'readiness_unconfirmed' });
+  f = fixture();
+  f.journal.dispatch.mockResolvedValue(null);
+  await expect(finalizeReadiness({ ...f, confirm: true })).rejects.toMatchObject({ code: 'readiness_refused' });
+});

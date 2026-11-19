@@ -83,11 +83,11 @@ function Step({ id, number, title, status, summary, actions, details = null, chi
     <li id={id} className="scroll-mt-6 px-5 py-4 sm:px-6">
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="flex min-w-0 flex-1 basis-full gap-3 md:basis-0">
-          <StepMarker status={status} number={number} />
+          {number != null && <StepMarker status={status} number={number} />}
           <div className="min-w-0 flex-1">
             <h3 className={`text-base font-semibold ${status === 'upcoming' ? 'text-gray-600' : 'text-gray-900'}`}>
               {title}
-              <span className="sr-only">{status === 'done' ? ' (done)' : status === 'current' ? ' (current step)' : ''}</span>
+              {number != null && <span className="sr-only">{status === 'done' ? ' (done)' : status === 'current' ? ' (current step)' : ''}</span>}
             </h3>
             {summary}
             {details && status === 'current' && details}
@@ -237,7 +237,14 @@ export default function StaffDeliberationsTab({
   requestNumber = '',
   isSuperuser = false,
   onSelectTab = null,
+  mode = 'legacy',
+  presentationContext = null,
+  boardDraftAlreadyLinked = false,
+  watchForReadyDraft = false,
+  onDraftChange = null,
 }) {
+  const presentationOnly = mode === 'presentation';
+  const boardDraftOnly = mode === 'board-draft';
   // Pre-Site Visit writeup state (legacy artifact; independent lifecycle).
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
@@ -341,7 +348,7 @@ export default function StaffDeliberationsTab({
           setSession(status.session || null);
           setSessionAttendees(Array.isArray(status.sessionAttendees) ? status.sessionAttendees : EMPTY_LIST);
           setMaterials(status.materials || null);
-          if (status.pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED) {
+          if (!presentationOnly && status.pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED) {
             setError(failureMessage(
               status.pendingArtifact,
               'The latest Word-draft attempt failed.',
@@ -367,12 +374,12 @@ export default function StaffDeliberationsTab({
       activeController.current?.abort();
       activeController.current = null;
     };
-  }, [requestId]);
+  }, [requestId, presentationOnly]);
 
   useEffect(() => {
     setPreviousVersions(EMPTY_LIST);
     setRegenerationRetry(null);
-    if (!requestId) return undefined;
+    if (!requestId || presentationOnly) return undefined;
     let disposed = false;
     let timer;
     const controller = new AbortController();
@@ -401,9 +408,10 @@ export default function StaffDeliberationsTab({
     };
     timer = setTimeout(refresh, 15000);
     return () => { disposed = true; clearTimeout(timer); controller.abort(); };
-  }, [requestId]);
+  }, [requestId, presentationOnly]);
 
   useEffect(() => {
+    if (mode !== 'legacy') return undefined;
     briefSequence.current += 1;
     briefController.current?.abort();
     briefController.current = null;
@@ -450,7 +458,13 @@ export default function StaffDeliberationsTab({
       briefController.current?.abort();
       briefController.current = null;
     };
-  }, [requestId]);
+  }, [requestId, mode]);
+
+  // Automatic preparation can finish while the Board draft tools are open.
+  const preparedSource = finalReview?.phase === 'ready' ? finalReview.sourceArtifactId : null;
+  useEffect(() => {
+    if (watchForReadyDraft && preparedSource) onDraftChange?.();
+  }, [watchForReadyDraft, onDraftChange, preparedSource]);
 
   useEffect(() => {
     if (!confirmDialog) return undefined;
@@ -600,6 +614,7 @@ export default function StaffDeliberationsTab({
         setPreparation(refreshed.preparation || null);
         setPreviousVersions(refreshed.previousVersions || EMPTY_LIST);
         setRegenerationRetry(null);
+        onDraftChange?.();
       }
     } catch (generationError) {
       if (generationError?.name !== 'AbortError'
@@ -903,6 +918,7 @@ export default function StaffDeliberationsTab({
       if (!body.artifact) throw new Error('Preparing the Draft writeup for editing returned no artifact identity.');
       setArtifact(body.artifact);
       setPendingArtifact(null);
+      onDraftChange?.();
     } catch (startError) {
       if (startError?.name !== 'AbortError'
         && generationSequence.current === sequence
@@ -977,6 +993,7 @@ export default function StaffDeliberationsTab({
         return;
       }
       setReopenForm(null);
+      onDraftChange?.();
     } catch (submitError) {
       if (submitError?.name !== 'AbortError'
         && generationSequence.current === sequence
@@ -1226,7 +1243,7 @@ export default function StaffDeliberationsTab({
                   : due ? 'Draft writeup needed'
             : timing?.endIso ? 'Before presentation' : 'Schedule needed';
   const materialsLine = siteVisitMaterialsLine(materials);
-  const timingLabel = presentationEndLabel(timing);
+  const timingLabel = presentationOnly && checkingStatus ? 'Checking the presentation schedule…' : presentationEndLabel(timing);
   // Same route, authorization and schedule fence as the Final writeup tab;
   // canStart and sourceArtifactId come from that tab's status (status-facts).
   async function startGroupReview() {
@@ -1381,14 +1398,16 @@ export default function StaffDeliberationsTab({
       : correctionDraft ? 'Corrections in progress'
         : generating || pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING ? 'Preparing…'
           : (readyFile || writeupHidden) && preSiteDraftReady ? `Draft ready${draftWarnings.length ? ` · ${draftWarnings.length} ${draftWarnings.length === 1 ? 'thing' : 'things'} to check` : ''}`
-            : due ? 'Not prepared yet' : 'Optional before the presentation';
+            : due ? 'Not prepared yet' : boardDraftOnly ? null : 'Optional before the presentation';
   // Post-visit drafting hands off to group review from step 4 (owner 2026-10-06).
-  const handOffOpen = preSiteShared && milestoneComplete && !preSiteFinal && !correctionDraft && finalReview?.phase === 'ready';
+  const handOffOpen = !boardDraftOnly && preSiteShared && milestoneComplete && !preSiteFinal && !correctionDraft && finalReview?.phase === 'ready';
   const canHandOff = handOffOpen && finalReview.canStart === true
     && sameArtifactId(finalReview.sourceArtifactId, artifact?.artifactId)
     && !regenerationPending;
   const handOffNote = !handOffOpen ? null
     : canHandOff ? 'When the draft is ready for colleagues, choose Ready for group review. They’ll edit this same file.'
+      : finalReview.startBlockedReason === 'final_writeup_offramped'
+        ? 'This request has been offramped and will not go to the Board. Group review is unavailable.'
       : finalReview.startBlockedReason === 'final_writeup_site_visit_not_ended'
         ? 'Group review becomes available after the scheduled presentation ends.'
         : finalReview.startBlockedReason
@@ -1545,7 +1564,7 @@ export default function StaffDeliberationsTab({
       <div className="mt-2 space-y-2 text-gray-600">
         <p data-testid="deliberations-session-line">{sessionLine(session)}</p>
         {currentStep === 'session' && nowLine && <p className="text-gray-900">{nowLine}</p>}
-        <p>{timingLabel}</p>
+        {!presentationOnly && <p>{timingLabel}</p>}
         <Link href={session?.sessionId ? `/meeting-tracker/sessions/${encodeURIComponent(session.sessionId)}` : `/meeting-tracker/visits/${encodeURIComponent(requestId)}`} className="font-medium text-blue-800 underline">Open meeting coordination</Link>
       </div>
     </details>
@@ -1553,13 +1572,13 @@ export default function StaffDeliberationsTab({
 
   const presentationStep = (
     <Step
-      number={4}
-      title="Presentation"
-      status={stepStatus('presentation')}
+      number={presentationOnly ? null : 4}
+      title={presentationOnly ? 'Presentation and staff discussion' : 'Presentation'}
+      status={presentationOnly ? (due ? 'done' : 'current') : stepStatus('presentation')}
       summary={(
         <>
           <p className={summaryClass} data-testid="deliberations-visit-line">{timingLabel}</p>
-          {currentStep === 'presentation' && nowLine && <p className="mt-1 text-sm text-gray-900">{nowLine}</p>}
+          {!presentationOnly && currentStep === 'presentation' && nowLine && <p className="mt-1 text-sm text-gray-900">{nowLine}</p>}
         </>
       )}
     >
@@ -1581,16 +1600,42 @@ export default function StaffDeliberationsTab({
     </Step>
   );
 
+  if (presentationOnly) {
+    const draftNeedsAttention = due && (preparationState === 'blocked'
+      || pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED);
+    return (
+      <section id="deliberations-status" aria-label="Presentation and discussion" className="space-y-3">
+        {error && <p role="alert" className="text-sm text-red-800">{error}</p>}
+        {draftNeedsAttention && onSelectTab && (
+          <p className="text-sm text-amber-800">
+            Draft Writeup preparation needs attention.{' '}
+            <button type="button" onClick={() => onSelectTab('final-writeup')} className="font-medium underline">
+              Open Final Assessment
+            </button>
+          </p>
+        )}
+        <Card hover={false} padding="p-0">
+          <ol>{presentationStep}</ol>
+        </Card>
+        {presentationContext}
+        {meetingDetails}
+        {materialsCard}
+      </section>
+    );
+  }
+
   const writeupStep = (
     <Step
       id="deliberations-writeup"
-      number={1}
-      title="Draft writeup"
-      status={writeupStatus}
-      summary={<p className={summaryClass}>{writeupSummary}</p>}
+      number={boardDraftOnly ? null : 1}
+      title={boardDraftOnly ? 'Draft Writeup' : 'Draft writeup'}
+      status={boardDraftOnly ? 'current' : writeupStatus}
+      summary={writeupSummary && <p className={summaryClass}>{writeupSummary}</p>}
       details={readyFile ? (
         <div className="mt-2 text-sm text-gray-700">
-          <p className="text-gray-600">Findings from the research presentation. All draft writeup edits go into this one file.</p>
+          <p className="text-gray-600">{boardDraftOnly
+            ? 'This draft becomes the Final Writeup.'
+            : 'Findings from the research presentation. All draft writeup edits go into this one file.'}</p>
           {!preSiteShared && !preSiteFinal && readyFile.lastModified && (
             <p className="mt-1">{`Draft generated ${new Date(readyFile.lastModified).toLocaleDateString()}`}</p>
           )}
@@ -1620,7 +1665,8 @@ export default function StaffDeliberationsTab({
       ) : null}
       actions={(
         <>
-          {(!due || ['disabled', 'blocked', 'none'].includes(preparationState)) && !readyFile && !writeupHidden && canChangeWriteup && !preSiteShared && !preSiteFinal && (
+          {(!boardDraftOnly || (due && timing?.availability === 'available'))
+            && (!due || ['disabled', 'blocked', 'none'].includes(preparationState)) && !readyFile && !writeupHidden && canChangeWriteup && !preSiteShared && !preSiteFinal && (
             <button
               type="button"
               onClick={() => generate()}
@@ -1643,7 +1689,7 @@ export default function StaffDeliberationsTab({
               </button>}
             </>
           )}
-          {readyFile && (preSiteShared || preSiteFinal) && (
+          {!boardDraftAlreadyLinked && readyFile && (preSiteShared || preSiteFinal) && (
             <a href={readyFile.webUrl} target="_blank" rel="noopener noreferrer" className={writeupStatus === 'current' ? primaryClass : secondaryClass}>
               {preSiteFinal ? 'Open draft writeup in Word' : 'Edit draft writeup in Word'}
             </a>
@@ -1657,6 +1703,16 @@ export default function StaffDeliberationsTab({
         </>
       )}
     >
+      {boardDraftOnly && !checkingStatus && !due && !artifact && !error && (
+        <p className="mt-2 text-sm text-gray-600">
+          {timing?.availability === 'missing' ? 'No presentation is scheduled.'
+            : timing?.availability === 'available' ? 'Prepare the Draft Writeup after the scheduled presentation ends.'
+              : 'The presentation end could not be verified.'}
+          {timing?.availability !== 'available' && (
+            <> <Link href={`/meeting-tracker/visits/${encodeURIComponent(requestId)}`} className="font-medium text-blue-800 underline">Open meeting record</Link></>
+          )}
+        </p>
+      )}
       {error && (
         <p className="mt-2 text-sm text-red-800" role="alert">{error}</p>
       )}
@@ -1770,7 +1826,7 @@ export default function StaffDeliberationsTab({
         </div>
       )}
       <section id="deliberations-status" aria-labelledby="deliberations-steps-heading" className="scroll-mt-6 space-y-3">
-        <h2 id="deliberations-steps-heading" className="sr-only">Staff Deliberations</h2>
+        <h2 id="deliberations-steps-heading" className="sr-only">{boardDraftOnly ? 'Draft Writeup preparation' : 'Staff Deliberations'}</h2>
         <p className="sr-only" data-testid="deliberations-stage-sentence">{phase}</p>
         {hasProblemNotice && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -1805,13 +1861,11 @@ export default function StaffDeliberationsTab({
             </p>
           </div>
         )}
-        {meetingDetails}
+        {!boardDraftOnly && meetingDetails}
         <Card hover={false} padding="p-0">
-          <ol aria-label="Staff deliberations steps" className="divide-y divide-gray-200">
+          <ol aria-label={boardDraftOnly ? 'Draft Writeup preparation' : 'Staff deliberations steps'} className="divide-y divide-gray-200">
             {writeupStep}
-            {reviewStep}
-            {briefingStep}
-            {presentationStep}
+            {!boardDraftOnly && <>{reviewStep}{briefingStep}{presentationStep}</>}
           </ol>
         </Card>
       </section>
@@ -1843,7 +1897,7 @@ export default function StaffDeliberationsTab({
         />
       )}
 
-      {!materialsCardInPanel && materialsCard}
+      {!boardDraftOnly && !materialsCardInPanel && materialsCard}
 
       {isSuperuser && (preSiteShared || reopenHistory.length > 0) && (
         <Card hover={false}>

@@ -3,6 +3,10 @@
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn(), getUserRole: jest.fn() }));
 jest.mock('../../lib/dataverse/core/context', () => ({ withDalContext: jest.fn((_label, fn) => fn()) }));
 jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({ getById: jest.fn(), findByIds: jest.fn() }));
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle.js', () => ({
+  ...jest.requireActual('../../lib/dataverse/adapters/operations-grant-cycle.js'),
+  linkedCycleExpand: jest.fn(() => 'wmkf_GrantCycle($select=wmkf_cyclecode)'),
+}));
 jest.mock('../../lib/dataverse/adapters/site-visit.js', () => ({
   findSummariesByRequests: jest.fn(async () => ({ records: [], capped: false })), getById: jest.fn(),
 }));
@@ -256,7 +260,7 @@ describe('real routes compose default services and nonempty projections', () => 
 
   test('Final GET resolves session authorization and projects a pending row through defaults', async () => {
     const pendingId = '44444444-4444-4444-8444-444444444444';
-    requestAdapter.getById.mockResolvedValue({ akoya_requestid: REQUEST_ID, _wmkf_currentpresitevisit_value: ARTIFACT_ID, _wmkf_programdirector_value: ACTOR_ID });
+    requestAdapter.getById.mockResolvedValue({ wmkf_GrantCycle: { wmkf_cyclecode: 'D26' }, wmkf_phaseiistatus: 100000000, akoya_requestid: REQUEST_ID, _wmkf_currentpresitevisit_value: ARTIFACT_ID, _wmkf_programdirector_value: ACTOR_ID });
     documentAdapter.findByRequest.mockResolvedValue({ records: [registryRow({
       wmkf_sharepointversionid: '1.0', wmkf_milestoneversionid: '1.0',
       wmkf_milestonecontenthash: 'fixture-hash', wmkf_milestonecreatedat: '2026-09-01T12:00:00Z',
@@ -270,6 +274,9 @@ describe('real routes compose default services and nonempty projections', () => 
     expect(res.statusCode).toBe(200);
     expect(res.body).toMatchObject({ success: true, available: true, phase: 'ready', canStart: true,
       sourceArtifactId: ARTIFACT_ID, pendingArtifact: { artifactId: pendingId, sourceArtifactId: ARTIFACT_ID } });
+    expect(requestAdapter.getById).toHaveBeenCalledWith(REQUEST_ID, {
+      select: expect.stringContaining('wmkf_phaseiistatus'), expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+    });
     expect(documentAdapter.findByRequest).toHaveBeenCalledWith(REQUEST_ID);
     expect(siteVisitAdapter.findSummariesByRequests).toHaveBeenCalledWith([REQUEST_ID]);
     expect(getUserRole).toHaveBeenCalledWith(ACTOR_ID);

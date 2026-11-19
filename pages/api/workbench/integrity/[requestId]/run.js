@@ -6,6 +6,8 @@ import { withDalContext } from '../../../../../lib/dataverse/core/context';
 import { loadModelOverrides } from '../../../../../lib/services/model-override-loader';
 import { ServiceHttpError } from '../../../../../lib/services/service-http-error';
 import { runWorkbenchIntegrityScreen } from '../../../../../lib/services/workbench/integrity-service';
+import { readJ27IntegrityJob } from '../../../../../lib/services/workbench/j27-integrity-jobs';
+import { isJ27IntegritySimulationRequest } from '../../../../../lib/utils/j27-integrity-readiness';
 import { isGuid } from '../../../../../lib/utils/guid';
 
 const limiter = nextRateLimiter({ max: 5 });
@@ -27,6 +29,9 @@ export default async function handler(req, res) {
   const rawRequestId = req.query.requestId;
   const requestId = typeof rawRequestId === 'string' ? rawRequestId.trim() : '';
   if (!isGuid(requestId)) return res.status(400).json({ error: 'requestId must be a GUID' });
+  if (isJ27IntegritySimulationRequest(requestId)) {
+    return res.status(409).json({ error: 'This request is reserved for automatic screening rehearsal.' });
+  }
 
   try {
     // The integrity engine resolves its model synchronously from the warmed
@@ -39,6 +44,10 @@ export default async function handler(req, res) {
 
   return withDalContext('workbench-integrity-run', async () => {
     try {
+      const automaticScreen = await readJ27IntegrityJob(requestId);
+      if (automaticScreen === 'queued' || automaticScreen === 'running') {
+        return res.status(409).json({ error: 'An automatic screen is already scheduled or running. Check its status first.' });
+      }
       const result = await runWorkbenchIntegrityScreen({
         requestId,
         actorProfileId: access.profileId || null,

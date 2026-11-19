@@ -331,4 +331,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { validateCapabilityEntries };
+module.exports = { validateCapabilityEntries, findConstObject };

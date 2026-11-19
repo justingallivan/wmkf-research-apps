@@ -377,7 +377,7 @@ export default function TestRequestFactoryIntake({
               {confirmReason ? <Reason id="factory-confirm-reason">{confirmReason}</Reason> : <span id="factory-confirm-reason" />}
             </div>
             <p className="max-w-2xl text-sm leading-6 text-gray-600">
-              Confirm reserves the run and creates nothing in Dataverse yet. You start the run, step by step, from the run panel. For Production J27 and later, this prepares a reviewer-workflow fixture. After cloning, an owner advances its phase statuses and finalizes staff readiness using the command-line tool. Intake automation is not rerun.
+              Confirm reserves the run; nothing is created in Dataverse yet. Next, start the run to create the test Request. For a J27 or later cycle on Production, then press Prepare for review on the run so the test Request appears in the Workbench. Intake automation is not rerun.
             </p>
           </form>
         </section>

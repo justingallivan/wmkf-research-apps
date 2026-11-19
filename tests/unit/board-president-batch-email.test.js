@@ -354,3 +354,23 @@ test('release-role failure does not starve independent archive copying or email 
     expect(f.state.releases[A].state).toBe('queued');
   } finally { alert.mockRestore(); }
 });
+
+test('worker clears stale calendar and notice alerts once the read and delivery succeed, but not after a failure', async () => {
+  const f = fixture(); await release(f);
+  process.env.VERCEL_ENV = 'production'; process.env.DYNAMICS_URL = 'https://wmkf.crm.dynamics.com'; delete process.env.DYNAMICS_SANDBOX_URL;
+  process.env.BOARD_WRITEUPS_ENABLED = 'on'; process.env.RESEARCH_LEADERSHIP_DIGEST_MODE = 'board-release';
+  f.state.handoffBackfilledAt = f.d.now();
+  const key = notices(f.config, f.state)[0].key;
+  const resolve = jest.spyOn(AlertService, 'autoResolve').mockResolvedValue(1);
+  const alert = jest.spyOn(AlertService, 'createAlert').mockResolvedValue(undefined);
+  try {
+    await runBoardWorkflow({ ...f.d, now: () => Date.parse(f.d.now()), listCycles: async () => ['D26'], deliverNotice: jest.fn(), reconcileNotices: jest.fn() });
+    expect(resolve).toHaveBeenCalledWith('board-writeup-calendar:D26');
+    expect(resolve).toHaveBeenCalledWith(`board-writeups:D26:${key}`);
+    resolve.mockClear();
+    const failing = jest.fn(async () => { throw Object.assign(new Error('blip'), { code: 'board_calendar_unavailable' }); });
+    await runBoardWorkflow({ ...f.d, now: () => Date.parse(f.d.now()), listCycles: async () => ['D26'], deliverNotice: failing, reconcileNotices: jest.fn() });
+    expect(resolve).not.toHaveBeenCalledWith(`board-writeups:D26:${key}`);
+    expect(alert).toHaveBeenCalledWith(expect.objectContaining({ autoResolveKey: `board-writeups:D26:${key}` }));
+  } finally { resolve.mockRestore(); alert.mockRestore(); }
+});

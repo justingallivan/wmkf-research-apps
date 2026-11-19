@@ -3,15 +3,17 @@ title: Test Request Factory Run Ledger
 domain: test-request-factory
 kind: atlas
 status: active
-summary: "Durable test Request ledger, written by the owner-run CLI and, since 2026-10-02, by the deployed admin form in Production. Current copy: managed Neon ledgers (054 + 058 + 094 verified 2026-11-03; operational data loaded 2026-09-30) behind a tracked host registry and schema fingerprint check. Shared Production app DB has 054 + 058 + 094 tables (empty; never the ledger; 094 added 2026-11-03); Preview unverified."
+summary: "Durable test Request ledger, written by the owner-run CLI and, since 2026-10-02, by the deployed admin form in Production. Current copy: managed Neon ledgers (054 + 058 + 094 + 098 verified 2026-11-14; operational data loaded 2026-09-30) behind a tracked host registry and schema fingerprint check. Shared Production app DB has 054 + 058 + 094 tables and the 098 function (empty; never the ledger; 094 added 2026-11-03, 098 on 2026-11-14); Preview unverified."
 canonical: false
 cataloged: 2026-09-23
-last_verified: 2026-11-03
+last_verified: 2026-11-14
 owner: product-engineering
 related:
   - docs/plans/TEST_REQUEST_FACTORY_DESIGN_2026-09-19.md
   - lib/db/migrations/054_test_request_runs.sql
   - lib/db/migrations/058_test_request_cast_slot_bindings.sql
+  - lib/db/migrations/098_test_request_j27_file_names.sql
+  - lib/db/migrations/099_test_request_narrative_bibliography.sql
   - lib/services/test-requests/foundation-transition.js
   - docs/plans/TEST_REQUEST_FACTORY_PRODUCTION_PLAN_2026-09-27.md
 ---
@@ -34,6 +36,40 @@ numbered migration, ledger-only ones included; the "Operational Factory
 ledger only" header in the 094 SQL describes where its data lives, not which
 databases receive the schema. The SQL file is left unchanged because the
 ledger runner checks migration-file checksums (Codex, 2026-11-03).
+
+**[APPLIED 2026-11-14, owner-run; code merged as `3e382029a`]** [VERIFIED via
+owner-run `ledger:apply` output (`[apply ok] 098`, `1 applied`) on `ledger` and
+`ledger_prod`, owner-run `apply-migrations.js` on the Production app database
+(`1 applied, 95 skipped, 96 total`), then `check:factory-ledger`: both ledgers
+match the 054+058+094+098 fingerprint] Migration 098 (`098_test_request_j27_file_names.sql`) replaces
+`test_request_receipt_ok` so receipts also accept the `Submission-Documents`
+folder and the `Project-Narrative_<n>.pdf` and `Bibliography_<n>.pdf` names
+(J27 Factory file destinations; runbook "Prepared J27 reviewer fixtures"). It
+only widens the validator, so stored rows still pass. The schema guard
+(`lib/db/ledger-guard.js`) refuses a DIFFERING function body, so the Factory
+pauses between applying 098 and deploying the matching code, in either order
+(as with 094). The JS mirror is
+`run-ledger.js` `SUBFOLDER`/`FILENAME`; the fresh-install copy is
+`scripts/setup-database.js`. The tracked fingerprint changes only in that
+function's body hash [VERIFIED via a disposable local PostgreSQL 16 and
+`check:factory-ledger` against both managed ledgers before 098, which reported
+the pre-098 hash `f2d697a6`]. Release order used: owner-run `ledger:apply` on
+both managed ledgers and `apply-migrations.js` on the Production app database,
+then the merge.
+
+**[APPLIED 2026-11-15, owner-run; code on branch `claude/factory-narrative-bibliography`, not yet merged]** [VERIFIED via owner-run `ledger:apply` output (`[apply ok] 099`, `1 applied`) on `ledger_prod` and `ledger`, owner-run `apply-migrations.js` on the Production app database (`1 applied, 96 skipped, 97 total`), then `check:factory-ledger` on the branch: both ledgers match the 054+058+094+098+099 fingerprint] Migration 099
+(`099_test_request_narrative_bibliography.sql`) replaces `test_request_receipt_ok`
+again, adding only the `Narrative-Bibliography_<n>.pdf` name (the `AI Materials`
+folder was already accepted): a J27 Factory run also builds the combined
+narrative-plus-bibliography PDF (alignment log D60; runbook "Prepared J27
+reviewer fixtures"). Same mirrors and the same guard pause as 098. The tracked
+fingerprint changes only in that function's body hash, now `d290103f`
+[VERIFIED via a disposable local PostgreSQL 17 scratch schema, 2026-11-15; the
+pg ledger and runner suites pass on 099]. Release order: owner-run
+`ledger:apply` on both managed ledgers and `apply-migrations.js` on the
+Production app database, then the merge. Until the merge, `main` and other
+checkouts' `check:factory-ledger` is red, and the deployed Factory form pauses on
+the ledger guard.
 
 **Where the ledger lives (2026-09-30, S553; `docs/plans/TEST_REQUEST_LEDGER_PORTABILITY_PLAN_2026-09-30.md`).** The operational ledger for production test Requests has lived only in `ledger_prod` inside the `wmkf-ledger-pg` Docker container on the owner's home Mac (sandbox counterpart `ledger`), hand-built and never dumped [VERIFIED S553: the office Mac holds no `ledger_prod`]. Owner decision D1 moved it to Neon project `wmkf-factory-ledger` (Vercel Marketplace, connected to no Vercel project, us-east-1), databases `ledger_prod` and `ledger`, with 054 + 058 applied and the local tracker `ledger_schema_migrations` recording 054; the home-Mac operational data was loaded into both on 2026-09-30 and the managed ledger is now the current copy [VERIFIED via `docs/plans/evidence/test-request-factory/ledger-snapshot-2026-09-30.md`]. Merged in PR #374: `lib/db/ledger-registry.js` is the tracked host allowlist the CLI's `requireLedgerUrl(target)` enforces (managed host requires `ledger_prod` for `--target=production`, `ledger` otherwise; the app's `POSTGRES_URL` is always refused), `lib/db/ledger-schema.js` + `lib/db/ledger-schema-fingerprint.json` are the structural schema check every ledger-driven CLI mode runs first (`check:factory-ledger` gate, `--ledger-check`), and `scripts/apply-ledger-migrations.js` is the ledger's own migration runner. Connection strings are `.env.local` variables for the CLI; since 2026-10-02 the production URL is also a hand-set Vercel Production variable for the admin form (`docs/CREDENTIALS_RUNBOOK.md`; see *Second writer: the deployed admin form*).
 
@@ -188,7 +224,7 @@ the B4 plan forbids pointing that runner at them (cast plan, *Order* 6, §6).
 - **Factory source bundle v5 (2026-10-03):** [DEPLOYED via PR #425 (`14e90a4`); the later prepared J27 clone and reviewer rehearsal passed on 2026-11-03, linked below.] The private bundle includes the source Request's applicant `wmkf_abstract` for ordinary basic clones. The compiler copies it to the new Request and source fencing/readback verify it; only bundle/body digests enter the ledger. This does not include `wmkf_abstractformatted` or `wmkf_abstractapproved`. Separately, the owner-authorized abstract-only repair of Request 1003303 returned HTTP 204 and its exact 2,476-character readback matched the pinned source; receipt: `/tmp/factory-abstract-repair-receipt.json`.
 - **Pathnames** (minted only by `factory-artifact-store.js`): `<target>/drafts/<actorId>/<draftId>/bundle.json` at source lookup; `<target>/runs/<runId>/{bundle,manifest}.json` at Confirm, written create-only before the ledger row is reserved.
 - **Reader:** `advance` (manifest, and the bundle checked against the run's `bundleSha256`), the artifacts route, and the owner-run `scripts/factory-artifacts-download.mjs`.
-- **Deletion:** only `sweepFactoryArtifacts`, run by the daily maintenance cron (`pages/api/cron/maintenance.js`), and only when both `TEST_REQUEST_LEDGER_URL` and `FACTORY_BLOB_RW_TOKEN` are set, which is now true in Production. It deletes drafts older than 6 hours; a run's two objects when its ledger row is `ready`; and objects with no ledger row once all are older than 24 hours. It never deletes for a `prepared`, `creating` or `needs_attention` run, so the artifacts of a parked run (today: `20407283`) stay until someone removes them by hand. Caps: 1,000 objects scanned per prefix and 200 deletions per sweep. Aggregate execution observed in the 2026-10-03 03:00 UTC daily maintenance record: 4 deleted, 2 kept, no errors or truncation. Exact object identities were not independently verified; see `docs/audits/OPEN_ITEMS_FOLLOWUP_2026-10-03.md`.
+- **Deletion:** only `sweepFactoryArtifacts`, run by the daily maintenance cron (`pages/api/cron/maintenance.js`), and only when both `TEST_REQUEST_LEDGER_URL` and `FACTORY_BLOB_RW_TOKEN` are set, which is now true in Production. It deletes drafts older than 6 hours; a run's two objects when its ledger row is `ready` (except a prepared J27+ run, kept until its readiness journal reads `complete` or for at most 30 days [DEPLOYED 2bdf62b5d]); and objects with no ledger row once all are older than 24 hours. It never deletes for a `prepared`, `creating` or `needs_attention` run, so the artifacts of a parked run (today: `20407283`) stay until someone removes them by hand. Caps: 1,000 objects scanned per prefix and 200 deletions per sweep. Aggregate execution observed in the 2026-10-03 03:00 UTC daily maintenance record: 4 deleted, 2 kept, no errors or truncation. Exact object identities were not independently verified; see `docs/audits/OPEN_ITEMS_FOLLOWUP_2026-10-03.md`.
 - **Consequence:** once a `ready` run's artifacts are swept, its manifest and bundle exist nowhere unless the owner downloaded them first.
 
 ## `test_request_run_reviewer_assignments` (slice 6c-i, D-R2 owner decision, 2026-09-25)
@@ -366,7 +402,7 @@ Two tables added in place to migration 054 (and the V55 mirror) for the cast pla
   `test_request_status_changes` remain absent there; all tables are empty and
   the CLI never uses that database [VERIFIED via owner-authorized read-only
   queries, 2026-09-30/10-01]. Preview's database is unverified.
-- The current managed `ledger_prod` and `ledger` have 054+058+094 verified on 2026-11-03. Every operation still requires the tracked schema preflight; new slot writes need fresh configuration/automation assessment. Use the dedicated ledger runner for future ledger migrations, never the shared app runner. Shared Production/Preview migration consistency is not a prerequisite for the managed slot journal.
+- The current managed `ledger_prod` and `ledger` have 054+058+094 verified on 2026-11-03, and 098 on 2026-11-14. Every operation still requires the tracked schema preflight; new slot writes need fresh configuration/automation assessment. Use the dedicated ledger runner for future ledger migrations, never the shared app runner. Shared Production/Preview migration consistency is not a prerequisite for the managed slot journal.
 - The JSONB resource receipts are checked by `test_request_receipt_ok` in
   PostgreSQL and by `assertLedgerReceipt` in JavaScript. They accept only
   bounded allowlisted keys and values; a writer bypassing JavaScript still
@@ -384,8 +420,10 @@ composite primary key), with a partial unique index allowing one open attempt,
 dispatch/completion timestamps, allowlisted effect receipts, and sanitized error.
 `readiness-journal.js` is the only writer. Its planned→dispatched conditional
 UPDATE returns a row to exactly one sender; dispatched operations never resend.
-`readiness-finalizer.js`, reached only from owner CLI `--finalize-readiness`,
-reads it and corroborates the marked destination, reserved manifest/body/bundle,
+`readiness-finalizer.js`, reached from owner CLI `--finalize-readiness` and
+[DEPLOYED 2bdf62b5d] from the admin form's **Prepare for
+review** (last step) (`POST /api/admin/test-requests/runs/[runId]/readiness`, superuser,
+caller-owned run, stored manifest; owner 2026-11-15), reads it and corroborates the marked destination, reserved manifest/body/bundle,
 J27+ cycle, phase pair, derived status, status journal, Foundation isolation and
 copied destination files. Saved-source provenance and completed destination
 byte/OOXML-attestation hashes are used after cloning; the real source can change
@@ -400,5 +438,7 @@ with observed IDs; recovery cannot clear them. No cleanup writer is added;
 attempt history remains part of the retained audit trail.
 
 The checked-in fingerprint includes 094 and both managed ledgers match it as of 2026-11-03. Justin authorized application before promotion and accepted the temporary interruption of the old Factory. Compatible code subsequently shipped in PR #617; that interruption is closed. Request 1003456 completed journaled readiness finalization and the later bounded reviewer rehearsal; see [receipt](../plans/evidence/test-request-factory/j27-reviewer-rehearsal-proof-2026-11-03.md). The fresh-install bootstrap executes the
-numbered migration through the existing migration runner. No API route, recipe
-step or new readiness-editing web capability is introduced.
+numbered migration through the existing migration runner. As of the 2026-11-03
+migration, no API route or recipe step was introduced; the 2026-11-15 form action
+above [DEPLOYED 2bdf62b5d] adds one route and no migration. It never sets readiness back
+to false.
