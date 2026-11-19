@@ -143,7 +143,7 @@ address and test data cannot reach one.
 
 | Item | Depends on |
 |---|---|
-| Keyword sections (decision 1) | Connor: which field holds keywords, how the main keyword is marked, and the grouping column in the Keywords table `wmkf_programlevel3`. Asked by the owner 2026-11-18. |
+| Keyword sections (decision 1) | Connor answered 2026-11-19 (email relayed by the owner): the Keywords table `wmkf_programlevel3` has `wmkf_KeywordDisciplineBranch` and `wmkf_KeywordDisciplineGroup`, which define the taxonomy tree, and `wmkf_KeywordType`, which separates Disciplines, Methods and Objects of Study [ASSUMED: not read from Dataverse]. The owner wants two header levels: broad area (life sciences, physical sciences, engineering), then subcategory (Molecular and Cellular Biology and the like). Still unknown: how a Request records its keywords and which one is the main keyword, whether the table is seeded, and which of Branch and Group is the broad level. The owner-run read-only `node scripts/probe-keyword-taxonomy.cjs --target=prod` reports all three. |
 | Chair marker on the roster (decision 3) | Agreement with the roster migration on `codex/expertise-roster-import-2026-11-10` about which store carries it; confirmation that both chairs are on the roster. |
 | Sending the email from the app, with an exact preview | Owner: the sender, and whether `DYNAMICS_IMPERSONATION_ENABLED` is `true` in Production (the Board share path refuses to send without it [VERIFIED via `lib/services/pre-site-visit/distribution/send.js:45`]). |
 | Pre-filling highlights from expert matching | The matching output on the other branch; its shape is [ASSUMED]. |
