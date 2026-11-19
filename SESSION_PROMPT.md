@@ -77,10 +77,14 @@
    parked expertise integration; ticking highlights by hand works today.
 2. **Staff view of which proposals lack a staff version.** Not built; no owner ask yet.
 3. **Staff note on a list.** Tabled by the owner 2026-11-18.
-4. **Expertise integration until Connor reviews the plan** (Session 683). Draft:
-   `docs/plans/EXPERTISE_ROSTER_POWER_AUTOMATE_PLAN_2026-11-19.md`. Reopen only after
-   Connor's feedback and owner direction.
-5. **Older roster migration/cutover stream.** Preserve
+4. **Expertise backend automation.** Separate later step after the production-only
+   roster migration and Admin editor. Owner requested the revised migration plan and
+   Claude Opus 5.5 OAuth adversarial review on November 19; see
+   `docs/plans/EXPERTISE_ROSTER_PRODUCTION_MIGRATION_PLAN_2026-11-19.md`.
+   Opus 5.5 OAuth review returned READY WITH CHANGES; required corrections are
+   incorporated, with verbatim review/disposition saved beside the plan. No build
+   or production execution yet.
+5. **Earlier roster implementation reference.** Preserve
    `origin/codex/expertise-roster-import-2026-11-10` (tip `754acf09a`). No migration,
    backend switch or cutover is authorized.
 6. **Backend prompt adoption/scheduling** (`codex/executive-summary-generation-2026-11-16`).
@@ -107,7 +111,7 @@
 - Initial Assessment (Session 683, PRs #644–#646) is Production-live but an
   authenticated save rehearsal was not run.
 - Request 1003528's status in older handoffs is stale; do not infer it or reset it.
-- Shared main checkout has unrelated untracked `commit-times-exact.txt`. Preserve it.
+- Owner explicitly requested discarding untracked `commit-times-exact.txt` during November 19 startup; discarded. No preservation action remains.
 - Older carryover (Chairs Stage 1, trial batch-2 expiry, real-proposal prompt
   review, Dependabot/branch hygiene) is at `git show 8f5c23fc8:SESSION_PROMPT.md`.
 
@@ -132,7 +136,7 @@ current permission or live-state evidence.
 |---|---|---|
 | Proposal lists | `docs/plans/J27_PROPOSAL_LIST_EMAILS_PLAN_2026-11-18.md`; `docs/atlas/postgres-proposal-list-links.md` | Production-live; PDF open and two-level sections unproven live; email send not built |
 | Initial Assessment | PRs #644–#646; `assessment-service.js`, `AssessmentForm.js` | Production-live; authenticated save acceptance unverified |
-| Connor roster access | `docs/plans/EXPERTISE_ROSTER_POWER_AUTOMATE_PLAN_2026-11-19.md` | Parked pending Connor review and owner direction |
+| Roster migration and Admin editor | `docs/plans/EXPERTISE_ROSTER_PRODUCTION_MIGRATION_PLAN_2026-11-19.md` | Production-only plan saved; Opus 5.5 reviewed, corrections incorporated; Admin editor included; backend automation and retirement separate; no build yet |
 | Older roster cutover | `origin/codex/expertise-roster-import-2026-11-10:SESSION_PROMPT.md` | Preserve branch/private inputs; reconcile direction before resuming |
 | Chairs Production stages | `docs/plans/J27_CHAIRS_RECOMMENDATION_PRODUCTION_PLAN_2026-11-18.md` | Not changed here; owner approval per stage |
 | Intake prompt delivery | `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md` | Owner-run flow/prompt work; backend adoption parked |

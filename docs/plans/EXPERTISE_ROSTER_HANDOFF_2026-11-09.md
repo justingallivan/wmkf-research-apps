@@ -1,6 +1,13 @@
 # Expertise roster migration handoff — November 9, 2026
 
-## Resume boundary
+**Historical checkpoint:** this document records November 9 branch state, not
+current execution instructions. The owner's November 19 production-only migration
+and Admin-editor plan is now [the current direction](EXPERTISE_ROSTER_PRODUCTION_MIGRATION_PLAN_2026-11-19.md).
+The sandbox, freeze, and broader matching prerequisites below are historical.
+Preserve the old branch/evidence; no build or production execution is authorized
+by this historical handoff.
+
+## Historical resume boundary
 
 Owner requested stop and a docs-only handoff on main. Runtime work remains on
 `codex/expertise-roster-foundation-2026-11-09`, pushed at **`1aedcb25d`**.
