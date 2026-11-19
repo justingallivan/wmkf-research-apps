@@ -1,6 +1,6 @@
 import {withDalContext} from '../../../lib/dataverse/core/context';
 import {ServiceHttpError} from '../../../lib/services/service-http-error';
-import rehearsal from '../../../lib/services/expertise-finder/roster-rehearsal-target.cjs';
+import { usesDataverseRoster, rosterTarget } from '../../../lib/services/expertise-finder/roster-mode.js';
 import {matchRosterSnapshot,assertRosterPrompt,validateRosterMatch,EXPERTISE_FINDER_ROSTER_V2_ROW,buildRosterV2Variables} from '../../../lib/services/expertise-finder/roster-match-contract';
 import { requireAcceptedLlmResponse } from '../../../lib/utils/llm-response';
 /**
@@ -54,7 +54,7 @@ export default async function handler(req, res) {
   let resolved = null; // set once the prompt row resolves; used for error-path usage logging
 
   try {
-    if(rehearsal.enabled())rehearsal.assertTarget();
+    if(usesDataverseRoster())rosterTarget();
     const { file, additionalNotes } = req.body;
 
     if (!file || !file.url) {
@@ -82,7 +82,7 @@ export default async function handler(req, res) {
     }
 
     // Fetch active roster
-    const modern=rehearsal.enabled();
+    const modern=usesDataverseRoster();
     const snapshot=modern?await withDalContext('expertise-roster-match',()=>matchRosterSnapshot()):null;
     const rosterResult = snapshot||await sql`
       SELECT * FROM expertise_roster WHERE is_active = true ORDER BY role_type, name

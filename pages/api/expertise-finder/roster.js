@@ -24,7 +24,8 @@ import { sql } from '@vercel/postgres';
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
 
-import rehearsal from '../../../lib/services/expertise-finder/roster-rehearsal-target.cjs';
+import { rosterMode, rosterTarget } from '../../../lib/services/expertise-finder/roster-mode.js';
+import { assertLegacyRosterWritable } from '../../../lib/services/expertise-finder/roster-cutover-marker.cjs';
 import { listRoster, saveRoster } from '../../../lib/services/expertise-finder/roster-service';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { actorRefFromSession } from '../../../lib/utils/actor-ref';
@@ -104,17 +105,20 @@ export default async function handler(req, res) {
   if (!access) return;
 
   try {
-    if (rehearsal.enabled()) return await withDalContext('expertise-roster-rehearsal', async () => {
-      rehearsal.assertTarget();
+    const mode = rosterMode();
+    if (mode !== 'legacy') return await withDalContext(mode === 'rehearsal' ? 'expertise-roster-rehearsal' : 'expertise-roster', async () => {
+      rosterTarget();
       if (req.method === 'GET') return res.status(200).json(await listRoster(req.query));
       if (!['POST','PATCH','DELETE'].includes(req.method)) return res.status(405).json({ error: 'Method not allowed' });
       const body = req.method === 'DELETE' ? { id:req.body?.id, etag:req.body?.etag, is_active:false } : req.body;
       return res.status(req.method === 'POST' ? 201 : 200).json(await saveRoster(body, actorRefFromSession(access.session), { create:req.method === 'POST' }));
     });
+    if (['POST', 'PATCH', 'DELETE'].includes(req.method)) await assertLegacyRosterWritable((text, params) => sql.query(text, params));
   } catch (error) {
-    const validErrorStatus = Number.isInteger(error.status) && error.status >= 400 && error.status <= 599;
-    const status = error.status === 412 ? 409 : validErrorStatus ? error.status : 503;
-    const message = error.status === 412 ? 'Profile changed; reload before saving.'
+    const errorStatus = error.status ?? error.httpStatus;
+    const validErrorStatus = Number.isInteger(errorStatus) && errorStatus >= 400 && errorStatus <= 599;
+    const status = errorStatus === 412 ? 409 : validErrorStatus ? errorStatus : 503;
+    const message = errorStatus === 412 ? 'Profile changed; reload before saving.'
       : validErrorStatus ? error.message : 'Roster operation outcome unavailable. Reload or retry with the same creation identity.';
     return res.status(status).json({ error: message });
   }

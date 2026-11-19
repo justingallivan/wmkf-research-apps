@@ -1,6 +1,6 @@
 # Expertise roster: simplified Production cutover — November 18, 2026
 
-**Status: PLANNED, owner-directed. Nothing here is built.** Amends
+**Status: IN PROGRESS, owner-directed. Remaining-work items 1–2 are built on the branch; nothing is deployed.** Amends
 `docs/plans/EXPERTISE_ROSTER_DATAVERSE_MIGRATION_PLAN_2026-11-09.md` §5C/§5D and the
 Production parts of `ALLOCATOR_CUTOVER_DESIGN_2026-11-10.md`. Branch inventory:
 `BRANCH_INVENTORY_2026-11-18.md`.
@@ -128,11 +128,19 @@ row.
 
 ## Remaining work, in order
 
-1. Read switch and target selection for every consumer (roster API, matching, batch
-   matching, consultant feedback, recipient directory), plus the cutover marker on legacy
-   writers.
-2. Simple post-cutover bind path (design item 4), replacing the lifecycle lock in
-   non-rehearsal mode.
+1. ~~Read switch and target selection for every consumer, plus the cutover marker on
+   legacy writers.~~ **[BUILT 2026-11-18]** `lib/services/expertise-finder/roster-mode.js`
+   (`rosterMode`, `usesDataverseRoster`, `rosterTarget`) replaces every
+   `rehearsal.enabled()`/`assertTarget()` branch point (roster API, matching, batch
+   matching, consultant feedback, recipient directory, profile adapter, consumer
+   projection, match contract). `roster-cutover-marker.cjs` guards the legacy API
+   POST/PATCH/DELETE and both legacy scripts.
+2. ~~Simple post-cutover bind path.~~ **[BUILT 2026-11-18]** `roster-binding.js`
+   `ensureProfileBinding`; `roster-service.js` uses it through a direct lease in Dataverse
+   mode and keeps the lifecycle lease in rehearsal. Tests: `roster-mode`,
+   `roster-cutover-marker`, `roster-binding`, `roster-service-dataverse-mode`, plus the
+   route marker cases in `expertise-roster-route`. Full Jest, all gates and the seven pg
+   suites pass. Not deployed; the setting is unset everywhere.
 3. Inert numbered migration for the two bridge tables.
 4. Production-capable cutover script and rollback script (dry-run default).
 5. Release items: Admin prompt-catalog entry; rehearsal-flag fail mode in shared paths;

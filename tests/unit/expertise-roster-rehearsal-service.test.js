@@ -2,7 +2,7 @@
 jest.mock('../../lib/dataverse/adapters/expertise-profile', () => ({ get: jest.fn(), list: jest.fn(), users: jest.fn(), update: jest.fn(), create: jest.fn(), byCreationKey: jest.fn() }));
 jest.mock('../../lib/dataverse/adapters/system-user', () => ({ getById: jest.fn() }));
 jest.mock('../../lib/dataverse/adapters/contact', () => ({ getByIdWithSelect: jest.fn() }));
-jest.mock('../../lib/services/expertise-finder/roster-rehearsal-target.cjs', () => ({ assertTarget: jest.fn() }));
+jest.mock('../../lib/services/expertise-finder/roster-rehearsal-target.cjs', () => ({ enabled: () => true, assertTarget: jest.fn() }));
 jest.mock('../../lib/services/expertise-finder/roster-lifecycle.cjs', () => ({ ...jest.requireActual('../../lib/services/expertise-finder/roster-lifecycle.cjs'), withRosterWrite: jest.fn() }));
 import * as profiles from '../../lib/dataverse/adapters/expertise-profile';
 import * as users from '../../lib/dataverse/adapters/system-user';

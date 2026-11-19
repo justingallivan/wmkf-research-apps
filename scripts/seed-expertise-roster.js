@@ -69,6 +69,9 @@ function parseCSVLine(line) {
 }
 
 async function seedRoster() {
+  // Refuse once the Production roster has moved to Dataverse (cutover marker).
+  await require('../lib/services/expertise-finder/roster-cutover-marker.cjs')
+    .assertLegacyRosterWritable((text, params) => sql.query(text, params));
   const raw = fs.readFileSync(CSV_PATH, 'utf-8');
   const lines = raw.split('\n').filter(l => l.trim());
 

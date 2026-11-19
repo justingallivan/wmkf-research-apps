@@ -70,7 +70,9 @@ index: `docs/plans/data/expertise-roster/README.md`.
    `docs/plans/data/expertise-roster/PRODUCTION_CUTOVER_SIMPLIFICATION_2026-11-18.md`:
    a read switch setting, a cutover marker on legacy writes, a simple bind path and a
    one-shot quiet-window script. Its "Remaining work" list replaces the release-gate parts
-   of items 1–2 below. Run `/contract-reconcile` on it before building.
+   of items 1–2 below. Contract-reconcile review done (READY WITH NAMED CHANGES, applied).
+   Remaining-work items 1–2 (read switch, cutover marker, direct bind) are built; next is
+   item 3, the inert bridge-table migration.
 
 1. **Inventory before building.** Compare this branch with the work-Mac plan
    (`0cb02f2d0` handoff steps 2–3) and current `main`; list what is built/tested

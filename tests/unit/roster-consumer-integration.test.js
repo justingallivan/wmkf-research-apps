@@ -2,7 +2,7 @@
 jest.mock('../../lib/services/expertise-finder/roster-sql.cjs',()=>({sql:{query:jest.fn()}}));
 jest.mock('../../lib/dataverse/adapters/expertise-profile.js',()=>({list:jest.fn()}));
 jest.mock('../../lib/dataverse/adapters/system-user.js',()=>({getById:jest.fn()}));
-jest.mock('../../lib/services/expertise-finder/roster-rehearsal-target.cjs',()=>({assertTarget:jest.fn(()=>({host:'sandbox.invalid'})),browserRequested:jest.fn(()=>false),assertBrowserTarget:jest.fn()}));
+jest.mock('../../lib/services/expertise-finder/roster-rehearsal-target.cjs',()=>({enabled:jest.fn(()=>true),assertTarget:jest.fn(()=>({host:'sandbox.invalid'})),browserRequested:jest.fn(()=>false),assertBrowserTarget:jest.fn()}));
 import {sql} from '../../lib/services/expertise-finder/roster-sql.cjs';
 import * as profiles from '../../lib/dataverse/adapters/expertise-profile';
 import * as users from '../../lib/dataverse/adapters/system-user';

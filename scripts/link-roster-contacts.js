@@ -195,6 +195,11 @@ async function main() {
     import('../lib/services/dynamics-context.js'),
   ]);
   enterDynamicsBypassForScript('link-roster-contacts');
+  if (options.apply) {
+    // Refuse once the Production roster has moved to Dataverse (cutover marker).
+    await require('../lib/services/expertise-finder/roster-cutover-marker.cjs')
+      .assertLegacyRosterWritable((text, params) => sql.query(text, params));
+  }
 
   const roster = await sql`
     SELECT id, name, preferred_email, orcid

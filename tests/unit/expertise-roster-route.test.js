@@ -11,8 +11,12 @@ jest.mock('@vercel/postgres', () => {
 jest.mock('../../lib/utils/auth', () => ({
   requireAppAccess: jest.fn(async () => ({ profileId: 42 })),
 }));
+jest.mock('../../lib/services/expertise-finder/roster-cutover-marker.cjs', () => ({
+  assertLegacyRosterWritable: jest.fn(async () => {}),
+}));
 
 import handler from '../../pages/api/expertise-finder/roster';
+const marker = require('../../lib/services/expertise-finder/roster-cutover-marker.cjs');
 
 const CONTACT_ID = '11111111-1111-4111-8111-111111111111';
 const SECOND_CONTACT_ID = '22222222-2222-4222-8222-222222222222';
@@ -127,4 +131,20 @@ test('soft delete preserves the Contact link for later undo', async () => {
   const templateText = mockSqlTag.mock.calls[0][0].join(' ');
   expect(templateText).toContain('SET is_active = false');
   expect(templateText).not.toContain('dataverse_contact_id');
+});
+
+describe('cutover marker (legacy Postgres roster)', () => {
+  test.each(['POST', 'PATCH', 'DELETE'])('%s is refused with 409 once the roster has moved, before any roster SQL', async (method) => {
+    marker.assertLegacyRosterWritable.mockRejectedValueOnce(Object.assign(new Error('The roster has moved to Dynamics. Edit it in Expertise Finder.'), { status: 409, code: 'roster_moved' }));
+    const res = await request(method, { id: 1, name: 'Synthetic' });
+    expect(res.statusCode).toBe(409);
+    expect(res.body).toEqual({ error: 'The roster has moved to Dynamics. Edit it in Expertise Finder.' });
+    expect(mockSqlTag).not.toHaveBeenCalled();
+  });
+
+  test('GET reads the legacy roster without consulting the marker', async () => {
+    mockSqlTag.mockResolvedValue({ rows: [{ total: '0' }] });
+    await request('GET');
+    expect(marker.assertLegacyRosterWritable).not.toHaveBeenCalled();
+  });
 });

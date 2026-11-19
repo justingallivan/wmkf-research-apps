@@ -1,6 +1,6 @@
 /** @jest-environment node */
 jest.mock('../../lib/services/dynamics-service', () => ({ DynamicsService: {createRecord:jest.fn(),updateRecord:jest.fn(),queryAllRecords:jest.fn(),executeChangeset:jest.fn()} }));
-jest.mock('../../lib/services/expertise-finder/roster-rehearsal-target.cjs', () => ({ assertTarget: jest.fn() }));
+jest.mock('../../lib/services/expertise-finder/roster-rehearsal-target.cjs', () => ({ enabled: () => true, assertTarget: jest.fn() }));
 import { DynamicsService } from '../../lib/services/dynamics-service';
 import {create,update,list} from '../../lib/dataverse/adapters/expertise-profile';
 const ID='11111111-1111-4111-8111-111111111111';
