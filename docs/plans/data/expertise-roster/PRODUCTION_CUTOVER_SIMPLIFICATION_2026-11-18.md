@@ -45,45 +45,76 @@ owner's go.
 2. **Target.** The Dataverse target is the deployment's `DYNAMICS_URL` hostname, and it
    must be in the tracked target registry. Bindings are looked up by that host. The local
    rehearsal mode stays as it is.
-3. **Cutover marker for legacy writes.** Once `expertise_roster_identity` has rows, the
-   legacy Postgres roster write paths (API POST/PATCH/DELETE, seed and link scripts)
-   refuse with "The roster has moved to Dynamics." This is one query, it covers Preview
-   deployments sharing the database, and it needs no setting.
+3. **Cutover marker for legacy writes.** Once `expertise_roster_binding` has a row for
+   the Production host (`wmkf.crm.dynamics.com`), the legacy Postgres roster write paths
+   refuse with "The roster has moved to Dynamics." Those paths are the API
+   POST/PATCH/DELETE (`roster.js:252,364,398`), `seed-expertise-roster.js:106` and
+   `link-roster-contacts.js:213`. Keying on the Production host rather than "any identity
+   row" means a stray sandbox row can't freeze Production. It is one query, it covers
+   Preview deployments sharing the database, and it needs no setting. The marker turns on
+   as soon as the import writes bindings, which freezes legacy edits through the cutover
+   window as intended.
 4. **Writes after cutover.** Create or update in Dataverse with the existing creation
    key. Then, in one ordinary transaction, `INSERT` an identity row with
    `id = nextval('expertise_roster_id_seq')` plus its binding for the current host, and
    reuse the existing row on a unique conflict. Continuing the old `SERIAL` sequence
    avoids any high-water bookkeeping, and the IDs stay valid if the old table is ever
-   restored. [VERIFIED: `expertise_roster.id` is `SERIAL` (`scripts/setup-database.js:2023`);
+   restored. Production saves bypass `lifecycle.withRosterWrite` (`roster-service.js:32`);
+   rehearsal keeps it. [VERIFIED: `expertise_roster.id` is `SERIAL` (`scripts/setup-database.js:2023`);
    the sequence is `public.expertise_roster_id_seq` in the rehearsal database.] No advisory locks, no pending intents. If the bind fails after the
    Dataverse save, return an error; a retry finds the profile by creation key and binds
    it (existing replay logic, `roster-service.js:44-50`, which today runs inside the lease).
 5. **Prompt.** With the switch on, matching uses `expertise-finder.match.roster-v2` and
-   its bundled fallback. The legacy row is untouched.
+   its bundled fallback through `resolveToolPrompt` (`match.js:114-115`). The legacy row is
+   untouched. Publishing the live row needs `seed-tool-prompts.js:153` to allow the
+   Production target for `roster-v2` (today it accepts only the sandbox).
 6. **Migration.** One inert numbered migration creates the two empty bridge tables. It is
    safe to apply at any time (number assigned against the live ledger), with the manifest
    and fresh-install shape updated together.
 
 ## Cutover (one operator, quiet window)
 
-Script, dry-run by default, requiring an exact Production target acknowledgement:
+Script, dry-run by default, requiring an exact Production target acknowledgement. Local
+Production access uses the existing interlock exceptions: `DATAVERSE_ALLOW_PROD_READS=yes`
+for reads and `DATAVERSE_PROD_WRITE_ACK="<purpose> <today's UTC date>"` for writes
+(`interlock.js:155-175`). The owner sets both.
 
+0. **Before the window:** apply the bridge-table migration to the Production database.
+   Provision `wmkf_expertiseprofile` in Production Dataverse (entity, three alternate
+   keys, auditing, optimistic concurrency) and the editor role. Assign the role to every
+   staff member with Expertise Finder access. Staff saves impersonate the user with no
+   fallback (`expertise-profile.js:25,27`; impersonation is on in Production per
+   `docs/CREDENTIALS_RUNBOOK.md`), so without the role every save fails. The sandbox
+   tools (`apply-roster-sandbox-schema.cjs`, role script) are sandbox-only today and need
+   a Production-capable variant.
 1. Export the Postgres roster and checksum it into the private evidence directory.
 2. Import into Production Dataverse with the existing import executor, extended to accept
-   the Production target only with that acknowledgement. Exclude ID 35 as before. Apply
-   the owner overrides recorded in `OWNER_MAPPING_DECISIONS_2026-11-09.md`, using
-   Production User/Contact GUIDs.
-3. In one SQL transaction: insert identity rows for every existing roster ID (including
-   35), bindings for the Production host, and retarget
-   `consultant_feedback.consultant_roster_id` to `expertise_roster_identity`.
+   the Production target and the shared database only with that acknowledgement. Today it
+   is pinned to the sandbox and loopback Postgres (`import-store.cjs:8,30-31`,
+   `execute-expertise-roster-import.cjs:14-21`). Exclude ID 35 as before. Apply the owner
+   overrides recorded in `OWNER_MAPPING_DECISIONS_2026-11-09.md`, using Production
+   User/Contact GUIDs. The importer already writes identity rows for every roster ID
+   (including 35) and Production-host bindings, and advances the old sequence
+   (`import-store.cjs:103-123`).
+3. In one SQL transaction: retarget `consultant_feedback.consultant_roster_id` to
+   `expertise_roster_identity`, after confirming every referenced ID has an identity row.
 4. Verify field and reference parity (existing verifier).
 5. Publish the v2 prompt row, set `EXPERTISE_ROSTER_BACKEND=dataverse` in Production,
    redeploy, and check the editor, matching, recipients and feedback.
 
 **Rollback:** unset the setting and redeploy. If profiles changed after cutover, re-enter
-them in the old roster by hand with the same IDs. Then, if needed, retarget the feedback
-FK back with a small script that first confirms every referenced ID exists in
-`expertise_roster` and then clears the identity rows, so the cutover marker lifts.
+them in the old roster by hand with the same IDs. Then, if needed, run a small script
+that confirms every referenced ID exists in `expertise_roster`, retargets the feedback FK
+back, and deletes the Production-host bindings before any identity rows (bindings use
+`ON DELETE RESTRICT`). Removing those bindings lifts the cutover marker.
+
+## Review
+
+`/contract-reconcile` plan review, 2026-11-18: **READY WITH NAMED CHANGES**, applied
+above: Production-host marker; bypassing the lifecycle lease in Production; prompt seeding
+for Production; schema and editor-role provisioning before the window; the import already
+writing bindings; the interlock exceptions; rollback delete order; a credentials-runbook
+row.
 
 ## Accepted risks
 
@@ -104,7 +135,10 @@ FK back with a small script that first confirms every referenced ID exists in
    non-rehearsal mode.
 3. Inert numbered migration for the two bridge tables.
 4. Production-capable cutover script and rollback script (dry-run default).
-5. Release items: Admin prompt-catalog entry; rehearsal-flag fail mode in shared paths.
-6. Atlas, route security matrix and service catalog at implementation.
+5. Release items: Admin prompt-catalog entry; rehearsal-flag fail mode in shared paths;
+   `seed-tool-prompts.js` Production support for `roster-v2`; Production schema and
+   editor-role provisioning tools (cutover step 0).
+6. Atlas, route security matrix, service catalog and a `docs/CREDENTIALS_RUNBOOK.md` row for
+   `EXPERTISE_ROSTER_BACKEND` at implementation.
 7. A sandbox rehearsal of the script end to end on the local rehearsal database, then the
    owner's go for Production.
