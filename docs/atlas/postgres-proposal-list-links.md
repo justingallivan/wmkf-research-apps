@@ -35,10 +35,12 @@ the only requests a link may open.
 request's keyword (`_wmkf_programareaserved_value`) in the Keywords table
 `wmkf_programlevel3`, copied when the
 list is built; a proposal with no Discipline keyword gets `Unassigned` and NULL.
-`subsection` comes from migration 102 **[BRANCH-BUILT on
-`claude/proposal-list-keyword-sections`; not applied]**. Because
-`PROPOSAL_LIST_SCHEMA_READY` gates only on migration 101, migration 102 must be
-applied before code that selects the column is deployed.
+`subsection` comes from migration 102, applied by the owner on 2026-11-19 before
+the code that selects it was pushed [VERIFIED via the owner-run
+`node scripts/apply-migrations.js` and `node scripts/probe-proposal-list-schema.mjs`
+readback, 2026-11-19: 10 item columns, `subsection` present, 0 rows].
+`PROPOSAL_LIST_SCHEMA_READY` gates only on migration 101, so any other database
+needs 102 applied before this code runs against it.
 
 ## Write and read paths
 

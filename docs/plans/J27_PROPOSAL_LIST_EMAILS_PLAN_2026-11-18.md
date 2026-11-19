@@ -131,9 +131,8 @@ address and test data cannot reach one.
 
 ### Stand-ins in this build
 
-- **Sections** on `main` use the request's program area name, labeled on the staff
-  page as a placeholder. On `claude/proposal-list-keyword-sections` each proposal
-  instead gets the discipline branch (the caret) and discipline group (a subheading
+- **Sections** are no longer a stand-in: each proposal
+  gets the discipline branch (the caret) and discipline group (a subheading
   inside it) of its keyword; only a Discipline keyword places a proposal, and anything
   else is listed under Unassigned. Keyword table facts: 259 rows, 5 branches, 11 discipline groups
   [VERIFIED via the owner-run `node scripts/probe-keyword-taxonomy.cjs --target=prod`, 2026-11-19].
@@ -147,7 +146,7 @@ address and test data cannot reach one.
 
 | Item | Depends on |
 |---|---|
-| Releasing keyword sections (decision 1) | The two-level sections are built on `claude/proposal-list-keyword-sections` (not merged; needs migration 102 applied first). Remaining: the owner applies migration 102, then the branch is merged. Settled: which request field holds the main discipline keyword. A request has two lookups to the Keywords table, `wmkf_programlevel3` and `wmkf_programareaserved`, plus the `wmkf_ai_keywords` text list [VERIFIED via the owner-run `node scripts/probe-keyword-taxonomy.cjs --target=prod`, 2026-11-19]. The build reads `wmkf_programareaserved`; the choice is one constant, `SECTION_KEYWORD_LOOKUP`. Evidence for that field: [VERIFIED via the owner-run `node scripts/probe-request-keywords.cjs --target=prod`, 2026-11-19: one request in all of Production has any of the three fields filled, intake test 1003526, whose `wmkf_programareaserved` points at the Discipline keyword "Structural Biology" (Life Sciences / Molecular and Cellular Biology); `wmkf_programlevel3` and `wmkf_ai_keywords` are empty on every request]. The owner accepted that request as the guide on 2026-11-19, so the staff-page warning is removed. |
+| Keyword sections (decision 1): first real use | Built and merged to `main` 2026-11-19; migration 102 applied by the owner first [VERIFIED via `node scripts/probe-proposal-list-schema.mjs`, 2026-11-19]. Not yet run in a browser or against Dataverse; the keyword-table read first runs when a list is created or refreshed. Settled: which request field holds the main discipline keyword. A request has two lookups to the Keywords table, `wmkf_programlevel3` and `wmkf_programareaserved`, plus the `wmkf_ai_keywords` text list [VERIFIED via the owner-run `node scripts/probe-keyword-taxonomy.cjs --target=prod`, 2026-11-19]. The build reads `wmkf_programareaserved`; the choice is one constant, `SECTION_KEYWORD_LOOKUP`. Evidence for that field: [VERIFIED via the owner-run `node scripts/probe-request-keywords.cjs --target=prod`, 2026-11-19: one request in all of Production has any of the three fields filled, intake test 1003526, whose `wmkf_programareaserved` points at the Discipline keyword "Structural Biology" (Life Sciences / Molecular and Cellular Biology); `wmkf_programlevel3` and `wmkf_ai_keywords` are empty on every request]. The owner accepted that request as the guide on 2026-11-19, so the staff-page warning is removed. |
 | Chair marker on the roster (decision 3) | Agreement with the roster migration on `codex/expertise-roster-import-2026-11-10` about which store carries it; confirmation that both chairs are on the roster. |
 | Sending the email from the app, with an exact preview | Owner: the sender, and whether `DYNAMICS_IMPERSONATION_ENABLED` is `true` in Production (the Board share path refuses to send without it [VERIFIED via `lib/services/pre-site-visit/distribution/send.js:45`]). |
 | Pre-filling highlights from expert matching | The matching output on the other branch; its shape is [ASSUMED]. |
