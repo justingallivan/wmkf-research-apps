@@ -270,6 +270,11 @@ proposal link in the email body.
   This replaces the earlier "shorter, staff-chosen list" for experts: staff choose what
   to highlight, not what to include. A Board expert's link therefore opens any
   submitted proposal, the same as a chair's.
+- **Access confirmed (owner, 2026-11-18).** Everyone has access to every proposal. The
+  Chairs are responsible for all proposals in their area; other Board members need the
+  curation but keep access to the rest.
+- **Highlighted proposals appear only at the top**, not again in their area sections.
+- **Tabled:** a staff note beside a highlighted proposal.
 - **Staff preview.** Staff preview the page as the recipient will see it, and the email,
   before sending.
 
