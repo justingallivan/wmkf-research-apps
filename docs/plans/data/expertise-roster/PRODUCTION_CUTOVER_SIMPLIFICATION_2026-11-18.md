@@ -1,6 +1,6 @@
 # Expertise roster: simplified Production cutover — November 18, 2026
 
-**Status: IN PROGRESS, owner-directed. Remaining-work items 1–2 are built on the branch; nothing is deployed.** Amends
+**Status: IN PROGRESS, owner-directed. Remaining-work items 1–3 are built on the branch; nothing is deployed or applied.** Amends
 `docs/plans/EXPERTISE_ROSTER_DATAVERSE_MIGRATION_PLAN_2026-11-09.md` §5C/§5D and the
 Production parts of `ALLOCATOR_CUTOVER_DESIGN_2026-11-10.md`. Branch inventory:
 `BRANCH_INVENTORY_2026-11-18.md`.
@@ -147,7 +147,13 @@ row.
    route marker cases in `expertise-roster-route`; real-SQL bind test
    `tests/integration/roster-binding.pg.test.js` (disposable schema). Full Jest, all gates and the seven pg
    suites pass. Not deployed; the setting is unset everywhere.
-3. Inert numbered migration for the two bridge tables.
+3. ~~Inert numbered migration for the two bridge tables.~~ **[BUILT 2026-11-18]**
+   `lib/db/migrations/100_expertise_roster_identity_bridge.sql` (DDL identical to the
+   reviewed `identity-bridge.sql`), manifest, fresh-install mirror in
+   `scripts/setup-database.js` and Atlas entry in `docs/atlas/postgres-infra-tables.md`.
+   Applied twice cleanly in a disposable schema. **Number 100 is provisional:** highest on
+   any branch is 099 (097 only on the parked backend branch); the live `schema_migrations`
+   tracker is unread (owner-run). Not applied to any shared database.
 4. Production-capable cutover script and rollback script (dry-run default).
 5. Release items: Admin prompt-catalog entry; rehearsal-flag fail mode in shared paths;
    `seed-tool-prompts.js` Production support for `roster-v2`; Production schema and

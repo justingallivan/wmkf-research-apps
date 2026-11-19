@@ -2055,6 +2055,19 @@ const v25Statements = [
     estimated_cost_cents NUMERIC(10,4),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`,
+  // Migration 100: inert numeric identity bridge (simplified Production cutover plan).
+  `CREATE TABLE IF NOT EXISTS expertise_roster_identity (
+    id INTEGER PRIMARY KEY CHECK (id > 0)
+  )`,
+  `CREATE TABLE IF NOT EXISTS expertise_roster_binding (
+    roster_id INTEGER NOT NULL REFERENCES expertise_roster_identity(id) ON DELETE RESTRICT,
+    target_host TEXT NOT NULL CHECK (
+      target_host = lower(target_host) AND target_host !~ '[/ :]' AND length(target_host) <= 253
+    ),
+    dataverse_profile_guid UUID NOT NULL,
+    PRIMARY KEY (roster_id, target_host),
+    UNIQUE (target_host, dataverse_profile_guid)
+  )`,
   `CREATE INDEX IF NOT EXISTS idx_expertise_roster_role_type ON expertise_roster(role_type)`,
   `CREATE INDEX IF NOT EXISTS idx_expertise_roster_active ON expertise_roster(is_active)`,
   `CREATE INDEX IF NOT EXISTS idx_expertise_roster_name ON expertise_roster(name)`,

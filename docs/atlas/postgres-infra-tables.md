@@ -173,6 +173,23 @@ The Expertise Finder editor is the interactive link writer, and
 The immutable roster row ID remains the external recipient identity; names and
 email addresses are never join keys. **[HISTORICAL LIVE SNAPSHOT 2026-08-24:
 migration-035 column exact; zero preferred-email values before staff population.]**
+
+### `expertise_roster_identity`, `expertise_roster_binding` (branch-built, not applied)
+**Source of truth:** Postgres (numeric identity only); Dataverse `wmkf_expertiseprofile`
+owns roster values. **[PLANNED — migration 100 exists only on branch
+`codex/expertise-roster-import-2026-11-10`; not on `main`; not applied to the shared
+database; number provisional until the live `schema_migrations` tracker is read.]**
+`expertise_roster_identity(id)` holds every numeric roster ID ever issued and becomes the
+`consultant_feedback.consultant_roster_id` FK target at cutover.
+`expertise_roster_binding(roster_id, target_host, dataverse_profile_guid)` maps a numeric ID
+to a profile GUID per Dataverse host (unique per host and GUID; `ON DELETE RESTRICT`).
+Writers: the import executor (`scripts/lib/expertise-roster-import-store.cjs`) and, in
+`EXPERTISE_ROSTER_BACKEND=dataverse` mode, `ensureProfileBinding` in
+`lib/services/expertise-finder/roster-binding.js` (new IDs from `expertise_roster_id_seq`).
+Readers: `roster-consumer-service.js` (numeric consumers) and the legacy cutover marker
+`roster-cutover-marker.cjs`, which freezes legacy `expertise_roster` writes once a
+`wmkf.crm.dynamics.com` binding exists. Plan:
+`docs/plans/data/expertise-roster/PRODUCTION_CUTOVER_SIMPLIFICATION_2026-11-18.md`.
 **[PRODUCTION SNAPSHOT 2026-09-14 local / 2026-09-15 UTC:]** 39 roster rows;
 9 active Board (4 linked), 26 active Consultants (6 linked), and 4 active
 Research Program Staff. Five Board rows are owner-deferred as a non-blocking
