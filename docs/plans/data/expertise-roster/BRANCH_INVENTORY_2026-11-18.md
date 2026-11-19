@@ -9,7 +9,7 @@ Plan: `docs/plans/EXPERTISE_ROSTER_DATAVERSE_MIGRATION_PLAN_2026-11-09.md` (§6 
 ## Branch hygiene
 
 - **[RE-VERIFIED 11-18]** Pushed; local = `origin`. All gates and self-tests pass after the
-  merge; full Jest passes except Docker/`ROSTER_LIVE_SQL_TEST_ENV` suites, which skip.
+  merge; full Jest passes (28,750); the Docker-backed suites pass separately (item 8 below).
 - **[RE-VERIFIED 11-18]** Shared-backend commits the branch notes cite (`7d0cf0392`,
   `eb0010163`, `6fe01c88e`, `f9b3dd1b4`, `ef5507ab8`, `a756735fa`, `0c4b8d39c`) are on
   `origin` (`codex/power-automate-integration-2026-11-11`,
@@ -63,8 +63,12 @@ rehearsal additionally requires local non-Vercel `localhost:3000`.
 5. **Direct-CRM writer control** and old-code Preview writer freeze rehearsal.
 6. **Release review items** above (rehearsal-flag fail mode in auth; Admin catalog entry).
 7. **Docs at implementation**: Atlas, route security matrix, service catalog.
-8. **Re-run Docker-backed suites** (allocator, phases, rollback, persistence) on the merged
-   tip once Docker is running.
+8. ~~Re-run Docker-backed suites~~ **[RE-VERIFIED 11-18]** All seven
+   `tests/integration/roster-*.pg.test.js` suites pass (65 tests) on the merged tip against
+   container `wmkf-roster-full-import17-20261110` (Colima). Public fixture counts unchanged
+   (39 roster, 40 identity, 39 binding, 9 feedback). One disposable schema
+   `roster_rehearsal_6b3775c8…` exists; its origin (pre-existing or from this run) is unknown.
+   Left in place.
 
 ## Recommendations-only direction (Power Automate plan slices 0–5)
 

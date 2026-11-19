@@ -90,7 +90,7 @@ index: `docs/plans/data/expertise-roster/README.md`.
   remove the exclusion.
 - Local rehearsal Postgres needs Docker: container/volume
   `wmkf-roster-full-import17-20261110`, loopback port 55439. Docker was not running on
-  2026-11-18; tests needing it were not exercised.
+  2026-11-18 at first; it is Colima here (`colima start`). The seven pg suites passed on the merged tip.
 
 ## Local-only artifacts (never commit; repo is public)
 
