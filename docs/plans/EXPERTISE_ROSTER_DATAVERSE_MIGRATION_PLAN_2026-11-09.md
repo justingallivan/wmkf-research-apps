@@ -16,6 +16,8 @@ related:
 ## Status and authority
 
 **IN PROGRESS — sandbox full import and stable replay verified; no Production schema change or runtime cutover.**
+
+**Amended 2026-11-18 (owner):** the Production cutover is simplified for once-per-cycle, single-operator use. §5C admission/drain, writer freeze, phase machine and automated §5D reconciliation are superseded for Production by `docs/plans/data/expertise-roster/PRODUCTION_CUTOVER_SIMPLIFICATION_2026-11-18.md`. Where they conflict, that addendum wins.
 Owner decisions below were settled with Justin on November 9, 2026. Justin developed the recovered design with Codex and sent it to Connor; Justin confirms Connor supports it. Connor's previous matcher embedded expertise in a Claude prompt executed by Power Automate. It is not evidence of an existing Expertise Profile table.
 
 This plan replaces the recovered email's proposed Short ID, program partition, Match Type and roster dates. It also supersedes the roster comparison/selection task in J27 alignment log D15/X1/T8: the destination is a shared Dataverse roster, not an unresolved choice between two verified roster tables. Scoring, lead assignment, load balancing, and expertise prose are separate future work.

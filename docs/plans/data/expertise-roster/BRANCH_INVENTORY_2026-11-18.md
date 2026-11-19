@@ -53,6 +53,10 @@ rehearsal additionally requires local non-Vercel `localhost:3000`.
 
 ## Remaining before any Production cutover
 
+**Superseded 2026-11-18:** the owner simplified the Production cutover. The current
+remaining-work list is in `PRODUCTION_CUTOVER_SIMPLIFICATION_2026-11-18.md`. Items 3–5
+below no longer apply; the list is kept as the pre-simplification view.
+
 1. **Production runtime mode.** Decide how the app selects Dataverse outside rehearsal
    (today only the rehearsal flag routes to it), then build and test that path.
 2. **Migration numbering** for `identity-bridge.sql` (inert DDL), manifest and

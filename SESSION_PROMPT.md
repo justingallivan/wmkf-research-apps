@@ -66,6 +66,12 @@ index: `docs/plans/data/expertise-roster/README.md`.
 
 ## Next Items
 
+0. **Production cutover simplified (owner, 2026-11-18).** Plan:
+   `docs/plans/data/expertise-roster/PRODUCTION_CUTOVER_SIMPLIFICATION_2026-11-18.md`:
+   a read switch setting, a cutover marker on legacy writes, a simple bind path and a
+   one-shot quiet-window script. Its "Remaining work" list replaces the release-gate parts
+   of items 1–2 below. Run `/contract-reconcile` on it before building.
+
 1. **Inventory before building.** Compare this branch with the work-Mac plan
    (`0cb02f2d0` handoff steps 2–3) and current `main`; list what is built/tested
    versus remaining release gates before choosing the next slice.
