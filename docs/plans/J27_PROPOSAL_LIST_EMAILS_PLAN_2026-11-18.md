@@ -119,7 +119,7 @@ An expert list holds a staff-chosen subset.
   per person and proposal.
 - New table (for example `proposal_list_links` and `proposal_list_items`): recipient,
   cycle, token digest, expiry, revoked-at, the frozen request set with section labels.
-  New audience on the existing token helper. It does not reuse `deliberation_briefing_links`
+  Token form: see Contract review item 1. It does not reuse `deliberation_briefing_links`
   rows, so a later deliberation share cannot revoke these links and the briefing
   feature flag does not gate this feature.
 - New public routes: verify token, rate limit, check membership, then stream the staff
@@ -182,6 +182,65 @@ tested on test requests with one unsectioned list. Expert emails (Stage 2) can f
 - **Staff version contents.** The owner chose this file for Board eyes. Confirm once on
   a real J27 folder that it holds nothing staff-only.
 - **Roster store.** Shared with Codex's migration; coordinate before touching it.
+
+## Contract review (2026-11-18)
+
+Reviewed against live source before any build. Verdict: **ready with named changes**.
+The changes below replace the matching parts of the Design section.
+
+1. **Use a short random token, not a signed one.** A signed token is about 290
+   characters; 300 links would put over 100 KB of link text in one email, past the size
+   at which mail clients clip messages [ASSUMED: arithmetic, not measured]. The stored
+   row is already the authority in the precedent: every call re-reads it by digest and
+   checks revoked and expiry [VERIFIED via `lib/external/verify-briefing-token.js:42-47`].
+   So this audience uses a random token of about 43 characters, stored as a digest plus a
+   sealed copy for resend, as `deliberation_briefing_links` does
+   [VERIFIED via `lib/db/migrations/038_deliberation_briefing_links.sql:15-17`].
+   Whether Dynamics limits email body size is untested.
+2. **Title links open a small page, which then loads the PDF.** Mail security scanners
+   often fetch every link in a message. If each link streamed the PDF directly, a scan
+   would pull up to 300 files from SharePoint, record false opens, and use up the
+   shared limiter's 30 requests per token per minute
+   [VERIFIED via `lib/external/rate-limit.js:36-37`], locking the real reader out. The
+   link opens a light page for that one proposal (no SharePoint call); the page loads
+   the PDF, and the open is recorded on the PDF fetch. The reader still lands on the
+   proposal in one click. The PDF fetch needs its own limit sized for a reader paging
+   through many proposals.
+3. **The server resolves the file; the link carries only the token and request number.**
+   Same rule as the precedent route, where the client never supplies a path or filename
+   [VERIFIED via `pages/api/external/briefing/[token]/document.js:4-10`]. Order: method,
+   rate limit, verify token, check the request is on that list, resolve the staff
+   version with the existing exactly-one-match rule, stream with `nosniff`, `no-store`
+   and `Referrer-Policy: no-referrer`. A missing or ambiguous staff version returns a
+   plain "not available yet" page, never another file.
+4. **Expiry.** "Until the Board meeting" reads the cycle's Board Meeting Date,
+   `wmkf_meetingdate` [VERIFIED via `shared/config/cycleCalendar.js:27`], a date with
+   no time. The row's expiry is the end of that day Pacific time. Sending is blocked
+   when the date is not set. If the date later moves, staff extend the links from the
+   compose page; expiry lives on the row, so no new email is needed.
+5. **Per-recipient results and resend.** The send returns an outcome for each recipient
+   by name, and a failed recipient can be retried alone. A resend reuses the same link
+   (from the sealed copy) so an earlier email's links keep working. Replacing a link is
+   a separate, deliberate "revoke and reissue" action.
+6. **Late arrivals.** A list is frozen when sent, so a proposal that becomes ready
+   afterwards is not on it. The compose page shows how many ready proposals are not yet
+   on each recipient's list and offers an update email. Owner to confirm this over a
+   list that grows on its own.
+7. **Own-institution flag.** The roster holds institution as free text
+   [VERIFIED via `lib/db/migrations/004_expertise_finder.sql:10`], while the applicant
+   is a Dynamics account. Name matching can miss. The flag is computed, shown in the
+   preview, and staff confirm it before sending. With two chairs this is a short check.
+8. **Sender.** The Board share path refuses to send unless
+   `DYNAMICS_IMPERSONATION_ENABLED` is `true`
+   [VERIFIED via `lib/services/pre-site-visit/distribution/send.js:45`]. The Production
+   value is unknown; owner-run check before the first send.
+9. **Durable surfaces at build:** migration and manifest, Atlas page, route security
+   matrix rows for the public and staff routes, route counts in the canonical counts,
+   email template setting, cleanup of expired rows, and tests that prove a request
+   *not* on a list is refused with a token that is otherwise valid.
+
+Not reviewed here because it is not designed yet: the keyword read (waiting on Connor)
+and pre-filling expert lists from matching (waiting on the other branch).
 
 ## Before building
 
