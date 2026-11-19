@@ -1,9 +1,11 @@
 # Proposal list links
 
 **[MERGED TO MAIN 2026-11-19; OFF]** Migration 101 defines `proposal_list_links` and
-`proposal_list_items`. The build session did not apply the migration to any
-database or set `PROPOSAL_LIST_SCHEMA_READY` in any environment [ASSUMED: live
-state unread; both are owner steps].
+`proposal_list_items`. The owner applied it on 2026-11-19 to the app database the
+main checkout's `POSTGRES_URL` names (`neondb`; [ASSUMED] the shared
+Production/Preview database) [VERIFIED via the owner-run `node scripts/apply-migrations.js` and `node scripts/probe-proposal-list-schema.mjs` readback, 2026-11-19: tracker `applied_at` 2026-11-19 18:09:35 UTC, `applied_by` `owner-proposal-lists`; both tables, expected column counts and the live-link index present; 0 rows].
+`PROPOSAL_LIST_SCHEMA_READY` was not set by the build session [ASSUMED: live
+environment values unread; setting it is an owner step].
 Nothing reads or writes these tables until that flag is the literal `on`. Plan:
 `docs/plans/J27_PROPOSAL_LIST_EMAILS_PLAN_2026-11-18.md`.
 

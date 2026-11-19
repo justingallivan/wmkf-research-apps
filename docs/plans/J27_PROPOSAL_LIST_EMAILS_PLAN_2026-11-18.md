@@ -61,9 +61,11 @@ same list mechanism could carry that packet later.
 
 ## What is built [MERGED, OFF]
 
-Merged to `main` on 2026-11-19 from `claude/proposal-list-pages`. Migration 101 was not
-applied to any database by the build session and `PROPOSAL_LIST_SCHEMA_READY` was not
-set anywhere [ASSUMED: live database and environment state unread]; with the flag unset
+Merged to `main` on 2026-11-19 from `claude/proposal-list-pages`. The owner applied
+migration 101 the same day and the read-only probe confirmed it
+[VERIFIED via `node scripts/probe-proposal-list-schema.mjs`, 2026-11-19].
+`PROPOSAL_LIST_SCHEMA_READY` was not set by the build session [ASSUMED: live
+environment values unread]; with the flag unset
 the staff route answers 503 and the public routes 404.
 
 **Verification so far.** Unit tests cover the services, verifier and routes; all check
@@ -154,7 +156,8 @@ Not planned: open tracking, an "extend link" action, per-chair personalization.
 Owner-only steps:
 
 1. Done 2026-11-19: branch merged to `main` after a Codex adversarial review.
-2. Apply migration 101 with `node scripts/apply-migrations.js`. The runner applies
+2. Done 2026-11-19: migration 101 applied with `node scripts/apply-migrations.js` and
+   confirmed by the probe. For reference, the runner applies
    every migration file the database has not recorded, so first run the read-only
    `node scripts/probe-proposal-list-schema.mjs`, which lists what would be applied;
    run it again afterwards to confirm the tables and index exist.
