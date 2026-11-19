@@ -1,3 +1,4 @@
+import { getAssessment, saveAssessment } from '../../../lib/services/workbench/assessment-service';
 import { getNotScoredReason, saveNotScoredReason } from '../../../lib/services/workbench/not-scored-reason-service';
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { actorRefFromSession } from '../../../lib/utils/actor-ref';
@@ -33,7 +34,8 @@ export default async function handler(req, res) {
   return withDalContext('workbench-initial-assessment-rationale', async () => {
     try {
       const mode = (req.method === 'GET' ? req.query.mode : req.body?.mode) ?? 'rationale';
-      if (!['rationale', 'not-scored'].includes(mode)) return res.status(400).json({ error: 'Unknown assessment editor.' });
+      if (!['rationale', 'not-scored', 'assessment'].includes(mode)) return res.status(400).json({ error: 'Unknown assessment editor.' });
+      if (req.method === 'GET' && mode === 'assessment') return res.status(200).json(await getAssessment(requestId));
       if (req.method === 'GET') return res.status(200).json(await (mode === 'not-scored' ? getNotScoredReason(requestId) : getInitialAssessmentRationale(requestId)));
       const actor = actorRefFromSession(access.session);
       if (!isGuid(actor)) return res.status(403).json({ error: 'A mapped staff identity is required.' });
@@ -41,6 +43,13 @@ export default async function handler(req, res) {
         return res.status(503).json({ error: 'Staff-attributed saves are unavailable.' });
       }
       const { rationale, version } = req.body;
+      if (mode === 'assessment') {
+        if (typeof version !== 'string' || !/^W\/"[0-9]+"$/.test(version)) return res.status(400).json({ error: 'A valid request version is required.' });
+        await saveAssessment({ requestId, version, actor, profileId: access.profileId,
+          decision: req.body.decision, rationale, reason: req.body.reason, notes: req.body.notes,
+          beforeWrite: async () => { if (!(await admitted())) throw new ServiceHttpError(UNAVAILABLE, { httpStatus: 404 }); } });
+        return res.status(200).json({ success: true });
+      }
       if (mode === 'not-scored') {
         if (!Number.isInteger(req.body.reason) || typeof version !== 'string' || !/^W\/"[0-9]+"$/.test(version)) {
           return res.status(400).json({ error: 'A valid reason and request version are required.' });

@@ -137,3 +137,23 @@ test('unknown editor modes fail without writing', async () => {
   expect(res.status).toHaveBeenCalledWith(400);
   expect(updateById).not.toHaveBeenCalled();
 });
+
+test('combined assessment saves status and rationale with the session actor in one write', async () => {
+  getById.mockResolvedValue({ ...row, _wmkf_programdirector_value: actor, wmkf_phaseistatus: null, wmkf_denialnotes: 'Preserve notes' });
+  const res = response();
+  await handler({ method: 'POST', body: { ...body, mode: 'assessment', decision: 'yes', actor: 'spoofed' } }, res);
+  expect(res.status).toHaveBeenCalledWith(200);
+  expect(updateById).toHaveBeenCalledTimes(1);
+  expect(updateById).toHaveBeenCalledWith(requestId, { wmkf_phaseistatus: 100000004, wmkf_initialassessmentrationale: body.rationale },
+    { ifMatch: version, actingUserSystemId: actor, noFallback: true });
+});
+test('combined assessment rejects unknown decisions without writing', async () => {
+  const res = response();
+  await handler({ method: 'POST', body: { ...body, mode: 'assessment', decision: 'unknown' } }, res);
+  expect(res.status).toHaveBeenCalledWith(400); expect(updateById).not.toHaveBeenCalled();
+});
+test('combined assessment validates version before entering its service', async () => {
+  const res = response();
+  await handler({ method: 'POST', body: { ...body, mode: 'assessment', decision: 'yes', version: '*' } }, res);
+  expect(res.status).toHaveBeenCalledWith(400); expect(updateById).not.toHaveBeenCalled();
+});
