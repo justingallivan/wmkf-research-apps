@@ -105,6 +105,10 @@ index: `docs/plans/data/expertise-roster/README.md`.
 - `/Users/gallivan/.local/share/wmkf-roster/` (`canary-20261110`,
   `full-import-20261110`): real export, import reports, receipts. Home Mac only.
 - `outputs/` in this worktree (gitignored): build/test logs and review transcripts.
+- **Shuttle copy for the work Mac (2026-11-18):** WMKF OneDrive `Research/Shuttle/Justin/`
+  holds `wmkf-roster-shuttle-20261118.tar.gz` (+ `.sha256`) and `RESTORE.md`. It has the private
+  directory without its three `.env` files, the worktree `outputs/`, and a `pg_dump` of the
+  rehearsal database. Recreate the `.env` files by hand per `RESTORE.md`.
 
 ## Testing
 
