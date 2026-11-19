@@ -31,7 +31,7 @@ function request(n, overrides = {}) {
     akoya_title: `Proposal ${n}`,
     _akoya_applicantid_value_formatted: `University ${n}`,
     _wmkf_projectleader_value_formatted: `Leader ${n}`,
-    _wmkf_programareaserved_value_formatted: 'Physics',
+    _wmkf_programareaserved_value: KEYWORD_PHYSICS,
     _wmkf_grantprogram_value: RESEARCH,
     wmkf_readyforreview: true,
     wmkf_GrantCycle: { wmkf_cyclecode: 'J27' },
@@ -41,8 +41,20 @@ function request(n, overrides = {}) {
   };
 }
 
-function deps(records, { capped = false, isolation = true } = {}) {
+const KEYWORD_PHYSICS = 'cccccccc-0001-4ccc-8ccc-cccccccccccc';
+const KEYWORD_METHOD = 'cccccccc-0002-4ccc-8ccc-cccccccccccc';
+const KEYWORD_LEGACY = 'cccccccc-0003-4ccc-8ccc-cccccccccccc';
+const KEYWORD_NO_GROUP = 'cccccccc-0004-4ccc-8ccc-cccccccccccc';
+const KEYWORDS = [
+  { wmkf_programlevel3id: KEYWORD_PHYSICS.toUpperCase(), wmkf_name: 'Condensed Matter Physics', wmkf_keywordtype_formatted: 'Discipline', wmkf_keyworddisciplinebranch_formatted: 'Physical Sciences', wmkf_keyworddisciplinegroup_formatted: 'Physics' },
+  { wmkf_programlevel3id: KEYWORD_METHOD, wmkf_name: 'X-ray crystallography', wmkf_keywordtype_formatted: 'Method', wmkf_keyworddisciplinegroup_formatted: 'Structure Determination and Spectroscopy' },
+  { wmkf_programlevel3id: KEYWORD_LEGACY, wmkf_name: 'Academic Building' },
+  { wmkf_programlevel3id: KEYWORD_NO_GROUP, wmkf_name: 'General Engineering', wmkf_keywordtype_formatted: 'Discipline', wmkf_keyworddisciplinebranch_formatted: 'Engineering' },
+];
+
+function deps(records, { capped = false, isolation = true, keywords = { records: KEYWORDS, capped: false } } = {}) {
   return {
+    listKeywords: jest.fn(async () => keywords),
     queryRequests: jest.fn(async () => ({ records, capped, hasMore: false })),
     listPrograms: jest.fn(),
     isolationEnabled: () => isolation,
@@ -65,12 +77,41 @@ afterAll(() => {
 
 describe('loadCycleProposalSnapshot', () => {
   test('lists every ready proposal in the cycle with title, institution, PI, and section', async () => {
-    const d = deps([request(1), request(2, { _wmkf_programareaserved_value_formatted: '' })]);
+    const d = deps([request(1), request(2, { _wmkf_programareaserved_value: null })]);
     const rows = await loadCycleProposalSnapshot({ cycleCode: 'j27', listKind: 'ordinary' }, d);
     expect(rows).toEqual([
-      { requestId: guid(1), requestNumber: '1001', title: 'Proposal 1', institution: 'University 1', projectLeader: 'Leader 1', section: 'Physics' },
-      { requestId: guid(2), requestNumber: '1002', title: 'Proposal 2', institution: 'University 2', projectLeader: 'Leader 2', section: UNASSIGNED_SECTION },
+      { requestId: guid(1), requestNumber: '1001', title: 'Proposal 1', institution: 'University 1', projectLeader: 'Leader 1', section: 'Physical Sciences', subsection: 'Physics' },
+      { requestId: guid(2), requestNumber: '1002', title: 'Proposal 2', institution: 'University 2', projectLeader: 'Leader 2', section: UNASSIGNED_SECTION, subsection: null },
     ]);
+  });
+
+  test('only a Discipline keyword with a branch places a proposal; anything else is Unassigned', async () => {
+    const d = deps([
+      request(1, { _wmkf_programareaserved_value: KEYWORD_METHOD }),
+      request(2, { _wmkf_programareaserved_value: KEYWORD_LEGACY }),
+      request(3, { _wmkf_programareaserved_value: KEYWORD_NO_GROUP }),
+      request(4, { _wmkf_programareaserved_value: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd' }),
+      // The other keyword lookup is never consulted: one field decides.
+      request(5, { _wmkf_programareaserved_value: null, _wmkf_programlevel3_value: KEYWORD_PHYSICS }),
+    ]);
+    const rows = await loadCycleProposalSnapshot({ cycleCode: 'J27', listKind: 'ordinary' }, d);
+    expect(rows.map((r) => [r.section, r.subsection])).toEqual([
+      [UNASSIGNED_SECTION, null],
+      [UNASSIGNED_SECTION, null],
+      ['Engineering', null],
+      [UNASSIGNED_SECTION, null],
+      [UNASSIGNED_SECTION, null],
+    ]);
+  });
+
+  test.each([
+    ['capped', { records: KEYWORDS, capped: true }],
+    ['empty', { records: [], capped: false }],
+    ['malformed', null],
+  ])('refuses the snapshot when the keyword read is %s', async (_label, keywords) => {
+    const d = deps([request(1)], { keywords });
+    await expect(loadCycleProposalSnapshot({ cycleCode: 'J27', listKind: 'ordinary' }, d))
+      .rejects.toMatchObject({ code: 'proposal_list_keywords_unavailable' });
   });
 
   test('the query carries no Program Director or caller scope', async () => {

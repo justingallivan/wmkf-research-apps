@@ -158,7 +158,7 @@ Promote any of these to a per-entity page if app code starts writing to it.
 
 `account.js`, `ai-prompt.js`, `ai-run.js`, `app-request-person.js`,
 `contact.js`, `email-activity.js`, `final-writeup-review-acknowledgement.js`,
-`grant-cycle.js`, `grant-program.js`, `grant-request.js`,
+`grant-cycle.js`, `grant-program.js`, `grant-request.js`, `keyword.js`,
 `grantee-deliverable.js`, `membership.js`, `policy.js`, `request-document.js`,
 `potential-reviewer.js`, `proposal-budget-line.js`, `researcher.js`,
 `review-answer.js`, `review-question.js`, `reviewer-suggestion.js`,

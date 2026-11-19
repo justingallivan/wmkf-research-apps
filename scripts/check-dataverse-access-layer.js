@@ -170,6 +170,7 @@ const LOGICAL_TO_ENTITY_SET = {
   wmkf_type: 'wmkf_types',
   wmkf_supporttype: 'wmkf_supporttypes',
   wmkf_programlevel2: 'wmkf_programlevel2s',
+  wmkf_programlevel3: 'wmkf_programlevel3s',
   wmkf_granteedeliverable: 'wmkf_granteedeliverables',
   systemuser: 'systemusers',
   sharepointdocumentlocation: 'sharepointdocumentlocations',
