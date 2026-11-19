@@ -241,6 +241,31 @@ The changes below replace the matching parts of the Design section.
 Not reviewed here because it is not designed yet: the keyword read (waiting on Connor)
 and pre-filling expert lists from matching (waiting on the other branch).
 
+## Revision: one link to a personal list page (owner, 2026-11-18)
+
+The owner proposed, and this plan adopts, a page in place of a long email. This
+supersedes the parts of the Design and Contract review sections that put every
+proposal link in the email body.
+
+- **Email.** A short personal note with one link to the recipient's list page.
+- **Page.** No login. Proposals are grouped by major area; each area is a collapsed
+  section the reader opens with a caret, showing its proposal count. Each row shows
+  title, institution and PI, with the own-institution flag where it applies. The title
+  opens that proposal's staff version.
+- **Links.** Still one personal link per recipient. The proposal links on the page are
+  that same personal link plus the request number, so access, revocation and open
+  records stay per person and per proposal (decision 4 holds).
+- **What this removes.** Email size is no longer a concern, so Contract review item 1's
+  short-token requirement is dropped and the existing signed-token helper can be used.
+  A mail scanner fetches one page, not 300 links, so item 2's intermediate page is not
+  needed: the title can open the PDF directly from the list page. The PDF fetch still
+  needs a limit sized for a reader working through many proposals.
+- **Expert emails.** Same page with a shorter, staff-chosen list.
+- **Staff preview.** Staff preview the page as the recipient will see it, and the email,
+  before sending.
+
+Contract review items 3 to 9 are unchanged.
+
 ## Before building
 
 - Run `/contract-reconcile` on this plan (new table, new public routes, outbound email).
