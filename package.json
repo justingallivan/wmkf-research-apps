@@ -189,7 +189,17 @@
       "devalue": "5.9.3",
       "nanoid": "5.1.16"
     },
+    "@workflow/world-local": {
+      "undici": "7.30.2"
+    },
+    "@workflow/world-vercel": {
+      "undici": "7.30.2"
+    },
+    "@tailwindcss/typography": {
+      "postcss-selector-parser": "6.1.6"
+    },
     "sharp": "0.35.5",
-    "uuid": "11.1.1"
+    "uuid": "11.1.1",
+    "zod": "4.6.7"
   }
 }

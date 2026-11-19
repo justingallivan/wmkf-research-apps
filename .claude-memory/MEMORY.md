@@ -23,7 +23,7 @@
 - Production smoke residue / cleanup scope: project-test-residue-cleanup-is-for-data-mining.md
 
 ## Working Norms
-- Performance/caching/refactor plans: feedback-latency-plan-scope-accretion-postmortem.md
+- Performance/caching/refactor plans; safety machinery vs usage volume: feedback-latency-plan-scope-accretion-postmortem.md; feedback-scale-safety-machinery-to-usage.md
 - Multi-session features / MVP drift / owner review burden: feedback-anchor-multisession-features-to-the-original-ask.md; feedback-owner-review-burden-must-shrink.md; changing the owner's named input source: feedback-keep-the-owners-named-input-source.md
 - Git / releases: ../docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md; feedback-verify-branch-before-git-action.md; feedback-scope-git-stash-in-shared-worktrees.md
 - Migration numbers / schema_migrations / branch-applied migrations: project-migration-numbers-claimed-off-main.md
