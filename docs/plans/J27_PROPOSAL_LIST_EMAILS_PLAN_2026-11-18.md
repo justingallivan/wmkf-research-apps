@@ -260,7 +260,16 @@ proposal link in the email body.
   A mail scanner fetches one page, not 300 links, so item 2's intermediate page is not
   needed: the title can open the PDF directly from the list page. The PDF fetch still
   needs a limit sized for a reader working through many proposals.
-- **Expert emails.** Same page with a shorter, staff-chosen list.
+- **Chairs' page.** All sections start collapsed; no per-chair personalization
+  (owner, 2026-11-18).
+- **Board experts' page (owner, 2026-11-18).** The proposals staff want that person's
+  opinion on appear at the top, open, as a highlighted group. Every other proposal
+  follows below in the same collapsed sections as the Chairs' page, as a courtesy.
+- **One list shape for everyone.** Each list holds every submitted proposal, and each
+  item carries a "highlighted for this person" mark. Chairs have none highlighted.
+  This replaces the earlier "shorter, staff-chosen list" for experts: staff choose what
+  to highlight, not what to include. A Board expert's link therefore opens any
+  submitted proposal, the same as a chair's.
 - **Staff preview.** Staff preview the page as the recipient will see it, and the email,
   before sending.
 
