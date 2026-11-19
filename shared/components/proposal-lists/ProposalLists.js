@@ -10,7 +10,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import { Button, Card } from '../Layout';
+import { Button, Card, PageHeader } from '../Layout';
 import { requestJson } from '../../utils/api-request';
 import { conventionalCycles } from '../../../lib/utils/cycle-code';
 
@@ -259,6 +259,7 @@ export default function ProposalLists() {
 
   return (
     <div className="space-y-6">
+      <PageHeader title="Proposal lists" subtitle="Personal links to the submitted proposals for Program Chairs and Board members." />
       <Card hover={false}>
         <p className="text-sm text-gray-700">
           Give a Board member a personal link to a page listing every submitted proposal in a cycle.
