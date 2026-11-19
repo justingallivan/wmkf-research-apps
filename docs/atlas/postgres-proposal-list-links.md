@@ -1,9 +1,9 @@
 # Proposal list links
 
-**[BRANCH-BUILT]** Migration 101 defines `proposal_list_links` and
-`proposal_list_items` on branch `claude/proposal-list-pages`. The migration has
-not been applied to any database, and `PROPOSAL_LIST_SCHEMA_READY` is not set in
-any environment [ASSUMED: neither was done this session; live state unread].
+**[MERGED TO MAIN 2026-11-19; OFF]** Migration 101 defines `proposal_list_links` and
+`proposal_list_items`. The build session did not apply the migration to any
+database or set `PROPOSAL_LIST_SCHEMA_READY` in any environment [ASSUMED: live
+state unread; both are owner steps].
 Nothing reads or writes these tables until that flag is the literal `on`. Plan:
 `docs/plans/J27_PROPOSAL_LIST_EMAILS_PLAN_2026-11-18.md`.
 

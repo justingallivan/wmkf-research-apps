@@ -3,10 +3,10 @@ title: J27 proposal lists for Program Chairs and Board experts
 domain: workbench
 kind: plan
 status: active
-summary: "Personal no-login pages listing every submitted J27 proposal for Program Chairs and Board members, with staff-highlighted proposals on top and a link to each proposal's staff version. The page and staff compose surface are branch-built behind a flag; the email, chair marker, and keyword sections are not built."
+summary: "Personal no-login pages listing every submitted J27 proposal for Program Chairs and Board members, with staff-highlighted proposals on top and a link to each proposal's staff version. The page and staff compose surface are merged to main behind a flag that is off; the email, chair marker, and keyword sections are not built."
 canonical: false
 cataloged: 2026-11-18
-last_verified: 2026-11-18
+last_verified: 2026-11-19
 owner: product-engineering
 related:
   - lib/services/proposal-lists/list-link-service.js
@@ -18,9 +18,9 @@ related:
 
 # J27 proposal lists for Program Chairs and Board experts
 
-State labels: `[VERIFIED via X]` was read or run this session (2026-11-18),
-`[BRANCH-BUILT]` is in source on `claude/proposal-list-pages` and not deployed,
-`[PLANNED]` is intent, `[ASSUMED]` is unconfirmed.
+State labels: `[VERIFIED via X]` was read or run in the build session (2026-11-18),
+`[MERGED, OFF]` is in source on `main` (merged 2026-11-19 at the owner's direction) with
+its flag unset, `[PLANNED]` is intent, `[ASSUMED]` is unconfirmed.
 
 ## What the owner asked for (2026-11-18)
 
@@ -59,14 +59,16 @@ same list mechanism could carry that packet later.
 | 13 | Sender is a staff member, to be named. Whether Production allows sending as a staff member is for the owner to determine. |
 | 14 | Tabled: a staff note beside a highlighted proposal. |
 
-## What is built [BRANCH-BUILT]
+## What is built [MERGED, OFF]
 
-On `claude/proposal-list-pages`. Not merged, not deployed. Migration 101 is not applied
-to any database and `PROPOSAL_LIST_SCHEMA_READY` is not set anywhere; with the flag
-unset the staff route answers 503 and the public routes 404.
+Merged to `main` on 2026-11-19 from `claude/proposal-list-pages`. Migration 101 was not
+applied to any database by the build session and `PROPOSAL_LIST_SCHEMA_READY` was not
+set anywhere [ASSUMED: live database and environment state unread]; with the flag unset
+the staff route answers 503 and the public routes 404.
 
 **Verification so far.** Unit tests cover the services, verifier and routes; all check
-gates pass. Migration 101 and the store's SQL statements were run by hand against a
+gates pass. A Codex adversarial review (2026-11-18) found two medium defects, both fixed
+with regression tests. Migration 101 and the store's SQL statements were run by hand against a
 throwaway local Postgres container [VERIFIED via psql, 2026-11-18]. The feature has
 **not** been run in a browser, through the app's database driver, or against SharePoint
 or Dynamics.
@@ -151,9 +153,11 @@ Not planned: open tracking, an "extend link" action, per-chair personalization.
 
 Owner-only steps:
 
-1. Review and merge the branch (it adds public no-login routes; an independent review
-   is recommended first).
-2. Apply migration 101 with `node scripts/apply-migrations.js`.
+1. Done 2026-11-19: branch merged to `main` after a Codex adversarial review.
+2. Apply migration 101 with `node scripts/apply-migrations.js`. The runner applies
+   every migration file the database has not recorded, so first run the read-only
+   `node scripts/probe-proposal-list-schema.mjs`, which lists what would be applied;
+   run it again afterwards to confirm the tables and index exist.
 3. Set `PROPOSAL_LIST_SCHEMA_READY=on` per environment, and confirm the public link
    origin (`DELIBERATION_BRIEFING_PUBLIC_BASE_URL`, falling back to `NEXTAUTH_URL`).
 4. Check on a Production test request, using a test list, that the page opens and a
