@@ -1,335 +1,174 @@
 ---
-title: J27 proposal list emails to Program Chairs and Board experts
+title: J27 proposal lists for Program Chairs and Board experts
 domain: workbench
 kind: plan
 status: active
-summary: "Plan for emailing Program Chairs the full list of submitted J27 proposals grouped by main keyword, and curated personalized lists to Board members with domain expertise, with a personal no-login link to each proposal's staff version. Not built."
+summary: "Personal no-login pages listing every submitted J27 proposal for Program Chairs and Board members, with staff-highlighted proposals on top and a link to each proposal's staff version. The page and staff compose surface are branch-built behind a flag; the email, chair marker, and keyword sections are not built."
 canonical: false
 cataloged: 2026-11-18
 last_verified: 2026-11-18
 owner: product-engineering
 related:
-  - lib/services/deliberation-briefing/briefing-link-service.js
-  - lib/services/workbench-proposal-documents.js
-  - lib/services/workbench/dashboard-service.js
-  - lib/services/review-manager/send-emails-service.js
+  - lib/services/proposal-lists/list-link-service.js
+  - lib/services/proposal-lists/list-snapshot-service.js
+  - lib/services/proposal-lists/list-page-service.js
+  - lib/external/verify-proposal-list-token.js
+  - docs/atlas/postgres-proposal-list-links.md
 ---
 
-# J27 proposal list emails to Program Chairs and Board experts
+# J27 proposal lists for Program Chairs and Board experts
 
-Nothing in this plan is built. State labels: `[VERIFIED via X]` was read in source this
-session (2026-11-18), `[ASSUMED]` is unconfirmed (including findings from a read-only
-search that were not re-read), `[PLANNED]` is this plan's intent.
+State labels: `[VERIFIED via X]` was read or run this session (2026-11-18),
+`[BRANCH-BUILT]` is in source on `claude/proposal-list-pages` and not deployed,
+`[PLANNED]` is intent, `[ASSUMED]` is unconfirmed.
 
 ## What the owner asked for (2026-11-18)
 
-Soon after proposals arrive on December 7:
+Soon after proposals arrive on December 7, and once intake is complete:
 
-1. **Chairs email.** One email to the Program Chairs listing every submitted proposal:
-   title, institution, PI name. Proposals are grouped into sections by main keyword
-   (all neuroscience together, all physics together). Each title links, with no login,
-   to the staff version of that proposal.
-2. **Expert emails.** Optionally, separate personalized emails to Board members with
-   domain expertise, each carrying a shorter list curated to that person. Who the
-   experts are and which proposals they match is being worked out on another branch.
+1. **Program Chairs** receive one link to a page listing every submitted proposal:
+   title, institution, PI. Proposals are grouped by major area (all neuroscience
+   together, all physics together), each area behind a caret that starts closed. Each
+   title opens the staff version of that proposal with no login.
+2. **Board members with domain expertise** receive the same page, with the proposals
+   staff want their view on highlighted at the top and every other proposal below as a
+   courtesy.
 
-## Earlier decisions this builds on
-
-From `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md` [VERIFIED via lines 19, 70]:
-
-- D34 (2026-10-28): Program Chairs and Board members get proposals through magic links;
-  the mechanism was left to design. This plan is that design.
-- Jan 14 "First Cut" packet: about 50 summaries to the Program Committee, personalized
-  by expertise. That is a later, smaller list. This plan covers the full list right
-  after submission; the same list mechanism could carry the First Cut packet later.
+This is the design for alignment-log decision D34 (2026-10-28), "Program Chairs and
+Board members get proposals through magic links", whose mechanism was left open
+[VERIFIED via `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md:70`]. It is earlier and larger
+than the January 14 "First Cut" packet of about 50 summaries (same log, line 19); the
+same list mechanism could carry that packet later.
 
 ## Owner decisions (2026-11-18)
 
 | # | Decision |
 |---|---|
-| 1 | Sections come from the keywords Connor's Power Automate flow writes at submission. |
-| 2 | Title links open the staff version (`{AKA}_Staff-Version_{Request#}.pdf`), not the reviewer copy. |
-| 3 | Chairs are marked on the existing Board roster; one roster serves both emails. |
-| 4 | Each person gets their own links, and each proposal has its own link that opens it directly. |
-| 5 | Volume: up to 300 proposals. Two chairs today, both Board members; whether both are on the roster is to be confirmed during the roster migration. |
-| 6 | Links last until the Board meeting. |
-| 7 | A proposal from the recipient's own institution stays on their list and is flagged. |
-| 8 | Sender is a staff member, to be named. |
-| 9 | Sections use Connor's keyword characterization as written. No staff control to move proposals between sections; chairs receive every proposal, so nothing is lost. |
+| 1 | Sections come from the keyword characterization Connor's Power Automate flow writes at submission, as written. No staff control to move a proposal between sections. |
+| 2 | Titles open the staff version (`{AKA}_Staff-Version_{Request#}.pdf`), not the reviewer copy. |
+| 3 | Chairs are marked on the existing Board roster; one roster serves both audiences. |
+| 4 | Each person gets their own link, and each proposal opens directly from it. |
+| 5 | Delivery is one link to a page, not a long email of links. |
+| 6 | Everyone with a link can open every submitted proposal. Chairs are responsible for all proposals in their area; other Board members get curation on top of full access. |
+| 7 | Chairs' sections all start collapsed; no per-chair personalization. One chair is a geologist interested in the physical sciences, the other a physician with broad interests. |
+| 8 | Highlighted proposals appear only at the top, not again in their section. |
+| 9 | A proposal from the recipient's own institution stays listed and is flagged. |
+| 10 | Links last until the Board meeting. |
+| 11 | Late submissions are not allowed and lists are sent after intake completes, so a list is a frozen snapshot. No update email. |
+| 12 | Volume: up to 300 proposals; two chairs today, both Board members. |
+| 13 | Sender is a staff member, to be named. Whether Production allows sending as a staff member is for the owner to determine. |
+| 14 | Tabled: a staff note beside a highlighted proposal. |
 
-Context for the Chairs email: one chair is a geologist interested in the physical
-sciences; the other is a physician with broad interests.
+## What is built [BRANCH-BUILT]
 
-## What exists today
+On `claude/proposal-list-pages`. Not merged, not deployed. Migration 101 is not applied
+to any database and `PROPOSAL_LIST_SCHEMA_READY` is not set anywhere; with the flag
+unset the staff route answers 503 and the public routes 404.
 
-- **Proposal list.** `lib/services/workbench/dashboard-service.js` selects title
-  (`akoya_title`), applicant, project leader and program area for cycle rows
-  [VERIFIED via `dashboard-service.js:70-87`]. J27 rows appear once Power Automate sets
-  `wmkf_readyforreview` [VERIFIED via `shared/config/workbenchVisibility.js:74,106`].
-- **Staff version.** The Workbench resolves it by the name suffix
-  `_staff-version_{number}.pdf` at the root of the request's SharePoint folder and
-  requires exactly one match [VERIFIED via `lib/services/workbench-proposal-documents.js:211-229`].
-  Connor's flow builds the file. It was missing on an earlier test request
-  [ASSUMED: from the alignment log, not re-read].
-- **No-login Board links.** The deliberation briefing page gives Board members a
-  no-login link. Each link is tied to one request, not to a person; the token digest
-  and sealed token are stored in Postgres `deliberation_briefing_links` with one live
-  link per request [VERIFIED via `lib/db/migrations/038*.sql`]. It serves the reviewer
-  copy, `Reviewer Materials/Proposal_{Request#}.pdf`
-  [VERIFIED via `lib/services/deliberation-briefing/briefing-page-service.js:365-369`],
-  streamed through the app from SharePoint [ASSUMED].
-- **Token helper.** `mintScopedToken({subject, audience, ops, expiresAt})` signs a JWT
-  [VERIFIED via `lib/services/external-token.js:125`].
-- **Email.** Sends go out as Dynamics email activities, as the staff member, after an
-  exact preview. The reviewer invite send is the model for per-person emails with a
-  per-recipient link minted at send time [ASSUMED: `lib/services/review-manager/send-emails-service.js`
-  not re-read]. Sending as the staff member needs `DYNAMICS_IMPERSONATION_ENABLED` [ASSUMED].
-- **Board roster.** Postgres `expertise_roster`, `role_type` 'Board'
-  [VERIFIED via `lib/db/migrations/004_expertise_finder.sql:8`]. Codex is migrating it to
-  Dataverse `wmkf_expertiseprofile` on `codex/expertise-roster-import-2026-11-10`; that
-  table exists only in the sandbox [ASSUMED: from the branch handoff of 2026-11-18].
-- **Matching.** The Expertise Finder already produces `board_interest[]` per proposal
-  [VERIFIED via `shared/config/expertise-finder-output-schema.js:83`] and stores it in
-  Postgres `expertise_matches` [ASSUMED].
+**Verification so far.** Unit tests cover the services, verifier and routes; all check
+gates pass. Migration 101 and the store's SQL statements were run by hand against a
+throwaway local Postgres container [VERIFIED via psql, 2026-11-18]. The feature has
+**not** been run in a browser, through the app's database driver, or against SharePoint
+or Dynamics.
 
-## Gaps
+### The recipient's page
 
-1. **Keywords.** No flow writes keywords yet, the Keywords table `wmkf_programlevel3`
-   is not seeded, no Keywords prompt exists, and nothing marks one keyword as the main
-   one [ASSUMED: from `docs/plans/J27_WORKBOOK_FIELD_MAP_2026-11-16.md`, not re-read]. Decision 1 makes
-   this feature depend on that work.
-2. **Chairs.** No chair marker was found in code, migrations or schema [ASSUMED: search
-   result]. Whether every Program Chair has a Board row on the roster is [ASSUMED].
-3. **Links.** No Board-facing link is tied to a person (reviewer links are, but they
-   are bound to reviewer records), and no no-login link serves the staff version.
+`/external/proposal-list/{token}`. No login. Shows who it was prepared for, the cycle,
+the proposal count and the date the link ends. Highlighted proposals, when there are
+any, sit in an open group at the top. Every other proposal sits in a section that
+starts collapsed, with its count. Each row has the title, institution and PI, and a
+"From your institution" flag where marked. The page reads only the frozen list stored
+for that link.
 
-## Design [PLANNED]
+### Opening a proposal
 
-One mechanism serves both emails: a **proposal list**, which is one recipient plus a set
-of proposals, each with a section label. The Chairs list holds every submitted proposal.
-An expert list holds a staff-chosen subset.
+A title links to `/api/external/proposal-list/{token}/document?request={number}`. The
+server checks the request number is on that person's list, takes the request's identity
+from the stored item, and resolves the staff version with the Workbench's existing rule
+(exactly one `_Staff-Version_{number}.pdf` at the request folder root)
+[VERIFIED via `lib/services/workbench-proposal-documents.js:211-229`]. A missing or
+ambiguous staff version, or a file that is not a PDF, returns "not available"; no other
+file is served. The caller never supplies a path, library, filename or request id.
 
 ### Links
 
-- One stored link per recipient list. The email's per-proposal URL is that link plus the
-  request number, for example `/external/proposal-list/{token}/{requestNumber}`. The
-  server opens a proposal only if it is on that recipient's list.
-- This meets decision 4: every person's links are their own, every title opens its
-  proposal directly, one person's access can be revoked alone, and opens are recorded
-  per person and proposal.
-- New table (for example `proposal_list_links` and `proposal_list_items`): recipient,
-  cycle, token digest, expiry, revoked-at, the frozen request set with section labels.
-  Token form: see Contract review item 1. It does not reuse `deliberation_briefing_links`
-  rows, so a later deliberation share cannot revoke these links and the briefing
-  feature flag does not gate this feature.
-- New public routes: verify token, rate limit, check membership, then stream the staff
-  version from SharePoint through the app, as the briefing page does for the reviewer copy.
-- **Email size.** A signed token is roughly 250 characters; hundreds of links in one
-  email may pass the size at which mail clients clip messages. Measure with the real
-  proposal count. If it clips, use a short random token for this audience (state is
-  stored either way). Decide during contract review.
+One live link per cycle, list type and recipient address. A signed token
+(`aud: 'proposal-list'`) from the shared helper
+[VERIFIED via `lib/services/external-token.js:125`]; the row stores its digest and a
+sealed copy so staff can copy the same link again. Every request re-reads the row, so
+switching a link off takes effect at once. Other external verifiers reject this
+audience [VERIFIED via `lib/external/verify-briefing-token.js:37`], and this verifier
+rejects theirs.
 
-### Sections
+The link ends at 08:00 UTC the day after the cycle's Board Meeting Date
+(`wmkf_meetingdate` [VERIFIED via `shared/config/cycleCalendar.js:27`]): the end of that
+day Pacific time, never earlier. A list cannot be created when the date is unset or
+past. The end date is fixed at creation; if the Board Meeting Date moves, staff switch
+the link off and create a new list.
 
-- Read the keyword Connor's flow writes and group by the Keywords table's grouping column.
-- **Needed from Connor before build:** which field holds the keywords, how the main
-  keyword is marked, and the grouping column in `wmkf_programlevel3`.
-- Proposals with no keyword are listed in an "Unassigned" section.
-- No staff control to move proposals between sections (decision 9).
+### Which proposals are listed
 
-### Chairs marker
+Every Research request linked to the cycle that passes the Workbench discovery rule
+(for 2027 and later cycles: Power Automate has marked it ready), read the same way for
+every staff member, with no Program Director or "my proposals" scope. The read is
+refused, never shortened, if it is incomplete, over 600 proposals, or the readiness
+scope cannot be read.
 
-- A chair flag on the Board roster. The roster is on Codex's active surface (Red under
-  the coordination rules). Agree with Codex which store carries the flag, Postgres
-  `expertise_roster` or the Dataverse profile, before building. Until then the build
-  reads chairs through one small function so the store can change.
+### The staff page
 
-### Compose and send
+`/proposal-lists` (staff with Request Workbench access). Choose a cycle; create a list
+for a Board member; tick the proposals to highlight and any own-institution marks; copy
+the link or open the page as the recipient will see it; refresh the proposals from the
+cycle (keeps the link and saved marks); switch a link off.
 
-- Staff page in the Workbench cycle view: choose recipients, review sections, see which
-  proposals lack a staff version, preview the exact email, send.
-- Sending is blocked for any listed proposal with no staff version (or staff remove it).
-- One email per recipient, sent as the staff member through the existing email-activity
-  path, with the preview check and per-recipient failure reporting of the reviewer send.
-- Email template in admin settings using the existing `{{token}}` syntax.
+A second list type, **test requests**, holds Factory test requests only and is always
+addressed to the signed-in staff member, so the page can be checked without a Board
+address and test data cannot reach one.
 
-### Expert emails
+### Stand-ins in this build
 
-- Same list mechanism. Staff pick the proposals for each Board member. The picker may
-  be pre-filled from matching results once the other branch settles its output; this
-  plan consumes that output and does not build matching. Its shape is [ASSUMED] until
-  Codex's branch lands.
+- **Sections** use the request's program area, labeled on the staff page as a
+  placeholder. Decision 1 replaces it once Connor's field is known.
+- **Recipients** are active Board members on the expertise roster who have an email
+  address; staff pick the chairs by name. There is no chair marker yet.
+- **Own-institution marks** are suggested when the roster's institution text exactly
+  matches the applicant institution; staff confirm or change them.
+- **Delivery**: staff copy the link into their own email. The app sends nothing.
 
-## Stages
+## Not built [PLANNED]
 
-| Stage | Scope | Depends on |
-|---|---|---|
-| 1 | List tables, per-person links, public route serving the staff version, staff compose/preview/send page, Chairs email with sections | Connor: keyword field and grouping; chair marker location |
-| 2 | Curated expert lists and personalized email | Stage 1 |
-| 3 | Pre-fill expert lists from matching | Codex's matching output |
+| Item | Depends on |
+|---|---|
+| Keyword sections (decision 1) | Connor: which field holds keywords, how the main keyword is marked, and the grouping column in the Keywords table `wmkf_programlevel3`. Asked by the owner 2026-11-18. |
+| Chair marker on the roster (decision 3) | Agreement with the roster migration on `codex/expertise-roster-import-2026-11-10` about which store carries it; confirmation that both chairs are on the roster. |
+| Sending the email from the app, with an exact preview | Owner: the sender, and whether `DYNAMICS_IMPERSONATION_ENABLED` is `true` in Production (the Board share path refuses to send without it [VERIFIED via `lib/services/pre-site-visit/distribution/send.js:45`]). |
+| Pre-filling highlights from expert matching | The matching output on the other branch; its shape is [ASSUMED]. |
+| A link to the staff page from the Workbench navigation | Owner: where it should appear. |
 
-**Smallest slice for December 7 (19 days from this plan):** list tables, per-person
-links, the public route that serves the staff version, and a previewed send of the
-Chairs email. Sections need Connor's keyword field; until it is known, the slice can be
-tested on test requests with one unsectioned list. Expert emails (Stage 2) can follow.
+Not planned: open tracking, an "extend link" action, per-chair personalization.
 
-## Dependencies and risks
+## Before this is turned on
 
-- **Connor's keyword flow before Dec 7.** Without it there are no sections. Possible
-  fallback: send one unsectioned list.
-- **Staff version on every proposal.** Depends on Connor's flow; the compose page shows
-  what is missing.
-- **Staff version contents.** The owner chose this file for Board eyes. Confirm once on
-  a real J27 folder that it holds nothing staff-only.
-- **Roster store.** Shared with Codex's migration; coordinate before touching it.
+Owner-only steps:
 
-## Contract review (2026-11-18)
+1. Review and merge the branch (it adds public no-login routes; an independent review
+   is recommended first).
+2. Apply migration 101 with `node scripts/apply-migrations.js`.
+3. Set `PROPOSAL_LIST_SCHEMA_READY=on` per environment, and confirm the public link
+   origin (`DELIBERATION_BRIEFING_PUBLIC_BASE_URL`, falling back to `NEXTAUTH_URL`).
+4. Check on a Production test request, using a test list, that the page opens and a
+   title opens the staff version.
+5. Confirm once, on a real J27 folder, that the staff version holds nothing that Board
+   members should not see.
 
-Reviewed against live source before any build. Verdict: **ready with named changes**.
-The changes below replace the matching parts of the Design section.
+## Risks
 
-1. **Use a short random token, not a signed one.** A signed token is about 290
-   characters; 300 links would put over 100 KB of link text in one email, past the size
-   at which mail clients clip messages [ASSUMED: arithmetic, not measured]. The stored
-   row is already the authority in the precedent: every call re-reads it by digest and
-   checks revoked and expiry [VERIFIED via `lib/external/verify-briefing-token.js:42-47`].
-   So this audience uses a random token of about 43 characters, stored as a digest plus a
-   sealed copy for resend, as `deliberation_briefing_links` does
-   [VERIFIED via `lib/db/migrations/038_deliberation_briefing_links.sql:15-17`].
-   Whether Dynamics limits email body size is untested.
-2. **Title links open a small page, which then loads the PDF.** Mail security scanners
-   often fetch every link in a message. If each link streamed the PDF directly, a scan
-   would pull up to 300 files from SharePoint, record false opens, and use up the
-   shared limiter's 30 requests per token per minute
-   [VERIFIED via `lib/external/rate-limit.js:36-37`], locking the real reader out. The
-   link opens a light page for that one proposal (no SharePoint call); the page loads
-   the PDF, and the open is recorded on the PDF fetch. The reader still lands on the
-   proposal in one click. The PDF fetch needs its own limit sized for a reader paging
-   through many proposals.
-3. **The server resolves the file; the link carries only the token and request number.**
-   Same rule as the precedent route, where the client never supplies a path or filename
-   [VERIFIED via `pages/api/external/briefing/[token]/document.js:4-10`]. Order: method,
-   rate limit, verify token, check the request is on that list, resolve the staff
-   version with the existing exactly-one-match rule, stream with `nosniff`, `no-store`
-   and `Referrer-Policy: no-referrer`. A missing or ambiguous staff version returns a
-   plain "not available yet" page, never another file.
-4. **Expiry.** "Until the Board meeting" reads the cycle's Board Meeting Date,
-   `wmkf_meetingdate` [VERIFIED via `shared/config/cycleCalendar.js:27`], a date with
-   no time. The row's expiry is the end of that day Pacific time. Sending is blocked
-   when the date is not set. If the date later moves, staff extend the links from the
-   compose page; expiry lives on the row, so no new email is needed.
-5. **Per-recipient results and resend.** The send returns an outcome for each recipient
-   by name, and a failed recipient can be retried alone. A resend reuses the same link
-   (from the sealed copy) so an earlier email's links keep working. Replacing a link is
-   a separate, deliberate "revoke and reissue" action.
-6. **Late arrivals: not a concern (owner, 2026-11-18).** Late submissions are not
-   allowed, and the emails are sent after intake is complete, not as proposals arrive.
-   A list is frozen when sent; no update-email feature is built.
-7. **Own-institution flag.** The roster holds institution as free text
-   [VERIFIED via `lib/db/migrations/004_expertise_finder.sql:10`], while the applicant
-   is a Dynamics account. Name matching can miss. The flag is computed, shown in the
-   preview, and staff confirm it before sending. With two chairs this is a short check.
-8. **Sender.** The Board share path refuses to send unless
-   `DYNAMICS_IMPERSONATION_ENABLED` is `true`
-   [VERIFIED via `lib/services/pre-site-visit/distribution/send.js:45`]. The Production
-   value is unknown; the owner will determine it before the first send (2026-11-18).
-9. **Durable surfaces at build:** migration and manifest, Atlas page, route security
-   matrix rows for the public and staff routes, route counts in the canonical counts,
-   email template setting, cleanup of expired rows, and tests that prove a request
-   *not* on a list is refused with a token that is otherwise valid.
-
-Not reviewed here because it is not designed yet: the keyword read (waiting on Connor)
-and pre-filling expert lists from matching (waiting on the other branch).
-
-## Revision: one link to a personal list page (owner, 2026-11-18)
-
-The owner proposed, and this plan adopts, a page in place of a long email. This
-supersedes the parts of the Design and Contract review sections that put every
-proposal link in the email body.
-
-- **Email.** A short personal note with one link to the recipient's list page.
-- **Page.** No login. Proposals are grouped by major area; each area is a collapsed
-  section the reader opens with a caret, showing its proposal count. Each row shows
-  title, institution and PI, with the own-institution flag where it applies. The title
-  opens that proposal's staff version.
-- **Links.** Still one personal link per recipient. The proposal links on the page are
-  that same personal link plus the request number, so access and revocation stay per
-  person and per proposal (decision 4 holds). Open records are not built; see Build status.
-- **What this removes.** Email size is no longer a concern, so Contract review item 1's
-  short-token requirement is dropped and the existing signed-token helper can be used.
-  A mail scanner fetches one page, not 300 links, so item 2's intermediate page is not
-  needed: the title can open the PDF directly from the list page. The PDF fetch still
-  needs a limit sized for a reader working through many proposals.
-- **Chairs' page.** All sections start collapsed; no per-chair personalization
-  (owner, 2026-11-18).
-- **Board experts' page (owner, 2026-11-18).** The proposals staff want that person's
-  opinion on appear at the top, open, as a highlighted group. Every other proposal
-  follows below in the same collapsed sections as the Chairs' page, as a courtesy.
-- **One list shape for everyone.** Each list holds every submitted proposal, and each
-  item carries a "highlighted for this person" mark. Chairs have none highlighted.
-  This replaces the earlier "shorter, staff-chosen list" for experts: staff choose what
-  to highlight, not what to include. A Board expert's link therefore opens any
-  submitted proposal, the same as a chair's.
-- **Access confirmed (owner, 2026-11-18).** Everyone has access to every proposal. The
-  Chairs are responsible for all proposals in their area; other Board members need the
-  curation but keep access to the rest.
-- **Highlighted proposals appear only at the top**, not again in their area sections.
-- **Tabled:** a staff note beside a highlighted proposal.
-- **Staff preview.** Staff preview the page as the recipient will see it, and the email,
-  before sending.
-
-Contract review items 3 to 9 are unchanged.
-
-## Build status (2026-11-18)
-
-**[BRANCH-BUILT]** on `claude/proposal-list-pages`; not merged, not deployed, migration
-101 not applied, `PROPOSAL_LIST_SCHEMA_READY` not set anywhere.
-
-Built in this slice:
-
-- Migration `101_proposal_list_links.sql` (links and frozen items). Atlas:
-  `docs/atlas/postgres-proposal-list-links.md`.
-- The no-login list page `/external/proposal-list/{token}`: highlighted proposals on
-  top, every other proposal in collapsed sections; each title opens the staff version.
-- The staff page `/proposal-lists`: choose a cycle, create a Board member's list, choose
-  highlights and own-institution marks, copy or open the link, refresh the proposals,
-  switch a link off.
-- A `test` list type that holds Factory test requests only and is always addressed to
-  the signed-in staff member, for checking the page without a Board address.
-
-Differences from the design above, decided during the build:
-
-- **No open records.** The earlier text said opens would be recorded per person and
-  proposal. The owner did not ask for that, so it is not built.
-- **No extend action.** A link's end date is fixed when the list is created. If the
-  Board Meeting Date moves, switch the link off and create a new list.
-- **Recipients come from Board rows on the roster** that have an email address. There is
-  no chair marker yet; staff pick the two chairs by name.
-- **Sections are a labeled placeholder** (the request's program area) until Connor's
-  keyword field and grouping are known. The staff page says so.
-- **Own-institution marks are suggested** by an exact institution-name match and staff
-  confirm or change them.
-
-Not built: the email itself (staff copy the link for now), the chair marker, keyword
-sections, pre-filled highlights from matching, and a link to this page from the
-Workbench navigation.
-
-## Before building
-
-- Run `/contract-reconcile` on this plan (new table, new public routes, outbound email).
-- Add the routes to `docs/API_ROUTE_SECURITY_MATRIX.md`; add an Atlas page for the tables.
-- Claim the migration number at build time after checking all local and remote branches
-  and the manifest. Do not use 097: it is missing on `main` and may be claimed on a branch.
-- Test with a capture or test-recipient send before any Board address is used.
-- Runtime work: build on a branch and promote deliberately.
-
-## Open design points
-
-1. **Link expiry date.** Which stored date is "the Board meeting" for the cycle (cycle
-   calendar field to identify), and whether the link stops at the start or end of that day.
-2. **Own-institution flag.** Needs each recipient's institution. Where that comes from
-   (roster affiliation or the Board member's contact record) is unread [ASSUMED], and
-   institution names must be matched reliably for the flag to be trusted.
-3. **Email size at 300 links.** Measure; shorten the token if mail clients clip.
-4. **Sender.** Staff member to be named; the send uses the pressing staff member's
-   identity unless decided otherwise.
+- **Connor's keyword flow before December 7.** Without it the page shows the
+  placeholder sections. Fallback: one unsectioned list.
+- **Staff version on every proposal.** Connor's flow builds the file; it was missing on
+  an earlier test request [ASSUMED: from the alignment log, not re-read]. A title whose
+  file is missing shows "not available" rather than another document. The staff page
+  does not yet show which proposals lack one.
+- **A forwarded link** opens every listed proposal until it is switched off or the
+  Board meeting date passes. There is no record of opens.
+- **Own-institution matching** is by exact name and can miss; staff confirm it.
