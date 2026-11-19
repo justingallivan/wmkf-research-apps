@@ -27,9 +27,20 @@ revoked_at IS NULL` holds at most one live link per recipient.
 
 `proposal_list_items` is the frozen proposal snapshot for one link: `link_id`
 (cascade delete), `request_id`, `request_number`, `title`, `institution`,
-`project_leader`, `section`, `highlighted`, `own_institution`. Primary key
+`project_leader`, `section`, `subsection`, `highlighted`, `own_institution`. Primary key
 `(link_id, request_id)`; `(link_id, request_number)` is unique. These rows are
 the only requests a link may open.
+
+`section` is the discipline branch and `subsection` the discipline group of the
+request's keyword (`_wmkf_programareaserved_value`) in the Keywords table
+`wmkf_programlevel3`, copied when the
+list is built; a proposal with no Discipline keyword gets `Unassigned` and NULL.
+`subsection` comes from migration 102, applied by the owner on 2026-11-19 before
+the code that selects it was pushed [VERIFIED via the owner-run
+`node scripts/apply-migrations.js` and `node scripts/probe-proposal-list-schema.mjs`
+readback, 2026-11-19: 10 item columns, `subsection` present, 0 rows].
+`PROPOSAL_LIST_SCHEMA_READY` gates only on migration 101, so any other database
+needs 102 applied before this code runs against it.
 
 ## Write and read paths
 
@@ -71,5 +82,4 @@ cycle.
 
 ## Not built
 
-Email sending, a chair marker on the roster, keyword-based sections (sections
-are a labeled placeholder: the request's program area), and open tracking.
+Email sending, a chair marker on the roster, and open tracking.

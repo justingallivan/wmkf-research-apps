@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * READ-ONLY probe: is migration 101 (proposal list links) applied?
+ * READ-ONLY probe: are migrations 101 and 102 (proposal list links) applied?
  *
  * Reads the app Postgres (POSTGRES_URL from .env.local) inside a READ ONLY
  * transaction. Prints:
@@ -8,7 +8,9 @@
  *      which is exactly what `node scripts/apply-migrations.js` would apply next;
  *   2. the tracker row for migration 101;
  *   3. whether `proposal_list_links` and `proposal_list_items` exist, with their
- *      column counts, the one-live-link index, and row counts.
+ *      column counts, the one-live-link index, and row counts;
+ *   4. whether migration 102's `proposal_list_items.subsection` column exists
+ *      (needed before the two-level sections code is deployed).
  * Never prints recipients, tokens or proposal titles. Exits 0 when 101 is fully
  * in place, 1 when it is not, 2 on a configuration or connection problem.
  *
@@ -74,7 +76,7 @@ try {
       continue;
     }
     const count = await client.query(`SELECT count(*)::int AS n FROM ${table}`);
-    const ok = n === expected;
+    const ok = n === expected || (table === 'proposal_list_items' && n === expected + 1);
     if (!ok) ready = false;
     console.log(`Table ${table}: present, ${n} columns (${ok ? 'as expected' : `EXPECTED ${expected}`}), ${count.rows[0].n} row(s)`);
   }
@@ -89,6 +91,14 @@ try {
     console.log(`Index ${LIVE_LINK_INDEX}: MISSING`);
     ready = false;
   }
+
+  const subsection = await client.query(
+    `SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'proposal_list_items' AND column_name = 'subsection'`,
+  );
+  console.log(subsection.rows.length
+    ? 'Migration 102: proposal_list_items.subsection present. Two-level sections code may be deployed.'
+    : 'Migration 102: proposal_list_items.subsection MISSING. Do not deploy the two-level sections code yet.');
 
   await client.query('ROLLBACK');
   console.log(ready

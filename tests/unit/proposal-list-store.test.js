@@ -13,7 +13,7 @@ const LINK = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const REQ_A = '11111111-1111-4111-8111-111111111111';
 const REQ_B = '22222222-2222-4222-8222-222222222222';
 const snapshot = [
-  { requestId: REQ_A, requestNumber: '1001', title: 'A', institution: 'U', projectLeader: 'P', section: 'Physics' },
+  { requestId: REQ_A, requestNumber: '1001', title: 'A', institution: 'U', projectLeader: 'P', section: 'Physical Sciences', subsection: 'Physics' },
   { requestId: REQ_B, requestNumber: '1002', title: 'B', institution: 'U', projectLeader: 'P', section: 'Physics' },
 ];
 
@@ -39,8 +39,10 @@ test('locks the link, then reads the marks, then replaces the items with those m
   expect(read).toBeGreaterThan(lock);
   expect(del).toBeGreaterThan(read);
   const inserts = mockClient.query.mock.calls.filter(([text]) => /INSERT INTO proposal_list_items/.test(text)).map(([, params]) => params);
-  // params: link, request id, number, title, institution, leader, section, highlighted, own institution
-  expect(inserts.map((p) => [p[2], p[7], p[8]])).toEqual([['1001', true, false], ['1002', false, true]]);
+  // params: link, request id, number, title, institution, leader, section, subsection, highlighted, own institution
+  expect(inserts.map((p) => [p[2], p[8], p[9]])).toEqual([['1001', true, false], ['1002', false, true]]);
+  // The discipline group is stored; a proposal without one stores NULL.
+  expect(inserts.map((p) => [p[6], p[7]])).toEqual([['Physical Sciences', 'Physics'], ['Physics', null]]);
   expect(texts.at(-1)).toBe('COMMIT');
 });
 
@@ -48,7 +50,7 @@ test('marks handed in by a caller are ignored; only stored marks count', async (
   script({ marks: [] });
   await replaceItems(LINK, snapshot.map((item) => ({ ...item, highlighted: true, ownInstitution: true })));
   const inserts = mockClient.query.mock.calls.filter(([text]) => /INSERT INTO proposal_list_items/.test(text)).map(([, params]) => params);
-  expect(inserts.map((p) => [p[7], p[8]])).toEqual([[false, false], [false, false]]);
+  expect(inserts.map((p) => [p[8], p[9]])).toEqual([[false, false], [false, false]]);
 });
 
 test('a link that is not live is left untouched', async () => {

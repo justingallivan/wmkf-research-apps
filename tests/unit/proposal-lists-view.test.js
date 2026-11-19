@@ -12,6 +12,7 @@ jest.mock('../../shared/components/Layout', () => ({
   __esModule: true,
   Button: ({ children, variant, size, loading, ...props }) => <button {...props} disabled={props.disabled || loading}>{children}</button>,
   Card: ({ children }) => <div>{children}</div>,
+  PageHeader: ({ title }) => <h1>{title}</h1>,
 }));
 
 const json = (body, ok = true) => ({ ok, status: ok ? 200 : 409, json: async () => body, text: async () => JSON.stringify(body), headers: { get: () => 'application/json' } });

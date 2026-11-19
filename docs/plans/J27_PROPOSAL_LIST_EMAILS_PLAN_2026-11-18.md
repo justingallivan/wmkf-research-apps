@@ -70,10 +70,20 @@ the staff route answers 503 and the public routes 404.
 
 **Verification so far.** Unit tests cover the services, verifier and routes; all check
 gates pass. A Codex adversarial review (2026-11-18) found two medium defects, both fixed
-with regression tests. Migration 101 and the store's SQL statements were run by hand against a
-throwaway local Postgres container [VERIFIED via psql, 2026-11-18]. The feature has
-**not** been run in a browser, through the app's database driver, or against SharePoint
-or Dynamics.
+with regression tests.
+
+First Production run, 2026-11-19, driven in the owner's browser on a J27 test list
+[VERIFIED via the live site]: the staff page loads; creating a test list works (one
+proposal, test request 1003518, which exercised the keyword-table read); the recipient
+page opens and its data requests succeed without login cookies; saving a highlight moves
+the proposal to the top; switching the link off makes the page say the link is no longer
+active. The run found three defects, fixed and re-checked live the same day: a title
+whose staff version is missing opened raw JSON (now a readable page), an empty "All
+other proposals" heading, and a missing staff page title.
+
+**Not yet proven in Production:** a staff-version PDF actually opening (1003518 has
+none), the two-level discipline sections (no J27 test request has a keyword; only
+"Unassigned" appeared), and a list for a real Board member.
 
 ### The recipient's page
 
@@ -131,10 +141,14 @@ address and test data cannot reach one.
 
 ### Stand-ins in this build
 
-- **Sections** use the request's program area, labeled on the staff page as a
-  placeholder. Decision 1 replaces it once Connor's field is known.
+- **Sections** are no longer a stand-in: each proposal
+  gets the discipline branch (the caret) and discipline group (a subheading
+  inside it) of its keyword; only a Discipline keyword places a proposal, and anything
+  else is listed under Unassigned. Keyword table facts: 259 rows, 5 branches, 11 discipline groups
+  [VERIFIED via the owner-run `node scripts/probe-keyword-taxonomy.cjs --target=prod`, 2026-11-19].
 - **Recipients** are active Board members on the expertise roster who have an email
-  address; staff pick the chairs by name. There is no chair marker yet.
+  address; staff pick the chairs (Edward M. Stolper and James S. Economou) by name.
+  There is no chair marker.
 - **Own-institution marks** are suggested when the roster's institution text exactly
   matches the applicant institution; staff confirm or change them.
 - **Delivery**: staff copy the link into their own email. The app sends nothing.
@@ -143,8 +157,8 @@ address and test data cannot reach one.
 
 | Item | Depends on |
 |---|---|
-| Keyword sections (decision 1) | Connor answered 2026-11-19 (email relayed by the owner): the Keywords table `wmkf_programlevel3` has `wmkf_KeywordDisciplineBranch` and `wmkf_KeywordDisciplineGroup`, which define the taxonomy tree, and `wmkf_KeywordType`, which separates Disciplines, Methods and Objects of Study [ASSUMED: not read from Dataverse]. The owner wants two header levels: broad area (life sciences, physical sciences, engineering), then subcategory (Molecular and Cellular Biology and the like). Still unknown: how a Request records its keywords and which one is the main keyword, whether the table is seeded, and which of Branch and Group is the broad level. The owner-run read-only `node scripts/probe-keyword-taxonomy.cjs --target=prod` reports all three. |
-| Chair marker on the roster (decision 3) | Agreement with the roster migration on `codex/expertise-roster-import-2026-11-10` about which store carries it; confirmation that both chairs are on the roster. |
+| Keyword sections (decision 1): first real use | Built and merged to `main` 2026-11-19; migration 102 applied by the owner first [VERIFIED via `node scripts/probe-proposal-list-schema.mjs`, 2026-11-19]. Not yet run in a browser or against Dataverse; the keyword-table read first runs when a list is created or refreshed. Settled: which request field holds the main discipline keyword. A request has two lookups to the Keywords table, `wmkf_programlevel3` and `wmkf_programareaserved`, plus the `wmkf_ai_keywords` text list [VERIFIED via the owner-run `node scripts/probe-keyword-taxonomy.cjs --target=prod`, 2026-11-19]. The build reads `wmkf_programareaserved`; the choice is one constant, `SECTION_KEYWORD_LOOKUP`. Evidence for that field: [VERIFIED via the owner-run `node scripts/probe-request-keywords.cjs --target=prod`, 2026-11-19: one request in all of Production has any of the three fields filled, intake test 1003526, whose `wmkf_programareaserved` points at the Discipline keyword "Structural Biology" (Life Sciences / Molecular and Cellular Biology); `wmkf_programlevel3` and `wmkf_ai_keywords` are empty on every request]. The owner accepted that request as the guide on 2026-11-19, so the staff-page warning is removed. |
+| Chair marker on the roster (decision 3) | Not needed to send: the two Program Chairs are Edward M. Stolper and James S. Economou (owner, 2026-11-19), and both appear in the staff page's Board member picker in Production alongside Board members Andrea M. Ghez and Kelsey C. Martin [VERIFIED via the live staff page, 2026-11-19], so staff create their lists by name. A marker would only matter if chairs should later get different treatment; owner's call whether to build it. |
 | Sending the email from the app, with an exact preview | Owner: the sender, and whether `DYNAMICS_IMPERSONATION_ENABLED` is `true` in Production (the Board share path refuses to send without it [VERIFIED via `lib/services/pre-site-visit/distribution/send.js:45`]). |
 | Pre-filling highlights from expert matching | The matching output on the other branch; its shape is [ASSUMED]. |
 | A link to the staff page from the Workbench navigation | Owner: where it should appear. |
