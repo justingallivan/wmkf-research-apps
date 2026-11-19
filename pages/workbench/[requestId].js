@@ -9,6 +9,7 @@
 import { j27IntegrityTarget, j27ChairsRecommendationEnabled, j27ChairsRecommendationRehearsalRequestId, j27IntegritySimulationRequestIds } from '../../lib/utils/j27-integrity-readiness';
 import { rationaleFieldReady, reviewSummaryFieldsReady, rosterFieldReady } from '../../lib/utils/workbench-field-readiness';
 import { workbenchPhaseReleaseAdmitted } from '../../lib/utils/workbench-phase-release';
+import NotScoredReason from '../../shared/components/workbench/NotScoredReason';
 import InitialAssessmentRationale from '../../shared/components/workbench/InitialAssessmentRationale';
 import MeetingRoster from '../../shared/components/workbench/MeetingRoster';
 import StaffVisitAssessment from '../../shared/components/workbench/StaffVisitAssessment';
@@ -24,13 +25,13 @@ import TestRequestBadge from '../../shared/components/TestRequestBadge';
 import J27StageStrip from '../../shared/components/workbench/J27StageStrip';
 import useReviewerProgress from '../../shared/components/workbench/useReviewerProgress';
 import { deriveJ27PageStage } from '../../shared/utils/j27PageStage';
-import { isJ27ScopeCycle } from '../../lib/services/workbench/j27-read-model';
+import { deriveRecorded, isJ27ScopeCycle } from '../../lib/services/workbench/j27-read-model';
 import { useAppAccess } from '../../shared/context/AppAccessContext';
 import { useProfile } from '../../shared/context/ProfileContext';
 import { readEmailSignaturePreference } from '../../shared/config/reviewerFinderPreferences';
 import ReviewersTab from '../../shared/components/reviewers/ReviewersTab';
 import ReviewsTab from '../../shared/components/workbench/ReviewsTab';
-import { isChairsRecommendationEditable } from '../../shared/config/j27Scoring';
+import { SCORING_STATUS, isChairsRecommendationEditable } from '../../shared/config/j27Scoring';
 import ScoringCard from '../../shared/components/workbench/ScoringCard';
 import ProposalTab from '../../shared/components/workbench/ProposalTab';
 import IntegrityTab from '../../shared/components/workbench/IntegrityTab';
@@ -207,6 +208,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
   const activeTab = phaseLayout ? (phaseContent[phase]?.[section || 'default'] || 'overview')
     : (tabParam && visibleTabKeys.has(tabParam) ? tabParam : 'overview');
   const reviewerSurfaceReadOnly = previewReadOnly && ['reviewers', 'reviews'].includes(activeTab);
+  const scoredAssessment = ['scored', 'inferred-scored'].includes(deriveRecorded(visibleContext?.phaseIStatus).scoring);
   const editingInitialRationale = showInitialRationale && activeTab === 'proposal';
   const updateProposalHref = useCallback((href) => {
     if (routeStateRef.current.generation === routeGeneration) {
@@ -385,11 +387,25 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
         </nav>
       )}
 
+      {editingInitialRationale && isJ27ScopeCycle(visibleContext?.cycleCode) && (
+        <ScoringCard key={`scoring:${routeRequestId}`}
+          context={visibleContext} canManage={canManage && !previewReadOnly}
+          previewReadOnly={previewReadOnly} refresh={refreshPhaseIStatus} />
+      )}
+
       {showInitialRationale && (editingInitialRationale || rationaleEditorRequestId === routeRequestId) && (
-        <div hidden={!editingInitialRationale}>
+        <div hidden={!editingInitialRationale || !scoredAssessment}>
           <InitialAssessmentRationale key={routeRequestId} requestId={routeRequestId}
+            active={editingInitialRationale && scoredAssessment}
+            onSaved={refreshPhaseIStatus}
             proposalHref={proposalLink?.generation === routeGeneration ? proposalLink.href : null} />
         </div>
+      )}
+
+      {showInitialRationale && (editingInitialRationale || rationaleEditorRequestId === routeRequestId) && (
+        <NotScoredReason key={`reason:${routeRequestId}`} requestId={routeRequestId}
+          active={editingInitialRationale && visibleContext?.phaseIStatus === SCORING_STATUS.no}
+          onSaved={refreshPhaseIStatus} />
       )}
 
       {phaseLinkPending ? (
@@ -432,7 +448,7 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
         />
       ) : activeTab === 'proposal' ? (
         <>
-          {isJ27ScopeCycle(visibleContext?.cycleCode) && (
+          {!showInitialRationale && isJ27ScopeCycle(visibleContext?.cycleCode) && (
             <ScoringCard
               key={`scoring:${routeRequestId}`}
               context={visibleContext}

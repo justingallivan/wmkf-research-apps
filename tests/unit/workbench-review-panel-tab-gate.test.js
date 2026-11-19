@@ -27,6 +27,7 @@ jest.mock('../../shared/components/workbench/ProposalTab', () => function Stub()
 jest.mock('../../shared/components/workbench/StatusTab', () => function Stub() { return <div />; });
 jest.mock('../../shared/components/workbench/AwardeeTab', () => function Stub() { return <div />; });
 jest.mock('../../shared/components/workbench/InitialAssessmentRationale', () => function Stub() { return <div />; });
+jest.mock('../../shared/components/workbench/NotScoredReason', () => function Stub() { return <div />; });
 jest.mock('../../shared/components/workbench/InitialAssessmentTab', () => function Stub() { return <div />; });
 jest.mock('../../shared/components/workbench/StaffDeliberationsTab', () => function Stub({ presentationContext }) {
   return <><h2>Presentation and staff discussion</h2>{presentationContext}</>;

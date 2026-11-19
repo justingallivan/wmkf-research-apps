@@ -38,7 +38,7 @@ test('intake shows one instruction and keeps later-stage empty states out of the
     },
   });
   expect(await screen.findByRole('heading', { name: 'Initial assessment pending' })).toBeVisible();
-  expect(screen.getByText('Read the proposal and record the staff rationale in Initial Assessment.')).toBeVisible();
+  expect(screen.getByText('Read the proposal and record the scoring decision in Initial Assessment.')).toBeVisible();
   expect(screen.queryByRole('button', { name: 'Open Initial Assessment' })).toBeNull();
   expect(screen.queryByText('0 reports received')).toBeNull();
   expect(screen.queryByText(/Presentation assessment ·/)).toBeNull();
@@ -71,7 +71,7 @@ test('saved review prose without a presentation opens Reports directly', async (
 test('Not Scored points to Initial Assessment without treating it as a formal outcome', async () => {
   renderOverview({ status: { phaseIStatus: SCORING_STATUS.no } });
   expect(await screen.findByRole('heading', { name: 'Marked Not Scored' })).toBeVisible();
-  expect(screen.getByText('The decision and staff rationale are in Initial Assessment.')).toBeVisible();
+  expect(screen.getByText('Review the reason for this decision in Initial Assessment.')).toBeVisible();
   expect(screen.queryByText('Request outcome recorded')).toBeNull();
 });
 
@@ -105,7 +105,8 @@ test.each([
   expect(await screen.findByRole('heading', { name: 'Staff review summary saved' })).toBeVisible();
   const checkpoint = screen.getByText('Initial Assessment', { exact: true }).closest('div');
   expect(checkpoint).toHaveTextContent(decision);
-  expect(checkpoint).toHaveTextContent(`Staff rationale · ${rationaleStatus}`);
+  if (phaseIStatus === null) expect(checkpoint).not.toHaveTextContent('Staff rationale');
+  else expect(checkpoint).toHaveTextContent(`Staff rationale · ${rationaleStatus}`);
   if (phaseIStatus === CHAIRS_RECOMMENDATION_STATUS.yes) expect(checkpoint).not.toHaveTextContent('Scored');
 });
 

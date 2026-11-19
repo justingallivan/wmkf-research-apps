@@ -1,5 +1,7 @@
 /** @jest-environment node */
 
+import { getMetadataBatch } from '../../lib/dataverse/adapters/metadata';
+jest.mock('../../lib/dataverse/adapters/metadata', () => ({ getMetadataBatch: jest.fn() }));
 import handler from '../../pages/api/workbench/initial-assessment-rationale';
 import { getById, updateById } from '../../lib/dataverse/adapters/grant-request';
 import { requireAppAccess } from '../../lib/utils/auth';
@@ -118,4 +120,20 @@ test.each(['D27', 'J28'])('a later cycle (%s) is read like J27', async (cycleCod
   await handler({ method: 'GET', query: { requestId } }, res);
   expect(res.status).not.toHaveBeenCalledWith(404);
   expect(res.json).toHaveBeenCalled();
+});
+
+
+test('Not Scored mode preserves notes and uses the mapped session actor', async () => {
+  getById.mockResolvedValue({ ...row, wmkf_phaseistatus: 100000005, wmkf_declinereason: 682090000, wmkf_denialnotes: 'Keep me' });
+  getMetadataBatch.mockResolvedValue([{ OptionSet: { Options: [{ Value: 682090003, Label: { LocalizedLabels: [{ LanguageCode: 1033, Label: 'Continuation/incremental' }] } }] } }, { MaxLength: 2000 }]);
+  const res = response();
+  await handler({ method: 'POST', body: { requestId, version, mode: 'not-scored', reason: 682090003, actor: 'spoofed' } }, res);
+  expect(res.status).toHaveBeenCalledWith(200);
+  expect(updateById).toHaveBeenCalledWith(requestId, { wmkf_declinereason: 682090003 }, { ifMatch: version, actingUserSystemId: actor, noFallback: true });
+});
+test('unknown editor modes fail without writing', async () => {
+  const res = response();
+  await handler({ method: 'POST', body: { ...body, mode: 'unknown' } }, res);
+  expect(res.status).toHaveBeenCalledWith(400);
+  expect(updateById).not.toHaveBeenCalled();
 });

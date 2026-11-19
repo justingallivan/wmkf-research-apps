@@ -62,7 +62,7 @@ Unless noted, fields are on the Request (`akoya_request`).
 | T | Certified date | none | ❌ Missing |
 | U | Flags (Claude, Field Analysis) | see decision 2 | ⚠️ |
 | V | Flags (PD final) | see decision 2 | ⚠️ |
-| W | Triage reason | `wmkf_triagestatus` holds the decision, not the reason | ❌ Missing |
+| W | Triage reason | `wmkf_declinereason` (Decline Reason), with `wmkf_denialnotes` (Invite/Decline Notes) for Other text | ✅ Existing fields verified by owner-run probes, 2026-11-19; three additional options pending provisioning |
 | X | Field Analysis (one-page document) | `wmkf_ai_fieldprimer` *(likely)* | ✅ |
 | Y | PD notes, added to over time | none | ❌ Missing |
 | Z | Rationale (Field Analysis), kept as a version | none | ❌ See decision 1 |
@@ -176,7 +176,7 @@ Connor creates the missing fields (owner, November 17).
 
 **Later stages (can wait until those stages are built):**
 - Certified by and Certified date
-- Triage reason
+- Triage reason: no new field; add two overlap options and Other to `wmkf_declinereason` (owner, November 19). Keep Limited impact and Continuation/incremental separate. Preserve existing `wmkf_denialnotes`; edit it only for Other.
 - PD notes
 - Advance questions sent (date)
 - Offramp reason (from a list)
@@ -202,6 +202,21 @@ Connor creates the missing fields (owner, November 17).
   text field. The one request with any of them filled points to `wmkf_programareaserved`
   [VERIFIED via the owner-run `node scripts/probe-request-keywords.cjs --target=prod`, 2026-11-19: one request in all of Production has any of the three fields filled, intake test 1003526, whose `wmkf_programareaserved` points at the Discipline keyword "Structural Biology" (Life Sciences / Molecular and Cellular Biology); `wmkf_programlevel3` and `wmkf_ai_keywords` are empty on every request]. An older table catalog (`docs/archive/DATAVERSE_CUSTOM_TABLES_2026-06-05.md`)
   lists the table's display name as "Program Service Area".
+
+## Triage reason verification — November 19, 2026
+
+[VERIFIED via owner-run `scripts/probe-request-triage-reasons.cjs` and
+`scripts/probe-request-decline-notes.cjs`, outputs supplied in chat.] All 36 supplied
+requests have a Decline Reason matching the workbook category after label mapping:
+15 Limited impact, 10 Continuation/incremental, eight Too applied/translational,
+two Implementation/risk and one Basic science question unclear. Thirteen have
+Invite/Decline Notes. The notes are private and are not copied into this document.
+
+Owner decision: keep all five existing values; add Overlap with existing funding,
+Overlap with a recent Keck award and Other. Branch implementation uses the existing
+fields, staff-attributed ETag saves and live metadata validation; no live provisioning
+or deployment is claimed. Scored proposals show Staff rationale; Not Scored proposals
+show Reason, with a text box for Other and preserved existing notes for other choices.
 
 ## Sources
 

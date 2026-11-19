@@ -241,7 +241,7 @@ test('J27 Initial Assessment hides the Word option and keeps the rationale draft
   const view = render(<WorkbenchRequest staffReviewSummary initialRationaleEnabled />);
   await act(async () => {
     pending.get('/api/workbench/resolve-request?requestId=request-a')({
-      ok: true, json: async () => ({ success: true, requestId: 'request-a', cycleCode: 'J27', phaseLayout: true }),
+      ok: true, json: async () => ({ success: true, requestId: 'request-a', cycleCode: 'J27', phaseLayout: true, phaseIStatus: 100000004 }),
     });
   });
   await act(async () => {
@@ -252,6 +252,7 @@ test('J27 Initial Assessment hides the Word option and keeps the rationale draft
 
   const editor = screen.getByRole('textbox', { name: 'Staff rationale' });
   expect(editor).toHaveValue('Saved rationale');
+  expect(screen.getByRole('heading', { name: 'Scoring', exact: true }).compareDocumentPosition(editor) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(screen.getAllByRole('button', { name: 'Assessment', exact: true })).toHaveLength(1);
   expect(screen.queryByTestId('legacy-initial-assessment')).toBeNull();
   expect(screen.queryByRole('button', { name: 'Word assessment' })).toBeNull();
@@ -317,4 +318,30 @@ test('a deployment that cannot admit any request keeps the old tabs even if a co
     ok: true, json: async () => ({ success: true, requestId: 'request-a', cycleCode: 'J27', phaseLayout: true }),
   }));
   expect(screen.queryAllByText('Peer Review')).toHaveLength(0);
+});
+
+test.each([null, 100000004, 100000005])('Initial Assessment selects the editor for scoring status %s', async (phaseIStatus) => {
+  tabName = 'initial-assessment';
+  render(<WorkbenchRequest staffReviewSummary initialRationaleEnabled />);
+  await act(async () => pending.get('/api/workbench/resolve-request?requestId=request-a')({
+    ok: true, json: async () => ({ success: true, requestId: 'request-a', cycleCode: 'J27', phaseLayout: true, phaseIStatus }),
+  }));
+  if (phaseIStatus === 100000004) {
+    await act(async () => pending.get('/api/workbench/initial-assessment-rationale?requestId=request-a')({
+      ok: true, json: async () => ({ rationale: 'Saved staff rationale', version: 'W/"1"' }),
+    }));
+    expect(screen.getByRole('textbox', { name: 'Staff rationale' })).toBeVisible();
+    expect(screen.queryByRole('combobox', { name: 'Reason' })).toBeNull();
+  } else if (phaseIStatus === 100000005) {
+    await act(async () => pending.get('/api/workbench/initial-assessment-rationale?mode=not-scored&requestId=request-a')({
+      ok: true, json: async () => ({ reason: 682090000, notes: 'Existing notes', version: 'W/"1"', editable: true,
+        maxLength: 2000, options: [{ value: 682090000, label: 'Limited impact', available: true }] }),
+    }));
+    expect(screen.getByRole('combobox', { name: 'Reason' })).toBeVisible();
+    expect(screen.queryByRole('textbox', { name: 'Staff rationale' })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Scoring', exact: true }).compareDocumentPosition(screen.getByRole('combobox', { name: 'Reason' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  } else {
+    expect(screen.queryByRole('textbox', { name: 'Staff rationale' })).toBeNull();
+    expect(screen.queryByRole('combobox', { name: 'Reason' })).toBeNull();
+  }
 });

@@ -154,8 +154,8 @@ describe('work left over from an earlier phase (owner, 2026-11-11)', () => {
       reviewers: { status: 'present', anySuggestion: true, counts: counts({ candidates: 1 }) },
     });
     expect(r.j27.phase).toBe('peer-review');
-    expect(earlierTaskKeys(r)).toEqual(['record-rationale', 'record-scoring', 'review-integrity']);
-    expect(rowNotes(r).filter((note) => note.kind === 'earlier')).toEqual([{ kind: 'earlier', text: '3 earlier steps still open' }]);
+    expect(earlierTaskKeys(r)).toEqual(['record-scoring', 'review-integrity']);
+    expect(rowNotes(r).filter((note) => note.kind === 'earlier')).toEqual([{ kind: 'earlier', text: '2 earlier steps still open' }]);
   });
   test('a current-phase main task leads over the leftover', () => {
     const r = invited({ requestStatus: 'Phase II Pending' }, {
@@ -176,7 +176,7 @@ describe('work left over from an earlier phase (owner, 2026-11-11)', () => {
     expect(tabCounts([r])['peer-review']).toBe(0);
   });
   test('an Initial Assessment request still leads with its own rationale task', () => {
-    const r = row({}, { rationale: { status: 'absent' } });
+    const r = row({ phaseIStatus: SCORING_STATUS.yes }, { rationale: { status: 'absent' } });
     expect(r.j27.phase).toBe('initial-assessment');
     expect(rowLine(r)).toMatchObject({ kind: 'next', key: 'record-rationale' });
     expect(earlierTaskKeys(r)).toEqual([]);
