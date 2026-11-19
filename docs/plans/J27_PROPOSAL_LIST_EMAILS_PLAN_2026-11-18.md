@@ -51,6 +51,14 @@ From `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md` [VERIFIED via lines 19, 70]:
 | 2 | Title links open the staff version (`{AKA}_Staff-Version_{Request#}.pdf`), not the reviewer copy. |
 | 3 | Chairs are marked on the existing Board roster; one roster serves both emails. |
 | 4 | Each person gets their own links, and each proposal has its own link that opens it directly. |
+| 5 | Volume: up to 300 proposals. Two chairs today, both Board members; whether both are on the roster is to be confirmed during the roster migration. |
+| 6 | Links last until the Board meeting. |
+| 7 | A proposal from the recipient's own institution stays on their list and is flagged. |
+| 8 | Sender is a staff member, to be named. |
+| 9 | Sections use Connor's keyword characterization as written. No staff control to move proposals between sections; chairs receive every proposal, so nothing is lost. |
+
+Context for the Chairs email: one chair is a geologist interested in the physical
+sciences; the other is a physician with broad interests.
 
 ## What exists today
 
@@ -127,9 +135,7 @@ An expert list holds a staff-chosen subset.
 - **Needed from Connor before build:** which field holds the keywords, how the main
   keyword is marked, and the grouping column in `wmkf_programlevel3`.
 - Proposals with no keyword are listed in an "Unassigned" section.
-- **Proposed, awaiting the owner's yes:** let staff move a proposal to another section
-  before sending. The owner chose Connor's keywords as the source; this control is extra
-  build and is left out unless approved.
+- No staff control to move proposals between sections (decision 9).
 
 ### Chairs marker
 
@@ -170,14 +176,11 @@ tested on test requests with one unsectioned list. Expert emails (Stage 2) can f
 ## Dependencies and risks
 
 - **Connor's keyword flow before Dec 7.** Without it there are no sections. Possible
-  fallbacks, for the owner to choose if needed: send one unsectioned list, or add staff
-  section assignment (extra build).
+  fallback: send one unsectioned list.
 - **Staff version on every proposal.** Depends on Connor's flow; the compose page shows
   what is missing.
 - **Staff version contents.** The owner chose this file for Board eyes. Confirm once on
   a real J27 folder that it holds nothing staff-only.
-- **Conflicts of interest.** Open: should a recipient's own institution's proposals be
-  left off their list or flagged?
 - **Roster store.** Shared with Codex's migration; coordinate before touching it.
 
 ## Before building
@@ -189,10 +192,13 @@ tested on test requests with one unsectioned list. Expert emails (Stage 2) can f
 - Test with a capture or test-recipient send before any Board address is used.
 - Runtime work: build on a branch and promote deliberately.
 
-## Open questions for the owner
+## Open design points
 
-1. How many proposals are expected, and how many chairs?
-2. How long should links last, and should they be switched off at a set date?
-3. Conflicts of interest, as above.
-4. Should the email also be sent to the staff member as a copy?
-5. Who sends: the CSO, or whichever staff member presses send?
+1. **Link expiry date.** Which stored date is "the Board meeting" for the cycle (cycle
+   calendar field to identify), and whether the link stops at the start or end of that day.
+2. **Own-institution flag.** Needs each recipient's institution. Where that comes from
+   (roster affiliation or the Board member's contact record) is unread [ASSUMED], and
+   institution names must be matched reliably for the flag to be trusted.
+3. **Email size at 300 links.** Measure; shorten the token if mail clients clip.
+4. **Sender.** Staff member to be named; the send uses the pressing staff member's
+   identity unless decided otherwise.
