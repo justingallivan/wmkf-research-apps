@@ -456,6 +456,71 @@ describe('publishPrompt', () => {
     });
   });
 
+  describe('A7: untrusted declarations cannot be weakened', () => {
+    const preSiteVars = (mutate) => {
+      const spec = JSON.parse(JSON.stringify(PRE_SITE_VARIABLES));
+      mutate(spec.variables);
+      return JSON.stringify(spec, null, 2);
+    };
+    const publishPreSite = (variables) => publishPrompt({
+      name: PRE_SITE_NAME,
+      body: PRE_SITE_BODY,
+      variables,
+      profileId: 7,
+    });
+    const expectRefused = async (promise, varName) => {
+      await expect(promise).rejects.toMatchObject({
+        httpStatus: 400,
+        body: expect.objectContaining({
+          status: 'invalid_variables',
+          error: expect.stringContaining(varName),
+        }),
+      });
+      expect(sql).not.toHaveBeenCalled();
+      expect(aiPrompt.create).not.toHaveBeenCalled();
+    };
+
+    beforeEach(() => {
+      aiPrompt.queryCurrentRows.mockResolvedValue({ records: [preSiteRow()] });
+    });
+
+    it('refuses an edit that drops untrusted: true', async () => {
+      await expectRefused(publishPreSite(preSiteVars((vars) => {
+        delete vars.find((v) => v.name === 'proposal_text').untrusted;
+      })), 'proposal_text');
+    });
+
+    it('refuses an edit that sets untrusted to false', async () => {
+      await expectRefused(publishPreSite(preSiteVars((vars) => {
+        vars.find((v) => v.name === 'request_context_json').untrusted = false;
+      })), 'request_context_json');
+    });
+
+    it('refuses an edit that removes maxChars from an untrusted variable', async () => {
+      await expectRefused(publishPreSite(preSiteVars((vars) => {
+        delete vars.find((v) => v.name === 'proposal_text').maxChars;
+      })), 'proposal_text');
+    });
+
+    it('refuses removing the declaration while the placeholder stays (auto-declared as plain override)', async () => {
+      await expectRefused(publishPreSite(preSiteVars((vars) => {
+        vars.splice(vars.findIndex((v) => v.name === 'proposal_text'), 1);
+      })), 'proposal_text');
+    });
+
+    it('allows an edit that keeps every untrusted declaration', async () => {
+      await publishPreSite(preSiteVars((vars) => {
+        vars.find((v) => v.name === 'proposal_text').maxChars = 90000;
+      }));
+      expect(aiPrompt.create).toHaveBeenCalled();
+    });
+
+    it('allows a body-only edit (variables carried from the prior row)', async () => {
+      await publishPrompt({ name: PRE_SITE_NAME, body: PRE_SITE_BODY, profileId: 7 });
+      expect(aiPrompt.create).toHaveBeenCalled();
+    });
+  });
+
   it('refuses a governed prompt model that conflicts with the durable Executor budget', async () => {
     aiPrompt.queryCurrentRows.mockResolvedValue({ records: [preSiteRow()] });
     assertExecutorBudgetForPromptModel.mockRejectedValueOnce(new ServiceHttpError(
