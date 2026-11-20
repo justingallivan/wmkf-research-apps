@@ -164,7 +164,7 @@ describe('A7: untrusted declarations survive a --force seed', () => {
     DynamicsService.queryRecords.mockResolvedValueOnce({ records: [priorWith(vars(UNTRUSTED))] });
     const { untrusted, ...plain } = UNTRUSTED;
     await expect(seedPromptRow({ promptName: NAME, recordData: seedWith(vars(plain)), force: true, now: NOW }))
-      .rejects.toThrow(/stop treating proposal_text as untrusted/);
+      .rejects.toMatchObject({ name: 'SeedRefused', details: expect.objectContaining({ action: 'republish', weakened: ['proposal_text'] }) });
     expect(DynamicsService.createRecord).not.toHaveBeenCalled();
   });
 
