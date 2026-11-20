@@ -18,6 +18,7 @@ source_files:
   - lib/services/reviewer-finder/save-candidates-service.js
 canonical_docs:
   - docs/APPLICATION_STATE_ATLAS.md
+  - docs/plans/REVIEWER_SEARCH_FOLLOW_UPS_2026-09-18.md
   - docs/atlas/postgres-reviewer-find-roster.md
   - docs/atlas/dataverse-wmkf-potentialreviewers.md
 watch_paths:

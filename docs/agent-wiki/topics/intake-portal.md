@@ -83,6 +83,7 @@ intake-to-Dataverse mapping.
 - Intake UI TODOs: `project-intake-portal-ui-todo`.
 - Virus scan and Cloudmersive: `project-intake-portal-virus-scan-e2e-deferred`, `project-virus-scanning-it-context`, `project-cloudmersive-advanced-endpoint`.
 - Cross-topic hard constraint: `project-no-banking-pii-in-dataverse`.
+- Pre-flight prompts (CSO review-workbook intent; Connor PA prompt delivery): `project-j27-review-workbook-reflects-cso-intent`, `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md`.
 
 ## Operating Notes
 

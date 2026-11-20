@@ -16,6 +16,7 @@ source_files:
   - lib/utils/reviewer-vetted-email.js
 canonical_docs:
   - docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md
+  - docs/REVIEWER_EMAIL_CONFLICT_SELF_SERVICE_PLAN.md
   - docs/APPLICATION_STATE_ATLAS.md
   - docs/atlas/dataverse-wmkf-appreviewersuggestion.md
 watch_paths:
