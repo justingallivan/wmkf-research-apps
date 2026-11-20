@@ -1,116 +1,29 @@
 {
-  "git": {
-    "deploymentEnabled": {
-      "codex/transcription-pilot": false
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "env": {
+    "TRANSCRIPTION_PILOT_DEPLOYMENT_PROFILE": "transcription-pilot"
+  },
+  "build": {
+    "env": {
+      "TRANSCRIPTION_PILOT_DEPLOYMENT_PROFILE": "transcription-pilot"
     }
   },
+  "git": {
+    "deploymentEnabled": false
+  },
   "functions": {
-    "pages/api/cycle-dossier/index.js": { "maxDuration": 300 },
-    "pages/api/cron/drain-cycle-dossiers.js": { "maxDuration": 300 },
-    "pages/api/cron/drain-review-panels.js": { "maxDuration": 300 },
-    "pages/api/cron/drain-transcriptions.js": { "maxDuration": 300 },
-    "pages/api/process.js": {
+    "pages/api/cron/drain-transcriptions.js": {
       "maxDuration": 300
-    },
-    "pages/api/process-*.js": {
-      "maxDuration": 300
-    },
-    "pages/api/analyze-*.js": {
-      "maxDuration": 300
-    },
-    "pages/api/cron/*.js": {
-      "maxDuration": 120
-    },
-    "pages/api/cron/refresh-irs-bmf.js": {
-      "maxDuration": 300
-    },
-    "pages/api/cron/file-review-docx.js": {
-      "maxDuration": 300
-    },
-    "pages/api/webhooks/vercel-log-drain.js": {
-      "maxDuration": 60
     }
   },
   "crons": [
-    { "path": "/api/cron/drain-cycle-dossiers", "schedule": "*/5 * * * *" },
-    { "path": "/api/cron/drain-review-panels", "schedule": "* * * * *" },
-    { "path": "/api/cron/drain-transcriptions", "schedule": "0 3 * * *" },
-    { "path": "/api/cron/drain-transcriptions?recovery=1", "schedule": "0 * * * *" },
     {
-      "path": "/api/cron/maintenance",
+      "path": "/api/cron/drain-transcriptions",
       "schedule": "0 3 * * *"
     },
     {
-      "path": "/api/cron/generate-grantee-titles",
-      "schedule": "0 6 * 4-6,10-12 *"
-    },
-    {
-      "path": "/api/cron/grantee-deliverable-reminders",
-      "schedule": "0 8 * * *"
-    },
-    {
-      "path": "/api/cron/health-check",
-      "schedule": "*/15 * * * *"
-    },
-    {
-      "path": "/api/cron/secret-check",
-      "schedule": "0 8 * * *"
-    },
-    {
-      "path": "/api/cron/log-analysis",
-      "schedule": "0 */6 * * *"
-    },
-    {
-      "path": "/api/cron/spend-check",
+      "path": "/api/cron/drain-transcriptions?recovery=1",
       "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/cron/reconcile-identities",
-      "schedule": "0 7 * * 1"
-    },
-    {
-      "path": "/api/cron/refresh-irs-bmf",
-      "schedule": "0 6 15 1,4,7,10 *"
-    },
-    {
-      "path": "/api/cron/sweep-stale-invites",
-      "schedule": "0 9 * * *"
-    },
-    {
-      "path": "/api/cron/send-review-thankyous",
-      "schedule": "30 10 * * *"
-    },
-    {
-      "path": "/api/cron/reviewer-email-reconcile",
-      "schedule": "0 4 * * *"
-    },
-    {
-      "path": "/api/cron/auth-bypass-check",
-      "schedule": "30 7 * * *"
-    },
-    {
-      "path": "/api/cron/drain-submissions",
-      "schedule": "*/2 * * * *"
-    },
-    {
-      "path": "/api/cron/drain-reviewer-acceptances",
-      "schedule": "*/2 * * * *"
-    },
-    {
-      "path": "/api/cron/drain-review-syntheses",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/cron/file-review-docx",
-      "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/cron/pricing-canary",
-      "schedule": "0 10 * * 1"
-    },
-    {
-      "path": "/api/cron/pricing-refresh",
-      "schedule": "0 11 1 * *"
     }
   ]
 }
