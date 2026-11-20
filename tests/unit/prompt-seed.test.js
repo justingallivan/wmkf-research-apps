@@ -152,3 +152,73 @@ test('governed seeds validate their model against the current Executor budget be
   expect(assertExecutorBudgetForPromptModel).toHaveBeenCalledWith(promptName, 'claude-limited');
   expect(DynamicsService.createRecord).not.toHaveBeenCalled();
 });
+
+// ── A7: a --force seed cannot weaken untrusted declarations ────────────────
+describe('A7: untrusted declarations survive a --force seed', () => {
+  const UNTRUSTED = { name: 'proposal_text', untrusted: true, dataClass: 'proposal', maxChars: 1000, source: { kind: 'override' } };
+  const vars = (...variables) => JSON.stringify({ variables });
+  const priorWith = (variables) => ({ ...row('a', 2, true), wmkf_ai_promptvariables: variables });
+  const seedWith = (variables, body = 'Read {{proposal_text}}') => ({ ...RECORD, wmkf_ai_promptbody: body, wmkf_ai_promptvariables: variables });
+
+  test('refuses a redeclaration that drops untrusted: true, with no write', async () => {
+    DynamicsService.queryRecords.mockResolvedValueOnce({ records: [priorWith(vars(UNTRUSTED))] });
+    const { untrusted, ...plain } = UNTRUSTED;
+    await expect(seedPromptRow({ promptName: NAME, recordData: seedWith(vars(plain)), force: true, now: NOW }))
+      .rejects.toThrow(/stop treating proposal_text as untrusted/);
+    expect(DynamicsService.createRecord).not.toHaveBeenCalled();
+  });
+
+  test('refuses dropping maxChars or dataClass', async () => {
+    for (const drop of ['maxChars', 'dataClass']) {
+      DynamicsService.queryRecords.mockResolvedValueOnce({ records: [priorWith(vars(UNTRUSTED))] });
+      const { [drop]: _gone, ...weak } = UNTRUSTED;
+      await expect(seedPromptRow({ promptName: NAME, recordData: seedWith(vars(weak)), force: true, now: NOW }))
+        .rejects.toBeInstanceOf(SeedRefused);
+    }
+    expect(DynamicsService.createRecord).not.toHaveBeenCalled();
+  });
+
+  test('refuses removing the declaration while its placeholder is still used', async () => {
+    DynamicsService.queryRecords.mockResolvedValueOnce({ records: [priorWith(vars(UNTRUSTED))] });
+    await expect(seedPromptRow({ promptName: NAME, recordData: seedWith(vars()), force: true, now: NOW }))
+      .rejects.toThrow(/proposal_text/);
+    expect(DynamicsService.createRecord).not.toHaveBeenCalled();
+  });
+
+  test('refuses an unparseable seed variables value when the prior row has untrusted variables', async () => {
+    DynamicsService.queryRecords.mockResolvedValueOnce({ records: [priorWith(vars(UNTRUSTED))] });
+    await expect(seedPromptRow({ promptName: NAME, recordData: seedWith('{not json'), force: true, now: NOW }))
+      .rejects.toBeInstanceOf(SeedRefused);
+    expect(DynamicsService.createRecord).not.toHaveBeenCalled();
+  });
+
+  test('checks the latest row on recover (no current row)', async () => {
+    DynamicsService.queryRecords.mockResolvedValueOnce({ records: [
+      { ...row('a', 2, false), wmkf_ai_promptvariables: vars(UNTRUSTED) },
+      { ...row('b', 1, false), wmkf_ai_promptvariables: vars() },
+    ] });
+    await expect(seedPromptRow({ promptName: NAME, recordData: seedWith(vars()), force: true, now: NOW }))
+      .rejects.toBeInstanceOf(SeedRefused);
+  });
+
+  test('allows a seed that keeps the declaration, or drops an unused variable', async () => {
+    for (const recordData of [seedWith(vars(UNTRUSTED)), seedWith(vars(), 'No placeholders now')]) {
+      jest.clearAllMocks();
+      DynamicsService.createRecord.mockResolvedValue({ wmkf_ai_promptid: 'new-id' });
+      DynamicsService.getRecord.mockResolvedValue({ _etag: 'etag-x' });
+      DynamicsService.queryRecords
+        .mockResolvedValueOnce({ records: [priorWith(vars(UNTRUSTED))] })
+        .mockResolvedValueOnce({ records: [row('new-id', 3, true), row('a', 2, false)] });
+      await expect(seedPromptRow({ promptName: NAME, recordData, force: true, now: NOW }))
+        .resolves.toMatchObject({ action: 'republish', version: 3 });
+    }
+  });
+
+  test('a prior row with no untrusted variables imposes nothing', async () => {
+    DynamicsService.queryRecords
+      .mockResolvedValueOnce({ records: [priorWith(vars({ name: 'x', source: { kind: 'override' } }))] })
+      .mockResolvedValueOnce({ records: [row('new-id', 3, true), row('a', 2, false)] });
+    await expect(seedPromptRow({ promptName: NAME, recordData: RECORD, force: true, now: NOW }))
+      .resolves.toMatchObject({ action: 'republish' });
+  });
+});
