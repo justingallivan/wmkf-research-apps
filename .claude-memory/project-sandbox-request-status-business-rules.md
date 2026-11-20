@@ -7,6 +7,7 @@ metadata:
   status: active
   originSessionId: 90b09a89-3fb2-4b7a-9bce-c5fb5d8ee6b4
   modified: 2026-11-09T04:12:05.464Z
+  last_verified: 2026-11-09 via Factory sandbox batch owner-j27-2026-11-09 (observed workflow behavior); later sandbox workflow edits would need a new batch
 ---
 
 ## Recall Rule

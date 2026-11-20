@@ -23,7 +23,7 @@ Do:
 - Use `wmkf_meetingdate` only as a date (display, ordering) until the later retirement steps move those too; Board dates come from the cycle calendar (`listBoardDates`).
 
 Do not:
-- Expose `akoya_fiscalyear` as a separate filter axis (it's just month+year of `wmkf_meetingdate`). Expertise Finder's proposals query and request search use the link filter; an unknown cycle label is a 400. `save-candidates` stamps suggestion rows with the linked code (the read was broken from 2026-09-08 until build step 2 fixed it).
+- Expose `akoya_fiscalyear` as a separate filter axis (it's just month+year of `wmkf_meetingdate`). Request search uses the link filter (the Expertise Finder proposals query did too until the Finder retired 2026-11-19); an unknown cycle label is a 400. `save-candidates` stamps suggestion rows with the linked code (the read was broken from 2026-09-08 until build step 2 fixed it).
 - Treat `Jxx`/`Dxx` as a schema invariant: it is a June/December convention and other months return null. Whether a view drops or separately exposes those rows depends on that consumer; check it.
 - Conflate `wmkf_meetingdate` (board-cycle) with `akoya_decisiondate` (approval-stamp/business-history axis).
 
@@ -65,8 +65,9 @@ function of the calendar and the cycles that exist — never of the caller's ass
 is visible to them. `lib/utils/cycle-code.js` `resolveWorkingCycle` (earliest meeting on/after today;
 September → D26) and `resolveLastDecidedCycle` (newest meeting before today; September → J26) are
 the only default-cycle rules; `conventionalCycles(today)` supplies the June/December codes to
-the callers with no list (the grantee-titles cron and, since S499, the Expertise Finder Batch tab —
-explicit fallbacks, not existence-aware).
+the callers with no list (the grantee-titles cron; the S499 Expertise Finder Batch tab caller
+retired 2026-11-19 — explicit fallbacks, not existence-aware). Other importers exist; check
+current callers before relying on this list.
 Awardees = last decided; every other Workbench view = working. UTC throughout. The precise
 invariant is PER GRANT PROGRAM: two callers viewing the same program on the same day open on the
 same cycle (the cycle list is program-scoped by the PR #183 owner decision). **Wired (PR #203):**

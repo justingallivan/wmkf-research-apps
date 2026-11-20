@@ -27,19 +27,19 @@
 - Git / releases: ../docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md; feedback-verify-branch-before-git-action.md; feedback-scope-git-stash-in-shared-worktrees.md
 - Migration numbers / schema_migrations / branch-applied migrations: project-migration-numbers-claimed-off-main.md
 - Action affordances / UI gating: feedback-ui-gates-must-mirror-server-guards.md; feedback-match-existing-ui-patterns.md; ordered workflows as one guided action: feedback-ordered-workflows-as-one-action.md
-- Tunables / cycle-scoped settings / per-cycle allowlists / PD campaign settings vs central defaults: feedback-mutable-parameters-not-in-code.md; feedback-minimize-per-cycle-configuration.md; feedback-centralize-over-pd-specific-settings.md
-- Test venue (default: Production test requests, not sandbox) / Factory safety vs fidelity / sandbox Request creates and derived status: feedback-factory-safe-not-full-fidelity.md; feedback-question-the-rehearsal-venue.md; project-sandbox-request-status-business-rules.md
+- Tunables / cycle-scoped settings / cycle literals / per-cycle allowlists / PD campaign settings vs central defaults: feedback-mutable-parameters-not-in-code.md; feedback-minimize-per-cycle-configuration.md; feedback-centralize-over-pd-specific-settings.md
+- Test venue (default: Production test requests, not sandbox) / Factory safety vs fidelity / sandbox Request creates (GoVerify bypass) and derived status: feedback-factory-safe-not-full-fidelity.md; feedback-question-the-rehearsal-venue.md; project-sandbox-request-status-business-rules.md
 - Tone / user context: feedback-no-performative-contrition.md; feedback-user-facing-error-copy-voice.md; item codes in owner/colleague text: feedback-no-item-codes-in-owner-facing-text.md
 - Legacy labels / interim trims on surfaces with a decided target: feedback-skip-legacy-fixes-that-the-target-state-removes.md
 - Search / schema language: feedback-grep-general-codebase-terms.md; feedback-human-legibility-schema-principle.md; feedback-staff-ui-never-shows-internal-ids.md; feedback-staff-ui-desktop-first.md
 
 ## Task Routing
 - Grant Reporting / Literature Analyzer: project-grant-reporting-rework.md; project-literature-analyzer-rework.md
-- Reviewer origination / retrieval / excluded-reviewer intake: ../docs/agent-wiki/topics/reviewer-origination.md; ../docs/EXCLUDED_REVIEWERS_STRUCTURED_INTAKE_PLAN.md
-- Reviewer identity / finding / contact / COI / verify-fail safety / contact promotion / address lifecycle / product decisions: ../docs/agent-wiki/topics/reviewer-identity.md (Durable Memory); ../docs/agent-wiki/topics/reviewer-address-referrals.md; ../docs/REVIEWER_IDENTITY_CONTACT_PLAN.md; ../docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md; feedback-prioritize-contact-recall-over-identity-precision.md
+- Reviewer origination / retrieval / find and search follow-ups / excluded-reviewer intake: ../docs/agent-wiki/topics/reviewer-origination.md; ../docs/agent-wiki/topics/reviewer-find-applicant-flow.md; ../docs/EXCLUDED_REVIEWERS_STRUCTURED_INTAKE_PLAN.md
+- Reviewer identity / finding / contact / COI / verify-fail safety / contact promotion / address lifecycle and trust / product decisions: ../docs/agent-wiki/topics/reviewer-identity.md (Durable Memory); ../docs/agent-wiki/topics/reviewer-address-referrals.md; ../docs/REVIEWER_IDENTITY_CONTACT_PLAN.md; ../docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md; feedback-prioritize-contact-recall-over-identity-precision.md
 - Reviewer workbench / lifecycle / roster / referral / closeout / invite capture / candidate card / stabilization (1002912): ../docs/agent-wiki/topics/reviewer-workbench-lifecycle.md (Durable Memory)
 - External reviewer portal / accept / forms / multiselect / SharePoint: ../docs/agent-wiki/topics/external-reviewer-portal.md
-- Dataverse / Dynamics / Explorer (incl. behavior campaign) / CRM facts / SharePoint DOCX-XLSX byte identity: ../docs/agent-wiki/topics/dataverse-dynamics.md (Durable Memory)
+- Dataverse / Dynamics / Explorer (incl. behavior campaign, SoCal vernacular, telemetry/eval) / CRM facts / SharePoint DOCX-XLSX byte identity: ../docs/agent-wiki/topics/dataverse-dynamics.md (Durable Memory)
 - Prompt / Executor / prompt governance / thinking-budget truncation: ../docs/agent-wiki/topics/prompt-executor.md (Durable Memory)
 - Initial Assessment registry/controls and Final Writeup lineage/review: ../docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md; ../docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md; ../docs/agent-wiki/topics/intake-portal.md (J27)
 - BILL / honoraria / payment semantics: ../docs/agent-wiki/topics/finance-honoraria.md

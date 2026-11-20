@@ -425,7 +425,7 @@ Append one row per audit (values from the §6 commands; do not estimate):
 | 2026-10-05 | routine (§6 + §10 diet) | 8,325→6,863 | 75→65 | 69→47 | 287 | 256/287 | 25→15 (4 from the hub-routing artifact; 7 recall rules added, 1 grounded; 8 shadow-atlas accepted; weak-basis 7 queued) | stale (read-only) | `docs/audits/memory-routine-audit-2026-10-05.md` |
 | 2026-10-17 | bounded Mode B (13 flagged leaves; router unchanged) | 7,816→7,816 | 70→70 | 59→59 | 298 | 266/298 | 13→7 (2 recall gaps and 2 routed oversize notes fixed; 7 lexical shadow-atlas hits accepted) | stale, 54 d (read-only) | `docs/audits/memory-health-cleanup-2026-10-17.md` |
 | 2026-10-22 | bounded router diet (review/test routes to existing hub) | 8,124→7,029 | 72→66 | 63→44 | 304 | 272/304 | 10→10 (parent-reported: 8 previously dispositioned; 2 routed oversize notes remain accepted size debt) | stale (read-only; Aug 24 report not refreshed) | `docs/audits/memory-router-and-audit-index-2026-10-22.md` |
-| 2026-11-20 | bounded router diet (line merges; 3 pointers moved to wiki hubs) | 8,247→7,343 | 74→59 | 53→52 | 313 | 280/313 | 21→21 (diet only; flagged leaves not dispositioned this pass) | stale (read-only) | Session 690 commit; CSO workbook leaf and PA handoff now routed from `intake-portal.md`, two reviewer plans via topic `canonical_docs` |
+| 2026-11-20 | routine (§6 + §10 diet) | 8,247→7,510 | 74→59 | 53→52 | 313 | 280/313 | 21→18 (3 fixed; 15 accepted incl. 5 honest-uncertainty weak-basis from the 10-22 rewrites; J27 cycle leaf split queued) | stale, 2026-08-23 (read-only) | `docs/audits/memory-routine-audit-2026-11-20.md` |
 
 Interpretation guardrails: router bytes trending toward 11 KiB means the
 routine cadence is too slow or diets too shallow; unique leaf refs climbing
