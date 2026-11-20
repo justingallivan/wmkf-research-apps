@@ -145,6 +145,9 @@ function ListEditor({ linkId, onChanged }) {
                       <span className="block text-gray-600">
                         {[item.requestNumber, item.institution, item.projectLeader, item.subsection].filter(Boolean).join(' · ')}
                       </span>
+                      {item.tickedFor?.length > 0 && (
+                        <span className="block text-gray-600">Ticked for: {item.tickedFor.join(', ')}</span>
+                      )}
                     </td>
                   </tr>
                 ))}
