@@ -55,7 +55,15 @@ test('top level is Home, Workbench, Meeting Tracker, Proposal Ranking, Tools, Gu
 
   fireEvent.click(within(nav).getByRole('button', { name: 'Tools' }));
   const menu = screen.getByRole('menu');
-  expect(within(menu).getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Review Panel', 'Grant Reporting']);
+  expect(within(menu).getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Review Panel', 'Grant Reporting', 'Share Proposals']);
+});
+
+test('Share Proposals appears only with the Workbench grant the proposal-lists API requires', async () => {
+  mockAccess = { isSuperuser: true, hasAccess: key => key !== 'reviewers' };
+  render(<Layout>content</Layout>);
+  await screen.findByText('content');
+  fireEvent.click(within(mainNav()).getByRole('button', { name: 'Tools' }));
+  expect(within(screen.getByRole('menu')).queryByText('Share Proposals')).not.toBeInTheDocument();
 });
 
 test('Tools lists only apps the user can access; Scientific dossier and Admin are superuser-only', async () => {
@@ -66,7 +74,7 @@ test('Tools lists only apps the user can access; Scientific dossier and Admin ar
   expect(within(mainNav()).queryByText('Proposal Ranking')).not.toBeInTheDocument();
   expect(within(mainNav()).queryByText('Admin')).not.toBeInTheDocument();
   fireEvent.click(within(mainNav()).getByRole('button', { name: 'Tools' }));
-  expect(within(screen.getByRole('menu')).getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Review Panel']);
+  expect(within(screen.getByRole('menu')).getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Review Panel', 'Share Proposals']);
   unmount();
 
   mockAccess = { isSuperuser: true, hasAccess: () => true };

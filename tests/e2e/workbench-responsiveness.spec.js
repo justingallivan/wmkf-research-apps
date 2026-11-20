@@ -155,6 +155,7 @@ async function installApiFixture(page, {
       otherDocuments: [],
       errors: [],
     });
+    if (path === '/api/workbench/request-narratives' && request.method() === 'GET') return fulfill({ success: true, requestId: url.searchParams.get('requestId'), canEdit: false, version: null });
     if (path === '/api/workbench/consultant-feedback') return fulfill({ success: true, feedback: [], consultants: [] });
     if (path === '/api/workbench/consultant-feedback/consultants') return fulfill({ success: true, consultants: [] });
     if (path === '/api/review-manager/reviewers') {
