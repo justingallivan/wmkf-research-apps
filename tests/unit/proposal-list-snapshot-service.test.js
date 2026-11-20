@@ -139,6 +139,26 @@ describe('loadCycleProposalSnapshot', () => {
     expect(filter).toContain('wmkf_readyforreview eq true');
   });
 
+  test('J27 membership is the Grant program; the Program field plays no part', async () => {
+    const OTHER = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+    const d = deps([
+      request(1, { _akoya_programid_value: null }), // like test request 1003528: Program blank
+      request(2, { _wmkf_grantprogram_value: OTHER }), // another Grant program
+    ]);
+    const rows = await loadCycleProposalSnapshot({ cycleCode: 'J27', listKind: 'ordinary' }, d);
+    expect(rows.map((r) => r.requestNumber)).toEqual(['1001']);
+    const { filter } = d.queryRequests.mock.calls[0][0];
+    expect(filter).toContain(`_wmkf_grantprogram_value eq ${RESEARCH}`);
+    expect(filter).not.toContain('_akoya_programid_value');
+  });
+
+  test('cycles before 2027 keep the Program field they were filed under', async () => {
+    const d = deps([]);
+    await loadCycleProposalSnapshot({ cycleCode: 'D26', listKind: 'ordinary' }, d);
+    const { filter } = d.queryRequests.mock.calls[0][0];
+    expect(filter).toContain('_akoya_programid_value eq 8dcab30b-958f-ee11-8179-000d3a341e8f');
+  });
+
   test('a proposal that is not ready is left out', async () => {
     const d = deps([request(1), request(2, { wmkf_readyforreview: false })]);
     const rows = await loadCycleProposalSnapshot({ cycleCode: 'J27', listKind: 'ordinary' }, d);
