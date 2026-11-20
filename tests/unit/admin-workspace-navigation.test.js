@@ -46,7 +46,7 @@ test('legacy anchors resolve to their new workspace locations', () => {
 });
 
 test('workspace and view navigation are URL-addressable and announce the active route', () => {
-  const workflows = resolveAdminLocation('workflows', 'final-writeups').workspace;
+  const workflows = resolveAdminLocation('workflows', 'site-visits').workspace;
   const { rerender } = render(<AdminWorkspaceNavigation activeWorkspace="workflows" />);
 
   expect(screen.getByRole('link', { name: 'Workflows' })).toHaveAttribute('aria-current', 'page');
@@ -55,8 +55,8 @@ test('workspace and view navigation are URL-addressable and announce the active 
     adminHref('operations', 'health'),
   );
 
-  rerender(<AdminViewNavigation workspace={workflows} activeView="final-writeups" />);
-  expect(screen.getByRole('link', { name: 'Final writeups' })).toHaveAttribute('aria-current', 'page');
+  rerender(<AdminViewNavigation workspace={workflows} activeView="site-visits" />);
+  expect(screen.getByRole('link', { name: 'Research presentations' })).toHaveAttribute('aria-current', 'page');
   expect(screen.getByRole('link', { name: 'Research presentations' })).toHaveAttribute(
     'href',
     adminHref('workflows', 'site-visits'),
@@ -120,4 +120,10 @@ test('a non-collapsible editor panel renders no disclosure and shows its body im
   );
   expect(container.querySelector('details')).toBeNull();
   expect(screen.getByText('Always visible')).toBeInTheDocument();
+});
+
+test('old Final writeups bookmarks resolve directly to Staffing without a redundant nav entry', () => {
+  expect(resolveAdminLocation('workflows', 'final-writeups')).toMatchObject({ workspace: { key: 'people' }, view: 'staffing' });
+  expect(adminHref('workflows', 'final-writeups')).toBe('/admin?workspace=people&view=staffing');
+  expect(ADMIN_WORKSPACES.find(w => w.key === 'workflows').views.some(v => v.key === 'final-writeups')).toBe(false);
 });

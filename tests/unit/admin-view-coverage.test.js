@@ -80,7 +80,6 @@ const EXPECTED_FETCHES = {
   'workflows:proposal-ranking': [
     '/api/app-access',
   ],
-  'workflows:final-writeups': [],
   'people:staffing': ['/api/admin/final-writeup-matrix-audiences', '/api/workbench/staffing'],
   'people:expertise-roster': ['/api/admin/expertise-roster?includeInactive=true'],
   'workflows:site-visits': [
@@ -162,7 +161,6 @@ const EXPECTED_HEADINGS = {
   'workflows:proposal-ranking': [
     'Proposal Ranking facilitators',
   ],
-  'workflows:final-writeups': ['Final writeup staffing'],
   'people:staffing': ['Final writeup staffing', 'Program review audiences', 'Related assignments', 'Shared roles', 'Staff responsibilities'],
   'people:expertise-roster': ['Expertise Roster'],
   'workflows:site-visits': [
