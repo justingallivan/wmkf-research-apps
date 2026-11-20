@@ -444,8 +444,9 @@ Asked 2026-11-20, ordered by urgency. Connor answered three the same day
 5. Does step 1 set `wmkf_applicantdisposition` on the `wmkf_appreviewersuggestion`
    rows it writes? The Workbench applicant-recommended check (PubMed verification
    and COI flags) reads only rows with Recommended (`100000000`)
-   (`lib/dataverse/adapters/reviewer-suggestion.js:1835`). **Asked 2026-11-20** (owner
-   to Connor): set Recommended on the five applicant-suggested rows. Awaiting reply.
+   (`lib/dataverse/adapters/reviewer-suggestion.js:1835`). **Answered 2026-11-20:** Connor
+   will make step 1 set Recommended (`100000000`) on the five applicant-suggested rows
+   (not yet built; until then those rows have a blank disposition).
 6. Is `wmkf_ai_methodologies` written by `intake.keywords` or a separate prompt?
 7. Low priority: confirm `akoya_submissionaccepted` is always manual (superseding
    the v3 spec's AI write), and whether `wmkf_ai_compliancesummary` is retired.
