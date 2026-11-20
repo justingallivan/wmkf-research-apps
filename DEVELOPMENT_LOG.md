@@ -10,6 +10,18 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## November 2026 — Proposal lists: advisor picks during Scoring, scored-only lists (Session 689)
+
+**Milestone:** Program Directors tick the Chairs and Board members who should see each scored proposal; those ticks set the highlights on each person's list.
+**Sessions:** Claude, 2026-11-19, concurrent with Codex Session 688; owner applied migration 105 and approved each merge.
+**Ship state:**
+- PR #654 / `8819feb62`: checkboxes in Initial Assessment, Postgres `proposal_list_advisor_picks` (migration 105), lists hold only scored proposals, recipient page "Proposals for review".
+- PR #658 / `2ecd5384c`: J27+ membership by Grant program, not the retiring Program field (found in the Production rehearsal).
+- PR #659 / `acb10dce4`: staff-only "Ticked for" note in the CSO's highlight editor.
+- Production rehearsal on test request 1003528 passed; the CSO sends links from their own email.
+**Why it matters:** The CSO no longer hand-highlights ~50 proposals per Board member, and lists cannot silently drop proposals with a blank Program field.
+**Pointers:** `docs/plans/J27_PROPOSAL_LIST_EMAILS_PLAN_2026-11-18.md` (decisions 15–18); `docs/atlas/postgres-proposal-list-links.md`.
+
 ## November 2026 — Standalone transcription pilot retired; shared engine preserved (Session 688)
 
 **Milestone:** Retired the standalone transcription evaluation interface in the main suite and isolated deployment while preserving Meeting Tracker transcription.
