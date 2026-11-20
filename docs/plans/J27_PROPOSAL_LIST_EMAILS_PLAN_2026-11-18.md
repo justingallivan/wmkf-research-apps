@@ -92,6 +92,10 @@ Merged to `main` in PR #654 (merge `8819feb62`) and deployed to Production on 20
   them. A **test** list highlights a test proposal ticked for anyone, so the whole path
   can be checked on test requests without a real Board list. A refresh keeps the marks
   on proposals already listed and highlights newly listed ones from their ticks.
+- **Ticked-for note (staff only):** in the highlight editor on `/proposal-lists`, each
+  proposal shows "Ticked for:" and the names of the Board members ticked for it, so
+  the CSO can see why a proposal is highlighted (owner, 2026-11-19). The recipient
+  page never shows it.
 - **Release order:** the owner applies migration 105 to Production **before** the
   branch merges, because Production list creation reads the new table at once.
 - **Rehearsal:** score a Production test request, tick an advisor on it, create a test

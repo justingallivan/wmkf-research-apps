@@ -10,6 +10,7 @@ import {
   computeProposalListExpiry,
   createProposalList,
   getAdvisorPicks,
+  getProposalListDetail,
   getProposalListOverview,
   rebuildProposalList,
   revokeProposalList,
@@ -77,6 +78,10 @@ function makeDeps(overrides = {}) {
       .map(([request]) => request))]),
     listPicksForRequest: jest.fn(async (requestId) => [...picks]
       .map((key) => key.split(':')).filter(([request]) => request === requestId).map(([, roster]) => Number(roster))),
+    listPicksForRequests: jest.fn(async (requestIds) => [...picks]
+      .map((key) => key.split(':'))
+      .filter(([request]) => requestIds.includes(request))
+      .map(([requestId, roster]) => ({ requestId, rosterId: Number(roster) }))),
     setPick: jest.fn(async (requestId, rosterId, picked) => {
       if (picked) picks.add(`${requestId}:${rosterId}`); else picks.delete(`${requestId}:${rosterId}`);
     }),
@@ -362,5 +367,71 @@ describe('advisor picks', () => {
     await expect(setAdvisorPick({ requestId: REQ_A, rosterId: 7, picked: true, actor: ACTOR }, preview.deps))
       .rejects.toMatchObject({ code: 'proposal_list_preview_read_only' });
     for (const made of [legacy, noActor, off, preview]) expect(made.deps.store.setPick).not.toHaveBeenCalled();
+  });
+});
+
+describe('ticked-for note in the staff highlight editor', () => {
+  test('each listed proposal carries the names ticked for it; a name off the Board roster is left out', async () => {
+    const { deps, picks } = makeDeps();
+    await createProposalList({ cycleCode: 'J27', listKind: 'ordinary', rosterId: 7, actor: ACTOR }, deps);
+    picks.add(`${REQ_A}:8`);
+    picks.add(`${REQ_A}:7`);
+    picks.add(`${REQ_B}:404`); // no longer on the roster
+    picks.add(`${REQ_C}:7`); // not on this list
+    const { items } = await getProposalListDetail({ linkId: LINK_ID }, deps);
+    expect(items.map((i) => [i.requestNumber, i.tickedFor])).toEqual([
+      ['1001', ['Board Member', 'No Email']],
+      ['1002', []],
+    ]);
+    expect(deps.store.listPicksForRequests).toHaveBeenCalledWith([REQ_A, REQ_B]);
+  });
+
+  test('no picks means no roster read', async () => {
+    const { deps } = makeDeps();
+    await createProposalList({ cycleCode: 'J27', listKind: 'ordinary', rosterId: 7, actor: ACTOR }, deps);
+    deps.getDirectory.mockClear();
+    const { items } = await getProposalListDetail({ linkId: LINK_ID }, deps);
+    expect(items.every((i) => Array.isArray(i.tickedFor) && i.tickedFor.length === 0)).toBe(true);
+    expect(deps.getDirectory).not.toHaveBeenCalled();
+  });
+});
+
+describe('ticked-for names never turn a committed change into an error', () => {
+  async function withTickedList() {
+    const made = makeDeps();
+    await createProposalList({ cycleCode: 'J27', listKind: 'ordinary', rosterId: 7, actor: ACTOR }, made.deps);
+    made.picks.add(`${REQ_A}:7`);
+    made.deps.getDirectory.mockRejectedValue(new Error('roster down'));
+    return made;
+  }
+  beforeEach(() => jest.spyOn(console, 'warn').mockImplementation(() => {}));
+  afterEach(() => console.warn.mockRestore());
+
+  test('the editor still opens, with the names reported unavailable', async () => {
+    const { deps } = await withTickedList();
+    const detail = await getProposalListDetail({ linkId: LINK_ID }, deps);
+    expect(detail.tickedForUnavailable).toBe(true);
+    expect(detail.items.map((i) => i.tickedFor)).toEqual([[], []]);
+  });
+
+  test('a marks save that committed reports success', async () => {
+    const { deps } = await withTickedList();
+    const result = await setProposalListMarks({ linkId: LINK_ID, highlightedRequestIds: [REQ_A], ownInstitutionRequestIds: [], actor: ACTOR }, deps);
+    expect(deps.store.setMarks).toHaveBeenCalled();
+    expect(result.tickedForUnavailable).toBe(true);
+  });
+
+  test('a rebuild that committed reports success', async () => {
+    const { deps } = await withTickedList();
+    deps.store.listPicksForRequests.mockRejectedValue(new Error('picks read failed'));
+    const result = await rebuildProposalList({ linkId: LINK_ID, actor: ACTOR }, deps);
+    expect(deps.store.replaceItems).toHaveBeenCalled();
+    expect(result.tickedForUnavailable).toBe(true);
+  });
+
+  test('names that load report available', async () => {
+    const { deps } = makeDeps();
+    await createProposalList({ cycleCode: 'J27', listKind: 'ordinary', rosterId: 7, actor: ACTOR }, deps);
+    expect((await getProposalListDetail({ linkId: LINK_ID }, deps)).tickedForUnavailable).toBe(false);
   });
 });
