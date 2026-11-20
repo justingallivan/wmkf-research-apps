@@ -2,8 +2,8 @@
 title: AI tool apps → editable Dataverse prompts — staged plan
 domain: architecture
 kind: plan
-status: draft
-summary: "Move the prompts and models of the five live standalone AI tool apps (multi-perspective evaluator, literature analyzer, funding-gap analyzer, expense reporter, expertise finder) from bundled prompt modules and the Model Config section into Dataverse prompt rows that staff edit in /admin → Prompt Templates. Routes keep their own LLMClient calls and A7 wrapping and read prompt text, model and max tokens through a shared prompt-resolver seam (no Executor). One app per stage; owner decisions recorded 2026-10-12; written for a cheaper model to execute stage by stage."
+status: historical
+summary: "Historical October 2026 migration of five tool apps to editable Dataverse prompt rows through the shared resolver seam. The November retirement preserves prompt definitions and shared infrastructure; Expense Reporter remains active and Expertise Finder is a separate workstream."
 canonical: false
 owner: product-engineering
 related:
@@ -16,6 +16,24 @@ related:
 ---
 
 # AI tool apps → editable Dataverse prompts — staged plan
+
+## Current disposition (source verified 2026-11-19)
+
+Multi-Perspective Evaluator, Literature Analyzer, and Funding Analysis are retired
+in source: their pages show notices and their APIs return authenticated HTTP 410.
+Their stored prompt rows, bundled definitions, schemas, and reusable helpers remain
+preserved. Expense Reporter remains active and still uses the shared resolver and
+composer; Expertise Finder is outside this retirement and belongs to another
+workstream. No prompt row was unpublished or deleted by this change. Source
+retirement is not evidence of Production promotion. See the
+[retirement manifest](APP_SUITE_RETIREMENT_2026-11-19.md).
+
+## Historical October 2026 migration record
+
+The stages, instructions, live checks, and implementation descriptions below are
+the dated October migration record, not a new execution plan or a current app
+inventory. Preserve its shared prompt-resolution contracts when reusing capability
+code; do not reactivate the retired entry points to complete an old stage.
 
 Candidate **A** from `LARGEST_UNPLANNED_REFACTOR_SCOPE_2026-10-11.md`. The file name keeps
 "executor convergence" for link stability; the plan no longer moves these apps onto the Executor

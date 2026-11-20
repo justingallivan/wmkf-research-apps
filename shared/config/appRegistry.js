@@ -12,32 +12,7 @@ export const APP_REGISTRY = [
   // user_app_access grants for 'concept-evaluator' are left in place — they
   // simply have no app to grant access to. A later cleanup pass can drop
   // those rows; not blocking.
-  {
-    key: 'multi-perspective-evaluator',
-    name: 'Multi-Perspective Evaluator',
-    href: '/multi-perspective-evaluator',
-    icon: '🎭',
-    description: 'Evaluate concepts using three AI perspectives (Optimist, Skeptic, Neutral) with integrated synthesis and recommendations',
-    categories: ['concepts'],
-    features: ['3 AI Perspectives', 'Consensus Analysis', 'Disagreement Resolution', 'Framework Selection'],
-  },
-  // Sunset 2026-07-08 (S344): batch-phase-i-summaries, batch-proposal-summaries,
-  // phase-i-writeup, and phase-ii-writeup are no longer used in their current
-  // (PDF-upload) format. Removed from APP_REGISTRY so they leave nav/home/admin
-  // grant UI; pages + API routes remain routable and the code is intentionally
-  // retained as the reference for a planned Dataverse-native migration (e.g.
-  // Phase I writeup elements moving into the Request Workbench). See
-  // APP_LIFECYCLE_REGISTRY (status: sunset-candidate) below and
-  // docs/PROMPT_LEGACY_AUDIT.md.
-  {
-    key: 'funding-gap-analyzer',
-    name: 'Funding Analysis',
-    href: '/funding-gap-analyzer',
-    icon: '💵',
-    description: 'Analyze federal funding landscapes for research proposals using NSF, NIH, and USAspending.gov data',
-    categories: ['phase-i', 'phase-ii'],
-    features: ['NSF Awards API', 'NIH RePORTER', 'USAspending.gov', 'Funding Gap Analysis'],
-  },
+  // Obsolete standalone tools are recorded in APP_LIFECYCLE_REGISTRY below.
   {
     key: 'review-panel',
     name: 'Review Panel',
@@ -75,15 +50,6 @@ export const APP_REGISTRY = [
     features: ['Private Preparation', 'Combined Assessments', 'Group Discussion', 'Shared Facilitation'],
   },
   {
-    key: 'peer-review-summarizer',
-    name: 'Summarize Peer Reviews',
-    href: '/peer-review-summarizer',
-    icon: '📝',
-    description: 'Analyze peer review feedback and generate site visit questions',
-    categories: ['phase-ii'],
-    features: ['Review Analysis', 'Common Themes', 'Action Items', 'Response Templates'],
-  },
-  {
     key: 'expense-reporter',
     name: 'Expense Reporter',
     href: '/expense-reporter',
@@ -91,15 +57,6 @@ export const APP_REGISTRY = [
     description: 'Extract and organize expense data from receipts and invoices with automated categorization',
     categories: ['other'],
     features: ['Receipt OCR', 'Image Processing', 'Auto-Categorization', 'Excel/CSV Export'],
-  },
-  {
-    key: 'literature-analyzer',
-    name: 'Literature Analyzer',
-    href: '/literature-analyzer',
-    icon: '📖',
-    description: 'Comprehensive analysis and synthesis of research papers and academic literature',
-    categories: ['other'],
-    features: ['Paper Synthesis', 'Theme Extraction', 'Cross-Paper Synthesis', 'Export Reports'],
   },
   {
     key: 'dynamics-explorer',
@@ -120,15 +77,6 @@ export const APP_REGISTRY = [
     features: ['Retraction Watch DB', 'Manual PubPeer Link', 'News Analysis', 'AI Summarization'],
   },
 
-  {
-    key: 'grant-reporting',
-    name: 'Grant Reporting',
-    href: '/grant-reporting',
-    icon: '📊',
-    description: 'Extract grantee progress/final reports into an editable form, compare goals vs. achievements against the original proposal, and export a Word doc matching the Keck final report template',
-    categories: ['phase-ii'],
-    features: ['PDF + DOCX Input', 'Dynamics Auto-Fill', 'SharePoint Proposal Lookup', 'Goals Assessment', 'Editable Form', 'Word Export'],
-  },
   {
     key: 'dataverse-bulk-export',
     name: 'Dataverse Bulk Export',
@@ -177,6 +125,116 @@ export const DEFAULT_APP_GRANTS = ['dynamics-explorer'];
  *   'direct-url-test'   — live direct-URL / test surface, intentionally not in nav
  */
 export const APP_LIFECYCLE_REGISTRY = {
+  'batch-phase-i-summaries': {
+    name: "Batch Phase I Summaries",
+    status: 'deprecated',
+    successorKey: null,
+    deprecatedAt: '2026-11-19',
+    pagePath: '/batch-phase-i-summaries',
+    archivedTo: '_archived/pages/batch-phase-i-summaries.js',
+    grantsRetained: true,
+    notes: "Standalone interface retired; page and API implementations archived. Authenticated API stubs return 410. Prompts, services and historical data retained for future adaptation.",
+    lastVerified: '2026-11-19',
+  },
+  'batch-proposal-summaries': {
+    name: "Batch Phase II Summaries",
+    status: 'deprecated',
+    successorKey: null,
+    deprecatedAt: '2026-11-19',
+    pagePath: '/batch-proposal-summaries',
+    archivedTo: '_archived/pages/batch-proposal-summaries.js',
+    grantsRetained: true,
+    notes: "Standalone interface retired; page and API implementations archived. Authenticated API stubs return 410. Prompts, services and historical data retained for future adaptation.",
+    lastVerified: '2026-11-19',
+  },
+  'phase-i-writeup': {
+    name: "Create Phase I Writeup Draft",
+    status: 'deprecated',
+    successorKey: null,
+    deprecatedAt: '2026-11-19',
+    pagePath: '/phase-i-writeup',
+    archivedTo: '_archived/pages/phase-i-writeup.js',
+    grantsRetained: true,
+    notes: "Standalone interface retired; page and API implementations archived. Authenticated API stubs return 410. Prompts, services and historical data retained for future adaptation.",
+    lastVerified: '2026-11-19',
+  },
+  'phase-ii-writeup': {
+    name: "Create Phase II Writeup Draft",
+    status: 'deprecated',
+    successorKey: null,
+    deprecatedAt: '2026-11-19',
+    pagePath: '/phase-ii-writeup',
+    archivedTo: '_archived/pages/phase-ii-writeup.js',
+    grantsRetained: true,
+    notes: "Standalone interface retired; page and API implementations archived. Authenticated API stubs return 410. Prompts, services and historical data retained for future adaptation.",
+    lastVerified: '2026-11-19',
+  },
+  'phase-i-dynamics': {
+    name: "Phase I (Dynamics)",
+    status: 'deprecated',
+    successorKey: null,
+    deprecatedAt: '2026-11-19',
+    pagePath: '/phase-i-dynamics',
+    archivedTo: '_archived/pages/phase-i-dynamics.js',
+    grantsRetained: true,
+    notes: "Standalone interface retired; page and API implementations archived. Authenticated API stubs return 410. Prompts, services and historical data retained for future adaptation.",
+    lastVerified: '2026-11-19',
+  },
+  'multi-perspective-evaluator': {
+    name: "Multi-Perspective Evaluator",
+    status: 'deprecated',
+    successorKey: null,
+    deprecatedAt: '2026-11-19',
+    pagePath: '/multi-perspective-evaluator',
+    archivedTo: '_archived/pages/multi-perspective-evaluator.js',
+    grantsRetained: true,
+    notes: "Standalone interface retired; page and API implementations archived. Authenticated API stubs return 410. Prompts, services and historical data retained for future adaptation.",
+    lastVerified: '2026-11-19',
+  },
+  'funding-gap-analyzer': {
+    name: "Funding Analysis",
+    status: 'deprecated',
+    successorKey: null,
+    deprecatedAt: '2026-11-19',
+    pagePath: '/funding-gap-analyzer',
+    archivedTo: '_archived/pages/funding-gap-analyzer.js',
+    grantsRetained: true,
+    notes: "Standalone interface retired; page and API implementations archived. Authenticated API stubs return 410. Prompts, services and historical data retained for future adaptation.",
+    lastVerified: '2026-11-19',
+  },
+  'peer-review-summarizer': {
+    name: "Summarize Peer Reviews",
+    status: 'deprecated',
+    successorKey: null,
+    deprecatedAt: '2026-11-19',
+    pagePath: '/peer-review-summarizer',
+    archivedTo: '_archived/pages/peer-review-summarizer.js',
+    grantsRetained: true,
+    notes: "Standalone interface retired; page and API implementations archived. Authenticated API stubs return 410. Prompts, services and historical data retained for future adaptation.",
+    lastVerified: '2026-11-19',
+  },
+  'grant-reporting': {
+    name: "Grant Reporting",
+    status: 'deprecated',
+    successorKey: null,
+    deprecatedAt: '2026-11-19',
+    pagePath: '/grant-reporting',
+    archivedTo: '_archived/pages/grant-reporting.js',
+    grantsRetained: true,
+    notes: "Standalone interface retired; page and API implementations archived. Authenticated API stubs return 410. Prompts, services and historical data retained for future adaptation. Preserve goals assessment, regeneration and archived editing logic; Word-based reporting is obsolete. Shared file classification stays active for Workbench.",
+    lastVerified: '2026-11-19',
+  },
+  'literature-analyzer': {
+    name: "Literature Analyzer",
+    status: 'deprecated',
+    successorKey: null,
+    deprecatedAt: '2026-11-19',
+    pagePath: '/literature-analyzer',
+    archivedTo: '_archived/pages/literature-analyzer.js',
+    grantsRetained: true,
+    notes: "Standalone interface retired; page and API implementations archived. Authenticated API stubs return 410. Prompts, services and historical data retained for future adaptation.",
+    lastVerified: '2026-11-19',
+  },
   'expertise-finder': {
     name: 'WMKF Expertise',
     status: 'deprecated',
@@ -218,7 +276,7 @@ export const APP_LIFECYCLE_REGISTRY = {
     archivedTo: '_archived/pages/concept-evaluator.js',
     grantsRetained: true,
     notes:
-      'Deprecated S110. Page / API / prompt archived to _archived/. Existing concept-evaluator grants left in place (no app to grant). multi-perspective-evaluator reuses some prompt content but is a distinct active app, not the successor.',
+      'Deprecated S110. Page / API / prompt archived to _archived/. Existing concept-evaluator grants left in place (no app to grant). multi-perspective-evaluator reuses some prompt content but is a distinct, separately retired app, not the successor.',
     lastVerified: '2026-06-26',
   },
   'phase-ii-writeup-legacy': {
@@ -244,88 +302,12 @@ export const APP_LIFECYCLE_REGISTRY = {
       'Retired S573 by owner decision 2026-10-04 (supersedes Phase A decision D5 "unchanged"). Page, SSE API route, panel-review-service, literature-search-service, prompt file and output schema archived to _archived/. Successor is the source-built Review Panel (key review-panel, Executor-governed seats/chair). Postgres tables panel_reviews / panel_review_items retained with their history; existing user_app_access grants left in place. multi-llm-service.js and vrp-providers.js stay live for the successor\'s provider vocabulary.',
     lastVerified: '2026-10-04',
   },
-  'phase-i-dynamics': {
-    name: 'Phase I (Dynamics)',
-    status: 'direct-url-test',
-    pagePath: '/phase-i-dynamics',
-    notes: 'Live direct-URL surface, intentionally not in home nav. NOT an orphan; do not archive.',
-    lastVerified: '2026-06-26',
-  },
   'test-email': {
     name: 'Test Email',
     status: 'direct-url-test',
     pagePath: '/test-email',
     notes: 'Live test surface (/test-email + /api/test-email). NOT an orphan; do not archive.',
     lastVerified: '2026-06-26',
-  },
-  // Sunset S344 (2026-07-08): the four PDF-upload document-processing apps are no
-  // longer used in their current format. Removed from APP_REGISTRY (out of nav /
-  // home / admin grant UI). The page files + API routes are intentionally kept in
-  // the tree (NOT archived to _archived/) as the reference for a planned
-  // Dataverse-native migration (e.g. Phase I writeup elements → Request Workbench,
-  // an unbuilt feature). Access after sunset [VERIFIED via app-access.js +
-  // AppAccessContext.js, S344]:
-  //   - The API routes stay server-side reachable: `requireAppAccess` honors an
-  //     existing grant AND has a superuser bypass.
-  //   - A non-superuser who still holds a retained grant can also load the PAGE
-  //     (their raw grants come back from /api/app-access unfiltered).
-  //   - A SUPERUSER can NOT load the page in the browser: the client guard
-  //     (`RequireAppAccess`→`hasAccess`) checks membership in the returned app
-  //     list and ignores isSuperuser, and superusers receive `ALL_APP_KEYS`
-  //     (which these keys left). This is acceptable for retired apps — do not
-  //     re-add them to ALL_APP_KEYS to "fix" browser access.
-  // Existing grants are retained (honored on read; only NEW grants are blocked
-  // since the keys left ALL_APP_KEYS). The structured extraction all four share
-  // (proposal-summarizer.createStructuredDataExtractionPrompt, formerly the
-  // phase-ii.extract-structured prompt) is the surface the S343 prompt-legacy
-  // audit flagged for Dataverse-native re-scope — see docs/PROMPT_LEGACY_AUDIT.md.
-  'batch-phase-i-summaries': {
-    name: 'Batch Phase I Summaries',
-    status: 'sunset-candidate',
-    successorKey: null,
-    sunsetAt: '2026-07-08',
-    pagePath: '/batch-phase-i-summaries',
-    apiRoute: '/api/process-phase-i',
-    grantsRetained: true,
-    notes:
-      'Sunset S344. PDF-upload batch Phase I summarizer. Page + /api/process-phase-i retained/routable; code kept for Dataverse-native migration. Shares createStructuredDataExtractionPrompt.',
-    lastVerified: '2026-07-08',
-  },
-  'batch-proposal-summaries': {
-    name: 'Batch Phase II Summaries',
-    status: 'sunset-candidate',
-    successorKey: null,
-    sunsetAt: '2026-07-08',
-    pagePath: '/batch-proposal-summaries',
-    apiRoute: '/api/process',
-    grantsRetained: true,
-    notes:
-      'Sunset S344. PDF-upload batch Phase II summarizer. Page + /api/process retained/routable (/api/process is also used by phase-ii-writeup). Code kept for Dataverse-native migration. Shares createStructuredDataExtractionPrompt.',
-    lastVerified: '2026-07-08',
-  },
-  'phase-i-writeup': {
-    name: 'Create Phase I Writeup Draft',
-    status: 'sunset-candidate',
-    successorKey: null,
-    sunsetAt: '2026-07-08',
-    pagePath: '/phase-i-writeup',
-    apiRoute: '/api/process-phase-i-writeup',
-    grantsRetained: true,
-    notes:
-      'Sunset S344. PDF-upload Phase I writeup drafter. Page + /api/process-phase-i-writeup retained/routable; code kept as the direct reference for the planned Dataverse-native Phase I writeup feature in the Request Workbench (unbuilt). Shares createStructuredDataExtractionPrompt.',
-    lastVerified: '2026-07-08',
-  },
-  'phase-ii-writeup': {
-    name: 'Create Phase II Writeup Draft',
-    status: 'sunset-candidate',
-    successorKey: null,
-    sunsetAt: '2026-07-08',
-    pagePath: '/phase-ii-writeup',
-    apiRoute: '/api/process',
-    grantsRetained: true,
-    notes:
-      'Sunset S344. PDF-upload Phase II writeup drafter. Page + /api/process retained/routable (/api/process is shared with batch-proposal-summaries). Code kept for Dataverse-native migration. Shares createStructuredDataExtractionPrompt.',
-    lastVerified: '2026-07-08',
   },
 };
 

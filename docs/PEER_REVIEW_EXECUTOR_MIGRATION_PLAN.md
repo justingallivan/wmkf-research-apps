@@ -22,10 +22,11 @@ related:
 
 ## Status: IMPLEMENTED + VERIFIED (S344, 2026-07-08)
 
-> **Current routing/outcome:** `process-peer-reviews.js` uses the editable
-> `peer-review-summarizer.*` prompt rows through `executePrompt()`. This document preserves
-> migration, parity, and adversarial-review evidence; consult source and `EXECUTOR_CONTRACT.md`
-> for current behavior.
+> **Current disposition:** the November 19 source retirement replaces this
+> standalone API with authenticated HTTP 410 and preserves its former implementation
+> under `_archived/pages/api/process-peer-reviews.js`. Prompt rows and Executor/A7
+> contracts remain intact. See `docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md` for
+> the source/deployment boundary. The remainder is historical migration evidence.
 
 Shipped. `process-peer-reviews.js` now calls `executePrompt()` for both the
 analyze and questions passes; the `peer-review-summarizer.*` rows were re-seeded
@@ -89,7 +90,7 @@ the Executor** so the admin rows are the execution source and staff prompt-edits
 take effect. A7 decision (owner): **preserve per-review nonce wrapping** (do not
 accept the coarser single-blob wrap).
 
-## Current state [VERIFIED via file, 2026-07-08]
+## Historical pre-migration state [VERIFIED via file, 2026-07-08]
 
 `process-peer-reviews.js`:
 - SSE route (`text/event-stream`); streams *progress* only — the two LLM calls

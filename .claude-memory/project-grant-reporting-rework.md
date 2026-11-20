@@ -1,43 +1,40 @@
 ---
-name: Grant Reporting future rework
-description: Owner says the standalone Grant Reporting app is out of date; integrate its useful features elsewhere in a future rework.
+name: Grant Reporting capability preservation
+description: Standalone Grant Reporting retirement; preserve assessment, editing, export, prompts, services, and historical data for a future home.
 type: project
 status: active
 scope: strategy
-last_verified: 2026-10-21 via explicit owner direction
+last_verified: 2026-11-19 via owner retirement decision and preservation inventory
 ---
 
-# Grant Reporting — future rework
+# Grant Reporting — retirement and capability preservation
 
-[VERIFIED — owner direction, 2026-10-21] Justin considers the standalone
-Grant Reporting app out of date and intends to integrate its features elsewhere.
-Record this as future work; implementation has not been requested.
+[VERIFIED — owner direction, 2026-11-19] Retire the standalone Grant Reporting
+application while preserving its useful capabilities. This advances the October 21
+request to integrate those capabilities elsewhere; it does not choose their new home.
 
-[PLANNED] Revisit which report extraction, proposal-versus-report assessment,
-staff editing, and export capabilities should be retained and where they belong.
-The destination, scope, and timing are undecided. Do not assume that the future
-workflow must retain the standalone app or follow the older Power Automate plan.
+The source change is described in `docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md`:
+the page becomes a retirement notice and its APIs become authenticated HTTP 410
+responses. Original page/API implementations are retained under `_archived/`.
+Deployment and live acceptance are separate verification steps.
 
-**Current implementation boundary (repository source, 2026-10-31):** the standalone
-app remains present and active. Its current flow supports request lookup, report
-extraction, proposal-versus-report goals assessment, staff editing, and Word export;
-the extracted content is not saved to an `akoya_request` field. This describes the
-existing app only and does not decide its successor or authorize migration/removal.
+Preserve the archived page's proposal-versus-report assessment editor, extracted
+fields, staff edits, regeneration modes, and Word export. Preserve
+`lib/services/grant-reporting/extract-service.js`, the prompt and output-schema
+modules, and `shared/utils/grant-report-word-export.js`. The retained extraction
+service does not save report fields to `akoya_request`; its best-effort
+`wmkf_ai_run` logging may be the only durable copy of historical generated output.
+No prompt row, audit record, uploaded document, request field, or access grant is
+deleted by the retirement.
+
+`lib/services/grant-reporting/classify-file.js` is still imported by Workbench's
+reviewer proposal loader. Its directory name is not permission to remove it.
+The lookup service and shared SharePoint discovery helpers are also preserved.
 
 ## Recall Rule
 
-Read when prioritizing Grant Reporting work or considering where its capabilities belong.
-
-Use this decision when prioritizing user-facing performance work: revisit the
-product direction before investing in optimization of the existing standalone
-Grant Reporting workflow. This note does not retire the app, remove access, or
-authorize changes to code, data, or deployment.
-
-Earlier roadmap references in `project-app-roadmap-2026-04-25.md` describe past
-intent. This owner direction supersedes any assumption that Grant Reporting's
-standalone UI is the decided long-term home for these features.
-
-Ground truth: the owner's explicit direction on 2026-10-21, recorded above; current
-source-backed implementation boundary is `pages/grant-reporting.js`,
-`pages/api/grant-reporting/lookup-grant.js`, and
-`lib/services/grant-reporting/extract-service.js`.
+Read before reusing Grant Reporting capabilities or considering data cleanup.
+Choose the new destination and persistence contract with the owner before building
+an integration. Do not reconstruct the assessment/editing flow from memory: use
+the preserved page and service. Do not reopen standalone UI development without a
+new decision. Earlier roadmap/Power Automate proposals are historical alternatives.

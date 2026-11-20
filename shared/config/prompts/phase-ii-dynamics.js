@@ -3,7 +3,7 @@
  * storage. Mirrors phase-i-dynamics.js, reviewer-finder-dynamics.js,
  * peer-reviewer-dynamics.js.
  *
- * Four live Claude prompts feed both `phase-ii-writeup` AND
+ * Four reference prompt definitions were staged for both `phase-ii-writeup` AND
  * `batch-proposal-summaries` (the two apps share the prompt set):
  *
  *   - phase-ii.summarize          — main two-part proposal writeup
@@ -20,22 +20,12 @@
  *
  * SOURCE OF TRUTH RECONCILIATION
  * ──────────────────────────────────────────────────────────────────────────
- * Live route still uses the function-based generators in
- * shared/config/prompts/proposal-summarizer.js (and the inline
- * REFINEMENT_PROMPT in pages/api/refine.js). That is unchanged; this file
- * is dormant Phase 0 storage that lets staff view/edit prompts in Dynamics
- * ahead of the post-cycle route refactor. When the routes (process.js,
- * qa.js, refine.js) migrate to executePrompt(), the legacy generators
- * become unused and can be deleted.
- *
- * SUNSET S344 (2026-07-08): the Phase-0-to-Executor migration this file was
- * staged for is NOT happening for these apps. `phase-ii-writeup` and
- * `batch-proposal-summaries` are now sunset-candidates (PDF-upload format
- * retired; see APP_LIFECYCLE_REGISTRY). The `phase-ii.extract-structured`
- * template below is retained only as the reference for the planned
- * Dataverse-native migration (source admin fields from `akoya_request`
- * instead of inferring them from the PDF) — see docs/PROMPT_LEGACY_AUDIT.md.
- * These rows remain viewable/editable in /admin but drive nothing.
+ * RETIRED 2026-11-19: both standalone interfaces now show notices and their
+ * processing routes return authenticated 410. Original handlers are preserved
+ * under _archived/pages/api/; they used the function-based generators in
+ * proposal-summarizer.js and inline REFINEMENT_PROMPT, not these stored rows.
+ * These templates remain reference material for future Dataverse adaptation.
+ * No stored prompt rows or historical outputs were removed.
  *
  * SYSTEM VS USER PLACEMENT (PHASE 0 COMPROMISE)
  * ──────────────────────────────────────────────────────────────────────────

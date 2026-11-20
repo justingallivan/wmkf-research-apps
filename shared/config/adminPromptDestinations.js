@@ -37,8 +37,8 @@ export const ADMIN_PROMPT_CALLER_DESTINATIONS = Object.freeze({
     summary: 'Request → AI Field Primer when generated for a grant; standalone generation returns the result without a grant-field write.',
     fields: ['akoya_request.wmkf_ai_fieldprimer'],
   },
-  'funding-gap.analyze': returned,
-  'funding-gap.extract': returned,
+  'funding-gap.analyze': reference,
+  'funding-gap.extract': reference,
   // workbench/grantee-deliverables/generate-service.js.
   'grantee-abstract.generate': { summary: 'Request → Formatted Abstract, saved by the Awardee workflow.', fields: ['akoya_request.wmkf_abstractformatted'] },
   // cron/generate-grantee-titles-service.js processRow (fresh ETag + empty check).
@@ -51,9 +51,9 @@ export const ADMIN_PROMPT_CALLER_DESTINATIONS = Object.freeze({
     summary: 'Initial Assessment DOCX in SharePoint; Request Document stores the file identity, not the narrative text in a Request field.',
     fields: ['wmkf_requestdocument.wmkf_sharepointdriveid', 'wmkf_requestdocument.wmkf_sharepointitemid'],
   },
-  'literature-analyzer.compare': returned,
-  'literature-analyzer.extract-paper': returned,
-  'literature-analyzer.synthesize': returned,
+  'literature-analyzer.compare': reference,
+  'literature-analyzer.extract-paper': reference,
+  'literature-analyzer.synthesize': reference,
   // meeting-tracker-transcription/fragment-review.js → alignment-service.js
   // → transcription-pilot/store.js completeAlignment.
   'meeting-transcript.fragment-review': {
@@ -77,18 +77,18 @@ export const ADMIN_PROMPT_CALLER_DESTINATIONS = Object.freeze({
     summary: 'Staff-only discussion summary draft in Postgres. Staff publication creates a SharePoint TXT file and a Request Document record.',
     fields: ['meeting_transcript_summary_drafts.summary_text'],
   },
-  'multi-perspective.initial-analysis': returned,
-  'multi-perspective.integrator': returned,
-  'multi-perspective.neutral': returned,
-  'multi-perspective.optimist': returned,
-  'multi-perspective.proposal-summary': returned,
-  'multi-perspective.skeptic': returned,
-  'peer-review-summarizer.analyze': returned,
-  'peer-review-summarizer.questions': returned,
+  'multi-perspective.initial-analysis': reference,
+  'multi-perspective.integrator': reference,
+  'multi-perspective.neutral': reference,
+  'multi-perspective.optimist': reference,
+  'multi-perspective.proposal-summary': reference,
+  'multi-perspective.skeptic': reference,
+  'peer-review-summarizer.analyze': reference,
+  'peer-review-summarizer.questions': reference,
   // Owner decision 2026-11-04; records intent, not a live Retired status.
   'phase-i.checkin': { summary: 'Deprecated. No active output destination is documented for this stored prompt.', fields: [] },
   // These Executor writebacks are read dynamically from the loaded row below.
-  'phase-i.summary': { summary: 'The Executor saves the summary to the destination configured in this prompt.', fields: [] },
+  'phase-i.summary': reference,
   'phase-ii.extract-structured': reference,
   'phase-ii.qa': reference,
   'phase-ii.refine': reference,

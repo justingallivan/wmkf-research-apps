@@ -18,8 +18,11 @@ related:
 # Executor Contract
 
 **Status:** SHIPPED on the Vercel side — this doc describes the contract that
-`lib/services/execute-prompt.js` implements in production today (used by the Phase I summary route
-and multiple live grantee, field-primer, and review services). A Power Automate implementation is a deferred target, not a
+`lib/services/execute-prompt.js` implements in production today (used by grantee, field-primer, and review services).
+The standalone Phase I Dynamics and peer-review upload routes are authenticated
+HTTP 410 retirement stubs in the 2026-11-19 source; their prompts and the shared
+Executor remain preserved. This source change does not establish Production
+retirement; see [retirement manifest](plans/APP_SUITE_RETIREMENT_2026-11-19.md). A Power Automate implementation is a deferred target, not a
 second current implementation. The original "May 1 2026 cycle target" framing is historical.
 **Created:** 2026-04-24 (Session 109, reconciliation pass)
 **Last status update:** 2026-09-12 (opt-in OpenAI provider seam for governed prompt snapshots)
@@ -55,7 +58,7 @@ The contract covers **Pattern A + dual-caller prompts and Pattern B/C Vercel-onl
 
 **Out of scope (separate code paths):**
 - Tool-use / agent loops (Dynamics Explorer)
-- Streaming SSE to the UI (token-by-token display — today's Phase II pattern stays outside)
+- Streaming SSE to the UI (token-by-token display — the archived Phase II pattern stays outside)
 - Providers other than Anthropic and OpenAI
 - Anthropic Batch API (`wmkf_batch_run`, retrospective work)
 - Multi-turn stateful conversations
@@ -566,7 +569,7 @@ If either assertion fails, the two implementations have drifted and must be reco
 - Target writer: `akoya_request` (including JSON-path set for `wmkf_ai_dataextract`)
 - Output guards: `skip-if-populated` (default for `akoya_request` field-targets) and `always-overwrite`
 - `forceOverwrite` input on the Executor; `parseMode: "raw"` and `parseMode: "json"` on output schemas
-- Reference route: `pages/api/phase-i-dynamics/summarize-v2.js` — calls into `executePrompt()`
+- Historical reference route: `_archived/pages/api/phase-i-dynamics/summarize-v2.js` — called into `executePrompt()`; the current route is an authenticated HTTP 410 stub. Current caller examples include `lib/services/field-primer-service.js` and `lib/services/review-manager/synthesize-reviews-service.js`.
 - First prompt row: `phase-i.summary` (system/body split, single raw-text output to `wmkf_ai_summary`, `guard: "skip-if-populated"`)
 
 **Still deferred (post-May 1 status — re-verify before consuming):**
