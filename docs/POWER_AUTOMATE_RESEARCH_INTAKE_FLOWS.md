@@ -424,13 +424,13 @@ Asked 2026-11-20, ordered by urgency. Connor answered three the same day
 2. **S&E/MR source — answered.** "MR/SE is set at the same time as the primary
    keyword. Each keyword has a default MR/SE assignment." So step 3 sets the
    request's MR/SE from the primary keyword's default
-   (`wmkf_keywordinternalprogram`). [ASSUMED: "set" means step 3 writes the
-   request's Program field `akoya_programid`, which would also answer question 3
-   and make the Program-field readers work for J27 once step 3 is live. Confirm the
-   target field, and whether the keyword-change flow and a coordinator's step-4
-   repoint also update it.]
-3. Does any step set `akoya_programid`, or is it permanently blank for J27? (See
-   question 2.)
+   (`wmkf_keywordinternalprogram`). The owner's understanding (2026-11-20): it lands
+   in the request's Program field `akoya_programid`, as MR/SE does today, so the
+   Program-field readers work for J27 once step 3 is live [owner; not yet confirmed
+   in a J27 row]. A coordinator's step-4 discipline change is unlikely to move a
+   request between programs; not pursued (owner).
+3. **Program field for J27 — answered by question 2:** set by step 3, blank until
+   step 3 is live.
 4. **J27 reviewer copy — answered: nothing produces it yet.** Connor says it is an
    easy flow to build and asks what should trigger it (he suggests
    `wmkf_phaseistatus` = Recommended). **Owner decision 2026-11-20:** trigger on

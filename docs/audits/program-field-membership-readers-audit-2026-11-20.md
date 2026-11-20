@@ -37,8 +37,9 @@ keywords carry `wmkf_keywordinternalprogram` ("legacy MR/SE bucket"), reachable 
 request's primary discipline `wmkf_programareaserved`. That is a **candidate** S&E/MR source,
 not a decision: it is filled only by the planned step 3.
 Connor then said (2026-11-20) MR/SE "is set at the same time as the primary keyword";
-if step 3 writes the request's `akoya_programid`, the Program-field readers work for
-J27 once step 3 is live (to confirm; see the intake map section 10 question 2). Item 2 (title cron) also changes once
+the owner's understanding is that step 3 writes the request's `akoya_programid`, as
+today, so the Program-field readers work for J27 once step 3 is live. Until then J27
+requests have a blank Program field and the class A readers below still miss them. Item 2 (title cron) also changes once
 step 3 is live, because step 3 writes the short title itself.
 
 ## Live readers that decide membership (class A)
