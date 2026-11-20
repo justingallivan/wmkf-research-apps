@@ -192,14 +192,30 @@ wording; the reviewer-apps leaf's dangling "S206 decisions block above" pointer;
 2026-05-12) in the system-model leaf and `docs/SYSTEM_MODEL.md`; virus-scan leaf
 now states the three-workstream shipment is UNKNOWN.
 
-Probes (not run; owner authorization or local access needed):
+Probes — run 2026-11-20 with the owner's approval (signed-in browser on
+`applications.wmkeck.org`, read-only GETs; two owner-approved read-only
+production scripts; local `gh`/Colima):
 
-- ~~Live authenticated 410 on the thirteen retired API URLs~~ — RESOLVED 2026-11-20: owner-requested signed-in check from the owner's Chrome session on `applications.wmkeck.org`. Each URL returned GET 405 (the stubs answer POST only, so a GET probe could never show 410) and empty-body POST 410 `APP_RETIRED`. The stubs run only the access check before responding (`pages/api/process.js` shape, identical across the thirteen).
-- Stored state of retired-interface prompt rows: a read-only `wmkf_ai_prompts` current-row query by name prefix.
-- Whether Connor's flow creates `Narrative-Bibliography_{Request#}.pdf`: a read-only listing of one J27 request's `AI Materials` folder.
-- Workbench Status tab absent in Production: signed-in observation.
-- Virus-scan sender UX, internal alert and enable: a source trace of the rejection path. Not done.
-- Cache post-fix cross-document read: `node scripts/probe-ai-run-cache-reads.js --since 2026-09-19T19:48:00Z`.
+- Thirteen retired API URLs: GET 405, empty POST 410 `APP_RETIRED`, all thirteen.
+- Retired-interface prompt rows: Admin prompts API (50 rows, 49 current). All 19
+  rows for the retired interfaces (`peer-review-summarizer.*`, `phase-ii.*`,
+  `phase-i.summary`, `multi-perspective.*`, `funding-gap.*`,
+  `literature-analyzer.*`, `expertise-finder.match`) are current, Published
+  (682090001), version 1. No `writeup.*` rows.
+- Combined `Narrative-Bibliography_` file: absent on all four J27 test requests
+  (Workbench documents listing). Real J27 proposals have not arrived; still open.
+- Workbench Status tab: absent on a D26 request page (10 tabs as in source). The
+  J27 request page uses the phase layout.
+- Virus-scan workstreams: PARTIAL by source trace. The alert and the 422 with
+  file names ship; no in-repo client calls the reviewer-portal upload API; the staff
+  upload client was not traced.
+- Cache cross-document read: confirmed once for `review-synthesis.generate`
+  (2026-09-22). No `cycle-dossier.entry` runs since the fix, so that check is still open.
+- `wmkf__ai_summary` field: gone (metadata read, no `wmkf__` attributes).
+- Admin prompt edit validation: hazard still open by source. Sentinel markers are
+  rejected; dropping `untrusted: true` declarations is not checked.
+- Routine-audit items: Colima running, ledger container exited; repository PUBLIC
+  with CodeQL default setup configured.
 
 Owner questions:
 

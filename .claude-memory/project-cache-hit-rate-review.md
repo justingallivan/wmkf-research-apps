@@ -25,9 +25,10 @@ the "two different documents share a byte-identical marked system block" unit te
 the Executor prompts that batch are `cycle-dossier.entry` (Opus 5, measured marked prefix
 610–618, several documents within seconds) and `review-synthesis.generate` (Sonnet 5,
 1841–2258). Pre-fix rows show every document writing its own entry and none reading; the
-post-fix cross-document read is pending the first post-fix batch (closing check:
-`--since 2026-09-19T19:48:00Z`, expect later documents' `cache_read` ≈ first document's
-`cache_create`). `phase-i.summary` has been idle since 2026-04-25 and has had no live caller since its routes were retired on 2026-11-19.
+post-fix check (2026-11-20, `--since 2026-09-19T19:48:00Z`): `review-synthesis.generate`
+showed one cross-document read (2026-09-22, `cache_read` 1806 ≈ the 1806 written by
+another document 4 minutes earlier); its other runs were too far apart to hit the cache.
+`cycle-dossier.entry` has had no runs since the fix, so its check is still open. `phase-i.summary` has been idle since 2026-04-25 and has had no live caller since its routes were retired on 2026-11-19.
 
 **Remaining work (data-gated, not code-gated):** the review panel system blocks DO cache
 on Opus 5 (seat row v2 measured 552, chair v3 801; the seat resolved to Opus 5 in the

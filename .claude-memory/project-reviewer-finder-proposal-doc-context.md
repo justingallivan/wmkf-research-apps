@@ -62,9 +62,11 @@ loader takes it first when exactly one exists, and only then falls back to the
 `Reviewer Materials/Proposal_` and `Phase I/ProjectDescription.pdf` rules above
 [VERIFIED 2026-11-20 via `lib/services/reviewer-finder/load-proposal-service.js`
 combined-then-canonical-then-fallback order; commit `f43f2db77` is an ancestor of
-Production merge SHA `ce4bc2618`]. More than one combined file is a 409. Whether
-Connor's flow now creates the file on real J27 requests is UNKNOWN (probe: an
-owner-run read-only listing of one J27 request's `AI Materials` folder). The
+Production merge SHA `ce4bc2618`]. More than one combined file is a 409. On 2026-11-20 none of the four J27
+test requests (1003456, 1003517, 1003526, 1003528) had the file (Workbench documents
+listing, signed-in); they carry `Submission-Documents/Project-Narrative_` and
+`Bibliography_` instead. Real J27 proposals had not yet arrived, so whether Connor's
+flow will create it remains open. The
 existing reviewer prompt ranks names mentioned in the proposal first and authors
 from references second, so the bibliography should improve proposal-grounded yield.
 

@@ -91,7 +91,7 @@ cross-prompt cache alignment. This is not current built-state guidance.
 ### Retired from prior plan
 - Old name `wmkf_prompt_template` — Connor built table as `wmkf_ai_prompt` (renamed); PROMPT_STORAGE_DESIGN updated globally S167. <!-- prompt-storage:ignore reason=rename-history -->
 - Old field names (`wmkf_body`, `wmkf_variables`, `wmkf_output_schema`) — actual names are `wmkf_ai_promptbody`, `wmkf_ai_promptvariables`, `wmkf_ai_promptoutputschema`
-- `wmkf__ai_summary` on akoya_request — confirmed a typo by Connor, being deleted, ignore
+- `wmkf__ai_summary` on akoya_request — confirmed a typo by Connor; gone as of the 2026-11-20 metadata read
 - Hybrid-vs-full-PA-composition debate — decided Session 102: full PA composition (no Vercel dependency at runtime)
 
 ### Scope of Executor (what it is NOT)

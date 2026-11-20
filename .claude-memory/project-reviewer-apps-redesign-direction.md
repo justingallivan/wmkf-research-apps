@@ -36,7 +36,7 @@ History: dated release checkpoints (2026-07-29 → 2026-09-02), the S194–S206 
 
 ## Current source-backed state (verified 2026-08-31)
 
-- [VERIFIED via local `pages/workbench/[requestId].js`, 2026-11-04] The Workbench has [10](../docs/CANONICAL_COUNTS.md#workbench-tab-count) top-level tabs, with zero placeholders. The redundant Status tab is removed in local source; Overview retains the read-only status display. Removal commit `dc3eb5233` is an ancestor of Production merge SHA `ce4bc2618` (READY 2026-11-20 UTC per the APP_SUITE_RETIREMENT receipt); the live tab bar has not been observed.
+- [VERIFIED via local `pages/workbench/[requestId].js`, 2026-11-04] The Workbench has [10](../docs/CANONICAL_COUNTS.md#workbench-tab-count) top-level tabs, with zero placeholders. The redundant Status tab is removed in local source; Overview retains the read-only status display. Removal commit `dc3eb5233` is an ancestor of Production merge SHA `ce4bc2618` (READY 2026-11-20 UTC per the APP_SUITE_RETIREMENT receipt); a signed-in check of a D26 request page on 2026-11-20 showed the 10 tabs and no Status tab.
   The former Pre-Site/Site
   Visit pair now presents as the unified Staff Deliberations workspace, and
   Final Writeup is a readiness-gated same-item handoff/workspace rather than a
@@ -103,7 +103,7 @@ History: dated release checkpoints (2026-07-29 → 2026-09-02), the S194–S206 
   smoke on request `1002788`.
 - Awardee includes the distinct live `/external/grantee/[token]` portal and
   `wmkf_granteedeliverable` persistence. GAL-trigger automation remains separate/unknown.
-- The proposed writeup URL fields and `writeup.*` prompt rows remain absent.
+- The proposed writeup URL fields and `writeup.*` prompt rows remain absent (prompt rows checked live 2026-11-20 via the Admin prompts API: none among 50).
   Their June design is historical input; the implemented pilot instead uses
   the production-provisioned `wmkf_requestdocument` registry and governed
   `initial-assessment.generate` v1. The controlled production rehearsal created

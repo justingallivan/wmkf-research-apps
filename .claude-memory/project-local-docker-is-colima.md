@@ -2,7 +2,7 @@
 name: project-local-docker-is-colima
 description: "Dated local setup: Test Request Factory ledger suites can use a throwaway Postgres container through Colima. Current Colima/container presence is unknown; verify locally before use."
 status: active
-last_verified: 2026-10-05 dated local Colima/container observation; current presence unknown
+last_verified: 2026-11-20 local check — Colima running; `wmkf-ledger-pg` (postgres:16-alpine) exists but exited 3 weeks earlier, so start it before ledger suites
 metadata:
   type: project
 ---

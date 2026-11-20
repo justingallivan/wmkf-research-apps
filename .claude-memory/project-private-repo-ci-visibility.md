@@ -1,11 +1,11 @@
 ---
 name: project-private-repo-ci-visibility
-description: Historical GitHub visibility/licensing and CI decisions from July–September 2026. Current repository visibility, plan, CodeQL setup, and alert state are unknown without a fresh GitHub check.
+description: Historical GitHub visibility/licensing and CI decisions from July–September 2026. A 2026-11-20 check found the repository public with CodeQL default setup configured; plan and alert state were not checked.
 metadata: 
   node_type: memory
   type: project
   status: active
-  last_verified: 2026-07-27 local workflow snapshot; external visibility/licensing facts are dated 2026-07-03/04 and 2026-09-20; current GitHub state unknown
+  last_verified: 2026-07-27 local workflow snapshot; external visibility/licensing facts are dated 2026-07-03/04 and 2026-09-20; 2026-11-20 `gh` check: repository PUBLIC; CodeQL default setup `configured` (query suite default, updated 2026-09-21)
   originSessionId: 6fc5f954-97c9-44ce-9593-d2aa5dce023e
 ---
 

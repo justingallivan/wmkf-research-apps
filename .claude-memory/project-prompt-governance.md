@@ -10,7 +10,7 @@ last_verified: 2026-10-22 PT (2026-10-23 UTC) bounded read-only Production promp
 **Dated evidence boundaries:** Publication/deployment observations below were verified on
 2026-08-18. The retained read-only evidence artifact
 `docs/audits/memory-historical-impact-evidence-2026-10-22.json` records a complete Production
-metadata query observed 2026-10-23 UTC, returning 39 current prompt rows
+metadata query observed 2026-10-23 UTC (on 2026-11-20 the Admin prompts API listed 50 rows, 49 current), returning 39 current prompt rows
 (`wmkf_ai_iscurrent=true`). All 39 `variables` values were valid JSON; each present output-schema
 value was valid JSON, while some rows had no output-schema value. The current
 `pre-site-visit.proposal-core.generate` row was v5 with `native-json-schema` and `rawRetention=full`;
@@ -81,6 +81,6 @@ current smoke status is UNKNOWN.
 admin publish both set `wmkf_ai_publisheddatetime` (domain publish time). The `/admin` panel surfaces
 these (S269).
 
-⚠️ **Hazard recorded 2026-08-18 (current status unknown):** the review then identified that admin `PUT` could edit a prompt's `variables`, while the file config-pin test and A7 gate did not validate the LIVE row's declarations. Do not present this as a confirmed current vulnerability without checking the current writer, consumers, and gates. The recorded source-built Pre-Site producer was an exception because it performed its own preflight; whether that version remains current is unknown.
+⚠️ **Hazard recorded 2026-08-18; source re-check 2026-11-20 says still open:** `lib/services/admin/prompts-publish-service.js` and `lib/utils/prompt-validators.js` reject A7 sentinel markers in the body and system prompt, but nothing checks that `untrusted: true` variable declarations survive an edit. Original finding: the review then identified that admin `PUT` could edit a prompt's `variables`, while the file config-pin test and A7 gate did not validate the LIVE row's declarations. Do not present this as a confirmed current vulnerability without checking the current writer, consumers, and gates. The recorded source-built Pre-Site producer was an exception because it performed its own preflight; whether that version remains current is unknown.
 
 Related: [[project-dynamics-as-prompt-ground-truth]], [[project-phaseistatus-decision-lifecycle]].
