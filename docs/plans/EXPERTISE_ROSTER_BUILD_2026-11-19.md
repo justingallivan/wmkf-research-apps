@@ -1,6 +1,6 @@
 # Roster migration and Admin editor — build evidence
 
-Status: implementation and focused verification completed; Opus correction verification returned code ready. Production execution is partial: schema/roles, migration 103 and Postgres-mode deployment are complete; import/cutover await Amy status clarification. See [execution checkpoint](EXPERTISE_ROSTER_PRODUCTION_EXECUTION_2026-11-19.md). Backend automation and app retirement remain separate.
+Status: implementation and focused verification completed; Opus correction verification returned code ready. Production import, migrations 103/104 and the Dataverse-backed Admin editor are complete. Amy ID 40 remains active and lead-PD eligible with her existing profile and future email preserved; no app access was granted and nothing was sent. See [production execution report](EXPERTISE_ROSTER_PRODUCTION_EXECUTION_2026-11-19.md). Backend automation and app retirement remain separate.
 
 The verification sections below record the pre-deployment build/review snapshot.
 
@@ -54,7 +54,7 @@ saved review dispositions. No Ultrareview or agent API-key session.
 
 ## Contract and sweep evidence
 
-Sweep Mode A: changed fact is branch implementation, not deployed storage. New
+Historical build-stage sweep Mode A: the changed fact at that checkpoint was branch implementation, not deployed storage. New
 Atlas page describes Expertise Profiles plus the two numeric bridge tables;
 Postgres Atlas explicitly retains the default production baseline, and feedback
 eligibility describes the selected backend. API matrix, service catalog,

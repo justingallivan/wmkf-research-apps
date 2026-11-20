@@ -28,10 +28,10 @@
    James S. Economou; Andrea M. Ghez and Kelsey C. Martin are Board members. All four
    are selectable on the staff page, so the planned roster "chair marker" is not
    needed to send.
-5. **Roster location clarified at stop.** The roster is still the Postgres table
+5. **Historical roster location at stop.** The roster was then the Postgres table
    `expertise_roster`, visible on the Roster tab of `/expertise-finder`. At that stop it had not
-   moved to Dataverse. November 19 execution has since provisioned the target and
-   deployed the new code in Postgres mode; import/cutover await Amy status clarification (see below).
+   moved to Dataverse. November 19 execution has since completed the production Dataverse migration
+   and Admin editor cutover (see below).
 
 ### Commits (all on `main`)
 
@@ -84,10 +84,10 @@
    `docs/plans/EXPERTISE_ROSTER_PRODUCTION_MIGRATION_PLAN_2026-11-19.md`.
    Opus 5.5 OAuth review returned READY WITH CHANGES; required corrections are
    incorporated, with verbatim review/disposition saved beside the plan. Build is committed on `codex/expertise-roster-admin-2026-11-19` (`40588fca3`);
-   Opus implementation review and correction verification completed. Production schema/roles, migration 103 and Postgres-mode deployment are complete; import/cutover await Amy status clarification. See `docs/plans/EXPERTISE_ROSTER_PRODUCTION_EXECUTION_2026-11-19.md`.
+   Opus implementation review and correction verification completed. Production import, migrations 103/104 and the Dataverse-backed Admin editor are complete. Amy ID 40 remains active and lead-PD eligible with her existing profile and future email preserved; no app access was granted and nothing was sent. See `docs/plans/EXPERTISE_ROSTER_PRODUCTION_EXECUTION_2026-11-19.md`.
    See `docs/plans/EXPERTISE_ROSTER_BUILD_2026-11-19.md`.
 5. **Earlier roster implementation reference.** Preserve
-   `origin/codex/expertise-roster-import-2026-11-10` (tip `754acf09a`). Current owner authorized the revised build and production migration/deployment. The older branch remains a reference; resume the November 19 execution checkpoint, not that branch.
+   `origin/codex/expertise-roster-import-2026-11-10` (tip `754acf09a`). Current owner authorized the revised build and production migration/deployment. The older branch remains a reference; use the completed November 19 execution report, not that branch.
 6. **Backend prompt adoption/scheduling** (`codex/executive-summary-generation-2026-11-16`).
 
 ### Owner Decisions Preserved — Not Resolved This Session
@@ -137,7 +137,7 @@ current permission or live-state evidence.
 |---|---|---|
 | Proposal lists | `docs/plans/J27_PROPOSAL_LIST_EMAILS_PLAN_2026-11-18.md`; `docs/atlas/postgres-proposal-list-links.md` | Production-live; PDF open and two-level sections unproven live; email send not built |
 | Initial Assessment | PRs #644–#646; `assessment-service.js`, `AssessmentForm.js` | Production-live; authenticated save acceptance unverified |
-| Roster migration and Admin editor | `docs/plans/EXPERTISE_ROSTER_PRODUCTION_MIGRATION_PLAN_2026-11-19.md` | Production-only plan saved; Opus 5.5 reviewed, corrections incorporated; Admin editor and migration implemented/tested on the new November 19 branch; Opus correction verification returned code ready; backend automation and retirement separate; production schema/roles/103 and Postgres-mode deployment complete; import/cutover await Amy status decision |
+| Roster migration and Admin editor | `docs/plans/EXPERTISE_ROSTER_PRODUCTION_MIGRATION_PLAN_2026-11-19.md` | Production-only plan saved; Opus 5.5 reviewed, corrections incorporated; Admin editor and migration implemented/tested on the new November 19 branch; Opus correction verification returned code ready; backend automation and retirement separate; production cutover complete: migrations 103/104, backend dataverse, 39 imported profiles and 10 exact Contact links; Amy active/lead eligible, no app access or sends; test profile retained inactive; Connor connection/effective-rights follow-up separate |
 | Older roster cutover | `origin/codex/expertise-roster-import-2026-11-10:SESSION_PROMPT.md` | Preserve branch/private inputs; reconcile direction before resuming |
 | Chairs Production stages | `docs/plans/J27_CHAIRS_RECOMMENDATION_PRODUCTION_PLAN_2026-11-18.md` | Not changed here; owner approval per stage |
 | Intake prompt delivery | `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md` | Owner-run flow/prompt work; backend adoption parked |

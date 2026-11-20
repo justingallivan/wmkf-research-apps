@@ -10,6 +10,14 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## November 2026 — Expertise roster migrated to Dataverse and Admin
+
+**Milestone:** Production roster content moved from Postgres to Dataverse, with editing in Admin → People & Access → Expertise Roster.
+**Sessions:** Codex, 2026-11-19; owner-authorized production-only cutover, Opus 5.5 OAuth plan and implementation reviews.
+**Ship state:** 39 profiles imported from 40 source identities; placeholder 35 excluded while historical identity survives. All 10 Contact links preserved; migrations 103/104 applied; production backend is `dataverse`; deployed CRUD and consumer checks passed. Amy remains active/lead eligible with her profile/future email preserved, no app-access grant or send. One acceptance profile retained inactive.
+**Why it matters:** Administrators can maintain the shared roster independently of Expertise Finder. Backend automation and app retirement remain separate; Connor's flow connection/effective-rights follow-up remains open.
+**Pointers:** `docs/plans/EXPERTISE_ROSTER_PRODUCTION_EXECUTION_2026-11-19.md`, `docs/atlas/dataverse-wmkf-expertiseprofile.md`; runtime cutover `665b652f0`.
+
 ## November 2026 — Proposal list pages for Chairs and Board members (Session 684)
 
 **Milestone:** Staff can give each Program Chair or Board member a personal no-login page listing every submitted proposal in a cycle, live in Production.

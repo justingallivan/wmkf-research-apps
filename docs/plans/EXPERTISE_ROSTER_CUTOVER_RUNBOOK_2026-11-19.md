@@ -1,8 +1,13 @@
 # Expertise roster — production cutover and recovery
 
-Status: **production schema/roles, migration 103 and Postgres-mode deployment complete; import/cutover pending Amy status clarification**. See [execution checkpoint](EXPERTISE_ROSTER_PRODUCTION_EXECUTION_2026-11-19.md). This runbook
+Status: **production migration and Admin editor cutover completed November 19, 2026**. See [execution checkpoint](EXPERTISE_ROSTER_PRODUCTION_EXECUTION_2026-11-19.md). This runbook
 implements the [accepted plan](EXPERTISE_ROSTER_PRODUCTION_MIGRATION_PLAN_2026-11-19.md).
 One operator, static dataset. No sandbox, locks, synchronization or automated rollback.
+
+The numbered steps below document the executed sequence, not outstanding work.
+Migration 104 is already applied; do not introduce another cutover migration.
+Connor’s connection/effective-access follow-up remains separate; existing broader
+roles were preserved.
 
 ## 1. Prepare and inventory
 
@@ -51,8 +56,9 @@ content fields except `id`, and a `decision` with the five link/eligibility fiel
 and `confirmed:true`. Optional text fields must be present (null permitted).
 
 Owner mappings: Justin/Jean active lead; Beth active nonlead; John E. Sader ID 1
-Staff/active/lead; Kevin ID 13 inactive; Amy Rowat new inactive Staff with null User
-and no lead eligibility. ID 35 excluded, inactive and unlinked, but retains its
+Staff/active/lead; Kevin ID 13 inactive; existing Amy Rowat ID 40 active Staff,
+linked to her existing production User and lead eligible (owner confirmed November 19).
+Preserve her profile and future email; do not grant app access or send messages. ID 35 excluded, inactive and unlinked, but retains its
 numeric identity. Any linked exclusion, duplicate Contact across inactive/active
 rows or Contact mapping mismatch blocks import before writes. Confirm User GUIDs,
 Contact health and duplicate-name warnings manually, without guessing identities.
@@ -132,7 +138,7 @@ Record deployment, ledger, receipts and acceptance results in private evidence.
 
 1. Keep the current mode while reconciling. Compare the final owner-mapped roster
    **plus every post-cutover edit/addition** to legacy Postgres. Manually preserve
-   IDs, Contact references, John's Staff category, Kevin/35 inactive, Amy inactive,
+   IDs, Contact references, John's Staff category, Kevin/35 inactive, Amy active/lead eligible,
    and new numeric IDs. Preserve User/lead values in a private export (legacy PG has
    no columns for those). If Dataverse is unavailable, use import/acceptance records;
    resolve unknown edits before reopening writes.

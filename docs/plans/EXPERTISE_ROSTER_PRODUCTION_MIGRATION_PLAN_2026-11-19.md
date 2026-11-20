@@ -1,6 +1,6 @@
 # Expertise roster: production migration and Admin editor
 
-**Status: IMPLEMENTED; PRODUCTION CUTOVER PARTIAL — two Claude Opus 5.5 OAuth adversarial reviews completed. Second verdict: READY WITH CHANGES; all earlier findings closed, with two Contact-preservation corrections incorporated below. See [review 1](EXPERTISE_ROSTER_OPUS_5_5_REVIEW_2026-11-19.md) and [review 2 with disposition](EXPERTISE_ROSTER_OPUS_5_5_REVIEW_2_2026-11-19.md). Owner subsequently authorized implementation on November 19; see [build evidence](EXPERTISE_ROSTER_BUILD_2026-11-19.md). Production schema/roles, migration 103 and Postgres-mode deployment are complete; import/cutover await Amy status clarification. See [execution checkpoint](EXPERTISE_ROSTER_PRODUCTION_EXECUTION_2026-11-19.md).**
+**Status: IMPLEMENTED; PRODUCTION CUTOVER COMPLETE — two Claude Opus 5.5 OAuth adversarial reviews completed. Second verdict: READY WITH CHANGES; all earlier findings closed, with two Contact-preservation corrections incorporated below. See [review 1](EXPERTISE_ROSTER_OPUS_5_5_REVIEW_2026-11-19.md) and [review 2 with disposition](EXPERTISE_ROSTER_OPUS_5_5_REVIEW_2_2026-11-19.md). Owner subsequently authorized implementation on November 19; see [build evidence](EXPERTISE_ROSTER_BUILD_2026-11-19.md). Production import, migrations 103/104 and the Dataverse-backed Admin editor are complete. Amy ID 40 remains active and lead-PD eligible with her existing profile and future email preserved; no app access was granted and nothing was sent. See [execution checkpoint](EXPERTISE_ROSTER_PRODUCTION_EXECUTION_2026-11-19.md).**
 
 Owner direction, November 19, 2026: move the small, infrequently used roster from
 Postgres to Dataverse and move its editor into Admin. Treat the roster as static
@@ -11,10 +11,10 @@ later steps, not prerequisites for delivering this migration.
 
 ## 1. Deliverable and scope
 
-[PLANNED] Dataverse owns the roster's editable content. Staff maintain it at
-**Admin → People & Access → Expertise Roster**, proposed URL
-`/admin?workspace=people&view=expertise-roster`. Connor can read the same table
-through his existing Dataverse connection. There is no new HTTP roster API for
+[VERIFIED via November 19 production import and signed-in Admin acceptance] Dataverse owns the roster's editable content. Staff maintain it at
+**Admin → People & Access → Expertise Roster**, URL
+`/admin?workspace=people&view=expertise-roster`. The table is available for Connor’s Dataverse connection; his actual flow-connection
+check remains outstanding. There is no new HTTP roster API for
 Power Automate and no additional Claude call in this migration.
 
 The editor supports list/search, category filtering, include-inactive, add, edit,
@@ -23,7 +23,7 @@ Contact reference, preferred email, staff User link, and lead-PD eligibility.
 Use the existing Admin layout and editor patterns; no general Admin redesign.
 Deletion is deactivation, preserving historical references.
 
-[PLANNED] In Dataverse mode, the old Roster tab becomes a link to Admin for authorized
+[VERIFIED via November 19 deployed UI/source] In Dataverse mode, the old Roster tab becomes a link to Admin for authorized
 administrators; its legacy roster GET and mutation methods refuse access with a
 clear moved-to-Admin response (409), rather than exposing the Admin DTO or User picker.
 In Postgres mode, retain today's editor, with admin-only mutations and the cutover
@@ -37,7 +37,7 @@ new roster source; do not import a new recommendation product as part of this wo
 
 | Claim | Evidence | Status |
 |---|---|---|
-| Current roster CRUD is in Expertise Finder and uses Postgres | `pages/api/expertise-finder/roster.js`; migrations 004, 035, 050 | VERIFIED via source |
+| Pre-migration roster CRUD was in Expertise Finder and used Postgres | `pages/api/expertise-finder/roster.js`; migrations 004, 035, 050 | VERIFIED via source |
 | Admin has a People & Access workspace and navigation registry | `pages/admin.js`, `shared/components/admin/workspaces/PeopleWorkspace.js`, `shared/components/admin/AdminWorkspaceNavigation.js` | VERIFIED via source |
 | Existing numeric roster IDs are used by feedback and recipient resolution | `lib/services/consultant-feedback-service.js`, `lib/services/site-visit/recipient-directory-service.js` | VERIFIED via source |
 | Proposal lists use that recipient directory and store the roster ID in recipient provenance | `lib/services/proposal-lists/list-link-service.js` | VERIFIED via source |
@@ -90,8 +90,11 @@ as well as a Dataverse profile; test this path, not only the imported records.
 
 Carry forward the owner's recorded mappings from the November 9 handoff: Justin
 and Jean active/lead eligible; Beth active/not lead eligible; John E. Sader changes
-to Research Program Staff, active/lead eligible; Kevin inactive; Amy Rowat staged
-inactive with no User link or lead eligibility. Verify production GUIDs at import.
+to Research Program Staff, active/lead eligible; Kevin inactive. The owner’s November 19
+clarification supersedes Amy’s old staged-inactive decision: preserve existing ID 40,
+active Staff, lead-PD eligible, linked to her already-existing production User. Preserve
+her complete profile and future email; grant no app access and send nothing. Production
+GUIDs were verified at import.
 Store lead-PD eligibility for the later automation
 step; this migration does not promise to change the standalone matcher's current
 role-based recommendation policy. Its existing prompt treats Research Program Staff
@@ -105,8 +108,10 @@ Initially all roster creation/maintenance goes through Admin. Connor's connectio
 reads profiles; direct Dynamics-created profiles are not part of this release,
 because existing application consumers also need the numeric mapping. Grant Connor's
 flow identity read-only table privileges and inspect its effective permissions. If
-its existing identity already has broader rights, resolve that access choice before
-handoff; do not assume a read-only role removes permissions granted elsewhere.
+its existing identity already has broader rights, report that access choice for
+separate follow-up; do not strip unrelated permissions or claim a read-only role
+removes permissions granted elsewhere. Production inspection found broader existing
+rights for Connor, which were preserved; his actual flow-connection check remains open.
 
 ### Editor and authorization
 
@@ -145,10 +150,13 @@ only change prompt/ID validation if that contract actually requires it.
 
 Do not merge the parked branch wholesale. Omit sandbox/rehearsal infrastructure,
 concurrency machinery, unrelated authentication/upload changes, and expanded
-recommendation-output features. Runtime work goes on a new feature branch based on
-current main; this planning change is documentation only.
+recommendation-output features. Runtime work was built on the November 19 feature branch and deliberately promoted
+to main. The execution report records the live result.
 
 ## 4. Production cutover — one operator
+
+Executed November 19; the following is the accepted sequence. See the execution
+report for actual receipts, acceptance coverage and Connor’s outstanding connection check.
 
 1. **Prepare:** finish the bounded code change and focused tests; record the previous
    deployment and rollback command. Recheck the production roster, table metadata,
@@ -230,7 +238,7 @@ Recovery, including a partial import: keep the current setting until the source 
 ready. Compare the expected final import roster plus any post-cutover edits with
 Postgres and manually reconcile all affected IDs first, not only edits since cutover.
 Preserve John's category, Kevin's and ID 35's inactive/nonselectable state, Amy's
-staged record, and any later additions with the same numeric IDs. Retain User links/
+active record, and any later additions with the same numeric IDs. Retain User links/
 lead eligibility in the private export where legacy Postgres cannot express them.
 If Dataverse cannot be read, use the import report and recorded acceptance edits;
 resolve unknown edits before reopening the old store. Verify references, then restore
@@ -268,12 +276,13 @@ implementation review and verification are tracked separately in
 `EXPERTISE_ROSTER_BUILD_2026-11-19.md`. No API-key agent session, Ultrareview or live
 production probe was used for the planning task.
 
-Sweep Mode A: the changed fact is owner direction, not deployed storage. This plan
+Historical planning sweep Mode A: the changed fact then was owner direction.
+The November 19 execution sweep now reconciles deployed Dataverse ownership. This plan
 supersedes the Postgres-plus-HTTP proposal in
 `EXPERTISE_ROSTER_POWER_AUTOMATE_PLAN_2026-11-19.md` and the earlier sandbox prerequisites
 for this roster migration. The November 9 handoff remains explicitly historical;
 parked branch code/evidence remains preserved. `SESSION_PROMPT.md` points here.
-Current-source Atlas descriptions remain accurate until migration actually occurs.
+Current-source Atlas descriptions now record the completed production migration.
 The historical production inventory remains dated, not promoted to a live claim.
 
 Contract review scope: whole-flow, partial import success, durable identity/reference

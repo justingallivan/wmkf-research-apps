@@ -152,13 +152,17 @@ RBAC scaffolding for the explorer write tools. Restrictions table is empty; a 27
 
 ## Expertise Finder
 
-### `expertise_roster` (39 rows), `expertise_matches` (344 rows)
-**Source of truth:** Postgres by default; production cutover not executed here.
-[VERIFIED via branch source 2026-11-19] The Admin editor and consumer backend switch
-are implemented; Dataverse mode uses Expertise Profiles and a numeric bridge. See
-[Expertise Profiles](dataverse-wmkf-expertiseprofile.md) for `expertise_roster_identity`,
-`expertise_roster_binding`, migration 103, and the separately staged feedback FK.
-The following production description is the retained Postgres-mode baseline.
+### `expertise_roster` (40 retained rows), `expertise_matches` (344 rows)
+**Source of truth:** Dataverse owns roster content; Postgres retains matching history.
+[VERIFIED via production import/API/SQL and signed-in Admin, 2026-11-19] Production
+uses `EXPERTISE_ROSTER_BACKEND=dataverse`. See
+[Expertise Profiles](dataverse-wmkf-expertiseprofile.md) for the live editor,
+`expertise_roster_identity` / `expertise_roster_binding` (migration 103) and the
+validated feedback FK to identity (migration 104). All 10 Contact links were preserved.
+The 40 original Postgres rows are frozen recovery data, not an editable mirror.
+All 344 matching-history rows remain; their existing null `user_profile_id` values
+mean the unchanged profile-filtered history UI does not expose them to Justin.
+The following describes the retained Postgres-mode schema/recovery baseline.
 Internal staff/consultant/board roster + per-proposal match history. Production
 consumers are `pages/api/expertise-finder/{match,batch-match,roster,history}.js`;
 production prompt rules live in the Dataverse `expertise-finder.match`
@@ -1102,12 +1106,13 @@ two entries derive the same filename. A signed-in production smoke on request
 1003222 proved create, upload/finalize, staff open, and delete.
 
 Columns: `id`, `request_id` (Dataverse `akoya_request` GUID, GUID-validated at
-the route boundary), `consultant_roster_id` (FK `expertise_roster.id`,
-nullable; joined **live and unfiltered by `is_active`** for display, so a
+the route boundary), `consultant_roster_id` (FK `expertise_roster_identity.id`
+since production migration 104, 2026-11-19; nullable; author content resolves from
+Dataverse **live and unfiltered by `is_active`** for display, so a
 deactivated consultant's past feedback keeps its author name),
 `one_off_name`/`one_off_affiliation` (used only when `consultant_roster_id` is
 null — a one-off consultant name stored on the entry itself; CF6: one-offs are
-never written to `expertise_roster` and never appear in recipient pickers),
+never written to either roster backend and never appear in recipient pickers),
 `body_html` (sanitized HTML, same `sanitizeReviewHtml` pipeline as reviews,
 re-sanitized on every read; required unless `requestdocument_id` is set —
 an attachment-only entry may carry a null body), `received_on` (date),
@@ -1131,7 +1136,7 @@ Constraints: `consultant_feedback_has_content` (`body_html IS NOT NULL OR
 requestdocument_id IS NOT NULL`); `consultant_feedback_one_author` (exactly
 one of `consultant_roster_id` / `one_off_name`). Server-side eligibility
 (`is_active = true AND role_type = 'Consultant'` against the selected roster backend;
-Postgres by default, Dataverse plus numeric bridge after cutover)
+Dataverse plus numeric bridge in production since 2026-11-19; Postgres remains the unset-mode default for recovery)
 is enforced in the service on create and on any author change — the FK alone
 would accept a Board member or an inactive roster row.
 

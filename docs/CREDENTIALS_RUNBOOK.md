@@ -35,17 +35,18 @@ changes that policy.
 
 ---
 
-## Expertise roster backend (branch source, 2026-11-19)
+## Expertise roster backend (production verified, 2026-11-19)
 
 `EXPERTISE_ROSTER_BACKEND` is a non-secret server-only selector: unset/empty/`postgres`
 keeps legacy storage; `dataverse` selects the registered production host; any other
-value fails closed. Do not enable until import verification and the separate feedback
-FK cutover pass. Admin saves require `DYNAMICS_IMPERSONATION_ENABLED=true` and the
+value fails closed. Production is explicitly `dataverse` (readable Config), enabled
+after exact import verification and migration 104 feedback-FK cutover. Admin saves require `DYNAMICS_IMPERSONATION_ENABLED=true` and the
 session's mapped User; they never retry as the application principal. Operator-only
 `EXPERTISE_ROSTER_ACTOR_ID` identifies the mapped User for import; it is not web input.
 Production access flags remain owner-supplied, and the new CLIs load no env files.
 See [cutover and recovery](plans/EXPERTISE_ROSTER_CUTOVER_RUNBOOK_2026-11-19.md).
-No production setting was changed in this build.
+The production deployment and signed-in Admin saves verified this setting. Recovery
+requires data/identity reconciliation and the runbook sequence, not a flag flip alone.
 
 ## All Environment Variables
 

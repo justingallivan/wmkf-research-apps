@@ -1,9 +1,13 @@
 # Expertise Profiles and numeric roster bridge
 
-**[VERIFIED via production preflight and deployment, 2026-11-19.]**
-Schema, roles and migration 103 are provisioned; new code is deployed in Postgres mode.
-Import/cutover await the Amy Rowat active-state decision; see the
-[execution checkpoint](../plans/EXPERTISE_ROSTER_PRODUCTION_EXECUTION_2026-11-19.md). `EXPERTISE_ROSTER_BACKEND` unset,
+**[VERIFIED via production import, SQL/API readback and signed-in Admin acceptance, 2026-11-19.]**
+Dataverse owns roster content; Production `EXPERTISE_ROSTER_BACKEND=dataverse` is
+active. Migrations 103/104 are applied. Exact verification imported 39 profiles
+from 40 source identities, excluding placeholder 35; all 10 Contact links survived.
+Acceptance added one inactive test profile: final snapshot 40 profiles, 41 identities,
+40 bindings and 21 active matching candidates. Amy ID 40 is active and lead eligible,
+with her existing User, profile and future email preserved; no access grant or send.
+See the [execution report](../plans/EXPERTISE_ROSTER_PRODUCTION_EXECUTION_2026-11-19.md). `EXPERTISE_ROSTER_BACKEND` unset,
 empty, or `postgres` retains Postgres; `dataverse` selects the production-only
 adapter; unknown values fail closed. See the [runbook](../plans/EXPERTISE_ROSTER_CUTOVER_RUNBOOK_2026-11-19.md).
 
@@ -55,8 +59,9 @@ cannot allocate an arbitrary replacement ID. The first production binding blocks
 legacy route/seed/contact-link mutations. Existing Postgres reads continue during
 import; Admin is unavailable until the switch.
 
-`consultant_feedback` remains Postgres. Its current FK remains on `expertise_roster`
-until a separate, post-verification cutover migration is introduced from the SQL
-template. It then references identity; no feedback is deleted/reassigned. Matching
+`consultant_feedback` remains Postgres. Migration 104, applied after exact import
+verification, retargeted its FK to `expertise_roster_identity(id)`; all seven original
+feedback rows remain unchanged. One private synthetic acceptance entry references
+the inactive test profile. No original feedback was deleted or reassigned. Matching
 history stays in `expertise_matches`. Old roster content stays for manual recovery.
 Backend automation and Expertise Finder retirement are separate later work.
