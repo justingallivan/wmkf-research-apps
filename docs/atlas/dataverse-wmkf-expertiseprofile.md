@@ -33,13 +33,12 @@ operator process, not a web endpoint. Connor has the Reader role but his broader
 connection/read-only acceptance remains open. Direct CRM
 creation is not supported because numeric consumers require a binding.
 
-Reads: Admin list; single/batch Expertise Finder matching; consultant eligibility,
+Reads: Admin list; consultant eligibility,
 feedback author/attachment/briefing hydration; Site Visit/meeting and proposal-list
 recipient directory. `roster-consumer-service` projects numeric IDs, includes
 inactive authors for history, rejects incomplete/unbound records and propagates
 outages. Excluded placeholder ID 35 has no profile: historical author displays
-“Unavailable consultant”. The standalone matcher retains its current role-based
-policy; lead eligibility is stored for later automation only.
+“Unavailable consultant”. Standalone matching retirement is built; see the [retirement report](../plans/EXPERTISE_FINDER_RETIREMENT_2026-11-19.md) for release status. Lead eligibility is stored for later backend automation.
 
 ## Postgres `expertise_roster_identity`, `expertise_roster_binding`
 
@@ -64,4 +63,4 @@ verification, retargeted its FK to `expertise_roster_identity(id)`; all seven or
 feedback rows remain unchanged. One private synthetic acceptance entry references
 the inactive test profile. No original feedback was deleted or reassigned. Matching
 history stays in `expertise_matches`. Old roster content stays for manual recovery.
-Backend automation and Expertise Finder retirement are separate later work.
+Backend automation remains separate. Standalone retirement and history cleanup are tracked in the retirement report.

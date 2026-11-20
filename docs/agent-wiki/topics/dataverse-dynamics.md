@@ -185,22 +185,15 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
   `docs/audits/audit-history-shape-2026-10-28-evidence.json`,
   `docs/plans/CYCLE_CALENDAR_DATAVERSE_PLAN_2026-10-28.md` §4 and §6; Atlas
   `docs/atlas/dataverse-wmkf-grantcycle.md`.
-- **Expertise roster Contact links are reference-only** **[PRODUCTION-LIVE
-  2026-09-14; Postgres migration 050 applied and read back].** The roster keeps its
-  Postgres `id` as the durable attendee identity and may hold one optional
-  `dataverse_contact_id`; a partial unique index permits only one active roster
-  row per Contact. Linked Board/Consultant directory rows read the active
-  Contact's current `emailaddress1` and never fall back to the manual roster
-  email when the Contact is missing, inactive, or email-less. The roster editor
-  can search existing Contacts but cannot create or edit them; its route is
-  bounded, wrapped in `withDalContext`, and guarded by the `expertise-finder`
-  app grant. The owner backfill is dry-run by default; only exact unique active
-  email-bearing ORCID matches are automatic, while name matches require an
-  explicit `rosterId=contactId` confirmation. Apply mode additionally requires
-  `--actor-profile-id` and records that profile in `updated_by`. The initial
-  owner-reviewed production reconciliation linked ten active Board/Consultant
-  rows. Five Board rows intentionally remain unlinked for this cycle and are a
-  non-blocking future-cycle reconciliation; see the roster Contact-link plan F5.
+- **Expertise roster Contact links are reference-only** **[PRODUCTION migration verified 2026-11-19].**
+  Dataverse `wmkf_expertiseprofile.wmkf_contactguid` preserves the 10 original Contact
+  GUIDs; `expertise_roster_identity` / `expertise_roster_binding` preserve numeric
+  attendee identities. Contact/User alternate keys reserve identities across active
+  and inactive profiles. Linked recipients use the active Contact's current email,
+  with no silent manual-email fallback. Admin's superuser-guarded roster endpoint
+  searches existing Contacts without creating or editing them. Legacy Postgres
+  scripts refuse writes after the migration marker. Standalone app retirement is
+  tracked in `docs/plans/EXPERTISE_FINDER_RETIREMENT_2026-11-19.md`.
 
 - **SharePoint package-promotion behavior is supported by specific samples, not a universal Office-file guarantee.** In a sandbox DOCX upload sample (Request 1000342, 2026-09-24), promotion added SharePoint `customXml`, rewrote package metadata and document relationships, and added `[trash]` entries; the governed content matched after normalization of the document-relationship rewrite. A second sandbox sample (Pre-Site v6 template into `akoya_request`, Request 1000348, 2026-09-27) showed some pre-existing SharePoint `customXml` parts rewritten for the destination library. A production XLSX copy sample (Request 1003308, 2026-10-02) differed in `docProps/custom.xml`; unpromoted XLSX and PPTX behavior is uncharacterized. One Word-edited DOCX sample (Request 1002903, 2026-09-17) was byte-identical across its observed round-trip; that does not establish a guarantee for all Word-edited packages. `hashGovernedDocxContent` covers all `word/` parts plus relationship-reachable parts outside `word/` and their relationship parts. The DOCX attestation applies characterized package normalizations, while `allowSharePointRewrites` permits rewrites to pre-existing SharePoint-shaped `customXml` parts only for app renders; uploader-supplied source `customXml` must remain byte-identical. Use the relevant attestation for governed DOCX package checks and do not generalize these samples to PPTX or other workflows. These Office samples establish no universal byte-stability guarantee for other formats. The frozen-distribution Word snapshot reuse (`validateReadySnapshot`) and briefing `writeup-docx` member compare `hashGovernedDocxContent` (Pre-RP Brief plan §12 Finding A). First observed on the Cycle Dossier production smoke, 2026-09-12.
 

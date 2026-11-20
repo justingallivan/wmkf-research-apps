@@ -44,11 +44,11 @@ export const ADMIN_PROMPT_CATALOG = Object.freeze({
     usage: "application",
   },
   "expertise-finder.match": {
-    group: "reviewers",
+    group: "reference",
     title: "Match a proposal to the internal expertise roster",
     description: "Compares a proposal with the supplied internal reviewer roster, explains suitable matches, and identifies expertise gaps.",
-    usedBy: "Expertise Finder → single-proposal and batch matching",
-    usage: "application",
+    usedBy: "Retired Expertise Finder — stored reference; backend adoption is separate",
+    usage: "reference",
   },
   "field-primer.generate": {
     group: "preflight",

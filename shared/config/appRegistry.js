@@ -119,15 +119,7 @@ export const APP_REGISTRY = [
     categories: ['phase-i', 'phase-ii'],
     features: ['Retraction Watch DB', 'Manual PubPeer Link', 'News Analysis', 'AI Summarization'],
   },
-  {
-    key: 'expertise-finder',
-    name: 'WMKF Expertise',
-    href: '/expertise-finder',
-    icon: '🧠',
-    description: 'Match grant proposals to internal staff, consultants, and board members using AI-powered expertise analysis',
-    categories: ['phase-i', 'phase-ii'],
-    features: ['Staff Assignment', 'Consultant Matching', 'Board Interest', 'Roster Management'],
-  },
+
   {
     key: 'grant-reporting',
     name: 'Grant Reporting',
@@ -185,6 +177,16 @@ export const DEFAULT_APP_GRANTS = ['dynamics-explorer'];
  *   'direct-url-test'   — live direct-URL / test surface, intentionally not in nav
  */
 export const APP_LIFECYCLE_REGISTRY = {
+  'expertise-finder': {
+    name: 'WMKF Expertise',
+    status: 'deprecated',
+    successorKey: null,
+    deprecatedAt: '2026-11-19',
+    archivedTo: '_archived/pages/expertise-finder.js',
+    grantsRetained: true,
+    notes: 'Standalone matching retired. Admin owns roster editing; shared roster consumers remain live. Backend matching is separate. Existing grants confer no executable matching route.',
+    lastVerified: '2026-11-19',
+  },
   'cycle-dossier': {
     name: 'Scientific dossier',
     status: 'direct-url-test',

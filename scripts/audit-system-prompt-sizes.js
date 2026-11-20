@@ -110,28 +110,6 @@ const MODEL = COUNT_MODEL;
     rows.push({ app: 'dynamics-explorer (system + tools)', desc: 'what actually gets cached', tokens: tokensWithTools, hasCacheControl: true, tier: 'haiku' });
   }
 
-  // ── 4. expertise-finder ─────────────────────────────────────────────────
-  // The match routes pass a cacheable system block composed from the bundled
-  // row (resolver fallback) + the roster variables. Measure the realistic
-  // shipped size with a representative roster — the real call path varies with active
-  // roster, but a typical foundation roster falls in this shape.
-  {
-    const { EXPERTISE_FINDER_MATCH_ROW, buildExpertiseMatchVariables } = await import('../shared/config/prompts/expertise-finder-dynamics.js');
-    const { composeToolPromptPair } = await import('../lib/services/tool-prompt-composer.js');
-    const synthRoster = buildSyntheticRoster();
-    const { systemPrompt: sys } = composeToolPromptPair(
-      { systemPrompt: EXPERTISE_FINDER_MATCH_ROW.systemPrompt, body: EXPERTISE_FINDER_MATCH_ROW.body },
-      buildExpertiseMatchVariables({ rosterMembers: synthRoster, wrappedProposal: '', additionalNotes: '' }),
-      { nonces: [] },
-    );
-    rows.push({
-      app: `expertise-finder (roster of ${synthRoster.length})`,
-      desc: 'composed expertise-finder.match system prompt with representative active roster',
-      tokens: await countTokens(sys),
-      hasCacheControl: true,
-    });
-  }
-
   // ── 6. phase-i-summaries (v1 Phase I) ───────────────────────────────────
   {
     const { createPhaseISummarizationPrompt } = await import('../shared/config/prompts/phase-i-summaries.js');
@@ -176,29 +154,3 @@ const MODEL = COUNT_MODEL;
     for (const r of belowFloor) console.log(`    - ${r.app} (${r.tokens} tok < ${r.tier || 'sonnet'} floor ${floorFor(r)})`);
   }
 })().catch(e => { console.error('FATAL:', e.message); console.error(e.stack); process.exit(1); });
-
-/**
- * Synthetic active-roster used to measure Expertise Finder's cached system
- * size without depending on a live Postgres connection. Member field densities
- * mirror the typical shape of expertise_roster rows.
- */
-function buildSyntheticRoster() {
-  const filler = (n) => 'lorem ipsum keywords domain terms separated by commas '.padEnd(n, '. ').slice(0, n);
-  const mk = (i, role_type, role) => ({
-    name: `Member ${i}`,
-    role_type,
-    role,
-    affiliation: 'Institution Name University Department of Science',
-    primary_fields: filler(120),
-    keywords: filler(180),
-    subfields_specialties: filler(150),
-    methods_techniques: filler(150),
-    expertise: filler(220),
-    keck_affiliation: 'Keck Research Liaison',
-  });
-  const roster = [];
-  for (let i = 1; i <= 6; i++) roster.push(mk(i, 'Research Program Staff', 'Program Director'));
-  for (let i = 1; i <= 6; i++) roster.push(mk(i, 'Consultant', 'External Consultant'));
-  for (let i = 1; i <= 4; i++) roster.push(mk(i, 'Board', 'Board Member'));
-  return roster;
-}

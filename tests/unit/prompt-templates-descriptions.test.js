@@ -265,9 +265,9 @@ test('all audited prompts appear once across the proposed workflow groups and th
   render(<PromptTemplatesSection />);
   await screen.findByLabelText('Search prompts');
   for (const label of [
-    'Pre-flight (4)', 'Reviewer selection (3)', 'Reviews and evaluations (11)',
+    'Pre-flight (4)', 'Reviewer selection (2)', 'Reviews and evaluations (11)',
     'Meetings and briefings (7)', 'Awardee content (2)', 'Research and office tools (7)',
-    'Diagnostics and drafts (2)', 'Legacy app prompts — stored reference (4)',
+    'Diagnostics and drafts (2)', 'Legacy app prompts — stored reference (5)',
   ]) expect(screen.getByText(label)).toBeInTheDocument();
   expect(screen.getAllByRole('article', { hidden: true })).toHaveLength(40);
   fireEvent.click(screen.getByText('Reviews and evaluations (11)', { selector: 'summary' }));

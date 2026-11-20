@@ -26,19 +26,19 @@ are machine-verified — `N` against the derive, the anchor against this registr
 
 ## app-definition-count
 
-- **Live value:** 14
+- **Live value:** 13
 - **Description:** APP_REGISTRY application definitions
 - **Derive:** `shared/config/appRegistry.js` → `APP_REGISTRY.length`
 
 ## requireappaccess-endpoint-count
 
-- **Live value:** 207
+- **Live value:** 201
 - **Description:** pages/api files with requireAppAccess() call sites
 - **Derive:** `pages/api/**/*.{js,mjs,cjs,jsx,ts,tsx}` → count of files containing at least one `requireAppAccess(...)` call
 
 ## api-route-file-count
 
-- **Live value:** 336
+- **Live value:** 330
 - **Description:** pages/api route files (matches check:api-routes walker)
 - **Derive:** `pages/api/**/*.js` → count of route files (same predicate `scripts/check-api-route-security-matrix.js` uses)
 

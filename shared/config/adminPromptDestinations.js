@@ -30,8 +30,8 @@ export const ADMIN_PROMPT_CALLER_DESTINATIONS = Object.freeze({
   // Tool routes return results; this does not describe separate user save/export actions.
   'expense-reporter.extract-document': returned,
   'expense-reporter.extract-image': returned,
-  // pages/api/expertise-finder/match.js + expertise-finder/batch-match-service.js.
-  'expertise-finder.match': { summary: 'Match results in Postgres.', fields: ['expertise_matches.match_results'] },
+  // Standalone Expertise Finder retired; no application execution or destination.
+  'expertise-finder.match': reference,
   // field-primer/generate-service.js generateForRequest vs generateStandalone.
   'field-primer.generate': {
     summary: 'Request → AI Field Primer when generated for a grant; standalone generation returns the result without a grant-field write.',
