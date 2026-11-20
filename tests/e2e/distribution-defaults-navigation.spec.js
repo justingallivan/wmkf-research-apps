@@ -30,6 +30,7 @@ async function setup(context, baseURL) {
     if (p === '/api/workbench/resolve-request') return json({ success: true, requestId: ID, requestNumber: '123', title: 'Distribution fixture', programDirectorId: OWNER });
     if (p === '/api/workbench/pre-rp-brief') return json({ success: true, currentArtifact: { artifactId: '44444444-4444-4444-8444-444444444444', operationStatus: 100000001, lifecycleState: 100000000, receivedReviewCount: 1, file: { name: 'Brief.docx', webUrl: `${baseURL}/fixture-brief.docx` } }, writeupAccess: { canChange: true, identityLinked: true, canRegenerate: true } });
     if (p === '/api/workbench/reviewer-rollup') return json({ success: true, requests: [] });
+    if (p === '/api/workbench/request-narratives') return json({ success: true, requestId: ID, canEdit: false, version: null });
     if (p === '/api/workbench/pre-site-visit') return json({ success: true, currentArtifact: null });
     if (p === '/api/workbench/site-visit/logistics') return json({ siteVisit: null, materials: [], presentationMaterialsStatus: 'disabled' });
     if (p === '/api/workbench/site-visit/recipients') return json({ staff: [], external: [] });
