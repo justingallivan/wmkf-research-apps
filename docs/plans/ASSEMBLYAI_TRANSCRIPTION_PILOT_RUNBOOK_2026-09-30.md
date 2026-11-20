@@ -2,8 +2,8 @@
 title: "AssemblyAI transcription pilot pre-enable runbook"
 domain: transcription
 kind: operations-runbook
-status: dedicated-project-review-enabled-submissions-disabled-speaker-label-live
-summary: "Dedicated Production is READY in review-only mode (pilot enabled, submissions disabled). One authorized hosted job is ready with transcript retained, input Blob absent, and provider API deletion verified. Migration 062 is applied and verified in isolated Neon; speaker-label UI is live and hosted save/reload plus TXT/VTT were verified. Timer delivery and maximum-size processing remain unverified; the old shared-project alias is unchanged."
+status: isolated-interface-retired; shared-interface-retired; cleanup-preserved
+summary: "The isolated standalone interface is retired live; shared PR #653 is Production-live (`b869fdf85`). November 19 isolated review found one expired owner-visible recording, inaccessible content, local cleanup pending and provider deletion recorded confirmed. Preserve protected operational APIs and cleanup resources; October enablement receipts are historical."
 owner: product-engineering
 related:
   - docs/plans/ASSEMBLYAI_TRANSCRIPTION_PILOT_PLAN_2026-09-30.md
@@ -14,7 +14,40 @@ related:
 
 # AssemblyAI transcription pilot pre-enable runbook
 
-## Release status
+## Current maintenance disposition — 2026-11-19
+
+The owner authorized standalone interface retirement while preserving Meeting
+Tracker and the shared engine. Source `df7537fc4` removes the Admin link and
+replaces the page with a retirement notice. The isolated retirement is live in verified deployment
+`dpl_4cujwwr6uiVd4gyu8vSzpNS5gWdw`; shared PR #653 is Production-live (`b869fdf85`).
+The release evidence records the dedicated-manifest packaging correction and
+post-promotion verification of the exact two retained schedules.
+
+The legacy `wmkf-transcription-pilot.vercel.app` alias was removed on November 19;
+its public pilot path now returns 404. The old deployment and data were retained.
+
+The pre-retirement inspection used the isolated October 1 deployment.
+Authenticated owner-scoped review showed one **Expired** recording: transcript
+access denied, local cleanup **pending**, provider cleanup recorded confirmed.
+The CSV export was blocked by Chrome and no database-wide/Blob inventory was
+available. Retain storage, exact-path cleanup records, operational APIs and
+schedules. Do not extend retention or resurrect expired content. Details and
+release boundaries are in the [retirement evidence](evidence/TRANSCRIPTION_PILOT_RETIREMENT_2026-11-19.md).
+
+Retirement changes the interface only. The environment/secret, retention and
+cleanup, and recovery contracts below remain operational guidance for retained
+services. New pilot submissions remain disabled. Interface retirement does not
+authorize deleting data, disabling maintenance, or migrating the isolated schema.
+
+## Historical pre-enable release and initialization record
+
+The following September/October checkpoints, through **Historical pre-enable migration and
+deployment checklist**, preserve the original pilot authorization and acceptance history.
+Their present-tense UI/transcript availability and enablement instructions are
+historical, not current work to reopen the pilot. Current maintenance resumes at
+**Environment and secret checklist** below.
+
+### Release status at the October 1 checkpoint
 
 **[VERIFIED CURRENT STATUS; REVIEW ENABLED, NEW SUBMISSIONS DISABLED]** The
 dedicated project `wmkf-transcription-pilot-isolated`
@@ -331,7 +364,7 @@ records are explicitly `false`, independently verified as described above.
 Keep them false until the owner separately authorizes enabling and all gates
 are cleared; the READY deployment is not pilot-use approval.
 
-## Before migration or deployment
+## Historical pre-enable migration and deployment checklist
 
 1. Owner authorization covers isolated Neon initialization, branch-only
    Preview environment configuration, migration 061 applied once in isolated
@@ -419,7 +452,7 @@ source. Selected Vercel environment-name/target metadata was inspected, not
 secret values, effective resource access or rotation state. Refer to `docs/CREDENTIALS_RUNBOOK.md` for the authoritative
 secret-entry process; this runbook does not replace its registry.
 
-## Privacy, vendor, and runtime gates
+## Historical pilot enablement gates
 
 - **Workflow deployment and recovery:** source uses Workflow 5.0.0; the owner
   has explicitly authorized one provider-free synthetic Workflow test. This
@@ -479,6 +512,10 @@ secret-entry process; this runbook does not replace its registry.
   general-purpose provider layer is in scope.
 
 ## Retention and cleanup operations
+
+These contracts remain relevant after interface retirement. Current source and
+the target deployment revision govern runtime behavior; the older isolated
+October engine must not be assumed to contain later shared-engine fixes.
 
 ### Historical local Workflow integration checkpoint — 2026-10-01
 
@@ -540,9 +577,11 @@ overwrite, and read back/hash-verified before ready.
 ## Recovery and abandonment
 
 - If upload/start returns retryable `503 transcription_dispatch_pending`, the
-  recording is already saved as a queued job. Keep that job selected and use
-  Retry start, which repeats durable-workflow delivery for the same job; do
-  not upload again or create another job/provider submission.
+  recording is already saved as a queued job. Operational recovery must repeat
+  durable-workflow delivery for that same job, preserving the existing route's
+  identity, version and acknowledgment requirements. The retired pilot page no
+  longer provides Retry start; do not upload again or create another job/provider
+  submission. Meeting Tracker retains its separate interface.
 - Before durable provider submission intent, an expired lease can safely
   return to queued, unless deletion was requested; that job transitions to
   expired and is claimed for cleanup. No provider POST has yet been authorized
@@ -585,7 +624,9 @@ overwrite, and read back/hash-verified before ready.
 
 ## Stop conditions
 
-Do not enable the pilot if the migration tracker/physical schema is ambiguous,
+The standalone interface is retired in shared and isolated Production; these retained controls do not
+constitute a plan or authorization to re-enable it. For any separately authorized
+future transcription use, stop if the migration tracker/physical schema is ambiguous,
 either flag is literal `true` before approval, any required secret is missing
 or mis-scoped, the account privacy/retention terms are unresolved for the
 selected recordings beyond the owner's explicit non-sensitive risk acceptance,

@@ -2,8 +2,8 @@
 title: "Atlas: AssemblyAI transcription pilot (Postgres)"
 domain: postgres
 kind: state-page
-status: meeting-tracker-production-staff-enabled; dedicated-pilot-review-enabled
-summary: "Meeting Tracker transcription is enabled for Production staff after shared-schema verification and bounded end-to-end acceptance. The separate dedicated pilot remains review-only. Cleanup/recovery schedules are registered; clock-driven delivery and untested recovery branches remain unverified."
+status: meeting-tracker-production-staff-enabled; isolated-pilot-interface-retired; shared-interface-retired
+summary: "Meeting Tracker transcription remains staff-enabled. The isolated standalone interface is retired live; shared PR #653 is Production-live (`b869fdf85`). November 19 isolated review found one expired owner-visible recording with local cleanup pending. Protected APIs, storage and shared cleanup/recovery remain preserved."
 canonical: true
 cataloged: 2026-10-01
 owner: product-engineering
@@ -23,6 +23,31 @@ related:
 # Atlas: AssemblyAI transcription pilot (Postgres)
 
 ## Current status
+
+**[VERIFIED source and bounded live inspection, 2026-11-19]** Source `df7537fc4`
+removes the standalone pilot Admin link and replaces its page with a retirement
+notice. The shared engine, Meeting Tracker, protected pilot APIs, schemas, storage,
+callbacks and schedules are unchanged in the source change. The isolated retirement is live in verified deployment
+`dpl_4cujwwr6uiVd4gyu8vSzpNS5gWdw`; shared PR #653 is Production-live (`b869fdf85`).
+The isolated package preserves the October runtime and exact two dedicated cron
+schedules; see the release evidence for the manifest packaging correction.
+The legacy `wmkf-transcription-pilot.vercel.app` alias was removed on November 19;
+its public pilot path now returns 404. The old deployment and data were retained.
+
+The isolated project was still on October deployment
+`dpl_EtKyWuWqTHXuXGQNUGUhTQGFrBhY` at inspection, with one owner-visible
+**Expired** recording and inaccessible content. Local cleanup was **pending**;
+provider deletion was recorded confirmed. No database-wide/Blob inventory or
+successful evaluation export was obtained. Preserve unresolved cleanup state and
+resources; do not infer physical erasure or resurrect expired content. See the
+[retirement evidence](../plans/evidence/TRANSCRIPTION_PILOT_RETIREMENT_2026-11-19.md).
+
+### Historical shared-engine and pilot release checkpoints
+
+The dated checkpoints below retain their original observations. In particular,
+the October pilot's ready transcript and UI acceptance do not describe the
+expired November result. Current ownership and service contracts resume under
+**Intended state ownership**.
 
 **[PRODUCTION-LIVE, 2026-10-19 PT; PR #513 `413c5f048`, all 12 checks passed.]**
 `codex/zoom-audio-streaming` adds metadata-gated exact-size audio reads with bounded
@@ -264,9 +289,10 @@ overlay only while content access is allowed and the evaluation receipt is
 live; aggregate evaluation CSV omits names. Server-side TXT/VTT formatters use
 saved names, with TXT/minute-grouped readable text headed `0:00`, `1:00`, etc.
 and VTT retaining original utterance timing. Migration 062 is applied in
-isolated Neon; the PATCH/UI consumer is live in deployment
-`dpl_EtKyWuWqTHXuXGQNUGUhTQGFrBhY` and its save/download flow was smoke-tested
-on the live one-job transcript.
+isolated Neon. At the historical October checkpoint, the PATCH/UI consumer in
+`dpl_EtKyWuWqTHXuXGQNUGUhTQGFrBhY` passed save/download checks on its then-readable
+transcript. November inspection found that result expired; current source replaces
+the standalone UI with a notice while retaining the protected PATCH contract.
 
 ## Source paths and evidence
 
@@ -285,8 +311,9 @@ on the live one-job transcript.
   `lib/services/transcription-pilot/workflow-dispatch.js`, `workflow.js`,
   and the provider-free `workflow-probe.js`,
   the Admin routes under `pages/api/admin/transcription-pilot/` (including
-  live versioned speaker-name PATCH), the AssemblyAI
-  callback and scheduled drain routes, and `/admin/transcription-pilot`.
+  retained versioned speaker-name PATCH), and the AssemblyAI callback and scheduled
+  drain routes. `/admin/transcription-pilot` is now a retirement notice in source,
+  with no pilot workflow imports; Meeting Tracker remains the active staff UI.
 - Tests: `tests/unit/transcription-pilot-store.test.js` and
   `tests/integration/transcription-pilot.pg.test.js`.
 - **[VERIFIED 2026-09-30 via local scratch Postgres]** The isolated integration

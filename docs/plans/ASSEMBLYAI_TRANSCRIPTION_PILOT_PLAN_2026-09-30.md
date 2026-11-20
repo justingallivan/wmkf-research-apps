@@ -2,12 +2,43 @@
 title: AssemblyAI transcription pilot
 domain: transcription
 kind: plan
-status: dedicated-project-review-enabled-submissions-disabled-speaker-label-live
-summary: "The isolated pilot remains a separate review-only checkpoint. Shared Meeting Tracker transcription is now production-live for approved non-sensitive use after upload, naming, TXT/VTT, publication and Workbench acceptance. Its daily/hourly schedules are deployed and platform invocations succeeded. Timer delivery, maximum-size behavior, and confidential use remain unverified."
+status: isolated-interface-retired; shared-interface-retired; historical-pilot-plan
+summary: "The isolated standalone interface is retired live; shared PR #653 is Production-live (`b869fdf85`). The November 19 isolated review found one expired owner-visible recording with local cleanup pending. Shared Meeting Tracker transcription and protected operational APIs remain preserved; the original pilot design and acceptance records below are historical."
 owner: product-engineering
 ---
 
 # AssemblyAI transcription pilot
+
+## Current disposition — 2026-11-19
+
+The owner authorized retirement of the standalone pilot interface. Source commit
+`df7537fc4` replaces its page with a retirement notice and removes its Admin link.
+The protected pilot APIs, shared transcription services, Meeting Tracker, storage,
+schemas, callbacks and scheduled cleanup/recovery are unchanged. The isolated retirement is live in verified deployment
+`dpl_4cujwwr6uiVd4gyu8vSzpNS5gWdw`; shared PR #653 is Production-live (`b869fdf85`).
+The release evidence records the dedicated-manifest packaging correction and
+post-promotion verification of the exact two retained schedules.
+
+The legacy `wmkf-transcription-pilot.vercel.app` alias was removed on November 19;
+its public pilot path now returns 404. The old deployment and data were retained.
+
+Authenticated review of the isolated October deployment on November 19 showed
+one owner-visible **Expired** recording, inaccessible content, local cleanup
+**pending**, and a confirmed provider-deletion receipt. The browser export was
+blocked; the database-wide and Blob inventories were not available. Preserve
+operational records and cleanup resources; do not recover expired content or
+infer that storage is empty. See the [preservation and release evidence](evidence/TRANSCRIPTION_PILOT_RETIREMENT_2026-11-19.md).
+
+This document now preserves the original pilot design and acceptance history.
+It is not a worklist to re-enable or rebuild the retired interface. Current
+maintenance guidance remains in the [runbook](ASSEMBLYAI_TRANSCRIPTION_PILOT_RUNBOOK_2026-09-30.md)
+and [Atlas](../atlas/postgres-transcription-pilot.md).
+
+## Historical pilot design and acceptance record
+
+Everything below records the September/October implementation and its checkpoints.
+Present-tense deployment, UI, transcript-availability and next-step wording in this
+historical record applies to those checkpoints, not the November retirement.
 
 Revision 3 with isolated initialization and disabled Preview checkpoints, updated 2026-10-01. **Current status: dedicated Production is READY in review-only mode (`TRANSCRIPTION_PILOT_ENABLED=true`, `TRANSCRIPTION_SUBMISSIONS_ENABLED=false`); one authorized non-sensitive hosted job succeeded and is ready for review.** Current deployment `dpl_EtKyWuWqTHXuXGQNUGUhTQGFrBhY` from `dffe18ba9` is READY at the dedicated default origin. Signed-in SSO and owner-scoped transcript access were verified. Read-only database verification found one ready job (version 26); its transcript remains available, the input Blob is absent, and the AssemblyAI API deletion response was verified (not independent proof of remote byte erasure). The 40,809,588-byte upload succeeded, but this is not proof of the 50 MiB maximum. Migration 062 was applied once to isolated Neon and read back: JSONB `speaker_names` is NOT NULL with `{}` default and a JSON-object/65,536-byte constraint; after hosted label save/reset, the job remains ready at version 26 with `{}` and unchanged expiry. The hosted speaker-label UI was exercised with six detected speakers: a temporary name survived save/reload and appeared in TXT and VTT downloads; TXT used minute headings without utterance ranges, while VTT retained precise timings. The temporary name was cleared; no new audio or provider request was made. Earlier readiness, empty recovery/cleanup, route isolation, synthetic Workflow, and manual cron receipts remain valid for their checkpoints; timed delivery remains unobserved. A manually cancelled prior Workflow run was recovered into a new run; automatic terminal-run clock delivery remains unobserved. No AssemblyAI callback delivery was tested. The existing `wmkf-transcription-pilot.vercel.app` alias remains on the prior shared project/deployment; do not move it or re-enable new submissions without a separate gate. The [pre-enable runbook](ASSEMBLYAI_TRANSCRIPTION_PILOT_RUNBOOK_2026-09-30.md) records evidence and remaining gates.
 
