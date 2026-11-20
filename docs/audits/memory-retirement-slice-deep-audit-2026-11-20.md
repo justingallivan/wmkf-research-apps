@@ -194,7 +194,7 @@ now states the three-workstream shipment is UNKNOWN.
 
 Probes (not run; owner authorization or local access needed):
 
-- Live authenticated 410 on the thirteen retired API URLs: a signed-in GET to each on `applications.wmkeck.org`.
+- ~~Live authenticated 410 on the thirteen retired API URLs~~ — RESOLVED 2026-11-20: owner-requested signed-in check from the owner's Chrome session on `applications.wmkeck.org`. Each URL returned GET 405 (the stubs answer POST only, so a GET probe could never show 410) and empty-body POST 410 `APP_RETIRED`. The stubs run only the access check before responding (`pages/api/process.js` shape, identical across the thirteen).
 - Stored state of retired-interface prompt rows: a read-only `wmkf_ai_prompts` current-row query by name prefix.
 - Whether Connor's flow creates `Narrative-Bibliography_{Request#}.pdf`: a read-only listing of one J27 request's `AI Materials` folder.
 - Workbench Status tab absent in Production: signed-in observation.

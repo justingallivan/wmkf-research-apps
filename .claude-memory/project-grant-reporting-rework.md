@@ -16,7 +16,7 @@ request to integrate those capabilities elsewhere; it does not choose their new 
 The source change is described in `docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md`:
 the page becomes a retirement notice and its APIs become authenticated HTTP 410
 responses. Original page/API implementations are retained under `_archived/`.
-Production release verified 2026-11-20 UTC (PR #651, `ce4bc2618`, deployment `dpl_2KcHR8Gd5vEUE9hxFBmd92mtNDBx`; signed-in notice smoke). Authenticated 410 is test-covered; the live probe saw only the anonymous 307 sign-in redirect.
+Production release verified 2026-11-20 UTC (PR #651, `ce4bc2618`, deployment `dpl_2KcHR8Gd5vEUE9hxFBmd92mtNDBx`; signed-in notice smoke). Signed-in check 2026-11-20 (owner's browser): both Grant Reporting APIs return 410 `APP_RETIRED` to POST and 405 to GET.
 
 Preserve the archived page's proposal-versus-report assessment editor, extracted
 fields, staff edits, regeneration modes, and Word export. Per the retirement plan, the assessment/regeneration and editing flow is the reuse target; the old extraction workflow and Word export are preserved as reference only, not future requirements. Preserve
