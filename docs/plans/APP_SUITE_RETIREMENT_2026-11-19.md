@@ -3,7 +3,7 @@ title: App suite retirement and capability preservation — November 19, 2026
 domain: architecture
 kind: plan
 status: active
-summary: "Retire ten standalone entry points while preserving prompts, implementations, shared dependencies, and historical data; source and deployment evidence remain separate."
+summary: "Ten standalone interfaces retired in Production; reusable capabilities, prompts, shared dependencies and history preserved. Includes CI, deployment, smoke and rollback receipts."
 canonical: false
 cataloged: 2026-11-19
 owner: product-engineering
@@ -33,10 +33,8 @@ their original relative imports are not rewritten into a runnable archive app.
 The active route files remain present, so route counts do not drop. Application
 registry membership changes independently of those counts.
 
-**Verification boundary:** this document records the authorized source design and
-preservation inventory. A source diff or passing local test is not a Production
-deployment receipt. Promotion, deployed smoke testing, and any effects on external
-callers require separate evidence. No live prompt/data mutation is part of this
+**Verification boundary:** source preservation and Production receipts are
+recorded separately below. Passing tests do not establish external flow behavior. No live prompt/data mutation is part of this
 change. Repo caller searches cannot prove the absence of bookmarks or external
 Power Automate/HTTP clients; authenticated 410 responses make retirement explicit.
 
@@ -63,7 +61,7 @@ Do not generalize this result to the retained lookup service or its shared helpe
 
 | Capability / asset | Preserved source | Reason / consumer |
 |---|---|---|
-| Grant report extraction, regeneration, proposal-versus-report goals assessment | `lib/services/grant-reporting/extract-service.js`; `shared/config/prompts/grant-reporting.js`; `shared/config/grant-reporting-output-schema.js` | Reusable capability; no new backend caller is implied |
+| Grant report assessment/regeneration; historical extraction | `lib/services/grant-reporting/extract-service.js`; `shared/config/prompts/grant-reporting.js`; `shared/config/grant-reporting-output-schema.js` | Assessment/regeneration is preserved for reuse; the old extraction workflow is reference only, not a future requirement |
 | Grant report assessment editing; historical Word export | `_archived/pages/grant-reporting.js`; `shared/utils/grant-report-word-export.js` | Preserves editable assessment, staff changes and counts/narratives for reuse; Word export is obsolete reference only, not a future requirement |
 | Request/document lookup and classification | `lib/services/grant-reporting/lookup-grant-service.js`; `lib/services/grant-reporting/classify-file.js`; `lib/utils/sharepoint-buckets.js` | Workbench proposal loading imports `classifyFile`; shared SharePoint discovery remains live |
 | Phase I code and stored-prompt summaries | `lib/services/phase-i-dynamics/`; `shared/config/prompts/phase-i-summaries.js`; stored `phase-i.summary` row | Existing writeback/A7/audit contracts retained as reference; no active standalone route invokes them |
@@ -173,18 +171,47 @@ work, not outcomes claimed by these tests.
 The first full CI run passed 1,566 suites and found one prompt-retirement
 regression: changing the catalog usage category weakened its blank-metadata
 retirement guard. The original protection was restored for all fourteen affected
-prompt names and covered with parameterized no-write tests. Final CI rerun pending.
+prompt names and covered with parameterized no-write tests. The correction passed
+217 focused tests and independent review. Final CI on `274bfb72f` passed 1,567
+Jest suites / 28,277 tests (27 suites / 335 tests skipped); the separate Postgres
+job passed 15 suites / 189 tests. All PR checks were green before merging.
+CI run: https://github.com/justingallivan/wmkf-research-apps/actions/runs/44666491019.
 
-### Release boundary and rollback
+### Production release receipt and rollback
 
-[PLANNED] This is a Tier 2 branch release because it retires upload/processing
-entry points across layers. Production promotion needs the explicit owner decision
-required by `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md` §4. Before
-promotion, record the last-known-good deployment; after promotion, verify staff
-sign-in, one active read-only path, retirement notices and access-controlled 410s.
-No production retirement or signed-in deployment smoke is claimed here.
+[VERIFIED via owner approval, GitHub merge, Vercel deployment metadata and signed-in
+Chrome smoke, 2026-11-19 Pacific / 2026-11-20 UTC]
 
-Rollback restores the prior page/route and registry implementations by reverting
-this retirement commit and deploying that revision. No database migration, stored
-prompt edit, grant purge, or data cleanup is needed to undo this source change.
-The archive is reference material; do not run it as a second app tree.
+- Owner explicitly approved “Merge and deploy after CI passes.” This satisfies
+  the Tier 2 promotion decision in the campaign release strategy.
+- PR #651 merged at 2026-11-20 03:24:12 UTC as
+  `ce4bc2618555a6b6a4196ff93c2b10f89de7b388`.
+- Production deployment `dpl_2KcHR8Gd5vEUE9hxFBmd92mtNDBx` reached **READY** at
+  `https://wmkfresearchapps-bwj9ogkby-justin-gallivans-projects.vercel.app` and
+  received the `applications.wmkeck.org` production alias. Vercel list metadata
+  linked that deployment to the merge SHA.
+- Signed-in staff smoke: Home shows eight active applications; all ten manifest
+  pages show retirement notices and Home links; Expense Reporter displays its
+  receipt-upload controls; Workbench D26 loads request data. No receipts were
+  uploaded and no model generation or lifecycle writes were exercised.
+- Anonymous GET and POST requests to all thirteen retired API URLs returned 307
+  to the application sign-in route at the proxy. They did not reach the route
+  handler. Authenticated 410 / method 405 behavior is covered by automated tests,
+  not claimed as a live authenticated API probe.
+- A deployment-specific runtime log query (`level:error`, preceding ten minutes,
+  limit 30) returned no error entries. This is a bounded release check, not an
+  assertion about all historical errors or monitoring configuration.
+
+**Last known good:** `442f9018f550a2155d17c10b0e5ce68ae82a477f`, deployment
+`dpl_8eJC42giXbHvEbhJsLPGVMUckepj`,
+`https://wmkfresearchapps-gofmf2qkt-justin-gallivans-projects.vercel.app`. It was
+recorded READY with the production alias before the retirement merge. The owner
+or authorized release operator can restore that deployment with
+`vercel rollback <last-known-good-url> --scope justin-gallivans-projects`, then
+revert the retirement source through the normal release path. No rollback was
+needed or executed.
+
+No database migration, stored prompt edit, grant purge, or data cleanup is needed
+to undo this source change. No such operation ran during the release. The archive
+is reference material; do not run it as a second app tree. Future Dataverse
+adaptation of preserved capabilities remains separate work.

@@ -1,44 +1,44 @@
-# Session 687 Prompt: Roster migration and retirement complete; backend work separate
+# Session 688 Prompt: App-suite retirement; shared capabilities preserved
 
-## Session 686 Summary — 2026-11-19 (Codex roster stream)
+## Session 687 Summary — 2026-11-19 (Codex app-suite stream)
 
-[VERIFIED via production SQL/Dataverse, signed-in browser, GitHub and Vercel]
+[VERIFIED via GitHub CI, Vercel deployment, signed-in Chrome and bounded release probes;
+2026-11-19 Pacific / 2026-11-20 UTC]
 
 ### What Was Completed
 
-1. **Production roster migration and Admin editor.** Dataverse owns roster content;
-   migrations 103/104 are applied. Imported 39 profiles from 40 source identities,
-   preserving all 10 Contact links. Admin owns editing. Amy remains active and
-   lead-PD eligible with her profile/future email preserved; no app access or sends.
-2. **Standalone Expertise Finder retired.** PR #650 merged as `6ae809f98`.
-   The old URL shows a notice linking to Admin; all six old APIs return 404.
-   Shared roster, feedback and recipient consumers remain live.
-3. **Authorized cleanup completed.** Deleted 344 obsolete matching-history rows and
-   exactly one synthetic feedback entry. All seven original feedback entries remain.
-   The acceptance profile stays inactive; identities/bindings and frozen Postgres
-   roster remain. No schema drop or backend automation change.
-4. **CI closed green.** At `09041225a`, Tests, CodeQL, Secret Scanning, Dependency
-   Scan, Security Scan and Vercel passed. Full unit/Postgres integration and E2E
-   passed on runtime merge `6ae809f98`; final docs-only commit did not rerun E2E.
-   Latest CodeQL run `44660911502` completed successfully.
-5. **Connor handoff saved.** Table/fields, active and lead-PD filters, Contact/email
-   behavior and Amy's special case are documented. Actual flow-connection acceptance
-   and backend implementation remain separate work.
+1. **Ten standalone interfaces retired.** Retirement notices replace the pages;
+   thirteen old API routes retain their method/access gates and return HTTP 410
+   after authorization. PR #651, merge `ce4bc2618`.
+2. **Capabilities and data preserved.** Original pages/routes/tests are archived;
+   prompt modules, stored prompt versions, services, helpers and historical data
+   remain. Grant Reporting assessment/editing logic is reusable; its old Word
+   export is historical reference, not a future requirement.
+3. **Surviving consumers protected.** Expense Reporter remains active; Workbench
+   classification and scholarly-discovery dependencies remain. This change did
+   not modify Expertise Finder runtime; that separate retirement is already
+   recorded in the roster stream.
+4. **Release evidence.** Final CI passed 1,567 suites / 28,277 tests (27 suites / 335 tests skipped); PostgreSQL integration passed 15 suites / 189 tests; all checks green. Production deployment
+   `dpl_2KcHR8Gd5vEUE9hxFBmd92mtNDBx` at `ce4bc2618`: READY, aliased to `applications.wmkeck.org`.
+   Signed-in Chrome verified Home (eight active apps), all ten notices, Expense Reporter upload controls, and loaded Workbench D26 request data. No receipt upload or model call ran; authenticated API 410 behavior is automated-test-proved only.
+
+Anonymous GET and POST requests to all thirteen retired APIs each returned 307
+sign-in redirects from the proxy; these are not live handler 401/405/410 results.
+The deployment-specific ten-minute error-log query returned zero error entries,
+which is a bounded observation, not proof of every consumer path. Last known-good
+rollback deployment: `442f9018f` / `dpl_8eJC42giXbHvEbhJsLPGVMUckepj`.
+PR #651 merged at 2026-11-20 03:24:12 UTC (November 19 Pacific).
 
 ### Commits
 
-- `40588fca3` — roster/Admin implementation (subsequent production corrections in execution report).
-- `665b652f0` — production Dataverse cutover.
-- `1c746f1a3` — concise Connor handoff.
-- `5d61c9041` — Admin roster view test coverage.
-- `34da3ae89`, `d4da3c500` — standalone retirement and historical-pointer correction.
-- `6ae809f98` — PR #650 merge.
-- `09041225a` — production retirement/cleanup documentation.
+- `1bcbab278` — app-suite retirement with preserved capability code and data.
+- `274bfb72f` — preserve prompt-retirement protection and regression coverage.
+- `ce4bc2618` — PR #651 merge.
 
-Exact prior Session 684/685 handoffs and concurrent-stream detail remain retrievable
-with `git show 09041225a:SESSION_PROMPT.md` (verified at close). Older Session 683
-handoff: `git show 108cba441:SESSION_PROMPT.md`. These are historical records, not
-fresh permissions or executable cleanup lists.
+Exact prior Session 686 summary, roster receipts, and concurrent-stream boundaries
+remain retrievable with `git show 442f9018f:SESSION_PROMPT.md` (retrievability verified at close).
+Older handoffs remain at the Git references preserved below. These are history,
+not fresh permissions or executable cleanup lists.
 
 ## Next Items
 
@@ -118,39 +118,39 @@ fresh permissions or executable cleanup lists.
 | Initial Assessment | PRs #644–#646 | Last handoff: production-live, authenticated save rehearsal owner-deferred; verify before resuming |
 | Chairs production stages | `docs/plans/J27_CHAIRS_RECOMMENDATION_PRODUCTION_PLAN_2026-11-18.md` | Unchanged; separate owner approval per stage |
 | Intake/Executor | `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md`; `docs/plans/PARKED_EXECUTOR_BRANCH_INVENTORY_2026-11-19.md` | Backend adoption parked; do not merge parked lineage |
-| App-suite cleanup | `codex/app-suite-cleanup-2026-11-19` | Separate worktree observed at close; no edits or disposal by this roster session |
+| App-suite cleanup | `docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md`; PR #651 | DONE in Production; signed-in page/read checks passed; prompts/services/data preserved; future adaptation separate |
 
-Retirement feature branch: `codex/expertise-finder-retirement-2026-11-19` (merged).
-Stop documentation destination: `main`. This checkout had no uncommitted WIP at
-closeout start. Other worktrees/branches were not modified or deleted. Their old
-cleanup recommendations above require a fresh preservation preflight, not automatic action.
+App-suite feature branch: `codex/app-suite-cleanup-2026-11-19`.
+Receipt branch: `codex/app-suite-retirement-receipt-2026-11-19`; documentation
+destination: `main` after the documentation checks.
+Other worktrees are not authorized for disposal by this closeout. Earlier cleanup
+recommendations require a fresh preservation preflight.
 
-Production permissions remain scoped to the authorized roster work; do not infer
-permission for unrelated work. Never read root `.env.local`. Private roster source,
-mappings and receipts remain in owner-managed storage; never commit them.
-Local containers use Colima. Recheck migration-number ownership before new schema work.
+Production authorization for this app-suite change covers the approved source
+release and verification, not prompt/data deletion or backend automation. Roster
+permissions remain scoped to that separate authorized workstream. Never read root
+`.env.local`; private roster sources/mappings/receipts remain in owner-managed
+storage. Local containers use Colima. Recheck migration-number ownership before
+new schema work.
 
 ## Key Files Reference
 
 | File | Purpose |
 |---|---|
-| `docs/plans/EXPERTISE_ROSTER_PRODUCTION_EXECUTION_2026-11-19.md` | Migration acceptance, private evidence and permission limits |
-| `docs/plans/EXPERTISE_FINDER_RETIREMENT_2026-11-19.md` | Retirement deployment, cleanup and CI evidence |
+| `docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md` | Ten-app/thirteen-route manifest, preservation, tests and release evidence |
+| `docs/plans/EXPERTISE_ROSTER_PRODUCTION_EXECUTION_2026-11-19.md` | Separate roster migration acceptance and permission limits |
+| `docs/plans/EXPERTISE_FINDER_RETIREMENT_2026-11-19.md` | Separate Expertise Finder retirement and cleanup |
 | `docs/plans/EXPERTISE_ROSTER_CONNOR_HANDOFF_2026-11-19.md` | Backend roster table/field contract |
-| `docs/plans/EXPERTISE_ROSTER_CUTOVER_RUNBOOK_2026-11-19.md` | Recovery requires saved pre-retirement build and identity/FK reconciliation |
-| `docs/atlas/dataverse-wmkf-expertiseprofile.md` | Current source of truth and preserved consumers |
+| `docs/plans/EXPERTISE_ROSTER_CUTOVER_RUNBOOK_2026-11-19.md` | Roster recovery and identity/FK reconciliation |
+| `docs/atlas/dataverse-wmkf-expertiseprofile.md` | Roster source of truth and preserved consumers |
 
 ## Testing and Session Close
 
-Focused runtime checks if future roster changes require them:
+Release checks and limitations belong in the retirement manifest; avoid running
+archived interface tests as if they still described active behavior. Future
+capability adaptation requires fresh caller, authorization and persistence review.
 
-```bash
-npx jest --runInBand --silent --testPathPatterns='(admin-expertise-roster|expertise-roster|expertise-finder-retirement|roster-contact)'
-```
-
-Milestone determination: **required and already recorded** in DEVELOPMENT_LOG.md:
-“Expertise roster migrated to Dataverse and Admin” and “Standalone Expertise Finder
-retired”. No duplicate entry added at stop. CLAUDE.md requires no change; its canonical
-pointers already cover the modified surfaces. No memory-router edits or new debt.
-Claim-evidence pilot `--current` returned local-state unavailable; no observation
-row was fabricated. This is an advisory-report limitation, not a runtime blocker.
+Milestone determination: **required and recorded**;
+added “Ten standalone apps retired; shared capabilities preserved” to DEVELOPMENT_LOG.md. No duplicate roster milestone is needed. CLAUDE.md's
+canonical pointers remain applicable. No memory-router edits or new debt in this
+app-suite closeout.
