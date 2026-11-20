@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * READ-ONLY probe: are migrations 101 and 102 (proposal list links) applied?
+ * READ-ONLY probe: are migrations 101, 102 and 105 (proposal list links) applied?
  *
  * Reads the app Postgres (POSTGRES_URL from .env.local) inside a READ ONLY
  * transaction. Prints:
@@ -10,7 +10,10 @@
  *   3. whether `proposal_list_links` and `proposal_list_items` exist, with their
  *      column counts, the one-live-link index, and row counts;
  *   4. whether migration 102's `proposal_list_items.subsection` column exists
- *      (needed before the two-level sections code is deployed).
+ *      (needed before the two-level sections code is deployed);
+ *   5. whether migration 105's `proposal_list_advisor_picks` table exists, and any
+ *      other migration the tracker records under the number 105 (needed before the
+ *      advisor-picks code is deployed).
  * Never prints recipients, tokens or proposal titles. Exits 0 when 101 is fully
  * in place, 1 when it is not, 2 on a configuration or connection problem.
  *
@@ -21,6 +24,7 @@ import fs from 'fs';
 import pg from 'pg';
 
 const MIGRATION = '101_proposal_list_links.sql';
+const PICKS_MIGRATION = '105_proposal_list_advisor_picks.sql';
 const EXPECTED_COLUMNS = { proposal_list_links: 15, proposal_list_items: 9 };
 const LIVE_LINK_INDEX = 'idx_proposal_list_links_live_per_recipient';
 
@@ -99,6 +103,18 @@ try {
   console.log(subsection.rows.length
     ? 'Migration 102: proposal_list_items.subsection present. Two-level sections code may be deployed.'
     : 'Migration 102: proposal_list_items.subsection MISSING. Do not deploy the two-level sections code yet.');
+
+  const picks = await client.query(
+    `SELECT count(*)::int AS n FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'proposal_list_advisor_picks'`,
+  );
+  const otherAt105 = [...tracked].filter((name) => name.startsWith('105_') && name !== PICKS_MIGRATION);
+  if (otherAt105.length) console.log(`Migration 105: number ALREADY USED by ${otherAt105.join(', ')}. Renumber before applying.`);
+  console.log(picks.rows[0].n === 4
+    ? `Migration 105: proposal_list_advisor_picks present (4 columns), ${tracked.has(PICKS_MIGRATION) ? 'recorded' : 'NOT recorded'} in the tracker. Advisor-picks code may be deployed.`
+    : picks.rows[0].n
+      ? `Migration 105: proposal_list_advisor_picks has ${picks.rows[0].n} columns, EXPECTED 4.`
+      : 'Migration 105: proposal_list_advisor_picks MISSING. Do not deploy the advisor-picks code yet.');
 
   await client.query('ROLLBACK');
   console.log(ready

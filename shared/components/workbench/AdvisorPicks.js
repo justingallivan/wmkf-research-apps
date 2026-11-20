@@ -8,7 +8,8 @@ const endpoint = '/api/workbench/proposal-lists';
  * member ticks the Chairs and Board members who should see this proposal.
  * Creating that person's proposal list highlights it for them. Each tick saves
  * on its own. The section renders only when the server says the request is
- * Scored, and not at all where proposal lists are off (503).
+ * Scored, and not at all where proposal lists are off (503). A read-only
+ * Preview deployment shows the ticks disabled (the server refuses them too).
  * Mounted keyed by request ID, so a request change remounts it.
  */
 export default function AdvisorPicks({ requestId }) {
@@ -56,7 +57,7 @@ export default function AdvisorPicks({ requestId }) {
     {state && state.advisors.length > 0 && <div className="mt-2 flex flex-wrap gap-x-6 gap-y-2">
       {state.advisors.map(advisor => (
         <label key={advisor.rosterId} className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={advisor.picked} disabled={saving !== null}
+          <input type="checkbox" checked={advisor.picked} disabled={saving !== null || state.readOnly}
             onChange={event => toggle(advisor.rosterId, event.target.checked)} />
           {advisor.name}
         </label>

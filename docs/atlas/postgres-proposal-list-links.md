@@ -13,7 +13,7 @@ Nothing reads or writes these tables until that flag is the literal `on`. Plan:
 
 `proposal_list_links` is one expiring, revocable personal link per grant cycle,
 list type, and recipient address. The link opens a no-login page listing that
-cycle's submitted proposals. Columns: `id`, `cycle_code`, `list_kind`
+cycle's submitted proposals (scored proposals only on the advisor-picks branch). Columns: `id`, `cycle_code`, `list_kind`
 (`ordinary` for real proposals, `test` for Factory test requests),
 `recipient_name`, `recipient_email` (lower case), `recipient_source` (a display
 reference such as `expertise_roster:7` or `staff:self`; deliberately not a

@@ -105,6 +105,7 @@ function makeDeps(overrides = {}) {
         ],
       })),
       loadSnapshot: jest.fn(async () => [snapshotItem(REQ_A, '1001'), snapshotItem(REQ_B, '1002', 'MIT')]),
+      previewReadOnly: () => false,
       // REQ_A and REQ_B are Scored (J27); REQ_C is a J27 request not yet scored.
       readRequest: jest.fn(async (id) => ({
         [REQ_A]: { akoya_requestid: REQ_A, wmkf_phaseistatus: 100000004, wmkf_GrantCycle: { wmkf_cyclecode: 'J27' } },
@@ -318,6 +319,7 @@ describe('advisor picks', () => {
     await setAdvisorPick({ requestId: REQ_A, rosterId: 7, picked: true, actor: ACTOR }, deps);
     expect(await getAdvisorPicks({ requestId: REQ_A.toUpperCase() }, deps)).toEqual({
       scored: true,
+      readOnly: false,
       advisors: [
         { rosterId: 7, name: 'Board Member', picked: true },
         { rosterId: 8, name: 'No Email', picked: false },
@@ -346,7 +348,7 @@ describe('advisor picks', () => {
     expect(deps.store.setPick).not.toHaveBeenCalled();
   });
 
-  test('refuses a request outside a J27-or-later cycle, a staff account with no Dynamics identity, and the flag off', async () => {
+  test('refuses a request outside a J27-or-later cycle, a staff account with no Dynamics identity, the flag off, and a read-only preview', async () => {
     const legacy = makeDeps({ readRequest: jest.fn(async () => ({ akoya_requestid: REQ_A, wmkf_phaseistatus: 100000004, wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } })) });
     await expect(setAdvisorPick({ requestId: REQ_A, rosterId: 7, picked: true, actor: ACTOR }, legacy.deps))
       .rejects.toMatchObject({ httpStatus: 404 });
@@ -355,6 +357,10 @@ describe('advisor picks', () => {
       .rejects.toMatchObject({ httpStatus: 403 });
     const off = makeDeps({ schemaReady: () => false });
     await expect(getAdvisorPicks({ requestId: REQ_A }, off.deps)).rejects.toMatchObject({ httpStatus: 503 });
-    for (const made of [legacy, noActor, off]) expect(made.deps.store.setPick).not.toHaveBeenCalled();
+    const preview = makeDeps({ previewReadOnly: () => true });
+    expect((await getAdvisorPicks({ requestId: REQ_A }, preview.deps)).readOnly).toBe(true);
+    await expect(setAdvisorPick({ requestId: REQ_A, rosterId: 7, picked: true, actor: ACTOR }, preview.deps))
+      .rejects.toMatchObject({ code: 'proposal_list_preview_read_only' });
+    for (const made of [legacy, noActor, off, preview]) expect(made.deps.store.setPick).not.toHaveBeenCalled();
   });
 });

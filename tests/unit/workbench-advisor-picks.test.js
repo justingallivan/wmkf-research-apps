@@ -56,3 +56,9 @@ it('shows a save failure and keeps the saved ticks', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent('only on a Scored request');
   expect(screen.getByRole('checkbox', { name: 'Edward Stolper' })).not.toBeChecked();
 });
+
+it('disables the ticks on a read-only preview', async () => {
+  requestJson.mockResolvedValueOnce(picks({ readOnly: true }));
+  render(<AdvisorPicks requestId="request" />);
+  expect(await screen.findByRole('checkbox', { name: 'Edward Stolper' })).toBeDisabled();
+});

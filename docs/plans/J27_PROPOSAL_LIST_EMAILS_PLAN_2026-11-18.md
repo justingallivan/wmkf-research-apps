@@ -49,19 +49,19 @@ same list mechanism could carry that packet later.
 | 3 | Chairs are marked on the existing Board roster; one roster serves both audiences. |
 | 4 | Each person gets their own link, and each proposal opens directly from it. |
 | 5 | Delivery is one link to a page, not a long email of links. |
-| 6 | Everyone with a link can open every submitted proposal. Chairs are responsible for all proposals in their area; other Board members get curation on top of full access. |
+| 6 | Everyone with a link can open every proposal on their list (narrowed by decision 15 to the scored proposals; first stated as every submitted proposal). Chairs are responsible for all proposals in their area; other Board members get curation on top of full access. |
 | 7 | Chairs' sections all start collapsed; no per-chair personalization. One chair is a geologist interested in the physical sciences, the other a physician with broad interests. |
 | 8 | Highlighted proposals appear only at the top, not again in their section. |
 | 9 | A proposal from the recipient's own institution stays listed and is flagged. |
 | 10 | Links last until the Board meeting. |
-| 11 | Late submissions are not allowed and lists are sent after intake completes, so a list is a frozen snapshot. No update email. |
+| 11 | Late submissions are not allowed and lists are sent after Scoring (decision 15; first stated as after intake), so a list is a frozen snapshot. No update email. |
 | 12 | Volume: up to 300 proposals; two chairs today, both Board members. |
-| 13 | Sender is a staff member, to be named. Whether Production allows sending as a staff member is for the owner to determine. |
+| 13 | The CSO sends each link from their own email; the app sends nothing (settled by decision 17). |
 | 14 | Tabled: a staff note beside a highlighted proposal. |
 
 ## Owner decisions (2026-11-19)
 
-These replace decisions 6, 11 and 13 where they differ.
+Decisions 6, 11 and 13 above are edited to match.
 
 | # | Decision |
 |---|---|
