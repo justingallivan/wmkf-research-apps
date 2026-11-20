@@ -63,11 +63,10 @@ test('workspace and view navigation are URL-addressable and announce the active 
   );
 });
 
-test('Transcription Pilot links to its dedicated Admin route and marks the active page', () => {
+test('the retired Transcription Pilot is absent even for its old active workspace', () => {
   render(<AdminWorkspaceNavigation activeWorkspace="transcription-pilot" />);
-
-  expect(screen.getByRole('link', { name: 'Transcription Pilot' })).toHaveAttribute('href', '/admin/transcription-pilot');
-  expect(screen.getByRole('link', { name: 'Transcription Pilot' })).toHaveAttribute('aria-current', 'page');
+  expect(screen.queryByRole('link', { name: 'Transcription Pilot' })).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Overview' })).toHaveAttribute('href', '/admin');
 });
 
 test('a collapsible editor panel starts closed when asked, keeps its heading visible, and opens on the header', () => {
