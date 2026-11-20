@@ -32,7 +32,7 @@ revoked_at IS NULL` holds at most one live link per recipient.
 the only requests a link may open.
 
 `proposal_list_advisor_picks` (migration 105, **[BRANCH-BUILT 2026-11-19 on
-`claude/session-2026-11-19b`; not applied, not merged]**) records the Chairs and
+`claude/session-2026-11-19b`; not merged. The owner applied migration 105 on 2026-11-19 [VERIFIED via the owner-run `node scripts/apply-migrations.js` ("1 applied") and `node scripts/probe-proposal-list-schema.mjs` readback: 0 pending, table present with 4 columns, recorded in the tracker]]**) records the Chairs and
 Board members staff ticked during Scoring to see a proposal: `request_id`,
 `roster_id` (numeric roster identity from migration 103; no foreign key, like
 `recipient_source`), `picked_by` (staff Dynamics system-user id), `picked_at`.

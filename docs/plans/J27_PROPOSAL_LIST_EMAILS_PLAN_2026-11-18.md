@@ -3,7 +3,7 @@ title: J27 proposal lists for Program Chairs and Board experts
 domain: workbench
 kind: plan
 status: active
-summary: "Personal no-login pages listing the scored J27 proposals for Program Chairs and Board members, with highlighted proposals on top and a link to each proposal's staff version. Production-live with keyword sections; the CSO pastes each link into their own email. Advisor picks during Scoring (which pre-fill highlights) and scored-only membership are branch-built on claude/session-2026-11-19b, awaiting migration 105."
+summary: "Personal no-login pages listing the scored J27 proposals for Program Chairs and Board members, with highlighted proposals on top and a link to each proposal's staff version. Production-live with keyword sections; the CSO pastes each link into their own email. Advisor picks during Scoring (which pre-fill highlights) and scored-only membership are branch-built on claude/session-2026-11-19b, migration 105 applied 2026-11-19, merge pending."
 canonical: false
 cataloged: 2026-11-18
 last_verified: 2026-11-19
@@ -73,7 +73,7 @@ Decisions 6, 11 and 13 above are edited to match.
 
 ## Advisor picks and scored-only lists [BRANCH-BUILT]
 
-Built on `claude/session-2026-11-19b` (2026-11-19); not merged.
+Built on `claude/session-2026-11-19b` (2026-11-19); not merged. Migration 105 applied to Production by the owner on 2026-11-19 [VERIFIED via the owner-run `node scripts/apply-migrations.js` and `node scripts/probe-proposal-list-schema.mjs`: 0 pending, table present, recorded].
 
 - **Where:** the Initial Assessment form, below the Scoring decision, once the saved
   decision is Scored (`shared/components/workbench/AdvisorPicks.js`). One checkbox per
