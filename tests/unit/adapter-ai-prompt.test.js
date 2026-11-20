@@ -35,7 +35,7 @@ const ADMIN_ROW_SELECT =
 const SEED_LIST_SELECT =
   'wmkf_ai_promptid,wmkf_ai_promptname,wmkf_promptversion,wmkf_ai_iscurrent,' +
   'wmkf_ai_displaytitle,wmkf_ai_description,wmkf_ai_groupkey,' +
-  'wmkf_ai_sectionkey,wmkf_ai_usedby,wmkf_ai_usagecategory';
+  'wmkf_ai_sectionkey,wmkf_ai_usedby,wmkf_ai_usagecategory,wmkf_ai_promptvariables';
 
 // ───────────────── getCurrentForExecutor (prompt-store.js:47) ─────────────────
 
