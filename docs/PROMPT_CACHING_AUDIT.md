@@ -15,6 +15,8 @@ last_verified: 2026-09-20
 > as low. Every claim below carries the auditor's `file:line` citation; re-verify against
 > live source before implementing (files may have moved).
 
+> Status 2026-11-20: the `pages/api/qa.js`, `pages/api/process-phase-i-writeup.js` and `phase-i-dynamics/*` call sites named below were retired 2026-11-19 and now return 410 `APP_RETIRED` (no model call runs; original code is under `_archived/pages/api/`; see `docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md`). Findings and recommendations for those sites are historical and moot; the shared-helper work (R1, R2) is unaffected. Line numbers cited for retired files refer to the pre-retirement source.
+
 ## 0. Implementation status (updated 2026-07-07 — merged to `main`)
 
 The root shared-helper fix and the two clean high-value consumers shipped in
@@ -34,7 +36,7 @@ remain owner decisions.
   already passes `opts.system` through verbatim, including a structured block array with
   `cache_control`; the two marked sites already rely on that. No LLMClient change was
   needed.
-- **R3 — DONE.** `pages/api/qa.js` now derives per-proposal / per-summary stable nonces
+- **R3 — DONE, then moot (qa.js retired 2026-11-19).** `pages/api/qa.js` (pre-retirement) now derives per-proposal / per-summary stable nonces
   (`deriveStableNonce`), so repeated turns against unchanged content have a byte-identical
   cached system prefix. Realized reads remain a telemetry question, not an assumed result.
 - **R4 — DONE for the nonce line (2026-09-19, Session 524); schema split NOT needed.** The
@@ -85,8 +87,8 @@ remain owner decisions.
   withdrawn: the seat and chair system blocks cache on Opus 5. The open panel question is
   only the unmarked user turn (proposal + question set), which still needs run-row cadence
   data first (net-negative unless the same proposal is re-sent within the TTL).
-- **R5 — NOT DONE (verify-then-fix; left for owner).** `composeScorePrompt` and
-  `process-phase-i-writeup` both require confirming the current model-specific prefix floor and
+- **R5 — NOT DONE (verify-then-fix; left for owner); `process-phase-i-writeup` half moot (route retired 2026-11-19), `composeScorePrompt` half still live.** `composeScorePrompt` and
+  `process-phase-i-writeup` both required confirming the current model-specific prefix floor and
   real repeat-within-TTL usage first.
 - **R6 — NOT NEEDED.** R1/R3 and the identical-rerun Executor mitigation shipped, so the
   pre-S341 net-negative-marker removal is no longer the appropriate interim action.
@@ -193,12 +195,12 @@ rows; the post-fix cross-document read is pending the first post-fix batch).
   to Opus 5, currently 512 tokens; its concrete source fallback is Opus 4.8 at 1024),
   and without moving the nonce boundary ahead of stable
   text (prompt-injection defense stays intact).
-- `process-phase-i-writeup-1` (`pages/api/process-phase-i-writeup.js:144`): hoist the
+- `process-phase-i-writeup-1` (`pages/api/process-phase-i-writeup.js:144`; RETIRED 2026-11-19, no longer actionable): hoist the
   ~1.8k-token static block into a marked system block — **only if** multi-file uploads are
   common (single-file gains nothing; check real usage first).
 
 **R6 — Historical interim, no longer recommended: remove the two net-negative markers**
-(`execute-prompt.js:448`, `qa.js:156`) to stop paying the 1.25× write premium for entries
+(`execute-prompt.js:448`, `qa.js:156` — qa.js retired 2026-11-19) to stop paying the 1.25× write premium for entries
 that are never read. The shipped R1/R3 and identical-rerun mitigation supersede this interim.
 
 **Explicit no-change list:** all 19 "none" sites (single-shot with unique payloads,

@@ -234,7 +234,7 @@ Sample JSON for `wmkf_ai_reportgoalsassessment`:
 1. ~~`wmkf_ai_run` child table + Choices~~ — **Done** (2026-04-14)
 2. ~~Field Set A — Proposal Intake Summary~~ — **Done** (2026-04-14)
 3. ~~Field Set C — Compliance Check~~ — **Done** (2026-04-14)
-4. ~~Field Set B — Grant Report~~ — **Done** (deployed 2026-05-07; 22 fields on `akoya_request`; see `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` for the field list. Wiring `pages/api/grant-reporting/extract.js` to write the flat fields is a follow-up.)
+4. ~~Field Set B — Grant Report~~ — **Done** (deployed 2026-05-07; 22 fields on `akoya_request`; see `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` for the field list. Wiring `pages/api/grant-reporting/extract.js` to write the flat fields was a follow-up that is now moot: the route was retired 2026-11-19 and returns 410 `APP_RETIRED`; see `docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md`. Any future writer of these fields would be new work.)
 5. ~~Field Set D — write permission grant~~ — **Done** (verified 2026-04-14)
 6. ~~Workflow-chaining fields~~ — **Done** (deployed alongside Set B on 2026-05-07: `wmkf_ai_keywords`, `wmkf_ai_methodologies`, `wmkf_ai_riskflags`, `wmkf_ai_teaminfo`, `wmkf_ai_budgetsummary`, `wmkf_ai_timeline`)
 
@@ -262,8 +262,8 @@ Verification and Connor follow-up after the v3 hand-off.
 
 | Item | Resolution |
 |------|------------|
-| Field Set B (Grant Report) | Cleared 2026-05-07; deployed alongside workflow-chaining fields the same day. 22 fields on `akoya_request` (8 counts, 7 multi-line text, 6 publication fields, 1 choice). Wiring `grant-reporting/extract.js` to write the flat fields is the remaining follow-up. |
-| Duplicate `wmkf__ai_summary` field (double underscore) on `akoya_request` | Confirmed as a mistake. Connor will delete it. Canonical field is `wmkf_ai_summary` (single underscore). |
+| Field Set B (Grant Report) | Cleared 2026-05-07; deployed alongside workflow-chaining fields the same day. 22 fields on `akoya_request` (8 counts, 7 multi-line text, 6 publication fields, 1 choice). Wiring `grant-reporting/extract.js` to write the flat fields was the remaining follow-up (moot as of 2026-11-20: route retired 2026-11-19, returns 410 `APP_RETIRED`). |
+| Duplicate `wmkf__ai_summary` field (double underscore) on `akoya_request` | Confirmed as a mistake. Connor will delete it (status 2026-11-20: confirmed gone from Dataverse by metadata read, no `wmkf__` attributes). Canonical field is `wmkf_ai_summary` (single underscore). |
 | `wmkf_ai_rundatetime` on `wmkf_ai_run` | Connor created it but it's vestigial. Apps should use the built-in `createdon` column as stated in the main v3 doc. Do **not** write to `wmkf_ai_rundatetime`. |
 
 ### Privilege gaps noted (not currently blocking)
