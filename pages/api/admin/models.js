@@ -133,7 +133,7 @@ async function handleGet(req, res) {
     }
     const reviewPanel = {
       appKey: 'review-panel',
-      label: 'Virtual Review Panel',
+      label: 'Review Panel',
       providerBound: true,
       models: {},
     };

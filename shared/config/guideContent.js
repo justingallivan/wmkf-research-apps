@@ -18,7 +18,7 @@ export const GUIDE_SECTIONS = [
       },
       {
         heading: 'Home Page',
-        content: `After signing in, you'll see cards for each application you have access to. Apps are organized into categories: Concepts, Phase I, Phase II, and Other. Click any card to open that app.`,
+        content: `After signing in, you'll see cards for each application you have access to. Apps are organized into categories: Phase I, Phase II, and Other Tools. Click any card to open that app.`,
       },
       {
         heading: 'Default Access',
@@ -137,7 +137,7 @@ export const GUIDE_SECTIONS = [
       },
       {
         heading: 'Model Configuration',
-        content: `Each app uses a default AI model. Override it from Admin → Models by selecting a different model from the dropdown. Overrides take effect immediately and persist in the database.`,
+        content: `Manage model overrides from Admin → AI → Models. Select a model and click Save Changes; saved overrides can take up to five minutes to take effect. The collapsed Preserved capabilities section retains settings for retired interfaces and dormant controls. Related preserved prompts remain available under Admin → AI → Prompts & budgets. These sections keep existing settings and prompt publication status intact.`,
       },
       {
         heading: 'Health Monitoring',
