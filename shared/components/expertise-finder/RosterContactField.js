@@ -11,7 +11,7 @@ const REASON_LABELS = Object.freeze({
 
 export default function RosterContactField({
   contactId,
-  endpoint = '/api/expertise-finder/contact-search',
+  endpoint = '/api/admin/expertise-roster',
   memberName = '',
   onSelect,
   onClear,

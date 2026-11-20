@@ -160,14 +160,14 @@ uses `EXPERTISE_ROSTER_BACKEND=dataverse`. See
 `expertise_roster_identity` / `expertise_roster_binding` (migration 103) and the
 validated feedback FK to identity (migration 104). All 10 Contact links were preserved.
 The 40 original Postgres rows are frozen recovery data, not an editable mirror.
-All 344 matching-history rows remain; their existing null `user_profile_id` values
+At migration acceptance, all 344 matching-history rows remained; their existing null `user_profile_id` values
 mean the unchanged profile-filtered history UI does not expose them to Justin.
 The following describes the retained Postgres-mode schema/recovery baseline.
-Internal staff/consultant/board roster + per-proposal match history. Production
-consumers are `pages/api/expertise-finder/{match,batch-match,roster,history}.js`;
-production prompt rules live in the Dataverse `expertise-finder.match`
+Historical internal staff/consultant/board roster + per-proposal match history.
+Standalone consumers are archived under `_archived/pages/api/expertise-finder/`;
+the stored reference prompt remains in the Dataverse `expertise-finder.match`
 prompt row (definition and bundled fallback:
-`shared/config/prompts/expertise-finder-dynamics.js`; resolved by
+`_archived/shared/config/prompts/expertise-finder-dynamics.js`; formerly resolved by
 `lib/services/tool-prompt-resolver.js`). The isolated
 `modules/expertise_matching` reference/demo has no production caller.
 Migration 035 added nullable normalized `preferred_email`. Migration 050 is
@@ -186,6 +186,9 @@ migration-035 column exact; zero preferred-email values before staff population.
 9 active Board (4 linked), 26 active Consultants (6 linked), and 4 active
 Research Program Staff. Five Board rows are owner-deferred as a non-blocking
 future-cycle reconciliation; see the roster Contact-link plan F5.
+
+Standalone retirement and owner-approved history deletion are tracked in
+[the retirement report](../plans/EXPERTISE_FINDER_RETIREMENT_2026-11-19.md); no history UI replacement is requested.
 
 ## Integrity Screener
 

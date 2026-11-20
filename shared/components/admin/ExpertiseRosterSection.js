@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '../Layout';
 import RosterContactField from '../expertise-finder/RosterContactField';
@@ -36,7 +35,7 @@ export default function ExpertiseRosterSection() {
     }).catch(e => { if (active && e.name !== 'AbortError') setError(e.message || 'The roster could not be loaded.'); });
     return () => { active = false; controller.abort(); };
   }, [reload]);
-  if (data?.backend === 'postgres') return <div className="space-y-3 text-sm"><p>The Admin roster editor will be available after the roster migration.</p><Link className="underline" href="/expertise-finder">Open the current Expertise Finder roster</Link></div>;
+  if (data?.backend === 'postgres') return <p role="status" className="text-sm">Roster editing is unavailable in this deployment. Ask your administrator to check the roster configuration.</p>;
   const members = (data?.members || []).filter(r => (inactive || r.is_active) && (!category || r.role_type === category)
     && `${r.name} ${r.affiliation || ''} ${r.expertise || ''} ${r.keywords || ''}`.toLowerCase().includes(search.toLowerCase()));
   return <div className="space-y-5">

@@ -73,7 +73,7 @@ describe('public Blob destination boundary', () => {
 const read = file => fs.readFileSync(path.join(process.cwd(), file), 'utf8');
 const directReaders = [
   'pages/api/analyze-literature.js', 'pages/api/analyze-funding-gap.js',
-  'pages/api/expertise-finder/match.js', 'pages/api/evaluate-multi-perspective.js',
+  'pages/api/evaluate-multi-perspective.js',
   'pages/api/process-phase-i-writeup.js', 'pages/api/process-peer-reviews.js',
   'pages/api/process-phase-i.js', 'pages/api/process.js',
   'pages/api/reviewer-finder/analyze.js',

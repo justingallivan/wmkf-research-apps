@@ -67,7 +67,7 @@ test('deprecated and reference names do not imply a live execution path', () => 
 });
 
 test('caller persistence is distinguished from a Dataverse Request-field write', () => {
-  expect(describe('{}', 'expertise-finder.match').caller.fields).toEqual(['expertise_matches.match_results']);
+  expect(describe('{}', 'expertise-finder.match').caller.fields).toEqual([]);
   expect(describe('{}', 'initial-assessment.generate').caller.summary).toMatch(/DOCX in SharePoint/);
   expect(describe('{}', 'field-primer.generate').caller.summary).toMatch(/standalone generation/);
 });

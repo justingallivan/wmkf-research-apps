@@ -52,6 +52,13 @@
 
 ## Next Items
 
+### Expertise Finder retirement in progress
+
+Owner subsequently authorized standalone retirement and confirmed matching history
+need not be retained. Work is on `codex/expertise-finder-retirement-2026-11-19`.
+See `docs/plans/EXPERTISE_FINDER_RETIREMENT_2026-11-19.md` for release/cleanup status.
+Admin roster and shared consumers remain; Connor backend automation is separate.
+
 ### Verified Open
 
 1. **Prove a staff-version PDF opens and the two-level sections render, live.**

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Governed bootstrap for the tool-app prompt rows (convergence plan Stage 0):
- * expertise-finder, funding-gap, expense-reporter, literature-analyzer,
+ * funding-gap, expense-reporter, literature-analyzer,
  * multi-perspective. One generalized CLI; each app supplies a manifest.
  *
  * Usage:
@@ -25,7 +25,6 @@ export const PROMPTSTATUS_PUBLISHED = 682090001;
 
 /** App key -> manifest module (shared/config/prompts/<file>-dynamics.js). */
 export const APP_MANIFEST_FILES = Object.freeze({
-  'expertise-finder': 'expertise-finder',
   'funding-gap': 'funding-gap',
   'expense-reporter': 'expense-reporter',
   'literature-analyzer': 'literature-analyzer',

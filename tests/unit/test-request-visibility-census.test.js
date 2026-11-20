@@ -65,7 +65,6 @@ const REPORT_SERVICE_CALLERS = {
 
 const BADGE_COMPONENTS = [
   'pages/dynamics-explorer.js',
-  'pages/expertise-finder.js',
   'pages/review-panel.js',
   'pages/workbench/[requestId].js',
   'shared/components/admin/TestRequestPreviewSection.js',
