@@ -478,7 +478,7 @@ Production Request Document row was created by this release smoke.
 - SharePoint library: the request's single Dynamics-tracked active
   `akoya_request` drive.
 - Proposal input: exactly one active
-  `AI Materials/ProposalNarrative_{Request#}.pdf`. The outbound reviewer
+  `AI Materials/ProposalNarrative_{Request#}.pdf` (D26 naming; J27 Research step 5 is reported to write `AI Materials/Narrative-Bibliography_<num>.pdf` instead, built but not live [REPORTED by Connor 2026-11-20; `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md` section 7]). The outbound reviewer
   package, Phase I display documents, archive-only matches, neighboring PDFs,
   and ambiguous active matches do not satisfy the producer contract.
 - Request-relative destination: `Artifacts/Initial Assessment/`.

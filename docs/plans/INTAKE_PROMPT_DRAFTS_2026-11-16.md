@@ -9,6 +9,16 @@ placeholder syntax, model settings, output parsing, field writeback) waits for
 Connor's example prompt, because these must run in his existing Power Automate
 flows. Resume context: [PA prompt delivery handoff](PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md).
 
+> **Status note, 2026-11-20 [REPORTED by Connor, see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`]:** Connor's flow map
+> lists `grantee-title.generate`, `intake.executive-summary`, `intake.methodology`,
+> `intake.personnel`, `intake.rationale` and `intake.keywords` (v4) as "tested" (passed on
+> a test request) inside step 3 (AI review), which is PLANNED and not live; the PD-scores,
+> injection, compliance and fit prompts are not written. The example prompt this draft waited
+> for arrived 2026-11-17 (below). The map does not say whether the tested prompt text is these
+> drafts or the published v2 rows, so the output limits below are not confirmed as the map's;
+> the map's targets and limits are the current reference. The "Not yet done" and "Next" lines
+> below are as of 2026-11-17.
+
 **Starting point for every prompt:** the J27 Review Workbook mockup v10.1, which
 reflects what Beth (CSO) has in mind. It is weighed seriously but is not canon;
 each section records where a draft departs from it and who decided.
@@ -81,7 +91,10 @@ From Connor's note `pa-prompt-format-answers-2026-11-17.md` (not in this repo):
 - **Audit retention:** Production keeps audit history forever (owner, 2026-11-17).
 
 - **Intake order:** all three intake prompts run before `wmkf_readyforreview` is set,
-  and a failed run stops intake (owner, 2026-11-17).
+  and a failed run stops intake (owner, 2026-11-17). [Superseded in part 2026-11-20, REPORTED by
+  Connor: `wmkf_readyforreview` is MANUAL, set by staff, not by a flow; step 3's end state is
+  `wmkf_ingeststage` = AI review done, awaiting coordinator review; the rationale prompt runs
+  after the executive summary and methodology.]
 
 - **Collaboration Letters:** the flow does not pass them to the Personnel prompt
   (owner, 2026-11-17), so collaborators come from the narrative only.

@@ -16,7 +16,7 @@ can copy a completed, suitable package into a fresh marked test request.
 The Factory may set readiness true **only on that run-owned test destination,
 after its status and required copied-artifact checks pass**. This is a narrow
 fixture-finalization operation, not permission to mark ordinary requests ready.
-Power Automate continues to own readiness for real intake. The Factory does not
+Power Automate was understood on 2026-11-02 to own readiness for real intake [2026-11-20, REPORTED by Connor in `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`: `wmkf_readyforreview` is MANUAL, no flow writes it; the app-side rule here is unchanged]. The Factory does not
 copy a source's readiness value or claim it reran assembly/AI processing.
 
 | Field | Final fixture value |

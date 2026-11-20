@@ -114,12 +114,12 @@ comments.
 
 | Field | Format | Produced | Source | Producer | Audience | Edit model |
 |---|---|---|---|---|---|---|
-| Short title | "To …" phrase | Intake | Proposal | Connor's flow, `grantee-title.generate` (D37/T13) | All | Stored (`wmkf_wmkfprojectdescription`) |
-| Lay abstract | Plain-language paragraph | Intake | Applicant's lay abstract, proposal | Connor's flow (D37) | All | Stored; field not yet identified |
-| Methods | Short paragraph replacing the old page-1 Methodology bullet (CSO note; length not specified) | Intake | Proposal | App job (open in D37) | All | Stored |
-| Key personnel | Name (role), rank and department; institution only if different; short expertise; at most one closing team sentence | Intake | Proposal, personnel records | App job (open in D37) | All | Stored |
-| First Cut rationale | 1–3 sentences on key impact | Intake | Proposal | App job (open in D37) | Chairs, Board | Stored and app-editable; shared packet snapshot frozen (F2) |
-| Field / methods keywords | From controlled lists | Intake | Proposal | Connor's flow (D37) | Staff, packets | Stored; full lists pending |
+| Short title | "To …" phrase | Intake | Proposal | Connor's PA step 3, `grantee-title.generate` (tested, step 3 PLANNED; D37/T13) [REPORTED by Connor 2026-11-20, see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`] | All | Stored (`wmkf_wmkfprojectdescription`) |
+| Lay abstract | Plain-language paragraph | Intake | Applicant's lay abstract, proposal | Connor's PA step 3, `intake.executive-summary` (tested, step 3 PLANNED) [REPORTED by Connor 2026-11-20, see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`] | All | Stored (`wmkf_layabstract`, 150–200 words) |
+| Methods | Short paragraph replacing the old page-1 Methodology bullet (CSO note; length not specified) | Intake | Proposal | Connor's PA step 3, `intake.methodology` (tested; 2–4 sentences, at most 100 words) [REPORTED by Connor 2026-11-20, see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`] | All | Stored (`wmkf_ai_methodologysummary`) |
+| Key personnel | Name (role), rank and department; institution only if different; short expertise; at most one closing team sentence | Intake | Proposal, personnel records | Connor's PA step 3, `intake.personnel` (tested) [REPORTED by Connor 2026-11-20, see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`] | All | Stored (`wmkf_ai_teaminfo`) |
+| First Cut rationale | 1–3 sentences on key impact | Intake | Proposal | Connor's PA step 3, `intake.rationale` (tested; 3+ sentences, at most 100 words) [REPORTED by Connor 2026-11-20, see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`] | Chairs, Board | Stored and app-editable; shared packet snapshot frozen (F2) |
+| Field / methods keywords | From controlled lists | Intake | Proposal | Connor's PA step 3, `intake.keywords` (tested, v4; `wmkf_programareaserved` primary discipline, `wmkf_ai_keywords`, `wmkf_ai_methodologies`) [REPORTED by Connor 2026-11-20, see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`] | Staff, packets | Stored; lists live in `wmkf_programlevel3` |
 | AI concern / primary triage reason | Distinct advisory concern and staff reason concepts; exact fields/options open | Intake and staff meetings | Proposal and staff judgment | AI flags concerns; staff decide | Staff only | Status, attention fields and workspace views pending colleague input |
 | Staff notes | Free text | Any | Staff | Staff | Staff only, never Chairs or Board | Single editable field; no entry history (D1) |
 | Reviewer summary | Opens with the scores; agreement, concerns | After review | Reviews, synthesis, writeup | Generated draft, staff edit in app | Staff, Board | Stored and app-editable (F1) |
@@ -213,12 +213,8 @@ editing decision remains separate.
 
 Split by owner, per D37 and D14.
 
-- **Connor's on-submit flows:** short title, lay abstract, keywords, initial
-  PD, clerical check, fitness flag, expertise. The app's part is the shared
-  prompt, the target field and the format. Needed from Connor: target field for
-  the lay abstract (none exists), confirmation that the short-title prompt is
-  `grantee-title.generate` or its edit, and the keyword lists.
-- **App jobs (pending the open D37 producer split):** methods, key personnel, First Cut rationale and the AI concern
+- **Connor's Power Automate flows (superseded 2026-11-20 [REPORTED by Connor 2026-11-20, see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`]):** step 1 application data and step 2 documents are LIVE; step 3 AI review is PLANNED and covers short title, executive summary (`wmkf_layabstract`), methodology, personnel, rationale, keywords, PD scores, injection screen, compliance (advisory) and fit; PD assignment is a separate PLANNED batch (step 6). The 2026-11-04 wording this replaces listed short title, lay abstract, keywords, initial PD, clerical check, fitness flag and expertise as on-submit steps with the lay-abstract field and keyword lists still needed from Connor; both are now answered by the map.
+- **App jobs (2026-11-20: methods, personnel and rationale moved to Connor's step 3 per the map; the AI concern explanation remains open):** the AI concern
   explanation; exact concern/reason split awaits colleague input. Proposed: one governed prompt over the AI Materials narrative plus
   request context, the same input shape as the existing Draft generator
   (`lib/services/pre-site-visit/proposal-core-service.js:188-215`), returning
@@ -299,7 +295,7 @@ platform-level auditing.
 |---|---|---|
 | 0 (thin D13 slice) | D41 staff-state field and bulk setting; intake fields visible in the Workbench list as they arrive | S1 target retained; colleague input on status/workspace model; Connor provisioning |
 | 1 | Field contract accepted; prompt formats written | F1, F2, I1 resolved; exact field/schema contracts still to verify; F3 amount deferred |
-| 2 | App intake job for methods, key personnel, First Cut rationale; Connor's flows for the rest | D37 split; test set review |
+| 2 | [Superseded 2026-11-20: Connor's step 3 prompts cover methods, personnel and rationale] App intake job for methods, key personnel, First Cut rationale; Connor's flows for the rest | D37 split; test set review |
 | 3a | First Cut and semi-finalist packets with workbook export and magic-link delivery | Stages 0–2; D34 design |
 | 3b | After-review packet, offramp record | Part 4 field decisions |
 | 3c | Finalist and Board packets from saved app fields; Word version tracking and reconciliation | F1 implementation design; D21 composition decision |

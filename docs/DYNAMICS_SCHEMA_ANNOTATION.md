@@ -127,7 +127,7 @@ Not just grants — this table holds **all record types**: grant applications (1
 | Field | Meaning |
 |-------|---------|
 | `_wmkf_grantprogram_value` | → wmkf_grantprogram: broad program (Research, SoCal, UE, etc.) |
-| `_akoya_programid_value` | → akoya_program: specific internal program (S&E, MR, HC, etc.) |
+| `_akoya_programid_value` | → akoya_program: specific internal program (S&E, MR, HC, etc.). Blank on J27 Research requests: Connor's live step-1 flow sets `wmkf_grantprogram` = Research but does not list this field [REPORTED by Connor 2026-11-20; `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`] |
 | `_wmkf_type_value` | → wmkf_type: request type classification |
 | `akoya_fiscalyear` | Grant cycle label like "June 2025" (NOT calendar year) |
 

@@ -459,6 +459,7 @@ Alt key: `(wmkf_request, wmkf_contact, wmkf_role)`.
 - Ongoing sync is **net-new PA flows**, not an extension. Connor will build PA flows on `akoya_request` create/update that (a) create `contact` records as needed and (b) write junction rows directly.
 - **`_wmkf_projectleader_value` (PI lookup) stays live** — used by other flows unrelated to reviewers; PA flows dual-write (projectleader field + junction `pi` row). Only the **co-PI slots** (`_wmkf_copi1..5_value`) become obsolete read-only legacy data once backfill + PA flows are live.
 - Backfill script remains Justin/Claude's job.
+- **Status note 2026-11-20 `[REPORTED by Connor 2026-11-20]`:** for Research J27 applications, the live step-1 intake flow writes `contact` and `wmkf_apprequestperson` rows (PI = `wmkf_role` `100000000`, Co-PI = `100000001`) on each run, clear-and-rebuild, and also sets `wmkf_projectleader`. See `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`. This is the "ongoing sync" above in practice; not probed by the app side.
 
 ### 6. Historical reviewer-portal field audit
 

@@ -44,8 +44,8 @@ same list mechanism could carry that packet later.
 
 | # | Decision |
 |---|---|
-| 1 | Sections come from the keyword characterization Connor's Power Automate flow writes at submission, as written. No staff control to move a proposal between sections. |
-| 2 | Titles open the staff version (`{AKA}_Staff-Version_{Request#}.pdf`), not the reviewer copy. |
+| 1 | Sections come from the keyword characterization Connor's Power Automate AI review (step 3, PLANNED, not live; it runs after the documents step, not at submission) writes as the request's primary discipline `wmkf_programareaserved` and `wmkf_ai_keywords`, as written; the coordinator may repoint the primary discipline at step 4 [REPORTED by Connor 2026-11-20, see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`]. No staff control to move a proposal between sections. |
+| 2 | Titles open the staff version (`{AKA}_Staff-Version_{Request#}.pdf`; once a primary keyword exists, Connor's step 5 names it `{AKA}_{Primary Keyword}_Staff-Version_{Request#}.pdf` [REPORTED by Connor 2026-11-20]; the matcher accepts both because it keys on the `_Staff-Version_{number}.pdf` ending), not the reviewer copy. |
 | 3 | Chairs are marked on the existing Board roster; one roster serves both audiences. |
 | 4 | Each person gets their own link, and each proposal opens directly from it. |
 | 5 | Delivery is one link to a page, not a long email of links. |
@@ -165,7 +165,7 @@ the link off and create a new list.
 ### Which proposals are listed
 
 Every Research request linked to the cycle that passes the Workbench discovery rule
-(for 2027 and later cycles: Power Automate has marked it ready) and whose Scoring
+(for 2027 and later cycles: `wmkf_readyforreview` is set; Connor's 2026-11-20 map lists that field as MANUAL staff handoff, not a flow write, see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`) and whose Scoring
 decision is Scored (decision 15), read the same way for
 every staff member, with no Program Director or "my proposals" scope. The read is
 refused, never shortened, if it is incomplete, over 600 proposals, or the readiness
@@ -238,10 +238,10 @@ Owner-only steps:
 
 ## Risks
 
-- **Connor's keyword flow before December 7.** Without it the page shows the
+- **Connor's keyword step (AI review, step 3, PLANNED, not live as of 2026-11-20 [REPORTED by Connor]) before December 7.** Without it the page shows the
   placeholder sections. Fallback: one unsectioned list.
-- **Staff version on every proposal.** Connor's flow builds the file; it was missing on
-  an earlier test request [ASSUMED: from the alignment log, not re-read]. A title whose
+- **Staff version on every proposal.** Connor's step 5 builds the file (BUILT, not live; it triggers on coordinator acceptance after step 3 [REPORTED by Connor 2026-11-20]), which explains its absence on
+  the test requests. A title whose
   file is missing shows "not available" rather than another document. The staff page
   does not yet show which proposals lack one.
 - **A forwarded link** opens every listed proposal until it is switched off or the

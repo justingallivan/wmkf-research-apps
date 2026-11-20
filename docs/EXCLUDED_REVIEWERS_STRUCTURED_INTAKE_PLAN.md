@@ -32,7 +32,14 @@ request, `akoya_request.wmkf_excludedreviewers` (Memo). Today:
   `lib/services/reviewer-exclusion-parser.js`,
   `lib/services/workbench/applicant-reviewers-service.js`, display in
   `shared/components/reviewers/ReviewerFindPanel.js`, plus explorer prompt and
-  probe scripts].
+  probe scripts]. **J27 update (2026-11-20):** Connor's live Research-intake
+  step-1 Power Automate flow now writes this field in a regular shape, one
+  excluded reviewer per line, `{first} {last} ({info}) — {reason}` (the
+  ` ({info})` part is omitted when blank), still as free text on the request,
+  not as `wmkf_appexcludedreviewer` rows. So J27 text could be parsed
+  deterministically instead of by the Haiku parse
+  [REPORTED by Connor 2026-11-20; `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`
+  section 3 and section 9 item 6; the app-side parser change is not built].
 - To use the text as a search soft-block, the Find tab has Claude Haiku parse
   names out of it on **every mount** where the text is substantive — an
   uncached, deterministic LLM call
@@ -211,7 +218,7 @@ per the campaign release strategy. Phase C is outside this repo.
 1. Should the form cap rows (e.g. 10)? Recommend a soft cap with the overflow
    text as the escape hatch.
 2. Does Connor's intake surface write to Dataverse directly or through an
-   intermediary (Power Pages / Flow)? Determines whether `wmkf_source`
+   intermediary (Power Pages / Flow)? (Partly answered 2026-11-20: for J27 Research, a live Power Automate flow writes the free-text field `wmkf_excludedreviewers` [REPORTED by Connor 2026-11-20]; whether structured rows will ever be written is still open.) Determines whether `wmkf_source`
    default can be trusted or must be enforced server-side.
 3. Do we want a Find-tab affordance for staff to add an exclusion row
    (Phase B scope creep — default no; revisit after Phase C).

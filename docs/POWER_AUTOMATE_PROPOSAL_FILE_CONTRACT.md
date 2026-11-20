@@ -6,7 +6,7 @@ status: active
 summary: "Required SharePoint folders and exact proposal PDF filenames for Power Automate."
 canonical: true
 owner: product-engineering
-last_verified: 2026-10-26
+last_verified: 2026-11-20
 related:
   - docs/REVIEWER_MATERIALS_FOLDER_SPEC.md
   - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
@@ -39,14 +39,10 @@ AI Materials/ProposalBibliography_1002379.pdf
 
 ### J27 names (owner decision 2026-10-26)
 
-> **Status 2026-11-20:** Connor's full Research intake map is now
-> `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md` (reported by Connor, not probed). Per that map:
-> step 2 (live) writes the applicant files to `Submission-Documents/`; step 5 (built, not live)
-> writes the staff version as `<AKA>_<Primary Keyword>_Staff-Version_<num>.pdf` (or
-> `<AKA>_Staff-Version_<num>.pdf` with no keyword), `AI Materials/Narrative-Bibliography_<num>.pdf`,
-> and **derived** files into `Submission-Documents/` (`Front-Matter_<num>.pdf` and four `.docx`
-> working files), so that folder no longer holds only applicant originals. No step produces a
-> J27 `Reviewer Materials/Proposal_` file. Where this section disagrees, the intake map is newer.
+> **Source for J27 file names:** Connor's Research intake flow map,
+> `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md` `[REPORTED by Connor 2026-11-20]`,
+> not probed by us. This section is reconciled to it; where they disagree, the
+> map is newer.
 
 For J27, GOApply places the applicant's documents in a `Submission-Documents`
 subfolder, and the J27 flows put the documents below in `AI Materials`, named
@@ -72,25 +68,43 @@ live in `Submission-Documents`, not `AI Materials`. Connor's Production test
 request 1003384 holds `Project-Narrative_`, `Bibliography_`, `Biosketches_`,
 `Other-Support_` and `Collaboration-Letters_` (each `{Request#}.pdf`) and
 `Graphical-Abstract_{Request#}.jpg` there, and has no `AI Materials` folder.
-On the J27 line (not promoted) the Workbench Proposal tab lists those six from
-`Submission-Documents` for J27 and later cycles, matching names exactly. The
-governed narrative and bibliography readers accept the J27 names in
+Connor's 2026-11-20 map confirms step 2 (a live flow) writes these to
+`Submission-Documents/` and adds `declarationofstatus_<applicant AKA or name>.pdf`
+when uploaded `[REPORTED by Connor 2026-11-20]`. The Workbench Proposal tab lists those
+six from `Submission-Documents` for J27 and later cycles, matching names exactly
+`[VERIFIED via lib/services/workbench-proposal-documents.js, on main and origin/main]`.
+The governed narrative and bibliography readers accept the J27 names in
 `Submission-Documents` as well (owner, 2026-11-10; alignment log D59). They
 still require exactly one copy across the accepted places and fail closed
 otherwise: `AI Materials` under either name, or `Submission-Documents` under the
-J27 name. Connor plans an `AI Materials` folder for J27 with different contents.
-The one item named so far is `Narrative-Bibliography_{Request#}.pdf`, the
-combined document for Reviewer Finder, built by Connor's flow (alignment log
-D60; not yet created). Derived files go in `AI Materials` so that
-`Submission-Documents` holds only the applicant's originals. On the J27 line
-Reviewer Finder loads that file by default when a request has exactly one.
+J27 name.
+
+Step 5 (staff version) is built but not live; it waits on the planned AI review
+(step 3) `[REPORTED by Connor 2026-11-20]`. When it runs it writes:
+
+- `AI Materials/Narrative-Bibliography_{Request#}.pdf`, the combined document for
+  Reviewer Finder (alignment log D60). It does not exist yet on real requests
+  because step 5 is not live. On the J27 line Reviewer Finder loads it by default
+  when a request has exactly one.
+- **Derived files into `Submission-Documents/`:** `Front-Matter_{Request#}.pdf` and
+  four `.docx` working files (`Cover-Page_`, `Summary_`, `Graphical-Abstract-Page_`,
+  `Project-Abstract-Page_`). So `Submission-Documents` holds the applicant's
+  originals plus these derived files; it is not originals-only.
 
 The J27 staff version sits at the root of the request folder, named
-`{AKA}_Staff-Version_{Request#}` (Connor, 2026-11-10; AKA is the institution's
-short name). The Proposal tab on the J27 line shows it first, matching any
-single root file whose name ends `_Staff-Version_{Request#}.pdf` (Connor
-confirmed the extension). The Expertise Finder batch match reads the same
-file, and still accepts the earlier `Phase_I_Staff_Version` name. The J27 reviewer copy is still to be specified.
+`{AKA}_{Primary Keyword}_Staff-Version_{Request#}.pdf`, or
+`{AKA}_Staff-Version_{Request#}.pdf` when there is no primary keyword yet
+(AKA is the institution's short name; Connor, 2026-11-10, keyword segment per the
+2026-11-20 map). The Proposal tab on the J27 line shows it first, matching any
+single root file whose name ends `_Staff-Version_{Request#}.pdf`, so both
+spellings match
+`[VERIFIED via lib/services/workbench-proposal-documents.js:212-228]`. If a re-run
+after a keyword change left both files the match would fail closed (open
+question for Connor, intake map section 10). The Expertise Finder batch match
+that also read this file (and accepted the earlier `Phase_I_Staff_Version` name) was
+retired 2026-11-19; its code is under `_archived/lib/services/expertise-finder/`.
+No step in the map produces a J27 `Reviewer Materials/Proposal_` file; the J27
+reviewer copy is still to be specified.
 
 ## File purposes
 
@@ -105,7 +119,7 @@ file, and still accepts the earlier `Phase_I_Staff_Version` name. The J27 review
 
 1. Use the folder names, filenames, and capitalization exactly as shown.
 2. Keep the proposal narrative and bibliography as separate PDFs.
-3. Do not create a combined canonical AI-input PDF. (J27 exception, D60: step 5 builds
+3. Do not create a combined canonical AI-input PDF. (J27 exception, D60: step 5, built but not live, builds
    `AI Materials/Narrative-Bibliography_<num>.pdf` for Reviewer Finder; the governed
    Pre-Site/Initial Assessment/Field Primer readers still use the separate files.)
 4. Do not add dates, version numbers, spaces, or suffixes such as `(1)` to the

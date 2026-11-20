@@ -76,7 +76,7 @@ Session 109 (2026-04-24) reconciled six design docs + Wave 1 reality + Connor's 
   on 2026-05-06; Vercel-labeled runs continued through 2026-07-26. The
   `PowerAutomate Auto` option is also used by the current Vercel
   title-generation cron, so the label alone is not caller proof.
-- The production flow-definition probe found no PA prompt Executor.
+- The production flow-definition probe found no PA prompt Executor. Update 2026-11-20: Connor reports J27 Research PA flows exist for step 1 (application data) and step 2 (documents), both LIVE, but step 3 (the AI review that would run `intake.*` prompts and `grantee-title.generate`) is PLANNED, so the claim that no PA prompt pipeline is deployed still holds for prompts [REPORTED by Connor 2026-11-20; `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`; not re-probed].
   Generalized context blocks and cross-prompt cache alignment remain unbuilt.
 
 **Historical Phase 1 target:** Connor would build a PA `ExecutePrompt` child

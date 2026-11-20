@@ -69,6 +69,15 @@ automated chaining DAG are **not deployed in the visible production flow
 metadata**. They remain unfinished target architecture, not unknown current
 behavior. Connection health and run history for a future PA implementation
 will require a new probe after a flow is actually deployed.
+
+**Update 2026-11-20 `[REPORTED by Connor 2026-11-20]`, not probed:** the Research
+intake flows are now partly deployed. Steps 1 (application data) and 2
+(documents) are live but make no AI calls. Step 3 (the AI review that runs the
+`wmkf_ai_prompt` rows and logs `wmkf_ai_run` rows with `wmkf_ai_runsource`
+PowerAutomate Auto or Test) is **planned**: five prompts are tested, four are not
+written. So the statement above still holds for the AI Executor chain as of
+Connor's report; see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`. Re-run the
+probe once step 3 is deployed.
 `docs/EXECUTOR_CONTRACT.md` is the current Vercel execution contract; the body
 below is retained as historical rationale and unfinished target architecture.
 

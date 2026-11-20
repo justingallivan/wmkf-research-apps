@@ -24,6 +24,8 @@ methodologies, risk flags, team info) predate that audit; they are defined in
 `lib/dataverse/schema/wave2-existing/akoya_request-ai-extensions.json` and were
 built on the apps side under Connor's May 6 delegation.
 
+**Update 2026-11-20 [REPORTED by Connor 2026-11-20, see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`]:** Connor's flow map says which Power Automate step writes several of these fields; where it does, a note is added in the row. Steps 1 (application data) and 2 (documents) are LIVE; step 3 (AI review, which writes columns H-O's AI fields) is PLANNED and not live.
+
 Unless noted, fields are on the Request (`akoya_request`).
 
 ## Intake: from the portal
@@ -31,26 +33,26 @@ Unless noted, fields are on the Request (`akoya_request`).
 | Column | Workbook header | Field | Status |
 |---|---|---|---|
 | A | Request # | `akoya_requestnum` | ✅ |
-| B | PD (lead) | `wmkf_programdirector` | ✅ |
+| B | PD (lead) | `wmkf_programdirector` | ✅ Written by step 6 (PD assignment, PLANNED batch after the deadline), from step 3's `wmkf_ai_pdscores` [REPORTED by Connor 2026-11-20, see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`] |
 | C | Organization | `akoya_applicantid` | ✅ |
-| D | Program | `wmkf_grantprogram` / `akoya_programid` *(likely; confirm which)* | ✅ |
+| D | Program | `wmkf_grantprogram` / `akoya_programid` *(likely; confirm which)* | ✅ Step 1 sets `wmkf_grantprogram` = Research and does not write `akoya_programid` [REPORTED by Connor 2026-11-20, see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`] |
 | E | Request ($) | Existing request amount field *(likely)* | ✅ |
 | F | Applicant title | `akoya_title` | ✅ |
-| G | Applicant abstract | `wmkf_abstract` | ✅ |
+| G | Applicant abstract | `wmkf_abstract` | ✅ Cleaned in place (PDF line breaks removed) by step 1, LIVE [REPORTED by Connor 2026-11-20, see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`] |
 
 ## Intake: written by Claude
 
 | Column | Workbook header | Field | Status |
 |---|---|---|---|
-| H | Short title | `wmkf_wmkfprojectdescription` | ✅ |
-| I | Executive Summary (at most 200 words) | `wmkf_layabstract`, created by the apps Nov 9, 2026; staff editor live | ✅ |
-| J | Methodology, page 1 (2 sentences to 100 words) | `wmkf_ai_methodologysummary`, created by Connor Nov 16, 2026 | ✅ |
+| H | Short title | `wmkf_wmkfprojectdescription` | ✅ Step 3 `grantee-title.generate` (tested) [REPORTED by Connor 2026-11-20, see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`] |
+| I | Executive Summary (at most 200 words) | `wmkf_layabstract`, created by the apps Nov 9, 2026; staff editor live | ✅ Step 3 `intake.executive-summary` (tested) writes it, plain text, 150-200 words [REPORTED by Connor 2026-11-20, see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`] |
+| J | Methodology, page 1 (2 sentences to 100 words) | `wmkf_ai_methodologysummary`, created by Connor Nov 16, 2026 | ✅ Step 3 `intake.methodology` (tested), 2-4 sentences, at most 100 words [REPORTED by Connor 2026-11-20, see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`] |
 | K | Personnel (length scales with team size) | `wmkf_ai_teaminfo`, created by the apps May 2026; repurposed for readable text (same team information, new format) | ✅ Description changed to "Summary of key personnel and expertise" in the repo and, per Connor, in Dynamics |
-| L | Rationale (Intake), kept as a version | `wmkf_ai_fitrationale` exists, but is paired with a fit rating from the older Phase I tool | ⚠️ See decision 1 |
-| M | Field keywords, from a list | `wmkf_ai_keywords` (JSON list), created by the apps May 2026 | ✅ List source: the Keywords table `wmkf_programlevel3` (seeded: 259 rows, probe 2026-11-19) |
-| N | Methods keywords, from a list | `wmkf_ai_methodologies` (JSON list), created by the apps May 2026 | ✅ List source: the Keywords table `wmkf_programlevel3` (seeded: 259 rows, probe 2026-11-19) |
-| O | Flags (Claude, intake) | `wmkf_ai_riskflags` (JSON list), created by the apps May 2026 | ⚠️ See decision 2 |
-| P | Open questions, with page and section, added to by every prompt | none | ❌ Missing |
+| L | Rationale (Intake), kept as a version | `wmkf_ai_fitrationale` exists, but is paired with a fit rating from the older Phase I tool | ⚠️ See decision 1. Connor's map names `wmkf_recommendationrationale` (step 3 `intake.rationale`, tested; overwritten each step-3 run, staff edit later) as the intake rationale target, not `wmkf_ai_fitrationale`, which holds the fit rationale (`wmkf_ai_fitassessment`, prompt not yet written) [REPORTED by Connor 2026-11-20, see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`] |
+| M | Field keywords, from a list | `wmkf_ai_keywords` (JSON list), created by the apps May 2026 | ✅ List source: the Keywords table `wmkf_programlevel3` (seeded: 259 rows, probe 2026-11-19). Step 3 `intake.keywords` writes the `wmkf-keywords/1` JSON here and the primary discipline to `wmkf_programareaserved`; a coined term becomes a new row with `wmkf_needsreview` = Yes [REPORTED by Connor 2026-11-20, see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`] |
+| N | Methods keywords, from a list | `wmkf_ai_methodologies` (JSON list), created by the apps May 2026 | ✅ List source: the Keywords table `wmkf_programlevel3` (seeded: 259 rows, probe 2026-11-19). The map's `wmkf-methods/1` JSON is written here; which prompt writes it is not stated [REPORTED by Connor 2026-11-20, see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`] |
+| O | Flags (Claude, intake) | `wmkf_ai_riskflags` (JSON list), created by the apps May 2026 | ⚠️ See decision 2. Connor's map does not list `wmkf_ai_riskflags`; its step 3 has an injection screen (`wmkf_ai_injectionflag`, `wmkf_ai_injectionnotes`), compliance and fit fields instead, none yet written [REPORTED by Connor 2026-11-20, see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`] |
+| P | Open questions, with page and section, added to by every prompt | none | ❌ Missing (Connor's map lists no open-questions field or prompt) |
 | Q | Staff notes / rationale (AI drafted, staff edited) | `wmkf_initialassessmentrationale`, created by the apps Nov 13, 2026 *(likely)* | ⚠️ Confirm it is the same thing |
 
 ## First Cut
@@ -171,7 +173,7 @@ Connor creates the missing fields (owner, November 17).
 **Intake (needed for the prompts now):**
 - Personnel: no new field; `wmkf_ai_teaminfo` repurposed (description changed)
 - Open questions
-- Rationale (Intake), once decision 1 is made
+- Rationale (Intake), once decision 1 is made (the map's step 3 already writes `wmkf_recommendationrationale`; versioning is not part of it)
 - The flag structure, once decision 2 is made
 
 **Later stages (can wait until those stages are built):**
@@ -186,7 +188,7 @@ Connor creates the missing fields (owner, November 17).
 
 - Whether the other existing fields above already hold data. (Per Connor, 2026-11-17:
   the four May `wmkf_ai_` fields hold no data and no flow writes them yet; the new
-  intake flows will.)
+  intake flows will. As of 2026-11-20 the map says step 3, which writes them, is still PLANNED, so this remains true [REPORTED by Connor 2026-11-20, see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`].)
 - The *(likely)* matches, which need confirmation from the people who use them.
 - The flag rubric, which the workbook marks as a placeholder.
 - The keyword lists: per Connor (relayed by the owner, 2026-11-18), the authoritative list is the

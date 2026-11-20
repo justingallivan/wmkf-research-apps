@@ -290,12 +290,14 @@ For the remaining Postgres-only tables (integrity, panel, expertise), the same p
 
 ### Flows to build
 
+Research-intake rows below are reconciled to `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md` (Connor's report, 2026-11-20); Phase II rows are unchanged.
+
 | Flow | Trigger | AI Task | Status |
 |------|---------|---------|--------|
-| Phase I file organization | Request created, `Phase I Status = Pending Committee Review` | — | Planned |
-| Phase I AI check-in | File organization complete | Claude: compliance + summary + keywords | Planned |
-| Phase I staff version | AI check passes compliance | — (PDF formatting) | Planned |
-| PD assignment | After application deadline (batch) | Claude: assign PD by specialty | Planned |
+| Phase I file organization (Research intake steps 1-2: application data, documents) | Request created, `Phase I Status = Pending Committee Review`; step 2 triggered by step 1 via `wmkf_ingeststage` | — | Live for Research [REPORTED by Connor 2026-11-20] |
+| Phase I AI check-in (Research intake step 3) | Step 2 complete (`wmkf_ingeststage` = Documents done) | Claude: summary, methodology, personnel, rationale, keywords; compliance, fit, injection and PD scores not yet written | Planned (five text/keyword prompts tested; the rest unwritten) [REPORTED by Connor 2026-11-20] |
+| Phase I staff version (Research intake step 5) | Manual coordinator acceptance (`akoya_submissionaccepted` = Yes), not an AI compliance pass; compliance is advisory | — (PDF formatting) | Built, not live: waits on step 3 [REPORTED by Connor 2026-11-20] |
+| PD assignment (Research intake step 6) | After application deadline (batch, started by staff) | Scores come from step 3 `wmkf_ai_pdscores`; flow assigns `wmkf_programdirector` | Planned [REPORTED by Connor 2026-11-20] |
 | Phase II file organization | `Phase II Status = Phase II Pending Committee Review` | — | Planned |
 | Phase II AI check-in | File organization complete | Claude: compliance (+ TBD) | Planned |
 | Phase II staff version | AI check passes compliance | — (PDF formatting) | Planned |
@@ -313,7 +315,7 @@ Dataverse trigger (status change on akoya_request)
 ```
 
 ### Trigger conditions
-To be determined during flow construction — the proposal process is actively evolving, so exact status values and conditions will be customized as flows are built.
+To be determined during flow construction — the proposal process is actively evolving, so exact status values and conditions will be customized as flows are built. For Research intake, Connor's built flows chain through `akoya_goapplystatustracking.wmkf_ingeststage` (steps 1 to 3) and a manual `akoya_submissionaccepted` = Yes (step 5) [REPORTED by Connor 2026-11-20; see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`].
 
 ### Who does what
 - **Justin:** develops and validates prompts (Phase 1), provides proven prompts for flows

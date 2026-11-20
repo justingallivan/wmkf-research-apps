@@ -143,6 +143,14 @@ Today's Vercel prompts return unstructured markdown. Target-state Pattern A prom
 }
 ```
 
+Note on the example above (2026-11-20): it is illustrative. In Connor's planned
+Research step 3, `wmkf_ai_keywords` holds JSON in format `wmkf-keywords/1` (a
+primary discipline, runner-up, secondary disciplines, objects of study and free
+terms, each tied to a `wmkf_programlevel3` row), and `wmkf_ai_methodologies`
+holds `wmkf-methods/1`, not a `string[]`
+`[REPORTED by Connor 2026-11-20]`; see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`.
+Any Vercel consumer of these fields must read those formats.
+
 ### Prompt chaining is first-class
 
 A downstream prompt's `wmkf_ai_promptvariables` can reference upstream prompt outputs rather than raw inputs:
@@ -173,7 +181,11 @@ The original blockers classify as follows:
    by this document and should not be assumed.
 
 3. **PA flow complexity — PLANNED/UNBUILT.** The 2026-07-27 production probe
-   found no prompt-Executor flow. Any future PA ingest flow still needs
+   found no prompt-Executor flow. Connor's 2026-11-20 map
+   `[REPORTED by Connor 2026-11-20]` shows the Research intake step-3 AI review
+   (a PA flow running governed prompts in sequence on cached documents and
+   writing `wmkf_ai_keywords`, `wmkf_ai_methodologies` and other fields) still
+   **planned**; see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`. Any future PA ingest flow still needs
    equivalent parse, validation, coalesced write, and retry behavior.
 
 4. **Validation parity — VERCEL SHIPPED / PA UNBUILT.** Vercel Executor

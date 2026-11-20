@@ -311,7 +311,7 @@ search limits: `docs/audits/product-backlog-reconciliation-2026-10-31.md`.
   parked `needs_attention` at verify on the Foundation GoVerify refresh (runbook
   "What 'cannot continue' leaves behind"); the create limit is now 60 s
   (`74f442200`) and the form offers Retry after a create timeout (`c689c352d`).
-  **Follow-up (owner, 2026-11-14; [BRANCH-BUILT 2026-11-15 on `claude/factory-narrative-bibliography`; ledger migration 099 applied 2026-11-15 (both ledgers, Production app database); not merged]):** have the Factory also produce the combined narrative and bibliography, `AI Materials/Narrative-Bibliography_{N}.pdf` (alignment log D60). In real J27 requests Connor's flow builds it and Reviewer Finder loads it by default. Needs a merge of the two copied PDFs, a new copy-step kind and a receipt-grammar widening (ledger migration, as 098). The root `{AKA}_Staff-Version_{N}.pdf` ("Combined proposal" on the page) is a separate staff-made file and not part of this follow-up.
+  **Follow-up (owner, 2026-11-14; [BRANCH-BUILT 2026-11-15 on `claude/factory-narrative-bibliography`; ledger migration 099 applied 2026-11-15 (both ledgers, Production app database); not merged]):** have the Factory also produce the combined narrative and bibliography, `AI Materials/Narrative-Bibliography_{N}.pdf` (alignment log D60). In real J27 requests Connor's step-5 staff-version flow builds it (built, not live until the planned step-3 AI review exists [REPORTED by Connor 2026-11-20; `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`]) and Reviewer Finder loads it by default when present. Needs a merge of the two copied PDFs, a new copy-step kind and a receipt-grammar widening (ledger migration, as 098). The root `{AKA}_Staff-Version_{N}.pdf` ("Combined proposal" on the page) is a separate staff-made file and not part of this follow-up.
   Original entry follows.
   The J27 Workbench is on in Production (every 2027-or-later request,
   `docs/plans/J27_WORKBENCH_PRODUCTION_ROLLOUT_2026-11-07.md`), so internal
@@ -903,7 +903,7 @@ These are valid directions but are not current app-team delivery commitments:
 - Power Automate Executor parity and status-driven backend automation — Connor-owned and dependent
   on grant-cycle sequencing. The 2026-07-27 production metadata probe found no
   deployed prompt-Executor flow among the 114 visible cloud-flow definitions;
-  this is planned external work, not an active production pipeline.
+  the prompt-Executor/AI part is planned external work, not an active production pipeline. Update 2026-11-20 (Connor's flow map, reported not probed): Research-intake steps 1-2 (application data, documents) are live Power Automate flows that run no prompts; the step-3 AI review is planned and the step-5 staff version is built but waits on it (`docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`).
 - Power Automate-backed writeup automation remains dependency-bound. The former Group B document
   is historical; the app-side writeup contract must be redesigned from current fields, prompts,
   inputs, and deadlines before any build.

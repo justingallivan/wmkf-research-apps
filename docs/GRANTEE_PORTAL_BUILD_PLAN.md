@@ -438,6 +438,15 @@ supersedes the earlier "new `wmkf_ai_editedtitle` wave" plan — no wave, no pre
   → days/months across a cycle; multiple editors; multi-edit revisions) — the opposite of a flow's
   single-identity burst; and **no service-account audit follows the human edits** (no read/react
   trigger-flow). **Owner confirmed S270: no trigger-flow watches the field.**
+  **Update 2026-11-20:** that finding (field exclusively human-curated, no flow
+  writer) predates Connor's J27 Research-intake design. His planned (not live) step 3
+  would write a short project title into `wmkf_wmkfprojectdescription` from this same
+  `grantee-title.generate` prompt row, overwriting on each step-3 run, so J27 requests
+  would already have a title by Invited and the cron here becomes a backstop. An
+  Admin edit of the prompt row changes both writers' output
+  [REPORTED by Connor 2026-11-20; `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`
+  section 9 item 1; cron skip-when-populated VERIFIED there via
+  `generate-grantee-titles-service.js:68-76`].
 - **Write-when-empty only** protects the manual curation: the cron never overwrites a populated value
   (the empty-field predicate), so staff edits and pre-existing manual titles are safe.
 

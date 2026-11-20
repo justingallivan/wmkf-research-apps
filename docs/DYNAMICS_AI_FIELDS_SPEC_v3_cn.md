@@ -103,9 +103,10 @@ Fields on `akoya_request`. Provenance lives in `wmkf_ai_run` with `wmkf_ai_taskt
 
 | Field | Type | Purpose |
 |-------|------|---------|
-| `akoya_submissionaccepted` *(existing)* | Two options | Compliance pass/fail — AI writes this on completion |
-| `wmkf_ai_complianceissues` | Multi-line text (JSON) | Array of `{category, severity, description}` |
-| `wmkf_ai_compliancesummary` | Multi-line text | Human-readable one-paragraph summary |
+| `akoya_submissionaccepted` *(existing)* | Two options | ~~Compliance pass/fail — AI writes this on completion~~ **Superseded for J27 Research intake (Connor's 2026-11-20 map, [ASSUMED] until he confirms):** coordinator acceptance is MANUAL and triggers the staff-version flow; compliance is advisory in `wmkf_ai_compliancecheck`; step 3 only resets this field to No if it was Yes |
+| `wmkf_ai_complianceissues` | Multi-line text (JSON) | Array of `{category, severity, description}` (v3 design; Connor's 2026-11-20 map describes a plain-language list of clerical issues, advisory only, which also receives a line when a prompt returns `INSUFFICIENT_MATERIAL`) |
+| `wmkf_ai_compliancesummary` | Multi-line text | Human-readable one-paragraph summary (exists in Dataverse; absent from Connor's 2026-11-20 map, so retired-or-planned is an open question for him) |
+| `wmkf_ai_compliancecheck` *(on `akoya_request`, added after v3)* | Choice | Compliant 682090000 / Non-Compliant 682090001 / Human Review 682090002 / Reviewed 682090003 (staff). Planned step-3 prompt writes it; the prompt is not yet written [REPORTED by Connor 2026-11-20; option values VERIFIED via Production metadata read 2026-11-20] |
 
 Sample JSON for `wmkf_ai_complianceissues`:
 
@@ -122,7 +123,7 @@ Sample JSON for `wmkf_ai_complianceissues`:
 
 ## Field Set D — PD Assignment
 
-**No new fields on `akoya_request`.** The AI writes directly to the existing `wmkf_programdirector` lookup. Confidence, rationale, and alternate candidates are exported to an Excel sheet by PowerAutomate for human audit — not persisted in Dynamics.
+**No new fields on `akoya_request`.** The AI writes directly to the existing `wmkf_programdirector` lookup. *(Update, Connor's 2026-11-20 map [REPORTED]: for J27 Research intake, the planned step 3 writes only scores to `wmkf_ai_pdscores`, and the separate planned step-6 batch flow assigns and load-balances `wmkf_programdirector`; see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`.)* Confidence, rationale, and alternate candidates are exported to an Excel sheet by PowerAutomate for human audit — not persisted in Dynamics.
 
 A `wmkf_ai_run` row is still created with `wmkf_ai_tasktype = 682090003` (PD Assignment) for traceability.
 
@@ -138,6 +139,8 @@ Fields on `akoya_request`. Written live by the Phase I Dynamics summarize-v2 Exe
 |-------|------|---------|
 | `wmkf_ai_fitassessment` | Picklist | AI's assessment of how well the proposal fits Keck program priorities |
 | `wmkf_ai_fitrationale` | Memo | AI-generated rationale supporting the fit assessment |
+
+Connor's 2026-11-20 map lists these as step-3 (planned, not live) Power Automate outputs: `wmkf_ai_fitassessment` Fit 682090000 / Not a Fit 682090001 / Unclear 682090002, with the fit prompt not yet written [REPORTED by Connor 2026-11-20; `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`]. The standalone summarize-v2 route is now an HTTP 410 stub in source (`docs/EXECUTOR_CONTRACT.md` status), so "written live" above describes the earlier Vercel path.
 
 Both fields are deployed and populated in prod (verified `akoya_request` 1002787, others).
 

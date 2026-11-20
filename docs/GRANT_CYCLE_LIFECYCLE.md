@@ -31,7 +31,7 @@ related:
 - **`/phase-i-dynamics/summarize-v2`** writes summaries via the Executor contract — single-request prompt-tuning surface (not in nav, direct URL).
 - **Reviewer-finding + Review-management + Integrity screening** all run from the Vercel app.
 - **PA-side `ExecutePrompt` flow** is the parity oracle (Connor builds; Vercel side is ready, see `scripts/test-echo-parity.js`).
-- **Connor's `akoya_request` create/update PA flows** (file-org, AI check-in, staff version) are still pending.
+- **Connor's `akoya_request` create/update PA flows** (file-org, AI check-in, staff version) were still pending as of 2026-05-08. Update 2026-11-20: for J27 Research intake, application data (step 1) and documents (step 2) are now live flows, the AI review (step 3) is planned, and the staff version (step 5) is built but waits on step 3 [REPORTED by Connor 2026-11-20; `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`].
 
 ---
 
@@ -123,10 +123,10 @@ PD assignment writes to existing `wmkf_programdirector` lookup (Field Set D — 
 
 | Flow | Trigger | Steps | Status |
 |------|---------|-------|--------|
-| Phase I file organization | Request created with `Phase I Status = Pending Committee Review` | Move docs to Phase I subfolder | Planned |
-| Phase I AI check-in | File organization complete | Call Claude API for compliance + summary + keywords → write to Dynamics | Planned |
-| Phase I staff version | AI check passes compliance | Generate cover page + consolidate PDF → save to WMKF Research SharePoint | Planned |
-| PD assignment | After application deadline (batch) | Call Claude API with all pending apps → assign PDs in Dynamics | Planned |
+| Phase I file organization | Request created with `Phase I Status = Pending Committee Review` | Move docs to Phase I subfolder | Planned for the D26 design; the J27 Research intake equivalents (steps 1-2, writing `Submission-Documents/`) are live [REPORTED by Connor 2026-11-20] |
+| Phase I AI check-in | File organization complete | Call Claude API for compliance + summary + keywords → write to Dynamics | Planned (J27 step 3: five prompts tested, compliance/fit/injection/PD-score prompts unwritten) [REPORTED by Connor 2026-11-20] |
+| Phase I staff version | AI check passes compliance (J27 step 5 instead triggers on manual `akoya_submissionaccepted` = Yes; compliance is advisory) | Generate cover page + consolidate PDF → save to WMKF Research SharePoint | Planned for D26; J27 step 5 built, not live [REPORTED by Connor 2026-11-20] |
+| PD assignment | After application deadline (batch) | Call Claude API with all pending apps → assign PDs in Dynamics | Planned (J27 step 6 assigns from step-3 `wmkf_ai_pdscores`, planned) [REPORTED by Connor 2026-11-20] |
 | Phase II file organization | `Phase II Status = Phase II Pending Committee Review` | Move docs to Phase II subfolder | Planned |
 | Phase II AI check-in | File organization complete | Call Claude API for compliance (+ TBD tasks) → write to Dynamics | Planned |
 | Phase II staff version | AI check passes compliance | Generate cover page + consolidate PDF → save to WMKF Research SharePoint | Planned |

@@ -181,7 +181,7 @@ plan is final, if a deck is still wanted.
   appears only when that folder holds a file. The individual files are read
   from the request's `Submission-Documents` folder; their names match
   Connor's Production test request 1003384 (owner-run listing, 2026-11-10).
-  The staff version's name has not yet been seen on a real request.
+  The staff version's name has not yet been seen on a real request. [2026-11-20 [REPORTED by Connor 2026-11-20, see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`]: `<AKA>_<Primary Keyword>_Staff-Version_<num>.pdf`, or `<AKA>_Staff-Version_<num>.pdf` before a keyword exists; built by step 5, not live.]
 - **Fixed: 8** for J27 requests (owner, 2026-11-10). The document is the
   "Draft Writeup" and becomes the "Final Writeup"; "Board recommendation"
   and "Board draft" are gone from the J27 screens. Text shared with earlier

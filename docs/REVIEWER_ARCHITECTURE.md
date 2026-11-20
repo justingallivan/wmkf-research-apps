@@ -87,6 +87,15 @@ The split exists so the same person can have an unbounded number of suggestion r
    materials sent, reminders, review received, and thank-you all timestamp on
    the suggestion row.
 
+**Second writer for Research J27 requests `[REPORTED by Connor 2026-11-20]`:** the live
+intake flow (step 1) also writes the applicant's five suggested reviewers, each as a
+`wmkf_potentialreviewers` row matched on email (created if new) plus a
+`wmkf_appreviewersuggestion` row with `wmkf_sources` = `"applicant"`, appended to an
+existing row's sources, and never deleted or rebuilt. So suggestion rows are not only
+app-created. The map does not say what the flow sets for `wmkf_selected`
+`[ASSUMED]`, so do not infer selection from row existence. See
+`docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md` section 3.
+
 ## Existing parallel: the `akoya_request` 5 slots
 
 `akoya_request` itself has `wmkf_potentialreviewer1..5` lookup fields. These are an over-invite buffer (we need 3 confirmed; 5 slots cover declines). The suggestion ledger and the slots co-exist:

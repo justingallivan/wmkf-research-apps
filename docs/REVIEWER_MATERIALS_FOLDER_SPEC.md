@@ -130,7 +130,11 @@ placing another file beside the proposal does not make it reviewer-visible.
   `ProposalBibliography_{Request#}.pdf`, or the J27 names
   `Project-Narrative_{Request#}.pdf` and `Bibliography_{Request#}.pdf`
   (accepted from 2026-10-26; one name per purpose, both present fails closed;
-  see `docs/POWER_AUTOMATE_PROPOSAL_FILE_CONTRACT.md`), including
+  for J27 the live intake flow writes them under `Submission-Documents/`, which
+  the readers also accept, and no step produces a J27
+  `Reviewer Materials/Proposal_` file `[REPORTED by Connor 2026-11-20]`;
+  see `docs/POWER_AUTOMATE_PROPOSAL_FILE_CONTRACT.md` and
+  `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`), including
   capitalization and extension. Filename matching is case-sensitive.
 - **Location:** both folders are directly inside
   `akoya_request/{requestNumber}_{requestGuid}/`.

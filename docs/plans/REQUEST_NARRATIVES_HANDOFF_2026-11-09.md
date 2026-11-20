@@ -32,7 +32,10 @@ operating contract, not an independent live inspection of the external flow.
   reviewer matching. Justin does not require another source-document decision.
 - `wmkf_readyforreview` is the final step, after documents and AI processing.
   Any failed run halts intake and notifies check-in staff; failed Summary generation
-  therefore holds the readiness handoff.
+  therefore holds the readiness handoff. [2026-11-20 [REPORTED by Connor 2026-11-20, see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`]: the map lists
+  `wmkf_readyforreview` as MANUAL, a staff handoff no flow writes; the flow's end state is
+  `wmkf_ingeststage` = AI review done, and a failure sets `wmkf_ingeststage` = Failed with the
+  message in `wmkf_ingesterror`. Step 3, which writes `wmkf_layabstract`, is PLANNED and not live.]
 - Connor intends no later flow to edit the field and offered to hide it from the
   Akoya Request form so this app owns subsequent staff editing. Actual form hiding
   and the working generation flow have not been independently verified.

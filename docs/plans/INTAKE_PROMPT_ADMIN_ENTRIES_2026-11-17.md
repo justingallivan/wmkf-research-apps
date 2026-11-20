@@ -9,7 +9,8 @@ the agent): `intake.executive-summary` v1, `intake.personnel` v1 and `intake.met
 owner-run read-only Production comparison: one current Published v1 row each; title,
 group, usage, model `sonnet`, max tokens 2048, no temperature, system prompt, body
 and output schema identical to the v1 text; variables none / `team_roster` only.]
-Neither runs until Connor's flow calls it by name.
+Neither runs until Connor's flow calls it by name. [2026-11-20, REPORTED by Connor, see
+`docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`: the flow that calls them is step 3 (AI review), PLANNED and not live; these prompts are listed there as "tested".]
 
 **v2 (agreed 2026-11-17, after a local trial on test Request 1003517):** max output
 tokens 2048 → 8192 on all three, because Sonnet 5.5 thinks by default and thinking

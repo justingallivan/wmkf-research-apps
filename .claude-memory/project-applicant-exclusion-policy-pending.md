@@ -13,7 +13,7 @@ Read this when: working on applicant-excluded reviewer handling, the Find-tab ex
 
 ## The open decision (PENDING — Justin cannot make it alone; needs the foundation)
 How broadly should an applicant be allowed to exclude reviewers, and on what basis?
-- Today an applicant's free-text `wmkf_excludedreviewers` is parsed and the Find tab honors it as a HARD soft-block (`partitionByExcluded` strips matches from Claude-verified / unverified / discovered). There is NO breadth limit and NO soft-vs-hard COI distinction.
+- Today an applicant's free-text `wmkf_excludedreviewers` is parsed and the Find tab honors it as a HARD soft-block (`partitionByExcluded` strips matches from Claude-verified / unverified / discovered). There is NO breadth limit and NO soft-vs-hard COI distinction. J27 Research: Connor's step 1 PA flow (LIVE) writes the field as one reviewer per line, `{first} {last} ({info}) — {reason}`, so J27 text is more regular than the D26 prose [REPORTED by Connor 2026-11-20; `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`].
 - A PI can therefore exclude the entire competent peer set with one soft sentence ("overlapping research programs"), leaving little/no qualified pool — a program-integrity risk (applicants can knock out all the tough reviewers).
 - Sub-decisions on the table:
   (a) **Visibility** — should the PD SEE excluded-but-Claude-suggested peers (currently silently clobbered) so they can judge each, rather than the matches vanishing?

@@ -17,6 +17,8 @@ per-proposal. Email is the de-dupe key. An identity-bearing acceptance promotes
 the person to a CRM `contact` via `wmkf_contact`; invitation send does not.
 Honorarium opt-outs promote, while declines do not.
 
+J27 Research: Power Automate step 1 (LIVE) also creates and matches rows here, matched on `wmkf_emailaddress` and created if new, for the five applicant-suggested reviewers per application (`wmkf_firstname`, `wmkf_lastname`, `wmkf_name`, `wmkf_title`, `wmkf_organizationname` / `wmkf_primaryaffiliation`); it never deletes or rebuilds them [REPORTED by Connor 2026-11-20; `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md` section 3; not probed by the Vercel side].
+
 This is the **canonical person record** for the reviewer-finder domain. The 2026-10-23 all-state Production query observed 4,545 Dataverse `wmkf_potentialreviewers` rows; the earlier 2026-08-13 receipt observed 4,474. Connor's team also tracks reviewers from other systems and historical outreach; dropped Postgres `researchers` was only a small, 331-row historical pool.
 
 ## Key fields (live, sample-probed 2026-05-07)

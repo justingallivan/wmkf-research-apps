@@ -222,6 +222,8 @@ Probed values for the two picklists relevant to `phase-i.intake-check` (probed 2
 
 Note: Connor's labels for `wmkf_ai_compliancecheck` are **"Compliant" / "Non-Compliant" / "Human Review"** (not "pass" / "fail" / "review" as casually written elsewhere). Match these labels exactly when authoring the prompt body or the `valueMap` keys.
 
+Update 2026-11-20: `wmkf_ai_compliancecheck` has a fourth option, `682090003` Reviewed, which is for staff and is not an AI output value; the probe above (2026-04-25) predates it [VERIFIED via read-only Production attribute-metadata read, 2026-11-20, per `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`]. Compliance is advisory in Connor's Research-intake design: it never sets `akoya_submissionaccepted` [REPORTED by Connor 2026-11-20].
+
 ---
 
 ## Sequenced implementation

@@ -37,7 +37,7 @@ invocations. Request linkage is present only when the Executor caller supplies
 - `wmkf_ai_promptversion` (Integer)
 - `wmkf_ai_rawoutput` (Memo, **1,000,000 char cap** per Connor 2026-04-14)
 - `wmkf_ai_notes` (Memo, 2000 char default — keep notes short)
-- `wmkf_ai_runsource` (Picklist) — written by `execute-prompt.js` `writeRunRow()` from `RUN_SOURCE` map (which surface invoked the prompt)
+- `wmkf_ai_runsource` (Picklist) — written by `execute-prompt.js` `writeRunRow()` from `RUN_SOURCE` map (which surface invoked the prompt). Second writer (planned, not live): J27 Research Power Automate step 3 writes one `wmkf_ai_run` row per Claude call, success or failure, with `wmkf_ai_runsource` = PowerAutomate Auto (`682090000`) in production or PowerAutomate Test (`682090004`) in tests, and `wmkf_ai_tasktype` = Summary (`682090000`) for title, executive summary, methodology, personnel and rationale, Check-in (`682090002`) for injection screen, keywords, PD scores, clerical and fit; `wmkf_ai_notes` there holds `latency=...; tokens in=/out=/cache_create=/cache_read=...; cacheHit=...; stopReason=...` [REPORTED by Connor 2026-11-20; `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md` section 5]. The `RUN_SOURCE` values in `lib/services/execute-prompt.js` match those two [VERIFIED via source 2026-11-20]
 - `wmkf_ai_promptoverridden` (Boolean) — true when caller passed an override payload at runtime; written by `writeRunRow()`
 - `wmkf_ai_promptoverride` (Memo, 4000 char truncation) — JSON of the override redacted; written by `writeRunRow()`
 - Built-in `createdon` is the run timestamp. **Do not write `wmkf_ai_rundatetime`** — vestigial.

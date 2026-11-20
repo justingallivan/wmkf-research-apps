@@ -528,7 +528,7 @@ existing path. Do not infer eligibility from a visible staff menu alone.
 - **Design direction — reviewer-materials selection: exact folder/file contract today, move to explicit attach-and-verify (decided S312, NOT yet built).**
   The one file a reviewer receives is
   `Reviewer Materials/Proposal_{Request#}.pdf`, built by Connor's PowerAutomate
-  flow. Both folder and request-bound filename are enforced (see
+  flow. That describes D26 and earlier: Connor's 2026-11-20 Research intake map lists no step that produces a J27 `Reviewer Materials/Proposal_` file, so the J27 reviewer copy is unspecified [REPORTED by Connor 2026-11-20; `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md` section 9]. Both folder and request-bound filename are enforced (see
   `listReviewerMaterials` in `lib/external/reviewer-materials.js` → `getRequestSharePointBuckets` +
   `isReviewerProposalFile`; the staff-side
   `/api/review-manager/materials-preflight` missing-proposal warning reuses the same

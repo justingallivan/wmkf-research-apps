@@ -300,8 +300,8 @@ Both expand to real child entities post-pilot. Narrowing the 2026-05-06 set keep
 
 | Field | Type |
 |---|---|
-| `wmkf_ai_keywords` | Memo (JSON array) |
-| `wmkf_ai_methodologies` | Memo (JSON array) |
+| `wmkf_ai_keywords` | Memo (JSON array; Connor's planned step 3 writes a `wmkf-keywords/1` JSON object, Text 10,000 [REPORTED by Connor 2026-11-20]) |
+| `wmkf_ai_methodologies` | Memo (JSON array; planned step 3 writes a `wmkf-methods/1` JSON object, Text 10,000 [REPORTED by Connor 2026-11-20]) |
 | `wmkf_ai_riskflags` | Memo (JSON array) |
 | `wmkf_ai_teaminfo` | Memo (originally JSON; repurposed 2026-11-17 as readable text: "Summary of key personnel and expertise") |
 | `wmkf_ai_budgetsummary` | Multi-line text |
@@ -339,7 +339,7 @@ Deploy hit Dataverse 429 throttling between metadata customizations (concurrent 
 
 **Population:**
 - One-time backfill (`scripts/backfill-request-person-junction.js`) — walks every `akoya_request`, emits ~3,000 rows. Justin/Claude.
-- Ongoing sync — **Connor's net-new PA flows** on `akoya_request` create/update. PA flows create `contact` records as needed and write junction rows directly.
+- Ongoing sync — **Connor's net-new PA flows** on `akoya_request` create/update. PA flows create `contact` records as needed and write junction rows directly. Update 2026-11-20: for J27 Research the live step-1 flow now does this, clear-and-rebuild on each run, and fills `wmkf_projectleader` [REPORTED by Connor 2026-11-20; `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`].
 - **`_wmkf_projectleader_value` (PI lookup) stays live** — used by other flows unrelated to reviewers. PA flows dual-write (projectleader field + junction `pi` row). Only the **co-PI slots** (`_wmkf_copi1..5_value`) become obsolete read-only legacy data post-migration.
 
 **Read-side strategy (steady state, revised 2026-05-07):** `/api/reviewer-finder/contact-history` UNIONs junction rows (role = pi OR copi) with `akoya_request._wmkf_projectleader_value` matches. Not a fallback — projectleader stays authoritative for PI in parallel with the junction. Avoids transition-window failure modes (junction stale on a projectleader-only update, or vice versa).

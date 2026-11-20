@@ -89,7 +89,7 @@ digest on every call to `/api/external/proposal-list/[token]/context` and
 `/document`, and refuses a revoked row or one past `expires_at`. The context
 route reads only `proposal_list_items`. The document route looks up the item by
 `(link_id, request_number)`, then resolves that request's staff version
-(`{AKA}_Staff-Version_{Request#}.pdf`) from SharePoint through
+(`{AKA}_Staff-Version_{Request#}.pdf`; J27 Research step 5 also writes `{AKA}_{Primary Keyword}_Staff-Version_{num}.pdf`, which the same root-file matcher accepts by its `_staff-version_{num}.pdf` suffix [REPORTED by Connor 2026-11-20; matcher [VERIFIED via `lib/services/workbench-proposal-documents.js` per `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md` section 9.5]]; step 5 is built, not live) from SharePoint through
 `lib/services/workbench-proposal-documents.js`. It serves no other file.
 
 ## Expiry and cleanup

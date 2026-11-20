@@ -7,9 +7,9 @@ Scope: PD dashboard discovery for J27 and later; preserve earlier-cycle eligibil
 ## Owner decisions and input contract
 
 [VERIFIED via Justin's 2026-11-02 messages and Connor's relayed response]
-Power Automate sets `akoya_request.wmkf_readyforreview` after backend processing,
+Per Connor's 2026-11-02 relayed response, Power Automate set `akoya_request.wmkf_readyforreview` after backend processing,
 including document assembly and AI analysis, is complete and proposals are ready
-for staff work. PD dashboards must hide J27-and-later requests until ready.
+for staff work. **Superseded 2026-11-20 [REPORTED by Connor, `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`]:** Connor's flow map lists `wmkf_readyforreview` as MANUAL (a staff handoff for review; no flow writes it), and the staff-version step sets `wmkf_phistaffversioncompleteflag`, not this field. The app-side rule below (read the Boolean, never set it) is unchanged. PD dashboards must hide J27-and-later requests until ready.
 Earlier cycles keep their existing eligibility. The apps read the marker and
 never set it or start the flows as part of visibility filtering.
 

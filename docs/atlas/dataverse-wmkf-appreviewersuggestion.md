@@ -20,7 +20,7 @@ candidates and zero attempts.
 
 ## Source of truth
 
-**Active.** Per-(reviewer, request) suggestion + outreach lifecycle. Reviewer Finder writes here on save-candidates; Review Manager updates lifecycle here on send/receive/thank-you. Postgres `reviewer_suggestions` was the 337-row legacy mirror before its 2026-06-04 drop; the ~97.6% parity figure is an S136 historical probe.
+**Active.** Per-(reviewer, request) suggestion + outreach lifecycle. Reviewer Finder writes here on save-candidates; Review Manager updates lifecycle here on send/receive/thank-you. **Second writer (J27 Research):** Power Automate step 1 (LIVE) writes one row per request + applicant-suggested reviewer (5 per application, never deleted or rebuilt): `wmkf_request`, `wmkf_potentialreviewer`, denormalized `wmkf_reviewerfirstname` / `lastname` / `title` / `affiliation` / `email`, `wmkf_notes` = stated expertise, `wmkf_sources` = `"applicant"`, `wmkf_suggestionlabel` = `"{title} — {first} {last}"` [REPORTED by Connor 2026-11-20; `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md` section 3; not probed by the Vercel side]. Connor's list does not include `wmkf_applicantdisposition`, so whether those rows read as `recommended` or null to `findApplicantRecommendedByRequest` is [ASSUMED] unverified; app readers must treat the rows as shared with the app's own `ensureApplicantRecommended` writer. Postgres `reviewer_suggestions` was the 337-row legacy mirror before its 2026-06-04 drop; the ~97.6% parity figure is an S136 historical probe.
 
 ## Schema (52 documented custom attrs as of 2026-05-09; +`wmkf_completedat` (S196) +`wmkf_applicantdisposition` (S208) added since — live probe 2026-05-31 shows 77 `wmkf_`-prefixed attrs incl. virtual `*name` denorms)
 
@@ -36,7 +36,7 @@ Suggestion content:
 - `wmkf_programarea` (String)
 - `wmkf_relevancescore` (Double, MinValue 0, MaxValue 100, Precision 4) — stores the 0-100 composite `relevanceScore` used for ranking. The save adapter clamps writes to `[0,100]`; the one-time metadata widen artifact is `scripts/widen-relevancescore-max.mjs`.
 - `wmkf_matchreason` (Memo)
-- `wmkf_sources` (String, comma-joined provenance only; referral closure reuses the existing `referred` token on the candidate row rather than adding operational state here)
+- `wmkf_sources` (String, comma-joined provenance only; referral closure reuses the existing `referred` token on the candidate row rather than adding operational state here). Writers include Power Automate step 1 for J27 Research, which writes `"applicant"` (appended to an existing row's sources) [REPORTED by Connor 2026-11-20; `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md` section 3]
 - `wmkf_notes` (Memo)
 
 ### Additive identity-COI currency — deployed, not authoritative

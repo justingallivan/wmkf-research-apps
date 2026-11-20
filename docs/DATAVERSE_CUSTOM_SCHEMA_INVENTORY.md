@@ -34,11 +34,11 @@ certain about are listed in Section 5 — please confirm those.
 
 | Entity (logical name) | Entity set | Purpose |
 |---|---|---|
-| `wmkf_appreviewersuggestion` | `wmkf_appreviewersuggestions` | Per-(reviewer, request) suggestion + outreach lifecycle (invite → accept/decline → review upload → complete). Reviewer workflow core. |
-| `wmkf_potentialreviewers` | `wmkf_potentialreviewerses` | Global per-person reviewer identity record (email-deduped). |
+| `wmkf_appreviewersuggestion` | `wmkf_appreviewersuggestions` | Per-(reviewer, request) suggestion + outreach lifecycle (invite → accept/decline → review upload → complete). Reviewer workflow core. The live Research-intake step-1 Power Automate flow also creates the applicant-suggested rows (5 per request, `wmkf_sources` = `"applicant"`) [REPORTED by Connor 2026-11-20]. |
+| `wmkf_potentialreviewers` | `wmkf_potentialreviewerses` | Global per-person reviewer identity record (email-deduped). The step-1 flow also matches on `wmkf_emailaddress` and creates rows for applicant-suggested reviewers [REPORTED by Connor 2026-11-20]. |
 | `wmkf_appgrantcycle` | `wmkf_appgrantcycles` | Grant cycle definitions (meeting dates, deadlines, template URLs). Dataverse-primary since 2026-05-12. |
-| `wmkf_apprequestperson` | `wmkf_apprequestpersons` | PI / Co-PI participation junction between `akoya_request` and `contact`. |
-| `wmkf_ai_run` | `wmkf_ai_runs` | Append-only audit ledger — one row per AI invocation. |
+| `wmkf_apprequestperson` | `wmkf_apprequestpersons` | PI / Co-PI participation junction between `akoya_request` and `contact`. The live step-1 flow rebuilds these rows on each run (clear-and-rebuild) [REPORTED by Connor 2026-11-20]. |
+| `wmkf_ai_run` | `wmkf_ai_runs` | Append-only audit ledger — one row per AI invocation. The planned step-3 Power Automate flow will also write one row per Claude call (`wmkf_ai_runsource` PowerAutomate Auto 682090000 / Test 682090004; task type Summary or Check-in) [REPORTED by Connor 2026-11-20; not live]. |
 | `wmkf_ai_prompt` | `wmkf_ai_prompts` | Staff-editable prompt library. |
 | `wmkf_policy` | `wmkf_policies` | Policy slot parent (stable slot codes, e.g. `reviewer-coi`, `reviewer-ai-use`). |
 | `wmkf_policyversion` | `wmkf_policyversions` | Versioned policy text children (one active version per slot). |
@@ -64,6 +64,8 @@ bibliometric fields were folded onto `wmkf_potentialreviewers`.
 `wmkf_ai_complianceissues`, `wmkf_ai_compliancesummary`, `wmkf_ai_fitassessment`,
 `wmkf_ai_fitrationale`, `wmkf_ai_fieldprimer`, `wmkf_ai_keywords`, `wmkf_ai_methodologies`,
 `wmkf_ai_riskflags`, `wmkf_ai_teaminfo`, `wmkf_ai_budgetsummary`, `wmkf_ai_timeline`.
+
+The planned step-3 Power Automate AI review (not live) is the intended writer of `wmkf_ai_keywords`, `wmkf_ai_methodologies`, `wmkf_ai_teaminfo`, `wmkf_ai_methodologysummary`, `wmkf_ai_pdscores`, `wmkf_ai_injectionflag`/`notes`, `wmkf_ai_compliancecheck`/`complianceissues`, `wmkf_ai_fitassessment`/`fitrationale`, plus `wmkf_layabstract`, `wmkf_recommendationrationale`, `wmkf_wmkfprojectdescription` and the `wmkf_programareaserved` primary discipline; several of these are not in the list above. The field-to-prompt map is `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md` [REPORTED by Connor 2026-11-20].
 
 **Grant Report set (22 fields):** `wmkf_ai_reportpostdoccount`, `wmkf_ai_reportgradstudentcount`,
 `wmkf_ai_reportundergradcount`, `wmkf_ai_reportpubstotal`, `wmkf_ai_reportpubspeerreviewed`,

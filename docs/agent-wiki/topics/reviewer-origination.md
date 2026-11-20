@@ -227,7 +227,7 @@ bare keyword→author lane is what underperformed.
   combined Phase I+II cycle to collect a bibliography assembled by a Power Automate
   flow. That is a historical planning expectation; the next-cycle intake and
   Reviewer Finder input configuration are not established by the current repository
-  evidence. Check the current Reviewer Materials producer and the routing in
+  evidence. Update 2026-11-20: Connor reports that J27 Research step 5 (built, not live) writes `AI Materials/Narrative-Bibliography_<num>.pdf` (narrative plus bibliography, for AI tools), and that no step produces a J27 `Reviewer Materials/Proposal_` file [REPORTED by Connor 2026-11-20; `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md` sections 7 and 9]. Check the current Reviewer Materials producer and the routing in
   memory `project-reviewer-finder-proposal-doc-context` before relying on that expectation.
 - **OpenAlex MERGES same-name authors.** Use the ORCID works list as the corpus, not
   a name lookup. Memory `project-openalex-merge-use-orcid-works`.

@@ -18,7 +18,7 @@ for this feature. Newly submitted J27 requests have Request Status Phase I
 Pending, Phase I Pending Committee Review, Phase II null. Advanced requests have
 Phase I Invited and Phase II Phase II Pending Committee Review, with Request
 Status expected to follow as Phase II Pending. `wmkf_readyforreview` is Boolean;
-Power Automate owns real-intake readiness after assembly and AI complete; the
+Power Automate was relayed (2026-11-02) to own real-intake readiness after assembly and AI complete [superseded 2026-11-20, REPORTED by Connor in `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`: `wmkf_readyforreview` is MANUAL, no flow writes it]; the
 separate Factory has an owner-approved test-fixture finalizer. J27 onward requires exact
 true. Earlier linked cycles are exempt from readiness, not from existing
 eligibility rules. Rerun risk is accepted; no additional producer checks/polling.

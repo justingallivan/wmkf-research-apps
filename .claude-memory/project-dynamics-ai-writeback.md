@@ -40,7 +40,7 @@ Ground truth: `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md`, `DynamicsService.logAiRun
 ## Canonical names (Field Sets A, C; table `wmkf_ai_run`)
 
 **`akoya_request` (Field Set A):** `wmkf_ai_summary` (Memo), `wmkf_ai_dataextract` (Memo, JSON).
-**`akoya_request` (Field Set C):** `akoya_submissionaccepted` (existing, reused), `wmkf_ai_complianceissues` (Memo, JSON), `wmkf_ai_compliancesummary` (Memo).
+**`akoya_request` (Field Set C):** `akoya_submissionaccepted` (existing, reused), `wmkf_ai_complianceissues` (Memo, JSON), `wmkf_ai_compliancesummary` (Memo). Connor's 2026-11-20 J27 intake map instead has planned step 3 write `wmkf_ai_compliancecheck` + `wmkf_ai_complianceissues` as advisory output and keeps `akoya_submissionaccepted` manual; see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md` [REPORTED by Connor 2026-11-20].
 **`wmkf_ai_run`:** `wmkf_ai_runid` (GUID), `wmkf_ai_runnum` (auto-number primary), `wmkf_ai_request` (lookup), `wmkf_ai_tasktype` (Picklist), `wmkf_ai_model` (String), `wmkf_ai_promptversion` (Integer), `wmkf_ai_status` (Picklist), `wmkf_ai_rawoutput` (Memo), `wmkf_ai_notes` (Memo). Timestamp = built-in `createdon`.
 
 **Choice values (must use numeric, not labels):**

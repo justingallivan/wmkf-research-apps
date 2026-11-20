@@ -263,7 +263,7 @@ recommendation that precedes the board is `Recommended Invite` (707510005) on th
   be re-runnable). **Model: Sonnet (temp 0.1)**, source = applicant **title + abstract**
   (`akoya_title` + `wmkf_abstract`). **Research grants only.** (Sonnet over Haiku: validated S269.)
 - Stored in the **EXISTING `wmkf_wmkfprojectdescription` field** (Memo 2000, "WMKF Project Description")
-  — staff curate it manually today; the cron writes it **only when empty**, staff edit afterward. **No
+  — staff curate it manually today; the cron writes it **only when empty**, staff edit afterward. (Update 2026-11-20: Connor's planned, not-live Research-intake step 3 would also write this field from the same `grantee-title.generate` row, so J27 requests would arrive with a title and the cron becomes a backstop [REPORTED by Connor 2026-11-20; `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`].) **No
   new schema wave** (supersedes an earlier new-field plan; `[VERIFIED S269 via live probe]`). The
   sibling `wmkf_projecttitle1` (String 500) is a different, unrelated field — leave it. **Reused twice**:
   the Board Book first (an external/manual consumer — we only need the field populated and legible),

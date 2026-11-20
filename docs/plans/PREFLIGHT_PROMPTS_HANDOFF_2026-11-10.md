@@ -14,6 +14,12 @@
 > Automate flows run the Dataverse prompts. See
 > [PA prompt delivery handoff](PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md) and
 > [parked branch inventory](PARKED_EXECUTOR_BRANCH_INVENTORY_2026-11-19.md).
+>
+> **Status note, 2026-11-20:** Connor's flow map (`docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`, his report) is the
+> current reference for step-3 targets, formats and limits. It lists `intake.rationale` and
+> `intake.keywords` (not in this file) and differs from the workbook table below on several
+> limits; the differences were listed for the owner, not reconciled here. Flags (column O),
+> open questions (P) and staff notes (Q) have no counterpart in the map.
 
 ## Status and owner decisions
 

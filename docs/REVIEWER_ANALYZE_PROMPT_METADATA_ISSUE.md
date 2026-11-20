@@ -117,7 +117,10 @@ the PDF rather than the authoritative `akoya_applicantid`.
 What the LLM is genuinely still needed for: understanding the science
 (PRIMARY/SECONDARY_RESEARCH_AREA, methodologies, keywords) and generating the reviewer
 suggestions (PART 2). (Some AI fields like `wmkf_ai_keywords`/`wmkf_ai_methodologies`
-exist on the request too but may not always be populated.)
+exist on the request too but may not always be populated. For Research J27 requests,
+Connor's planned step-3 AI review would fill them in the `wmkf-keywords/1` and
+`wmkf-methods/1` JSON formats; it is not live, so expect them empty
+`[REPORTED by Connor 2026-11-20]`. See `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`.)
 
 ## Implemented fix
 
@@ -127,7 +130,8 @@ exist on the request too but may not always be populated.)
    `loadReviewerRequestContext()` before calling Claude.
 3. `reviewer-request-context.js` reads title / PI / Co-PIs / institution / program /
    abstract from Dataverse. Program uses `akoya_programid` first, then older fallback
-   fields, but is only overlaid into `proposalInfo` for downstream save compatibility;
+   fields (J27 requests have a blank `akoya_programid`; the intake flow sets only
+   `wmkf_grantprogram` = Research `[REPORTED by Connor 2026-11-20]`), but is only overlaid into `proposalInfo` for downstream save compatibility;
    Co-PIs come from `wmkf_apprequestperson`.
 4. `composeAnalyzePrompt()` prepends a trusted metadata block and slims stale prompt
    bodies for request-backed analysis, so Dataverse/user prompt rows cannot keep asking

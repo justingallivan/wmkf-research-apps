@@ -27,13 +27,36 @@ format copied exactly. Two changes only: section headings were turned into
 Markdown, and the two example PD nicknames in the PD-scores format were replaced
 with placeholders.
 
-**Evidence level:** everything in sections 1–8 is **Connor's report**
-`[REPORTED by Connor 2026-11-20]`; the Vercel side has not probed the flows. The
-only items independently confirmed are the three compliance fields on
-`akoya_request` (types, and the four `wmkf_ai_compliancecheck` options), read from
-Production Dataverse metadata on 2026-11-20 `[VERIFIED via read-only attribute
-metadata read, 2026-11-20]`. Do not upgrade any other line to verified without a
-named, owner-approved read.
+**Evidence level:** the flow behavior in sections 1–8 (what runs when, what each
+step writes, status labels) is **Connor's report** `[REPORTED by Connor 2026-11-20]`.
+
+What was independently checked (owner-approved, read-only Production metadata reads
+through the repo's interlocked Dataverse client, 2026-11-20; no request or
+applicant rows read):
+
+- **Fields: all 57 named fields exist** on `akoya_goapplystatustracking` (2),
+  `akoya_request` (30, including `akoya_programid`), `wmkf_apprequestperson` (8),
+  `wmkf_programlevel3` (7), `wmkf_ai_run` (9) and `account` (1), with the option
+  values the map gives `[VERIFIED via attribute metadata]`. Label differences only:
+  `682090003` is "Document done", and `682090004`/`682090005` read "AI Review …".
+  `wmkf_apprequestperson.wmkf_role` also has Senior Personnel, Key Personnel and Other
+  (`100000002`–`100000004`) beyond the PI/Co-PI the map uses. `wmkf_ai_run.wmkf_ai_status`
+  also has `682090002` Needs Review; `wmkf_ai_runsource` also has PowerAutomate Manual
+  `682090005` and three Vercel values.
+- **Lookup targets:** `wmkf_programlevel3.wmkf_keywordinternalprogram` →
+  `akoya_program` (the same table as the request Program field `akoya_programid`);
+  `wmkf_programlevel3.wmkf_parentgrantprogram` → `wmkf_grantprogram`;
+  `akoya_request.wmkf_programareaserved` → `wmkf_programlevel3`
+  `[VERIFIED via LookupAttributeMetadata]`.
+- **Flows: not verifiable from the app identity.** No cloud flow (workflow category
+  5) visible to the Dataverse application user is named "Research Application
+  Fields", "Research Application Documents" or "Research Intake Staff Version"; a
+  broader search for names containing Research/Intake/Application found only
+  unrelated Sales/GOapply flows. The flows' existence and on/off state are therefore
+  `UNKNOWN` to us (likely not shared with the application user, as in the 2026-07-27
+  probe) — rely on Connor for status.
+
+Do not upgrade other lines to verified without a named, owner-approved read.
 
 **Status labels are Connor's and must not be rounded up:**
 
@@ -319,10 +342,14 @@ Checked against our source on 2026-11-20 unless labeled.
    matches the blank-Program J27 test request behind the Grant-program membership
    rule; see `docs/audits/program-field-membership-readers-audit-2026-11-20.md`.
 3. **A possible S&E/MR source.** Discipline keywords carry
-   `wmkf_keywordinternalprogram` (Connor: "legacy MR/SE bucket"), reachable from
-   the request's primary discipline `wmkf_programareaserved`. This is a
-   candidate, not a decision: Connor calls it legacy, and the lookup is filled
-   only by step 3, which is not live.
+   `wmkf_keywordinternalprogram` (Connor: "legacy MR/SE bucket"). It is a lookup to
+   `akoya_program`, the same table as the request Program field
+   [VERIFIED via lookup metadata 2026-11-20], so request → `wmkf_programareaserved`
+   → keyword → `wmkf_keywordinternalprogram` yields the same program IDs the app's
+   `RESEARCH_PROGRAM_IDS` use. This is a candidate, not a decision: Connor calls it
+   legacy, how many discipline rows have it filled is unknown (no row data read),
+   coined keywords' value is unstated, and the request lookup is filled only by
+   step 3, which is not live.
 4. **Compliance (owner decision deferred 2026-11-20).**
    - Connor's design is advisory: `wmkf_ai_compliancecheck` plus
      `wmkf_ai_complianceissues`, with acceptance (`akoya_submissionaccepted`)
@@ -356,7 +383,23 @@ Checked against our source on 2026-11-20 unless labeled.
    `"applicant"`, appending to an existing row's sources. The app also writes this
    table through `lib/services/reviewer-engagement/`, so the two writers share
    rows.
-8. **Step-3 output limits.** Compare with
+8. **Ready-for-review gates J27 visibility, and no flow sets it.** For 2027+
+   cycles the Workbench discovery filter, Reviewer Finder "my proposals" and the
+   readiness rule admit a Research request only when `wmkf_readyforreview` is true
+   [VERIFIED via `shared/config/workbenchVisibility.js:74`,
+   `shared/config/requestReadiness.js:17`,
+   `lib/services/reviewer-finder/my-proposals-service.js:153`]. The app's own
+   comment says "Power Automate owns real-intake wmkf_readyforreview"
+   (`shared/config/requestReadiness.js:3`), and older plans (alignment log D25/D56)
+   assumed a flow-set files-ready flag. Connor's map says the field is **[MANUAL]:
+   no flow writes it**. The app itself writes it only for Factory test requests
+   [VERIFIED via `lib/services/test-requests/readiness-finalizer.js:113`; no other
+   writer in `lib/`, `shared/`, `pages/`, `scripts/`], so staff have no control for it
+   in the app. Unless staff set it in Dynamics, real J27 proposals stay hidden from
+   the Workbench and Reviewer Finder. Which person sets it, when (after step 4
+   acceptance? after step 5?), and whether the app should gate on
+   `wmkf_phistaffversioncompleteflag` instead is an owner/Connor decision.
+9. **Step-3 output limits.** Compare with
    `docs/plans/PREFLIGHT_PROMPTS_HANDOFF_2026-11-10.md` and
    `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md` before changing a
    prompt; list differences for the owner rather than reconciling them silently.
@@ -373,3 +416,8 @@ Checked against our source on 2026-11-20 unless labeled.
 5. Is `wmkf_keywordinternalprogram` reliable enough to drive the S&E/MR split for
    J27 briefings and ranking, or is it being retired?
 6. Does any step set `akoya_programid`, or is it permanently blank for J27?
+8. Who sets `wmkf_readyforreview` for J27, and at what point? The app hides
+   2027+ Research requests until it is true (section 9 item 8).
+9. Does step 1 set `wmkf_applicantdisposition` (or any disposition) on the
+   `wmkf_appreviewersuggestion` rows it writes? The app's applicant-recommended
+   and not-excluded reader filters depend on it.

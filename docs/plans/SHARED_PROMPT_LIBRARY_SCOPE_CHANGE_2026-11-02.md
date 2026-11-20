@@ -217,6 +217,7 @@ Justin's same-day approval (`DATAVERSE_PROD_WRITE_ACK`). Steps as run:
 8. **Next: Connor adds his prompts,** filling in the catalog fields as he
    goes. He must not reuse an existing app prompt name. Publishing a brand-new
    name still needs the first-publish gap closed (see below).
+   **Update 2026-11-20 [REPORTED by Connor, `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`]:** Connor's flow map lists `grantee-title.generate`, `intake.executive-summary`, `intake.methodology`, `intake.personnel`, `intake.rationale` and `intake.keywords` as tested prompts in his step 3 (AI review, PLANNED, not live); the pd-scores, injection, compliance and fit prompts are not yet written. The `intake.*` prompts were published through Admin on 2026-11-17 (see [Intake prompt Admin entries](INTAKE_PROMPT_ADMIN_ENTRIES_2026-11-17.md)); `intake.rationale` and `intake.keywords` are not covered there.
 
 Not backfilled:
 

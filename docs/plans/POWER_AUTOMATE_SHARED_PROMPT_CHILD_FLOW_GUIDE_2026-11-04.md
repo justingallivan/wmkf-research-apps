@@ -18,6 +18,8 @@ was built or deployed in this session. The authoritative full contract is
 `docs/EXECUTOR_CONTRACT.md`; this guide proposes a deliberately small first
 implementation and must not be represented as full Executor parity.
 
+> **Status note, 2026-11-20 [REPORTED by Connor, `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`]:** Connor's flow map describes step 3 (AI review, PLANNED, not live) as running each prompt from `wmkf_ai_prompt` in sequence on cached documents and writing one `wmkf_ai_run` row per Claude call (PowerAutomate Auto `682090000` / Test `682090004`; task type Summary `682090000` / Check-in `682090002`). The map does not say whether this guide's child-flow design was adopted; treat the guide as a proposal, and the map as the reference for what the flow does.
+
 ## Responsibility split
 
 Parent flows gather proposal inputs, decide sequencing and branching, and save

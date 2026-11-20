@@ -4,7 +4,7 @@ description: "Connor's Research intake Power Automate map (2026-11-20) is the re
 metadata:
   type: project
   status: active
-  last_verified: 2026-11-20 via Connor's field map (owner-supplied text file); only the compliance fields were probed
+  last_verified: 2026-11-20 via Connor's field map plus owner-approved metadata reads (all 57 named fields exist; the three flows are not visible to the app identity)
 ---
 
 ## Recall Rule

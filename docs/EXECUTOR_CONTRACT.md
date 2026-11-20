@@ -22,8 +22,8 @@ related:
 The standalone Phase I Dynamics and peer-review upload routes are authenticated
 HTTP 410 retirement stubs in the 2026-11-19 source; their prompts and the shared
 Executor remain preserved. This source change does not establish Production
-retirement; see [retirement manifest](plans/APP_SUITE_RETIREMENT_2026-11-19.md). A Power Automate implementation is a deferred target, not a
-second current implementation. The original "May 1 2026 cycle target" framing is historical.
+retirement; see [retirement manifest](plans/APP_SUITE_RETIREMENT_2026-11-19.md). A Power Automate implementation of this contract is a deferred target, not a
+second current implementation. Connor's planned Research-intake step 3 (not live) would run `wmkf_ai_prompt` rows from Power Automate and log one `wmkf_ai_run` row per call (`wmkf_ai_runsource` PowerAutomate Auto 682090000 / Test 682090004); his map does not say whether it reuses an `ExecutePrompt` child flow or follows these ten steps [REPORTED by Connor 2026-11-20; `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`]. The original "May 1 2026 cycle target" framing is historical.
 **Created:** 2026-04-24 (Session 109, reconciliation pass)
 **Last status update:** 2026-09-12 (opt-in OpenAI provider seam for governed prompt snapshots)
 **Owners:** Justin (Vercel implementation — shipped); Connor would own any future Power Automate implementation

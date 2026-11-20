@@ -22,7 +22,7 @@ Reviewer-finder under-delivered: asked for 12 reviewers, surfaced ~6 (all "liter
 
 ## Current contract and forward action
 
-For the final separate Phase II cycle, Power Automate publishes the outbound
+For the final separate Phase II cycle (D26 and earlier; Connor's 2026-11-20 Research intake map lists no step that produces a J27 `Reviewer Materials/Proposal_` file [REPORTED by Connor 2026-11-20; `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`]), Power Automate publishes the outbound
 reviewer package at exactly:
 
 `Reviewer Materials/Proposal_{Request#}.pdf`
@@ -57,7 +57,7 @@ Dataverse/SharePoint probe]
 
 J27 (D23/D60 in `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`, owner-confirmed
 2026-11-10): Reviewer Finder's input is one combined
-`AI Materials/Narrative-Bibliography_{Request#}.pdf`, built by Connor's flow. The
+`AI Materials/Narrative-Bibliography_{Request#}.pdf`, written by Connor's step 5 flow (built, not live; waits on step 3) [REPORTED by Connor 2026-11-20]. The
 loader takes it first when exactly one exists, and only then falls back to the
 `Reviewer Materials/Proposal_` and `Phase I/ProjectDescription.pdf` rules above
 [VERIFIED 2026-11-20 via `lib/services/reviewer-finder/load-proposal-service.js`
@@ -65,8 +65,7 @@ combined-then-canonical-then-fallback order; commit `f43f2db77` is an ancestor o
 Production merge SHA `ce4bc2618`]. More than one combined file is a 409. On 2026-11-20 none of the four J27
 test requests (1003456, 1003517, 1003526, 1003528) had the file (Workbench documents
 listing, signed-in); they carry `Submission-Documents/Project-Narrative_` and
-`Bibliography_` instead. Real J27 proposals had not yet arrived, so whether Connor's
-flow will create it remains open. The
+`Bibliography_` instead. Real J27 proposals had not yet arrived. Connor's 2026-11-20 map answers the earlier open question: step 5 creates it, so it appears only once step 3 (AI review) and step 5 go live [REPORTED by Connor 2026-11-20; `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md` section 9.5]. The
 existing reviewer prompt ranks names mentioned in the proposal first and authors
 from references second, so the bibliography should improve proposal-grounded yield.
 

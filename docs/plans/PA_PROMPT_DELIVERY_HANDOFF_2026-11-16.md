@@ -1,5 +1,16 @@
 # Power Automate prompt delivery — consolidated stop handoff
 
+> **Status note, 2026-11-20:** this is the 2026-11-16 stop handoff; later state is in
+> `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md` (Connor's report). Since this was written, Connor's example prompt
+> arrived (2026-11-17, see [intake prompt drafts](INTAKE_PROMPT_DRAFTS_2026-11-16.md)); the
+> `intake.*` prompts were published through Admin (2026-11-17, see
+> [Admin entries](INTAKE_PROMPT_ADMIN_ENTRIES_2026-11-17.md)); and Connor's map lists
+> `grantee-title.generate`, `intake.executive-summary`, `intake.methodology`,
+> `intake.personnel`, `intake.rationale` and `intake.keywords` as tested in step 3 (AI review),
+> which is PLANNED and not live. Sections below that call work "open" or "verified open" are as
+> of 2026-11-16. The map's output limits differ from this file's in several places; they were
+> listed for the owner and not reconciled here.
+
 Owner: Justin; coordinating Codex chat **Contracts for PA flows**.
 Date: 2026-11-16. Single resume point for both that chat and
 **Clarify PA prompt test purpose**. The latter completed its read-only stop packet
@@ -8,8 +19,8 @@ and is idle; it made no files, commits, prompt changes or deployments.
 ## Current direction — owner decided
 
 Deliver Dataverse prompts that Connor can run in his **existing Power Automate
-flows**, with clear inputs, output shapes and destination fields. Justin has asked
-Connor for an example prompt; it has not arrived in either coordinated chat.
+flows**, with clear inputs, output shapes and destination fields. Justin had asked
+Connor for an example prompt; it had not arrived in either coordinated chat as of 2026-11-16 (it arrived 2026-11-17).
 
 **Backend integration is stopped/parked.** Do not resume submit/poll adoption,
 worker scheduling, backend rollout, or more backend acceptance tests as the next
@@ -36,7 +47,7 @@ Production versions, distinct from the separate Sandbox Summary v1 trial.
 | `pd-assignment.expertise-match` | 1 | `applications` and `eligible_program_directors` inputs; roster/ID mapping and destination unresolved, model/budget null. Recommendation is not automatic assignment authority |
 
 No dedicated intake Personnel, Rationale, Keywords or Concern Flags prompt was
-identified in that full inventory. Existing similar prompts are not confirmed
+identified in that full inventory (as of 2026-11-16; `intake.personnel`, `intake.rationale` and `intake.keywords` are listed as tested in Connor's 2026-11-20 map, `intake.rationale` and `intake.keywords` having no Admin entry document in this repo). Existing similar prompts are not confirmed
 substitutes. `phase-i.checkin` is non-current/deprecated; `phase-i.summary` produces
 the older `wmkf_ai_summary`, not Executive Summary.
 
@@ -59,7 +70,7 @@ sheet `1 Review (staff master)`.
 | P | Open questions with page/section references, accumulated across prompts |
 | Q | AI-drafted, human-edited staff notes/rationale |
 
-Keyword lists come from the Keywords table `wmkf_programlevel3` (Connor via owner, 2026-11-18; seeded with 259 rows per the 2026-11-19 probe); flag rubric/audience provisional. P/Q need not
+Keyword lists come from the Keywords table `wmkf_programlevel3` (Connor via owner, 2026-11-18; seeded with 259 rows per the 2026-11-19 probe, 247 active per that probe's report in the J27 field map; Connor's map says 247 seeded Research rows); flag rubric/audience provisional. P/Q need not
 be separate prompts. Compliance and broader expertise matching scope are unresolved.
 
 ## Completed work and preservation boundary
@@ -119,7 +130,7 @@ be separate prompts. Compliance and broader expertise matching scope are unresol
 
 ## Resume in one session
 
-**Verified open:** compare Connor's example with the worksheet extraction and the
+**Verified open (as of 2026-11-16; the example arrived 2026-11-17 and the comparison was done in the intake prompt drafts):** compare Connor's example with the worksheet extraction and the
 inventory above. Establish prompt columns read, document/text attachment or
 substitution, placeholder syntax, model/settings ownership, plain-text/JSON output,
 parsing and field writeback. Ask only for mechanics missing from the example.

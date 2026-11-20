@@ -153,10 +153,11 @@ The current proposal source for Initial Assessment and Workbench Field Primer
 request mode remains one exact active request file, under either accepted name:
 
 `AI Materials/ProposalNarrative_{Request#}.pdf` (D26 flows) or
-`AI Materials/Project-Narrative_{Request#}.pdf` (J27 flows)
+`AI Materials/Project-Narrative_{Request#}.pdf` (J27 flows, earlier location) or
+`Submission-Documents/Project-Narrative_{Request#}.pdf` (J27 flows, current location)
 
 **[OWNER DECISION 2026-10-26; BUILT ON BRANCH `claude/j27-ai-materials-names`,
-NOT YET RELEASED]** The J27 flows name their `AI Materials` files
+NOT YET RELEASED]** The J27 flows named their files
 `{Type}_{Request#}` (Connor). The apps accept `Project-Narrative_{Request#}.pdf`
 and `Bibliography_{Request#}.pdf` alongside the D26 names
 (`lib/utils/proposal-document-names.js` `acceptedProposalNarrativeFilenames` /
@@ -164,6 +165,20 @@ and `Bibliography_{Request#}.pdf` alongside the D26 names
 may be present; both present fails closed. Connor confirmed 2026-10-26 that
 the J27 files are PDFs, except the graphical abstract, which is an image. See
 `docs/POWER_AUTOMATE_PROPOSAL_FILE_CONTRACT.md`.
+
+**Location changed 2026-11-10 (Connor; alignment log D58/D59), reconfirmed by
+Connor's flow map:** the J27 individual files live in `Submission-Documents/`,
+not `AI Materials/` (the step-2 flow writes `Project-Narrative_`,
+`Bibliography_`, `Biosketches_`, `Other-Support_`, `Collaboration-Letters_`,
+`Graphical-Abstract_` and `declarationofstatus_` there)
+`[REPORTED by Connor 2026-11-20; see docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md]`.
+`Submission-Documents` also receives DERIVED files from the not-yet-live step 5
+(`Front-Matter_{Request#}.pdf` and four `.docx` working files), so it is not
+"applicant originals only". Step 5 also writes the staff-version PDF at the
+request-folder root and `AI Materials/Narrative-Bibliography_{Request#}.pdf`.
+The governed readers accept the J27 names under `Submission-Documents` as well
+as `AI Materials`, and still require exactly one copy across the accepted
+places `[VERIFIED via lib/utils/proposal-document-names.js:64-70]`.
 
 The file must be under the request's Dynamics-associated `akoya_request`
 SharePoint folder. An archive-only match, multiple active exact matches, both
@@ -197,7 +212,7 @@ Assessment, and Field Primer supply and fingerprint only the narrative. The
 earlier plan to have Reviewer Finder separately label and fingerprint both
 files was superseded and is not built: per D60, Reviewer Finder's loader
 defaults to one combined `AI Materials/Narrative-Bibliography_{Request#}.pdf`
-(Connor's flow) when the request has exactly one, so cited authors can provide
+(Connor's step-5 staff-version flow, built but not live until step 3 exists [REPORTED by Connor 2026-11-20]) when the request has exactly one, so cited authors can provide
 reviewer-discovery leads; otherwise it behaves as before
 [VERIFIED `lib/services/reviewer-finder/load-proposal-service.js`; `f43f2db77`
 is an ancestor of `origin/main`]. The two-file rule above still governs the

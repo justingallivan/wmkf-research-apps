@@ -317,7 +317,7 @@ Before implementation completion, inspect `docs/CI_GATES_REFERENCE.md` and `pack
 
 - [VERIFIED] No bulk migration is required: plain text is valid Markdown, and existing allowed Markdown already renders through the canonical helper.
 - [VERIFIED via route/service tests] The API response additions are backward-compatible; existing fields and write payloads remain.
-- [ASSUMED] External Power Automate or direct Dataverse readers may exist outside this repository. Keeping the exact persisted field meanings and syntax minimizes that risk; no external-consumer claim is treated as proven.
+- [ASSUMED] External Power Automate or direct Dataverse readers may exist outside this repository. Keeping the exact persisted field meanings and syntax minimizes that risk; no external-consumer claim is treated as proven. One external writer is now known: Connor's live Research-intake step-1 flow cleans `wmkf_abstract` in place (PDF line breaks removed) on each run, including resubmission [REPORTED by Connor 2026-11-20; `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`].
 - [VERIFIED via git and owner production observation] Abstract and caption runtime UI work is merged to auto-deploying `main`; the separate slow-save reconciliation remains isolated on `codex/fix-abstract-save-timeout` pending deliberate promotion.
 - [VERIFIED by unchanged persistence contract] Rollback can revert the editor and derived response fields without data repair because stored values remain readable Markdown.
 - [VERIFIED by unchanged renderer] After rollback, allowed formatting markers may again appear visibly in a plain textarea, but publication output remains formatted because the canonical renderer is unchanged.
