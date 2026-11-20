@@ -441,9 +441,11 @@ Asked 2026-11-20, ordered by urgency. Connor answered three the same day
    The external reviewer portal serves only `Reviewer Materials/Proposal_<num>.pdf`
    (`lib/external/reviewer-materials.js`), and J27 reviewer invitations need the
    PDF (alignment log D48; invitations start at the 2027-02-24 Chairs meeting).
-5. Does step 1 set `wmkf_applicantdisposition` (or any disposition) on the
-   `wmkf_appreviewersuggestion` rows it writes? The app's applicant-recommended
-   and not-excluded reader filters depend on it.
+5. Does step 1 set `wmkf_applicantdisposition` on the `wmkf_appreviewersuggestion`
+   rows it writes? The Workbench applicant-recommended check (PubMed verification
+   and COI flags) reads only rows with Recommended (`100000000`)
+   (`lib/dataverse/adapters/reviewer-suggestion.js:1835`). **Asked 2026-11-20** (owner
+   to Connor): set Recommended on the five applicant-suggested rows. Awaiting reply.
 6. Is `wmkf_ai_methodologies` written by `intake.keywords` or a separate prompt?
 7. Low priority: confirm `akoya_submissionaccepted` is always manual (superseding
    the v3 spec's AI write), and whether `wmkf_ai_compliancesummary` is retired.
