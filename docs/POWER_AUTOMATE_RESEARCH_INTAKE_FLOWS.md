@@ -170,7 +170,14 @@ section 9).
   `wmkf_request`, `wmkf_potentialreviewer`, denormalized
   `wmkf_reviewerfirstname` / `lastname` / `title` / `affiliation` / `email`,
   `wmkf_notes` = stated expertise, `wmkf_sources` = `"applicant"` (appended to an
-  existing row's sources), `wmkf_suggestionlabel` = `"{title} — {first} {last}"`.
+  existing row's sources), `wmkf_suggestionlabel` = `"{title} — {first} {last}"`,
+  `wmkf_applicantdisposition` = Recommended (`100000000`) [REPORTED by Connor
+  2026-11-20: already added; every request from now on gets it. Test requests
+  written before the change have a blank disposition]. `wmkf_selected` is not in
+  Connor's list (the app's own applicant path writes `false`).
+- **Not written:** the request's legacy reviewer lookups
+  `wmkf_potentialreviewer1`–`5`. Connor calls them deprecated [REPORTED by Connor
+  2026-11-20].
 
 ### Chief research officer
 
@@ -363,9 +370,12 @@ Checked against our source on 2026-11-20 unless labeled.
      until Connor confirms; low priority, nothing in the app reads acceptance
      except the Factory clone, `lib/services/test-requests/basic-clone-steps.js`].
    - `wmkf_ai_compliancesummary` exists in Dataverse [VERIFIED 2026-11-20 metadata
-     read] but is not in Connor's map; no app code reads it. The Dynamics Explorer
+     read] and is still written, but only when a submission does not follow the
+     instructions; a blank value on a J27 request means compliant [REPORTED by Connor
+     2026-11-20; section 10 question 7]. No app code reads it. The Dynamics Explorer
      prompt describes it as a report (interim/final) check-in summary
-     (`shared/config/prompts/dynamics-explorer.js:112`).
+     (`shared/config/prompts/dynamics-explorer.js:112`), which does not match the
+     intake use.
    - Fit (`wmkf_ai_fitassessment`, `wmkf_ai_fitrationale`) and the injection
      screen are separate step-3 tasks.
 5. **Files.**
@@ -385,13 +395,27 @@ Checked against our source on 2026-11-20 unless labeled.
      Connor will build it, triggered at `wmkf_phaseistatus` = Recommended (owner,
      2026-11-20); staff decide its contents; the portal serves it unchanged
      (section 10 question 4).
-6. **Excluded reviewers become structured.** Step 1 writes one reviewer per line
-   (`{first} {last} ({info}) — {reason}`). Our parser
+6. **Excluded reviewers stay free text, in a fixed format.** Step 1 writes one
+   reviewer per line (`{first} {last} ({info}) — {reason}`) to
+   `wmkf_excludedreviewers`. Connor confirms the format is deterministic and will
+   not write `wmkf_potentialreviewers` or `wmkf_appexcludedreviewer` rows for
+   excluded reviewers: the form collects only name and institution, no email, so
+   flow-created records would risk duplicates. He leaves any promotion to the app
+   [REPORTED by Connor 2026-11-20; section 10 question 8]. Our parser
    (`lib/services/reviewer-exclusion-parser.js`) was built for heterogeneous D26
-   prose and uses an LLM; J27 text could be parsed deterministically.
+   prose and uses an LLM; J27 text could be parsed deterministically. Search blocks
+   excluded names by exact normalized name (`filterExcluded`,
+   `shared/components/reviewers/reviewer-search-logic.js:661`), which needs no
+   email.
 7. **Suggested reviewers arrive as rows.** Step 1 writes five
    `wmkf_appreviewersuggestion` rows per request with `wmkf_sources` =
-   `"applicant"`, appending to an existing row's sources. The app also writes this
+   `"applicant"` (appending to an existing row's sources) and
+   `wmkf_applicantdisposition` = Recommended, so the Workbench applicant check
+   (`findApplicantRecommendedByRequest`) finds them [REPORTED by Connor 2026-11-20;
+   not yet seen on a J27 row]. Step 1 does not fill the request's
+   `wmkf_potentialreviewer1`–`5` lookups, so the app's slot ingestion
+   (`lib/services/workbench/applicant-reviewers-service.js`) finds nothing on J27
+   requests; it still serves earlier cycles. The app also writes this
    table through `lib/services/reviewer-engagement/`, so the two writers share
    rows.
 8. **The ready flag is a deliberate manual gate.** For 2027+ cycles the Workbench
@@ -416,8 +440,8 @@ Checked against our source on 2026-11-20 unless labeled.
 
 ## 10. Open questions for Connor
 
-Asked 2026-11-20, ordered by urgency. Connor answered three the same day
-`[REPORTED by Connor 2026-11-20]`.
+Asked 2026-11-20, ordered by urgency. Connor answered all but question 6 and the
+acceptance half of question 7 the same day `[REPORTED by Connor 2026-11-20]`.
 
 1. **Staff version after a keyword change — answered.** Connor will build a
    separate keyword-change flow that deletes the old documents and creates updated
@@ -444,9 +468,21 @@ Asked 2026-11-20, ordered by urgency. Connor answered three the same day
 5. Does step 1 set `wmkf_applicantdisposition` on the `wmkf_appreviewersuggestion`
    rows it writes? The Workbench applicant-recommended check (PubMed verification
    and COI flags) reads only rows with Recommended (`100000000`)
-   (`lib/dataverse/adapters/reviewer-suggestion.js:1835`). **Answered 2026-11-20:** Connor
-   will make step 1 set Recommended (`100000000`) on the five applicant-suggested rows
-   (not yet built; until then those rows have a blank disposition).
+   (`lib/dataverse/adapters/reviewer-suggestion.js:1835`). **Answered 2026-11-20:**
+   already done. Step 1 sets Recommended (`100000000`) on the five
+   applicant-suggested rows for every request from now on; earlier test requests
+   have a blank disposition. Connor also says step 1 does not fill the request's
+   `wmkf_potentialreviewer1`–`5` lookups, which are deprecated. To confirm on the
+   first new J27 test request (owner-approved read): the five rows show as
+   applicant-suggested in the Workbench.
 6. Is `wmkf_ai_methodologies` written by `intake.keywords` or a separate prompt?
+   Asked again 2026-11-20; not answered.
 7. Low priority: confirm `akoya_submissionaccepted` is always manual (superseding
    the v3 spec's AI write), and whether `wmkf_ai_compliancesummary` is retired.
+   **Compliance summary answered 2026-11-20:** not retired; written only when the
+   submission does not follow the instructions. Acceptance not answered.
+8. **Excluded reviewers — answered 2026-11-20.** Connor keeps them in
+   `wmkf_excludedreviewers` in the deterministic one-per-line format and will not
+   create reviewer records for them (no email is collected, so records would risk
+   duplicates). Whether the parenthesized part is always the institution was not
+   answered.

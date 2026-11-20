@@ -105,7 +105,7 @@ Fields on `akoya_request`. Provenance lives in `wmkf_ai_run` with `wmkf_ai_taskt
 |-------|------|---------|
 | `akoya_submissionaccepted` *(existing)* | Two options | ~~Compliance pass/fail — AI writes this on completion~~ **Superseded for J27 Research intake (Connor's 2026-11-20 map, [ASSUMED] until he confirms):** coordinator acceptance is MANUAL and triggers the staff-version flow; compliance is advisory in `wmkf_ai_compliancecheck`; step 3 only resets this field to No if it was Yes |
 | `wmkf_ai_complianceissues` | Multi-line text (JSON) | Array of `{category, severity, description}` (v3 design; Connor's 2026-11-20 map describes a plain-language list of clerical issues, advisory only, which also receives a line when a prompt returns `INSUFFICIENT_MATERIAL`) |
-| `wmkf_ai_compliancesummary` | Multi-line text | Human-readable one-paragraph summary (exists in Dataverse; absent from Connor's 2026-11-20 map, so retired-or-planned is an open question for him) |
+| `wmkf_ai_compliancesummary` | Multi-line text | Human-readable one-paragraph summary (exists in Dataverse; Connor 2026-11-20: still written, only when a submission does not follow the instructions [REPORTED by Connor]) |
 | `wmkf_ai_compliancecheck` *(on `akoya_request`, added after v3)* | Choice | Compliant 682090000 / Non-Compliant 682090001 / Human Review 682090002 / Reviewed 682090003 (staff). Planned step-3 prompt writes it; the prompt is not yet written [REPORTED by Connor 2026-11-20; option values VERIFIED via Production metadata read 2026-11-20] |
 
 Sample JSON for `wmkf_ai_complianceissues`:

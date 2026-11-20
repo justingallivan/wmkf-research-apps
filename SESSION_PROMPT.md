@@ -77,12 +77,19 @@ flow names); no request or applicant rows were read.
    - `akoya_programid`, `wmkf_programareaserved` and `wmkf_ai_keywords` are populated;
    - the staff version and `AI Materials/Narrative-Bibliography_` appear after step 5.
    Evidence: map section 0 status note; audit doc.
-2. **Connor builds that are promised but not yet confirmed:** the keyword-change flow,
-   the reviewer-copy flow (Recommended trigger), and step 1 setting
-   `wmkf_applicantdisposition` = Recommended. Evidence: map section 10, items 1, 4 and 5.
+2. **Connor builds that are promised but not yet confirmed:** the keyword-change flow
+   and the reviewer-copy flow (Recommended trigger). Evidence: map section 10, items
+   1 and 4. Step 1 setting `wmkf_applicantdisposition` = Recommended is done for new
+   requests (Connor, 2026-11-20). Confirm on the first new J27 test request
+   (owner-approved read) that its five suggested reviewers show as
+   applicant-suggested in the Workbench (map section 10, item 5).
 3. **Low-priority questions for Connor:** whether `wmkf_ai_methodologies` comes from
-   `intake.keywords` or another prompt, and whether `wmkf_ai_compliancesummary` is
-   retired (map section 10, items 6 and 7).
+   `intake.keywords` or another prompt, whether `akoya_submissionaccepted` is always
+   manual, and whether the parenthesized part of an excluded-reviewer line is always
+   the institution (map section 10, items 6–8). Answered 2026-11-20: the compliance
+   summary is written only for non-compliant submissions; the request's
+   `wmkf_potentialreviewer1`–`5` lookups are deprecated; excluded reviewers stay free
+   text, with no flow-created records.
 4. **`cycle-dossier.entry` cache read:** re-run
    `scripts/probe-ai-run-cache-reads.js --prompt cycle-dossier.entry` after the next
    dossier batch. This is a Production read and needs the owner's OK.
