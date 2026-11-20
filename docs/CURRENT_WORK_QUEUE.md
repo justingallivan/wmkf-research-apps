@@ -311,16 +311,22 @@ search limits: `docs/audits/product-backlog-reconciliation-2026-10-31.md`.
   parked `needs_attention` at verify on the Foundation GoVerify refresh (runbook
   "What 'cannot continue' leaves behind"); the create limit is now 60 s
   (`74f442200`) and the form offers Retry after a create timeout (`c689c352d`).
-  **Follow-up (owner, 2026-11-14; [BRANCH-BUILT 2026-11-15 on `claude/factory-narrative-bibliography`; ledger migration 099 applied 2026-11-15 (both ledgers, Production app database); not merged]):** have the Factory also produce the combined narrative and bibliography, `AI Materials/Narrative-Bibliography_{N}.pdf` (alignment log D60). In real J27 requests Connor's step-5 staff-version flow builds it (built, not live until the planned step-3 AI review exists [REPORTED by Connor 2026-11-20; `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`]) and Reviewer Finder loads it by default when present. Needs a merge of the two copied PDFs, a new copy-step kind and a receipt-grammar widening (ledger migration, as 098). The root `{AKA}_Staff-Version_{N}.pdf` ("Combined proposal" on the page) is a separate staff-made file and not part of this follow-up.
+  **Follow-up (owner, 2026-11-14; [MERGED to `main`: `c7ebedc1f` and `6a3c2f20c` and the branch tip `claude/factory-narrative-bibliography` are ancestors of `origin/main` (VERIFIED 2026-11-20 via `git merge-base --is-ancestor`); builder in `lib/services/test-requests/narrative-bibliography.js`; ledger migration 099 applied 2026-11-15 (both ledgers, Production app database)]):** have the Factory also produce the combined narrative and bibliography, `AI Materials/Narrative-Bibliography_{N}.pdf` (alignment log D60). In real J27 requests Connor's step-5 staff-version flow builds it (built, not live until the planned step-3 AI review exists [REPORTED by Connor 2026-11-20; `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`]) and Reviewer Finder loads it by default when present. Needs a merge of the two copied PDFs, a new copy-step kind and a receipt-grammar widening (ledger migration, as 098). The root `{AKA}_Staff-Version_{N}.pdf` ("Combined proposal" on the page) is a separate staff-made file and not part of this follow-up.
   Original entry follows.
   The J27 Workbench is on in Production (every 2027-or-later request,
   `docs/plans/J27_WORKBENCH_PRODUCTION_ROLLOUT_2026-11-07.md`), so internal
   testing will want J27 test requests. Do before the Factory next creates them;
   Codex is not working on the Factory now (owner, 2026-11-14). Three gaps
-  [`main` has none of the scenario titles, and `lib/services/test-requests/`
-  has no J27 name or `Submission-Documents` reference; VERIFIED via grep]:
-  1. *File names.* `lib/services/test-requests/file-plan.js:37-45` writes the
-     D26 names `ProposalNarrative_{N}.pdf` / `ProposalBibliography_{N}.pdf` to
+  [`main` has none of the scenario titles (no `First Cut`/`Semi-finalist` match
+  in `lib/` or `scripts/`; VERIFIED via grep 2026-11-20). Gap 1 text below is the
+  pre-fix description: `lib/services/test-requests/file-plan.js` now carries the
+  J27 layout (`SUBMISSION_DOCUMENTS_FOLDER` line 23; `SINGLE_SUBMISSION_DESTINATIONS`
+  lines 62-73 writes `Project-Narrative_{N}.pdf` / `Bibliography_{N}.pdf` to
+  `Submission-Documents` when `destinationLayout` is `single-submission`, line 32;
+  the D26 names in `GENERATED_KINDS` lines 49-58 remain the default layout);
+  VERIFIED via source]:
+  1. *File names (pre-fix; merged in `3e382029a`, see above).* Before that merge
+     `lib/services/test-requests/file-plan.js` wrote only the D26 names `ProposalNarrative_{N}.pdf` / `ProposalBibliography_{N}.pdf` to
      `AI Materials` [VERIFIED via source]. Readers still accept them there, so
      runs work, but they do not exercise J27's names `Project-Narrative_{N}.pdf`
      / `Bibliography_{N}.pdf` or the `Submission-Documents` narrative place

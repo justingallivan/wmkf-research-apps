@@ -186,9 +186,10 @@ missing on the request page: an accepted limit for test requests. The layout is
 never inferred on resume, so a run reserved before this change, and every D26
 run, keeps the `AI Materials` destinations.
 
-**[BRANCH-BUILT 2026-11-15 (`claude/factory-narrative-bibliography`); ledger
+**[Built 2026-11-15 on `claude/factory-narrative-bibliography`, now on `main`
+(`c7ebedc1f`, `6a3c2f20c` are ancestors of `origin/main`, verified 2026-11-20); ledger
 migration 099 applied to both ledgers and the Production app database
-2026-11-15; not merged]** A J27-or-later run whose source has
+2026-11-15]** A J27-or-later run whose source has
 both a narrative and a bibliography also builds
 `AI Materials/Narrative-Bibliography_<n>.pdf` (alignment log D60; owner,
 2026-11-15): the narrative's pages, then the bibliography's, no cover page.
