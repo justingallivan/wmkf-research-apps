@@ -47,8 +47,8 @@ use `wmkf_preferredemail`. An unavailable linked Contact must not silently fall
 back to the manual address.
 
 Keep roster maintenance in Admin; the flow only needs reads. Your actual production
-connection still needs a read check. Backend automation and Expertise Finder
-retirement remain separate work.
+connection still needs a read check. Backend automation remains separate work.
+Standalone Expertise Finder is retired; see the [retirement report](EXPERTISE_FINDER_RETIREMENT_2026-11-19.md).
 
 Verified against the deployed schema and roster contract on November 19, 2026.
 See the [production execution report](EXPERTISE_ROSTER_PRODUCTION_EXECUTION_2026-11-19.md)

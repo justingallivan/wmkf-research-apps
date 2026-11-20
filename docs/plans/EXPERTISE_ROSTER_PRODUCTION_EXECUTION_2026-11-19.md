@@ -1,9 +1,11 @@
 # Expertise roster production execution — November 19
 
 **Status: COMPLETE — production import, feedback identity migration and Admin editor cutover.**
-Backend automation and Expertise Finder retirement remain separate and unchanged.
+Backend automation remains separate. Standalone retirement and subsequent history/
+synthetic-feedback cleanup are complete; see the [retirement report](EXPERTISE_FINDER_RETIREMENT_2026-11-19.md).
+The acceptance details below are the historical migration checkpoint before that cleanup.
 
-## Verified production result
+## Historical migration acceptance result
 
 [VERIFIED via production CLI/API/SQL, exact importer verification and signed-in Chrome,
 November 19 Pacific / November 20 UTC]

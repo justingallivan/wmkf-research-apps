@@ -10,6 +10,14 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## November 2026 — Standalone Expertise Finder retired
+
+**Milestone:** Removed standalone matching while retaining the Dataverse roster and Admin editor.
+**Sessions:** Codex, 2026-11-19; owner authorized retirement and history deletion.
+**Ship state:** PR #650 / `6ae809f98` deployed; six old APIs return 404, old page links to Admin. Deleted 344 obsolete history rows and one synthetic feedback entry; all seven original feedback entries and Contact links remain.
+**Why it matters:** Roster maintenance is independent of the retired app. Connor's backend automation and actual connection check remain separate.
+**Pointers:** `docs/plans/EXPERTISE_FINDER_RETIREMENT_2026-11-19.md`.
+
 ## November 2026 — Expertise roster migrated to Dataverse and Admin
 
 **Milestone:** Production roster content moved from Postgres to Dataverse, with editing in Admin → People & Access → Expertise Roster.

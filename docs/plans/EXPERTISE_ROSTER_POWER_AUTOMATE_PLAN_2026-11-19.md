@@ -8,9 +8,10 @@ with roster maintenance moved into Admin. The current plan is
 
 Do not implement the earlier read-only HTTP roster endpoint, custom connector,
 or its authentication setup. Connor will read the migrated Dataverse table.
-Backend matching automation is a separate later step, followed separately by
-Expertise Finder retirement after replacement acceptance and caller verification.
+Backend matching automation remains separate. The production roster migration and
+Admin editor are complete; standalone retirement was separately authorized and
+completed without waiting for backend replacement. See the [retirement report](EXPERTISE_FINDER_RETIREMENT_2026-11-19.md).
 
-This is a change of direction, not a completed migration. The original discussion
+This superseded proposal records the earlier change of direction. The original discussion
 draft is preserved in this file's Git history. It recommended leaving Postgres
 as the source and awaiting Connor's review; that recommendation is superseded.

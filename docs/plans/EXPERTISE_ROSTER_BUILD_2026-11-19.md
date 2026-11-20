@@ -1,6 +1,6 @@
 # Roster migration and Admin editor — build evidence
 
-Status: implementation and focused verification completed; Opus correction verification returned code ready. Production import, migrations 103/104 and the Dataverse-backed Admin editor are complete. Amy ID 40 remains active and lead-PD eligible with her existing profile and future email preserved; no app access was granted and nothing was sent. See [production execution report](EXPERTISE_ROSTER_PRODUCTION_EXECUTION_2026-11-19.md). Backend automation and app retirement remain separate.
+Status: implementation and focused verification completed; Opus correction verification returned code ready. Production import, migrations 103/104 and the Dataverse-backed Admin editor are complete. Amy ID 40 remains active and lead-PD eligible with her existing profile and future email preserved; no app access was granted and nothing was sent. See [production execution report](EXPERTISE_ROSTER_PRODUCTION_EXECUTION_2026-11-19.md). Backend automation remains separate; subsequent standalone retirement is recorded in the [retirement report](EXPERTISE_FINDER_RETIREMENT_2026-11-19.md).
 
 The verification sections below record the pre-deployment build/review snapshot.
 

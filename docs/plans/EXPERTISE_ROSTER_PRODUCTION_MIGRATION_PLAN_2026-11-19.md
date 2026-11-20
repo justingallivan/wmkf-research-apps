@@ -7,7 +7,8 @@ Postgres to Dataverse and move its editor into Admin. Treat the roster as static
 through the migration. Use production only; no sandbox, synchronization, dual
 writes, concurrency locks, deployment-drain system, or automated rollback engine.
 Backend matching automation and standalone Expertise Finder retirement are separate
-later steps, not prerequisites for delivering this migration.
+steps, not prerequisites for delivering this migration. Retirement was subsequently
+authorized and completed independently; see the [retirement report](EXPERTISE_FINDER_RETIREMENT_2026-11-19.md).
 
 ## 1. Deliverable and scope
 
@@ -23,15 +24,11 @@ Contact reference, preferred email, staff User link, and lead-PD eligibility.
 Use the existing Admin layout and editor patterns; no general Admin redesign.
 Deletion is deactivation, preserving historical references.
 
-[VERIFIED via November 19 deployed UI/source] In Dataverse mode, the old Roster tab becomes a link to Admin for authorized
-administrators; its legacy roster GET and mutation methods refuse access with a
-clear moved-to-Admin response (409), rather than exposing the Admin DTO or User picker.
-In Postgres mode, retain today's editor, with admin-only mutations and the cutover
-marker enforced; Admin shows that its new editor becomes available at cutover.
-This same Postgres-mode editor is the recovery path. There is only one writable
-editor in either mode. Single and batch matching and saved matching history remain available in Expertise Finder
-until the separate retirement step. Preserve their current behavior using the
-new roster source; do not import a new recommendation product as part of this work.
+[VERIFIED via subsequent production retirement] The old URL now shows a retirement
+notice linking to Admin; all six standalone APIs are absent. Recovery requiring the
+legacy editor must use the saved migration-aware pre-retirement deployment and the
+runbook's identity/FK reconciliation. The 344 obsolete matching-history rows were
+removed with owner authorization; Admin and shared consumers remain live.
 
 ## 2. Evidence and boundaries
 
@@ -51,7 +48,7 @@ Do not read main `.env.local`, self-enable production access flags, or copy
 sandbox identities into production. Use the repository's existing authorized
 production tooling and target/write interlock when execution is approved.
 
-## 3. Minimal implementation
+## 3. Historical accepted migration implementation scope
 
 ### Data and identities
 
@@ -202,7 +199,7 @@ report for actual receipts, acceptance coverage and Connor’s outstanding conne
    to prove the storage/editor move; the real-context test verifies matching input/
    output parity except for the recorded owner overrides.
 
-## 5. Acceptance and recovery
+## 5. Historical migration acceptance and recovery contract
 
 Acceptance checks:
 
@@ -257,11 +254,10 @@ eligible groups, prompt additions, outputs/destination, and execution point in h
 existing proposal-processing flow. Reuse the roster via Dataverse and avoid a second
 Claude call. This plan neither implements nor enables automated matching/assignments.
 
-**Expertise Finder retirement:** after the backend replacement is accepted, separately
-inventory live routes/callers, navigation, app grants, prompts, history access, and
-scripts. Preserve a usable home for existing history before removing the app. Admin
-roster maintenance and shared consumers must remain independent. Removal is
-unverified-until-checked and requires a separate implementation decision.
+**Expertise Finder retirement:** complete under the owner's subsequent authorization,
+without waiting for backend replacement. Caller verification preserved Admin and
+shared consumers. The owner declined retention of the 344 obsolete history rows.
+See the [retirement report](EXPERTISE_FINDER_RETIREMENT_2026-11-19.md) for deployment and cleanup evidence.
 
 ## 7. Review and documentation reconciliation
 

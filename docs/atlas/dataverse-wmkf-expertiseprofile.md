@@ -38,7 +38,7 @@ feedback author/attachment/briefing hydration; Site Visit/meeting and proposal-l
 recipient directory. `roster-consumer-service` projects numeric IDs, includes
 inactive authors for history, rejects incomplete/unbound records and propagates
 outages. Excluded placeholder ID 35 has no profile: historical author displays
-“Unavailable consultant”. Standalone matching retirement is built; see the [retirement report](../plans/EXPERTISE_FINDER_RETIREMENT_2026-11-19.md) for release status. Lead eligibility is stored for later backend automation.
+“Unavailable consultant”. Standalone matching is retired in production; see the [retirement report](../plans/EXPERTISE_FINDER_RETIREMENT_2026-11-19.md) for release status. Lead eligibility is stored for later backend automation.
 
 ## Postgres `expertise_roster_identity`, `expertise_roster_binding`
 
@@ -60,7 +60,8 @@ import; Admin is unavailable until the switch.
 
 `consultant_feedback` remains Postgres. Migration 104, applied after exact import
 verification, retargeted its FK to `expertise_roster_identity(id)`; all seven original
-feedback rows remain unchanged. One private synthetic acceptance entry references
-the inactive test profile. No original feedback was deleted or reassigned. Matching
-history stays in `expertise_matches`. Old roster content stays for manual recovery.
-Backend automation remains separate. Standalone retirement and history cleanup are tracked in the retirement report.
+feedback rows remain unchanged. The private synthetic acceptance entry was removed
+after retirement; its test profile remains inactive. All 344 obsolete matching-history
+rows were deleted with owner authorization; the empty `expertise_matches` table and
+old roster content remain. Backend automation remains separate. Production cleanup
+evidence is recorded in the retirement report.

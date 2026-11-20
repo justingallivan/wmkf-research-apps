@@ -1,6 +1,6 @@
 ---
 name: AI capabilities — matching and compliance
-description: Standalone Expertise Finder retirement is built; Dataverse roster/Admin remain live. Backend matching is separate. Compliance status requires a fresh check.
+description: Standalone Expertise Finder retirement is production-live; Dataverse roster/Admin remain live. Backend matching is separate. Compliance status requires a fresh check.
 type: project
 status: active
 scope: strategy

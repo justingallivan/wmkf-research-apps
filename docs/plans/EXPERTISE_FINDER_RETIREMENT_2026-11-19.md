@@ -1,6 +1,6 @@
 # Standalone Expertise Finder retirement
 
-Status: **built; production release and data cleanup pending**.
+Status: **COMPLETE — retired in production; authorized data cleanup verified**.
 Owner authorized retirement on November 19 and confirmed the 344 matching-history
 records need not be retained. Backend automation remains separate and unverified.
 
@@ -56,3 +56,33 @@ facts/pointers, doc references/currency, secret scan and memory-router checks pa
 with applicable self-tests. Fresh independent read-only review found one stale Admin
 Postgres-mode link; it now gives a configuration message rather than linking to the
 retired editor. No unresolved runtime dependency finding.
+
+## Production acceptance — November 19 Pacific / November 20 UTC
+
+[VERIFIED via GitHub, Vercel, signed-in Chrome and production SQL] PR #650 merged
+as `6ae809f98`; deployment `dpl_3imy7GjGkrGQQUHh6NEHAbfM2fHG` is Ready.
+The production domain displays the retirement notice. Signed-in visits to all six
+former APIs return 404; anonymous requests first encounter the normal sign-in guard.
+Admin roster reload passed with the active roster, including Amy.
+
+All PR CI checks passed (Tests run `44657934091`), including full Jest, production
+build, repository gates and Postgres integration; security scans and CodeQL passed.
+The first CI attempt caught a historical document pointer to the archived route;
+that pointer was corrected before the successful run.
+
+The guarded SQL transaction deleted exactly 344 matching-history rows and synthetic
+feedback ID 9 after verifying its original mutation/request/content and test-request
+marker. Readback confirms zero history rows and all seven original feedback IDs
+`1,3,4,5,6,7,8`. No table, roster identity, binding or profile was deleted.
+A fresh real-service probe confirms exact imported Contact/email preservation,
+21 active matching-input profiles, Amy active/lead eligible with future email intact,
+and inactive/excluded feedback-author behavior. No matching model call or email sent.
+
+Private receipts: `retirement-cleanup.json`, `retirement-deployment.json`, and
+`consumers.json` in the owner-managed production evidence directory named in the
+migration execution report. Original migration receipts remain dated snapshots.
+
+Sweep Mode A scope: retirement status, history retention and synthetic acceptance
+feedback across current plan, runbook, handoff, Atlas, memory and session pointers.
+Historical planning/review/build evidence remains explicitly historical. Backend
+flow implementation and Connor's actual connection check remain outside this release.

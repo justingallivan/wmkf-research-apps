@@ -148,11 +148,15 @@ Record deployment, ledger, receipts and acceptance results in private evidence.
    before applying either SQL template. If switched, introduce a new numbered recovery migration from
    `scripts/sql/expertise-roster-feedback-rollback.sql.template`, align fresh-install
    FK, regenerate manifest, apply through the same runner. Its validated FK must pass.
-4. Switch to the tested **new code in Postgres mode**; do not redeploy an old build
+4. Switch to the saved **pre-retirement, migration-aware Postgres-mode deployment**
+   listed in the execution report; the current retired app has no legacy editor.
+   Do not redeploy an old build
    lacking the marker. Verify reads. Only then clear bindings for
    `target_host='wmkf.crm.dynamics.com'` to reopen legacy edits (explicit operator SQL,
    after saving the bindings privately). Keep identity rows and Dataverse profiles.
 5. Reimport reuses original dataset/mutation keys. Retained profiles with differing
    values require explicit reconciliation; never create another dataset blindly.
 
-No table drops, app retirement, automation changes, or broad database migration.
+This migration runbook does not perform app retirement, automation changes or table
+drops. Subsequent retirement and authorized history cleanup are complete; see the
+[retirement report](EXPERTISE_FINDER_RETIREMENT_2026-11-19.md). Deleted history is intentionally not restored.

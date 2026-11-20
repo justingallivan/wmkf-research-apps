@@ -94,10 +94,12 @@ results are recorded under Parked item 4 and the workstream table below.
 
 ## Next Items
 
-### Expertise Finder retirement in progress
+### Expertise Finder retirement complete
 
 Owner subsequently authorized standalone retirement and confirmed matching history
-need not be retained. Work is on `codex/expertise-finder-retirement-2026-11-19`.
+need not be retained. PR #650 merged (`6ae809f98`) and production verification passed.
+All six former APIs return 404. Deleted 344 history rows and one synthetic feedback
+entry; all seven original feedback entries remain.
 See `docs/plans/EXPERTISE_FINDER_RETIREMENT_2026-11-19.md` for release/cleanup status.
 Admin roster and shared consumers remain; Connor backend automation is separate.
 
@@ -189,7 +191,7 @@ current permission or live-state evidence.
 |---|---|---|
 | Proposal lists | `docs/plans/J27_PROPOSAL_LIST_EMAILS_PLAN_2026-11-18.md`; `docs/atlas/postgres-proposal-list-links.md` | Production-live; Share Proposals menu link live; PDF open and two-level sections unproven live (needs Connor's J27 test request); email send deferred |
 | Initial Assessment | PRs #644–#646; `assessment-service.js`, `AssessmentForm.js` | Production-live; authenticated save acceptance unverified |
-| Roster migration and Admin editor | `docs/plans/EXPERTISE_ROSTER_PRODUCTION_MIGRATION_PLAN_2026-11-19.md` | Production-only plan saved; Opus 5.5 reviewed, corrections incorporated; Admin editor and migration implemented/tested on the new November 19 branch; Opus correction verification returned code ready; backend automation and retirement separate; production cutover complete: migrations 103/104, backend dataverse, 39 imported profiles and 10 exact Contact links; Amy active/lead eligible, no app access or sends; test profile retained inactive; Connor connection/effective-rights follow-up separate |
+| Roster migration and Admin editor | `docs/plans/EXPERTISE_ROSTER_PRODUCTION_MIGRATION_PLAN_2026-11-19.md` | Production-only plan saved; Opus 5.5 reviewed, corrections incorporated; Admin editor and migration implemented/tested on the new November 19 branch; Opus correction verification returned code ready; backend automation separate; standalone retirement complete in PR #650; production cutover complete: migrations 103/104, backend dataverse, 39 imported profiles and 10 exact Contact links; Amy active/lead eligible, no app access or sends; test profile retained inactive; Connor connection/effective-rights follow-up separate |
 | Older roster cutover | `origin/codex/expertise-roster-import-2026-11-10:SESSION_PROMPT.md` | Preserve branch/private inputs; reconcile direction before resuming |
 | Chairs Production stages | `docs/plans/J27_CHAIRS_RECOMMENDATION_PRODUCTION_PLAN_2026-11-18.md` | Not changed here; owner approval per stage |
 | Intake prompt delivery | `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md` | Owner-run flow/prompt work; backend adoption parked; branch inventory in `docs/plans/PARKED_EXECUTOR_BRANCH_INVENTORY_2026-11-19.md` |

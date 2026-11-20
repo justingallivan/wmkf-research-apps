@@ -152,16 +152,17 @@ RBAC scaffolding for the explorer write tools. Restrictions table is empty; a 27
 
 ## Expertise Finder
 
-### `expertise_roster` (40 retained rows), `expertise_matches` (344 rows)
-**Source of truth:** Dataverse owns roster content; Postgres retains matching history.
+### `expertise_roster` (40 retained rows), `expertise_matches` (0 rows after retirement cleanup)
+**Source of truth:** Dataverse owns roster content; the Postgres matching-history table is empty.
 [VERIFIED via production import/API/SQL and signed-in Admin, 2026-11-19] Production
 uses `EXPERTISE_ROSTER_BACKEND=dataverse`. See
 [Expertise Profiles](dataverse-wmkf-expertiseprofile.md) for the live editor,
 `expertise_roster_identity` / `expertise_roster_binding` (migration 103) and the
 validated feedback FK to identity (migration 104). All 10 Contact links were preserved.
 The 40 original Postgres rows are frozen recovery data, not an editable mirror.
-At migration acceptance, all 344 matching-history rows remained; their existing null `user_profile_id` values
-mean the unchanged profile-filtered history UI does not expose them to Justin.
+[VERIFIED via production SQL, November 19] Owner authorized deletion of all 344
+matching-history rows after retirement; zero remain. All seven original consultant
+feedback entries remain; the single private synthetic acceptance entry was removed.
 The following describes the retained Postgres-mode schema/recovery baseline.
 Historical internal staff/consultant/board roster + per-proposal match history.
 Standalone consumers are archived under `_archived/pages/api/expertise-finder/`;
@@ -177,7 +178,7 @@ active roster row per Contact. For an unlinked Board/Consultant row, the Site
 Visit recipient directory continues to use `preferred_email`. For a linked row,
 it resolves the active Contact's current `emailaddress1`; a missing, inactive,
 or email-less Contact yields no email and never falls back to the manual copy.
-In Postgres mode the Expertise Finder editor is the interactive link writer, and
+In the historical pre-retirement Postgres build, Expertise Finder was the interactive link writer, and
 `scripts/link-roster-contacts.js` is a dry-run-first owner-operated backfill.
 The immutable roster row ID remains the external recipient identity; names and
 email addresses are never join keys. **[HISTORICAL LIVE SNAPSHOT 2026-08-24:
