@@ -1,8 +1,11 @@
 /**
  * Reviewed display metadata for Admin → AI → Prompts.
  * Purpose/caller evidence: docs/audits/prompt-descriptions-and-callers-2026-10-29.md.
- * These labels do not control execution, publication, or access. Caller status
- * describes source usage, not recent execution or Production feature activation.
+ * Display labels do not control execution or access. The usage fallback also
+ * protects application prompts from Admin retirement when stored usage is blank.
+ * Retired interfaces therefore retain application usage protection while their
+ * preserved prompts/backend consumers await a separate retirement decision.
+ * Caller descriptions do not establish Production feature activation.
  * Publication state always comes from the live prompt row, never this catalog.
  * Add new names after checking their prompt content and actual callers; unknown
  * stored names remain visible through the explicit fallback below.
@@ -62,14 +65,14 @@ export const ADMIN_PROMPT_CATALOG = Object.freeze({
     title: "Federal funding landscape report",
     description: "Uses proposal details and funding records already retrieved by the app to write a report on funding patterns and potential gaps.",
     usedBy: "Retired standalone interface — preserved for future adaptation; external backend usage is separate",
-    usage: "reference",
+    usage: "application",
   },
   "funding-gap.extract": {
     group: "tools",
     title: "Extract proposal details for funding searches",
     description: "Extracts the investigator, institution, research topics, and search terms needed for the app’s federal funding lookup.",
     usedBy: "Retired standalone interface — preserved for future adaptation; external backend usage is separate",
-    usage: "reference",
+    usage: "application",
   },
   "grantee-abstract.generate": {
     group: "awardees",
@@ -97,21 +100,21 @@ export const ADMIN_PROMPT_CATALOG = Object.freeze({
     title: "Compare research papers",
     description: "Compares the methods or findings across the supplied paper summaries.",
     usedBy: "Retired standalone interface — preserved for future adaptation; external backend usage is separate",
-    usage: "reference",
+    usage: "application",
   },
   "literature-analyzer.extract-paper": {
     group: "tools",
     title: "Extract information from one research paper",
     description: "Reads an attached research-paper PDF and extracts structured information for a literature review.",
     usedBy: "Retired standalone interface — preserved for future adaptation; external backend usage is separate",
-    usage: "reference",
+    usage: "application",
   },
   "literature-analyzer.synthesize": {
     group: "tools",
     title: "Synthesize a literature review",
     description: "Combines extracted paper summaries into a review of shared themes, patterns, and relationships, optionally focused on a topic.",
     usedBy: "Retired standalone interface — preserved for future adaptation; external backend usage is separate",
-    usage: "reference",
+    usage: "application",
   },
   "meeting-transcript.fragment-review": {
     group: "meetings",
@@ -154,7 +157,7 @@ export const ADMIN_PROMPT_CATALOG = Object.freeze({
     title: "Extract and assess a research concept",
     description: "Reads the uploaded concept PDF and produces the initial concept analysis against the supplied Foundation funding guidelines.",
     usedBy: "Retired standalone interface — preserved for future adaptation; external backend usage is separate",
-    usage: "reference",
+    usage: "application",
   },
   "multi-perspective.integrator": {
     group: "reviews",
@@ -162,7 +165,7 @@ export const ADMIN_PROMPT_CATALOG = Object.freeze({
     title: "Combine the three concept evaluations",
     description: "Combines the optimist, skeptic, and neutral assessments into an integrated recommendation, identifying agreement and resolving disagreements.",
     usedBy: "Retired standalone interface — preserved for future adaptation; external backend usage is separate",
-    usage: "reference",
+    usage: "application",
   },
   "multi-perspective.neutral": {
     group: "reviews",
@@ -170,7 +173,7 @@ export const ADMIN_PROMPT_CATALOG = Object.freeze({
     title: "Balanced research concept assessment",
     description: "Produces a realistic, probability-weighted assessment using the concept analysis, supplied literature, and evaluation framework.",
     usedBy: "Retired standalone interface — preserved for future adaptation; external backend usage is separate",
-    usage: "reference",
+    usage: "application",
   },
   "multi-perspective.optimist": {
     group: "reviews",
@@ -178,7 +181,7 @@ export const ADMIN_PROMPT_CATALOG = Object.freeze({
     title: "Strongest case for a research concept",
     description: "Builds the strongest fair case in favor of the concept using the supplied analysis, literature, and framework.",
     usedBy: "Retired standalone interface — preserved for future adaptation; external backend usage is separate",
-    usage: "reference",
+    usage: "application",
   },
   "multi-perspective.proposal-summary": {
     group: "reviews",
@@ -186,7 +189,7 @@ export const ADMIN_PROMPT_CATALOG = Object.freeze({
     title: "Plain-language concept summary",
     description: "Explains what the researchers propose and the possible impact using the initial analysis and supplied literature.",
     usedBy: "Retired standalone interface — preserved for future adaptation; external backend usage is separate",
-    usage: "reference",
+    usage: "application",
   },
   "multi-perspective.skeptic": {
     group: "reviews",
@@ -194,7 +197,7 @@ export const ADMIN_PROMPT_CATALOG = Object.freeze({
     title: "Risks and weaknesses of a research concept",
     description: "Identifies weaknesses, missing evidence, and potential failure modes while assessing the concept fairly.",
     usedBy: "Retired standalone interface — preserved for future adaptation; external backend usage is separate",
-    usage: "reference",
+    usage: "application",
   },
   "peer-review-summarizer.analyze": {
     group: "reviews",
@@ -202,7 +205,7 @@ export const ADMIN_PROMPT_CATALOG = Object.freeze({
     title: "Summarize uploaded peer reviews",
     description: "Combines uploaded review documents into a narrative summary and a separate list of reviewers’ questions and concerns.",
     usedBy: "Retired standalone interface — preserved for future adaptation; external backend usage is separate",
-    usage: "reference",
+    usage: "application",
   },
   "peer-review-summarizer.questions": {
     group: "reviews",
@@ -210,7 +213,7 @@ export const ADMIN_PROMPT_CATALOG = Object.freeze({
     title: "Recover questions from uploaded reviews",
     description: "Extracts reviewer questions and concerns when the main analysis produces no usable questions section or fewer than 50 characters of questions.",
     usedBy: "Retired standalone interface — preserved for future adaptation; external backend usage is separate",
-    usage: "reference",
+    usage: "application",
   },
   "phase-i.checkin": {
     group: "diagnostics",
@@ -224,7 +227,7 @@ export const ADMIN_PROMPT_CATALOG = Object.freeze({
     title: "Phase I proposal summary",
     description: "Writes a structured Phase I summary for the chosen length and audience; the Executor saves it to the request’s AI summary field.",
     usedBy: "Retired standalone interface — preserved for future adaptation; external backend usage is separate",
-    usage: "reference",
+    usage: "application",
   },
   "phase-ii.extract-structured": {
     group: "reference",

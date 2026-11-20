@@ -94,6 +94,10 @@ included.
   `peer-review-summarizer.*` current rows at version 1; Expense Reporter's two
   version-1 rows were outside the mutation scope. This metadata observation does
   not verify prompt-body parity or external consumers.
+- Admin catalog caller descriptions identify the retired interfaces, but their
+  original `application` usage fallback remains: Admin uses that category to
+  block prompt retirement when a stored row has no usage metadata. Interface
+  retirement does not authorize unpublishing these preserved prompts.
 - Existing `wmkf_ai_run` records, `api_usage_log` entries, request summary fields,
   Blob uploads, SharePoint documents, and exported reports remain untouched.
 - Grant Reporting's retained service has no save-to-request implementation for
@@ -165,6 +169,11 @@ component only renders its supplied name and Home link; it imports no archived
 code. Existing grants and historical data remain available to their existing
 readers. Future capability adaptation and external backend behavior are separate
 work, not outcomes claimed by these tests.
+
+The first full CI run passed 1,566 suites and found one prompt-retirement
+regression: changing the catalog usage category weakened its blank-metadata
+retirement guard. The original protection was restored for all fourteen affected
+prompt names and covered with parameterized no-write tests. Final CI rerun pending.
 
 ### Release boundary and rollback
 
