@@ -119,3 +119,47 @@ by staff (2026-11-20). **Fixed the same day** in PR #665 (merge `996ba8187`); li
 **Verdict:** CLAIM NOT RECONCILED. Every durable doc in scope is reconciled. One
 code comment is pending an owner decision, and flow existence is not independently
 verifiable from the app identity.
+
+## Step-3 output vs prompt handoffs (owner review; not reconciled)
+
+PA = `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md`; PF =
+`docs/plans/PREFLIGHT_PROMPTS_HANDOFF_2026-11-10.md`; map = section 5 of the intake map.
+
+1. **Executive summary:**
+   - Map: one paragraph of 150–200 words.
+   - PA and PF: at most 200 words, with no minimum.
+   - The drafts aim for 150–180 words.
+2. **Methodology:**
+   - Map: 2–4 sentences, at most 100 words.
+   - PA and PF: from 2 sentences up to 100 words, with no 4-sentence cap.
+   - The published `proposal.methodology` v2 asks for 300–350 words.
+3. **Rationale:**
+   - Map: `wmkf_recommendationrationale`, 3+ sentences, at most 100 words. Overwritten on each step-3 run; staff edit it later.
+   - PA and PF: "Versioned" refresh.
+4. **Personnel:**
+   - Map: one entry per person, with no length limit.
+   - PA and PF: length scales with team size.
+   - The drafts: about 15–20 words per person, at most 200 words in total.
+5. **Keywords:**
+   - Map: `wmkf-keywords/1` JSON with a primary discipline, a runner-up, 0–3 secondary disciplines, at most 8 objects of study and 0–5 free-text terms; coined terms create table rows; methods go to `wmkf_ai_methodologies`.
+   - PA and PF: field and method keywords from controlled lists only.
+6. **Keyword table size:**
+   - Map: 247 seeded rows.
+   - PA: 259 seeded rows.
+   - Field map: 259 rows, 247 of them active.
+7. **Flags, open questions, staff notes** (workbook columns O–Q):
+   - The map has no counterpart. It has an injection flag with notes, compliance and fit instead.
+   - PF's six named flags with colour codes are not in the map.
+8. **PD scores:**
+   - Map: scores 0–10 per PD only; assignment is step 6.
+   - PA: `pd-assignment.expertise-match` returns an assignment with a confidence.
+9. **Prompt names:** the map uses `intake.*`; PA uses `proposal.*`.
+10. **Output format and destinations:**
+    - Map: specifies both.
+    - PA: called them unresolved.
+11. **Token budgets:**
+    - Admin entries: 8192.
+    - Map: states none.
+12. **Execution path:**
+    - PF: "PA triggers the shared backend Executor", already marked superseded in PF.
+    - PA: agrees with the map.
