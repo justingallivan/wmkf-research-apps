@@ -369,12 +369,17 @@ Dataverse/Graph extraction]** Request `1002788` resolves
 text. Existing stored Field Primers remain cached until an explicit
 regeneration.
 
-**[OWNER DECISION 2026-08-17; PRE-SITE NARRATIVE-ONLY; REVIEWER FINDER CUTOVER
-PLANNED.]** Keep the narrative and bibliography as separate exact AI Materials
-PDFs. Pre-Site, Initial Assessment, and Field Primer use and fingerprint only
-the narrative. The current-cycle Reviewer Finder loader is intentionally
-unchanged; next cycle it will label and fingerprint both files so cited authors
-can inform reviewer discovery. No caller depends on a combined PDF.
+**[OWNER DECISION 2026-08-17; PRE-SITE NARRATIVE-ONLY; REVIEWER FINDER INPUT
+REVISED BY D60 (2026-11-10).]** The governed readers keep the narrative and
+bibliography as separate exact AI Materials PDFs. Pre-Site, Initial Assessment,
+and Field Primer use and fingerprint only the narrative. The earlier plan for
+Reviewer Finder to label and fingerprint both files separately was superseded
+and is not built: Reviewer Finder's loader defaults to a combined
+`AI Materials/Narrative-Bibliography_{Request#}.pdf` when the request has
+exactly one, so cited authors can inform reviewer discovery
+[VERIFIED `lib/services/reviewer-finder/load-proposal-service.js`; `f43f2db77`
+is an ancestor of `origin/main`]. The governed readers do not accept that
+combined file.
 
 The AI drafts Summary, Significance & Impact, Research Plan, and Team
 Expertise from the approved proposal inputs. **Foundation Opportunity is a

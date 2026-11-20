@@ -4,7 +4,7 @@ description: The D26 Proposal tab displays its Phase I bridge plus files from Ph
 type: project
 status: active
 scope: strategy
-last_verified: 2026-11-10
+last_verified: 2026-11-20
 ---
 
 ## Recall Rule
@@ -38,8 +38,9 @@ Phase I export, an archive match, or a best-guess classifier. Missing or
 ambiguous exact input fails before model/result writes. Request `1002788` is
 the live read-only resolver/extraction example; its earlier generated artifact
 still proves mechanics only because that run used an old Phase I document.
-Reviewer Finder is a separate staff discovery surface: its current-cycle
-default prefers the exact outbound reviewer package and falls back only to exactly one active
+Reviewer Finder is a separate staff discovery surface: its default prefers
+the exact `AI Materials/Narrative-Bibliography_{Request#}.pdf` when the request
+has one (D60), else the exact outbound reviewer package, and falls back only to exactly one active
 `Phase I/ProjectDescription.pdf`; neither or ambiguity returns a server-listed
 picker before download/Blob write. The fallback does not alter the governed or
 external-reviewer contracts.
@@ -48,11 +49,16 @@ Power Automate publishes two separate exact files:
 `AI Materials/ProposalNarrative_{Request#}.pdf` and
 `AI Materials/ProposalBibliography_{Request#}.pdf`. Pre-Site, Initial
 Assessment, and Field Primer use and fingerprint only the exact narrative.
-The bibliography remains separate for the next-cycle Reviewer Finder, which
-will label and fingerprint both sources so cited authors can inform discovery.
-Its current-cycle resolver remains unchanged.
+The bibliography stays a separate exact file for the D26 cycle. **Superseded
+intent (the earlier plan to have Reviewer Finder label and fingerprint the two
+files separately was replaced by D60 and is not built):** Reviewer Finder's
+loader instead takes one combined `AI Materials/Narrative-Bibliography_{Request#}.pdf`
+(Connor's flow; the Test Request Factory builds it on J27 test requests) by
+default when the request has exactly one, so cited authors inform discovery;
+with none it behaves as before, and more than one fails 409
+[VERIFIED `lib/services/reviewer-finder/load-proposal-service.js` (`isNarrativeBibliography`, step 3); `f43f2db77` is an ancestor of `origin/main`, i.e. in Production].
 **J27 names established 2026-10-26 (Connor's email; owner decision to change the apps):** J27 flows write `AI Materials/Project-Narrative_{Request#}` and `Bibliography_{Request#}` (plus seven other `{Type}_{Request#}` files); GOApply originals land in `Submission-Documents`. The governed readers and Proposal-tab AI slots accept either the D26 or the J27 name and fail closed when both are present (branch `claude/j27-ai-materials-names`, unreleased at writing; Connor confirmed all are PDFs except the image graphical abstract). Ground truth: `lib/utils/proposal-document-names.js`, `docs/POWER_AUTOMATE_PROPOSAL_FILE_CONTRACT.md`.
-**J27 layout revised 2026-11-10 (owner with Connor; built on the J27 line `claude/j27-cycle-page`, not promoted, so Production still behaves as described above):** the J27 individual files live in `Submission-Documents`, not `AI Materials` (six names confirmed by an owner-run listing of Production test request 1003384; graphical abstract is a `.jpg`); the staff version is `{AKA}_Staff-Version_{Request#}.pdf` at the request root; Reviewer Finder's input will be `AI Materials/Narrative-Bibliography_{Request#}.pdf`, built by Connor's flow; no `Phase II` folder is expected. On that branch the governed narrative and bibliography readers also accept the J27 names in `Submission-Documents` (exactly one copy or fail closed), and the Proposal tab shows the staff version first with the individual files collapsed. Ground truth: alignment log D57 to D61 and `docs/POWER_AUTOMATE_PROPOSAL_FILE_CONTRACT.md` on that branch.
+**J27 layout revised 2026-11-10 (owner with Connor; the readers' `Submission-Documents` acceptance (`ebb38322b`) and Reviewer Finder's Narrative-Bibliography loader (`f43f2db77`) are ancestors of `origin/main`, i.e. in Production [VERIFIED 2026-11-20 via `git merge-base --is-ancestor`]; the Proposal-tab staff-version display was not re-checked):** the J27 individual files live in `Submission-Documents`, not `AI Materials` (six names confirmed by an owner-run listing of Production test request 1003384; graphical abstract is a `.jpg`); the staff version is `{AKA}_Staff-Version_{Request#}.pdf` at the request root; Reviewer Finder's input is `AI Materials/Narrative-Bibliography_{Request#}.pdf` when present, built by Connor's flow; no `Phase II` folder is expected. The governed narrative and bibliography readers also accept the J27 names in `Submission-Documents` (exactly one copy or fail closed), and the Proposal tab shows the staff version first with the individual files collapsed. Ground truth: alignment log D57 to D61 and `docs/POWER_AUTOMATE_PROPOSAL_FILE_CONTRACT.md`.
 **Owner 2026-09-09 (register J27-082):** D26 pre-site drafts are being generated for every advancing request by an owner-run script that depends on this exact path; in J27 the source file name and location *may* change, so the J27 planning must settle the source contract before designing the next-cycle auto-generation trigger (which will not be a script).
 
 **Filename-match is FRAGILE.** Historical (S265, now superseded for the two AI Materials inputs by the 2026-10-26 J27 names above): do not assert it "will break in J27" without evidence. (Corrected S265, Justin: the earlier "J27 will use new naming conventions / a different collection mechanism, so filename-match WILL break" claim was **unsubstantiated** — Connor pushed back on dropping filename-reconciliation on that premise. There is **no evidence** J27 changes naming; filename-match only breaks **if the names actually change**, which isn't established.) The durable case for moving OFF filename-match is **fragility + Dataverse legibility**, not a J27-will-break prediction: it depends on PDs naming files consistently/correctly. The earlier S258 claim that there was **no structured place** for app-readable generated writeups is historical and superseded: `wmkf_requestdocument` now provides a typed, durable document registry and documents are linked directly rather than filename-joined. That registry solves document identity and registration, but does not establish that future J27 writeup producers, capture triggers, or input contracts are built. Keep the D26 name→label map in one small per-cycle config; never hard-code D26 names as permanent (consistent with [[project-grant-phasing-evolution]]).

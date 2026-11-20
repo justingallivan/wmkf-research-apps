@@ -57,10 +57,13 @@ akoya_request/                                                ← existing libra
   reviewer-visible merely because it exists, and the bibliography is not a
   Pre-Site Visit input.
 
-Do not merge the narrative and bibliography into a third canonical PDF.
 Pre-Site, Initial Assessment, and Field Primer load and fingerprint the exact
-narrative only. The planned Reviewer Finder cutover will load, label, and
-fingerprint the two files independently.
+narrative only. The earlier plan for Reviewer Finder to load, label, and
+fingerprint the two files independently was superseded by alignment-log D60 and
+is not built: Reviewer Finder's loader defaults to a combined
+`AI Materials/Narrative-Bibliography_{Request#}.pdf` when the request has
+exactly one [VERIFIED `lib/services/reviewer-finder/load-proposal-service.js`;
+`f43f2db77` is an ancestor of `origin/main`].
 
 Anything else in the request folder — including other files placed in
 `Reviewer Materials/`, admin paperwork, staff briefs, and raw application

@@ -188,14 +188,20 @@ Primer preserves its existing stored-envelope behavior, so this source change
 applies to new generations and explicit regenerations rather than silently
 invalidating an existing primer.
 
-**[OWNER DECISION 2026-08-17; PRE-SITE NARRATIVE-ONLY; REVIEWER FINDER CUTOVER
-PLANNED; J27 NAMES ADDED 2026-10-26 ABOVE.]** Power Automate keeps two exact files:
+**[OWNER DECISION 2026-08-17; PRE-SITE NARRATIVE-ONLY; REVIEWER FINDER INPUT
+REVISED BY D60 (2026-11-10); J27 NAMES ADDED 2026-10-26 ABOVE.]** Power Automate
+keeps two exact files for the D26 cycle:
 `AI Materials/ProposalNarrative_{Request#}.pdf` and
-`AI Materials/ProposalBibliography_{Request#}.pdf`. Do not combine them into a
-third canonical PDF. Pre-Site, Initial Assessment, and Field Primer supply and
-fingerprint only the narrative. The current-cycle Reviewer Finder resolver is
-unchanged; next cycle it will separately label and fingerprint both files so
-cited authors can provide reviewer-discovery leads.
+`AI Materials/ProposalBibliography_{Request#}.pdf`. Pre-Site, Initial
+Assessment, and Field Primer supply and fingerprint only the narrative. The
+earlier plan to have Reviewer Finder separately label and fingerprint both
+files was superseded and is not built: per D60, Reviewer Finder's loader
+defaults to one combined `AI Materials/Narrative-Bibliography_{Request#}.pdf`
+(Connor's flow) when the request has exactly one, so cited authors can provide
+reviewer-discovery leads; otherwise it behaves as before
+[VERIFIED `lib/services/reviewer-finder/load-proposal-service.js`; `f43f2db77`
+is an ancestor of `origin/main`]. The two-file rule above still governs the
+governed readers.
 
 **Historical proof for the superseded automated-input contract:** [VERIFIED
 2026-07-30 via live read-only Graph/Dataverse probe] Request
