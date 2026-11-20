@@ -1,4 +1,7 @@
 /**
+ * Standalone interface retired 2026-11-19; prompts preserved for future reuse.
+ * Original interface/route implementations are under _archived/pages/.
+ *
  * Dynamics-backed prompt rows for the Multi-Perspective Evaluator (convergence plan Stage 5).
  *
  * Source of truth for the six `multi-perspective.*` wmkf_ai_prompt rows AND the

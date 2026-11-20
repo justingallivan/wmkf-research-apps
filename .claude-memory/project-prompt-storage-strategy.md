@@ -26,7 +26,7 @@ Do not:
 
 Ground truth: `docs/EXECUTOR_CONTRACT.md`, `docs/PROMPT_STORAGE_DESIGN.md`,
 `docs/WORKFLOW_CHAINING_DESIGN.md`, `lib/services/execute-prompt.js`, and the
-Phase I summarize-v2 route/service. The prompt schema was probed live
+preserved Phase I summarize-v2 service and archived route implementation. The standalone route is an authenticated HTTP 410 stub in the 2026-11-19 retirement source; this does not remove the Executor or stored prompt rows. The prompt schema was probed live
 2026-04-24; the most recent retained row-count snapshot is 2026-07-12.
 
 ## Current boundary
@@ -70,7 +70,7 @@ Session 109 (2026-04-24) reconciled six design docs + Wave 1 reality + Connor's 
 
 **Phase 0 — SHIPPED (historical, kept for context):**
 - Connor added `wmkf_ai_systemprompt` Memo + Lookup `wmkf_ai_prompt` on `wmkf_ai_run` (verified live).
-- `phase-i.summary` prompt row authored; `lib/services/execute-prompt.js` is the canonical Executor implementation; `pages/api/phase-i-dynamics/summarize-v2.js` imports it.
+- `phase-i.summary` prompt row authored; `lib/services/execute-prompt.js` is the canonical Executor implementation; the historical `pages/api/phase-i-dynamics/summarize-v2.js` implementation imported it (now archived).
 - `wmkf_ai_runs` had 353 rows on 2026-07-27. The 303
   PowerAutomate-labeled historical rows had no current-prompt lookup and ended
   on 2026-05-06; Vercel-labeled runs continued through 2026-07-26. The

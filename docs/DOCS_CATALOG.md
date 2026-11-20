@@ -280,7 +280,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [PROMPT_LEGACY_AUDIT.md](PROMPT_LEGACY_AUDIT.md) | audit | draft |  | Per-prompt eval of the wmkf_ai_prompt corpus: which asks are now Dataverse-authoritative (redundant/crash-risk) and which prompts have promise-gaps. | 2026-07-07 |
+| [PROMPT_LEGACY_AUDIT.md](PROMPT_LEGACY_AUDIT.md) | audit | historical |  | Historical July 2026 prompt audit; November 2026 app retirement preserves prompts and implementations without reviving the earlier re-scope recommendations. | 2026-07-07 |
 
 ## repo-hygiene
 

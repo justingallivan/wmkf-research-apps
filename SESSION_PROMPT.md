@@ -1,144 +1,72 @@
-# Session 686 Prompt: Proposal lists live; prove a PDF and two-level sections on a real test request
+# Session 688 Prompt: App-suite retirement; shared capabilities preserved
 
-## Session 685 Summary — 2026-11-19 (Claude, concurrent with Codex roster work)
+## Session 687 Summary — 2026-11-19 (Codex app-suite stream)
 
-Claude worked in worktree `/Users/gallivan/Code/WMKF_Apps-claude-2026-11-19`
-while Codex worked the roster stream in the main checkout. Codex's roster
-results are recorded under Parked item 4 and the workstream table below.
+[VERIFIED via GitHub CI, Vercel deployment, signed-in Chrome and bounded release probes;
+2026-11-19 Pacific / 2026-11-20 UTC]
 
 ### What Was Completed
 
-1. **E2E (Playwright) green on `main` again.** Red since `1037d2dbd` (2026-11-16):
-   the Overview tab's request-text card fetches `/api/workbench/request-narratives`,
-   which two strict fixtures refused. Both now stub it. Full suite 77/77 locally;
-   CI E2E and Tests green on `97399470c`.
-2. **Share Proposals link live.** Tools menu entry to `/proposal-lists` for
-   Workbench (`reviewers`) grant holders, mirroring the API guard; nav unit test
-   updated with a negative case. PR #648, merge `97399470c`, Vercel Production
-   deploy succeeded.
-3. **Owner decisions recorded** in `docs/plans/J27_PROPOSAL_LIST_EMAILS_PLAN_2026-11-18.md`:
-   roster chair marker dropped; list-type picker not remembered (page always opens
-   on Submitted proposals).
-4. **Parked Executor branch explained and inventoried.** Owner parked it
-   2026-11-16; it stacks a week of backend work (111 commits). Nothing on it is
-   wanted in Production; Production Admin already edits the `wmkf_ai_prompt` rows.
-   `docs/plans/PARKED_EXECUTOR_BRANCH_INVENTORY_2026-11-19.md` (new);
-   `docs/plans/PREFLIGHT_PROMPTS_HANDOFF_2026-11-10.md` copied to `main` with a
-   superseded-sections banner.
-5. **Worktree and branch cleanup (owner-approved).** Removed 24 merged/clean
-   worktrees and their local branches; deleted the 10 local
-   `codex/executor-*` / `codex/staff-draft-*` branches after `git cherry` showed
-   zero commits missing from `origin/codex/executive-summary-generation-2026-11-16`;
-   pruned stale records. Codex's read-only review of its three dirty worktrees
-   (`codex/leadership-dashboard-testing`, `codex/board-archive-rehearsal`,
-   `codex/j27-factory-scenarios`) recommends keeping all three.
-6. **Beth Pruitt Admin access confirmed** via the owner-run access census:
-   superuser, active, linked systemuser, 8 app grants including `reviewers` and
-   `proposal-ranking`.
-7. **PR #630 closed unmerged;** its Session 661 reminder-history milestone was
-   carried into `DEVELOPMENT_LOG.md`.
+1. **Ten standalone interfaces retired.** Retirement notices replace the pages;
+   thirteen old API routes retain their method/access gates and return HTTP 410
+   after authorization. PR #651, merge `ce4bc2618`.
+2. **Capabilities and data preserved.** Original pages/routes/tests are archived;
+   prompt modules, stored prompt versions, services, helpers and historical data
+   remain. Grant Reporting assessment/editing logic is reusable; its old Word
+   export is historical reference, not a future requirement.
+3. **Surviving consumers protected.** Expense Reporter remains active; Workbench
+   classification and scholarly-discovery dependencies remain. This change did
+   not modify Expertise Finder runtime; that separate retirement is already
+   recorded in the roster stream.
+4. **Release evidence.** Final CI passed 1,567 suites / 28,277 tests (27 suites / 335 tests skipped); PostgreSQL integration passed 15 suites / 189 tests; all checks green. Production deployment
+   `dpl_2KcHR8Gd5vEUE9hxFBmd92mtNDBx` at `ce4bc2618`: READY, aliased to `applications.wmkeck.org`.
+   Signed-in Chrome verified Home (eight active apps), all ten notices, Expense Reporter upload controls, and loaded Workbench D26 request data. No receipt upload or model call ran; authenticated API 410 behavior is automated-test-proved only.
+
+Anonymous GET and POST requests to all thirteen retired APIs each returned 307
+sign-in redirects from the proxy; these are not live handler 401/405/410 results.
+The deployment-specific ten-minute error-log query returned zero error entries,
+which is a bounded observation, not proof of every consumer path. Last known-good
+rollback deployment: `442f9018f` / `dpl_8eJC42giXbHvEbhJsLPGVMUckepj`.
+PR #651 merged at 2026-11-20 03:24:12 UTC (November 19 Pacific).
 
 ### Commits
 
-- `38aa02a8e`, `ceb8cd1da`, `3e0dd6269`, `78d5b138a`, `37f9bdfd8` (PR #648, merge
-  `97399470c`); `76c0492fc` and this stop commit on `claude/session-685-stop`.
+- `1bcbab278` — app-suite retirement with preserved capability code and data.
+- `274bfb72f` — preserve prompt-retirement protection and regression coverage.
+- `ce4bc2618` — PR #651 merge.
 
-
-## Session 684 Summary — 2026-11-18/19 (Claude)
-
-### What Was Completed
-
-1. **Proposal list pages shipped to Production.** Each Program Chair or Board
-   member gets a personal no-login link to a page listing every submitted proposal
-   in the cycle (title, institution, PI), grouped under collapsed section headings,
-   each title opening the staff-version PDF. Staff create, highlight, and switch off
-   lists at `/proposal-lists`. Owner applied migrations 101 and 102 to the Production
-   database and set `PROPOSAL_LIST_SCHEMA_READY=on` in Production.
-2. **Sections come from the intake keyword.** Connor confirmed the Keywords table
-   columns; owner accepted request 1003526 as the guide. The section is the
-   discipline branch (for example Life Sciences) and the subsection is the discipline
-   group (for example Molecular and Cellular Biology) of the keyword in the request's
-   `wmkf_programareaserved` lookup. Requests without a discipline keyword fall under
-   "Unassigned", sorted last.
-3. **First Production run, driven in the owner's Chrome on a J27 test list**
-   (one proposal, test request 1003518). Verified: staff page loads; list creation
-   (including the keyword read); recipient page loads without cookies; a highlight
-   moves the proposal to the top; switch-off disables the link immediately. Three
-   defects found and fixed in the same session: raw JSON shown when a staff version
-   is missing (now a readable "Proposal not available" page), an empty "All other
-   proposals" heading, and a missing staff page title. The test list is switched off;
-   J27 has no lists.
-4. **Recipients confirmed by the owner.** Program Chairs are Edward M. Stolper and
-   James S. Economou; Andrea M. Ghez and Kelsey C. Martin are Board members. All four
-   are selectable on the staff page, so the planned roster "chair marker" is not
-   needed to send.
-5. **Historical roster location at stop.** The roster was then the Postgres table
-   `expertise_roster`, visible on the Roster tab of `/expertise-finder`. At that stop it had not
-   moved to Dataverse. November 19 execution has since completed the production Dataverse migration
-   and Admin editor cutover (see below).
-
-### Commits (all on `main`)
-
-- `ec077d3fa`: merge slice 1 (pages, migration 101, flag off).
-- `d05e73fb5`, `8adaef02e`, `c6f3e4caa`, `dceef11e4`: keyword probes and keyword
-  sections (migration 102).
-- `213559d95`, `cbee390fa`: first-run fixes.
-- `91dd0ebaa`, `50b17ec7d`, `83f6545f9`: plan and Atlas updates.
-
-### Verification
-
-- 72 scoped gates and self-tests passed before each merge; unit suites for the
-  snapshot, store, link, page, route and view passed.
-- Vercel deployments for each push succeeded. E2E was red from 2026-11-16; fixed in
-  Session 685 (PR #648).
+Exact prior Session 686 summary, roster receipts, and concurrent-stream boundaries
+remain retrievable with `git show 442f9018f:SESSION_PROMPT.md` (retrievability verified at close).
+Older handoffs remain at the Git references preserved below. These are history,
+not fresh permissions or executable cleanup lists.
 
 ## Next Items
 
-### Expertise Finder retirement complete
+### Verified Open — External Follow-up
 
-Owner subsequently authorized standalone retirement and confirmed matching history
-need not be retained. PR #650 merged (`6ae809f98`) and production verification passed.
-All six former APIs return 404. Deleted 344 history rows and one synthetic feedback
-entry; all seven original feedback entries remain.
-See `docs/plans/EXPERTISE_FINDER_RETIREMENT_2026-11-19.md` for release/cleanup status.
-Admin roster and shared consumers remain; Connor backend automation is separate.
+1. **Connor checks his actual production flow connection.** The table and Reader
+   role exist; his broader pre-existing permissions were preserved. Do not describe
+   effective permissions as read-only or remove unrelated roles.
+   Evidence: `docs/plans/EXPERTISE_ROSTER_CONNOR_HANDOFF_2026-11-19.md` and production
+   execution report. No further migration/editor/retirement work remains.
 
-### Verified Open
+### Owner Decision Needed / Blocked
 
-1. **Prove a staff-version PDF opens and the two-level sections render, live.**
-   Evidence: `docs/plans/J27_PROPOSAL_LIST_EMAILS_PLAN_2026-11-18.md` (first
-   Production run). Request 1003518 has no staff version and no J27 test request has
-   a keyword, so only "Unassigned" has been seen in Production. Needs a J27 test
-   request carrying both; **blocked on Connor**, the only one who can supply it
-   (owner, 2026-11-19). Do not create a list for a real Board member to test this.
-
-### Owner Decision Needed
-
-1. **Deferred by owner (2026-11-19):** whether the app should send the email, and
-   from whom. Owner first wants to settle whether every PD sends lists or only the
-   CSO (suspects only the CSO). If CSO-only, narrow the page guard and the Share
-   Proposals link together. Pasting the link into the owner's own email works today.
-2. Confirm the staff-version contents on a real J27 proposal after December 7.
-3. Optional: whether any tests/tools on Codex's three kept dirty worktrees are worth
-   recovering (Codex recommendation: keep all three for selective recovery).
+1. **Proposal-list live PDF and two-level sections:** latest owning-plan/handoff
+   boundary is blocked on Connor supplying a suitable J27 test request. Recheck
+   that boundary before acting; do not test with a real Board recipient.
+2. **Proposal-list email sending and sender scope:** owner deferred deciding all
+   PDs versus CSO-only. If CSO-only is chosen, page and navigation guards must agree.
+3. Confirm staff-version contents on a real J27 proposal after December 7.
 
 ### Parked
 
-1. **Pre-filling Board-expert highlights from expertise matching.** Depends on the
-   parked expertise integration; ticking highlights by hand works today.
-2. **Staff view of which proposals lack a staff version.** Not built; no owner ask yet.
-3. **Staff note on a list.** Tabled by the owner 2026-11-18.
-4. **Expertise backend automation.** Separate later step after the production-only
-   roster migration and Admin editor. Owner requested the revised migration plan and
-   Claude Opus 5.5 OAuth adversarial review on November 19; see
-   `docs/plans/EXPERTISE_ROSTER_PRODUCTION_MIGRATION_PLAN_2026-11-19.md`.
-   Opus 5.5 OAuth review returned READY WITH CHANGES; required corrections are
-   incorporated, with verbatim review/disposition saved beside the plan. Build is committed on `codex/expertise-roster-admin-2026-11-19` (`40588fca3`);
-   Opus implementation review and correction verification completed. Production import, migrations 103/104 and the Dataverse-backed Admin editor are complete. Amy ID 40 remains active and lead-PD eligible with her existing profile and future email preserved; no app access was granted and nothing was sent. See `docs/plans/EXPERTISE_ROSTER_PRODUCTION_EXECUTION_2026-11-19.md`.
-   See `docs/plans/EXPERTISE_ROSTER_BUILD_2026-11-19.md`.
-5. **Earlier roster implementation reference.** Preserve
-   `origin/codex/expertise-roster-import-2026-11-10` (tip `754acf09a`). Current owner authorized the revised build and production migration/deployment. The older branch remains a reference; use the completed November 19 execution report, not that branch.
-6. **Backend prompt adoption/scheduling** (`codex/executive-summary-generation-2026-11-16`).
+- **Backend expertise matching:** separate implementation in Connor's existing flow;
+  no replacement flow or second matching call authorized by this closeout.
+- Board-expert highlight prefill, staff missing-PDF overview, and staff notes on
+  proposal lists remain parked per the prior handoff; recheck owner priority first.
+- Earlier roster branches are reference material, not a pending migration.
+- Backend prompt adoption/scheduling on the parked Executor lineage remains parked.
 
 ### Owner Decisions Preserved — Not Resolved This Session
 
@@ -183,45 +111,46 @@ Admin roster and shared consumers remain; Connor backend automation is separate.
 
 ## Concurrent Workstreams and Preservation
 
-The Session 683 (Codex) handoff is retrievable with
-`git show 108cba441:SESSION_PROMPT.md`. Historical paths and observations are not
-current permission or live-state evidence.
-
-| Stream | Owning reference | Latest recorded boundary |
+| Stream | Owning reference | Latest recorded resume boundary |
 |---|---|---|
-| Proposal lists | `docs/plans/J27_PROPOSAL_LIST_EMAILS_PLAN_2026-11-18.md`; `docs/atlas/postgres-proposal-list-links.md` | Production-live; Share Proposals menu link live; PDF open and two-level sections unproven live (needs Connor's J27 test request); email send deferred |
-| Initial Assessment | PRs #644–#646; `assessment-service.js`, `AssessmentForm.js` | Production-live; authenticated save acceptance unverified |
-| Roster migration and Admin editor | `docs/plans/EXPERTISE_ROSTER_PRODUCTION_MIGRATION_PLAN_2026-11-19.md` | Production-only plan saved; Opus 5.5 reviewed, corrections incorporated; Admin editor and migration implemented/tested on the new November 19 branch; Opus correction verification returned code ready; backend automation separate; standalone retirement complete in PR #650; production cutover complete: migrations 103/104, backend dataverse, 39 imported profiles and 10 exact Contact links; Amy active/lead eligible, no app access or sends; test profile retained inactive; Connor connection/effective-rights follow-up separate |
-| Older roster cutover | `origin/codex/expertise-roster-import-2026-11-10:SESSION_PROMPT.md` | Preserve branch/private inputs; reconcile direction before resuming |
-| Chairs Production stages | `docs/plans/J27_CHAIRS_RECOMMENDATION_PRODUCTION_PLAN_2026-11-18.md` | Not changed here; owner approval per stage |
-| Intake prompt delivery | `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md` | Owner-run flow/prompt work; backend adoption parked; branch inventory in `docs/plans/PARKED_EXECUTOR_BRANCH_INVENTORY_2026-11-19.md` |
+| Roster/Admin/retirement | `docs/plans/EXPERTISE_FINDER_RETIREMENT_2026-11-19.md` | DONE in production; only Connor connection check and backend work remain separate |
+| Proposal lists | `docs/plans/J27_PROPOSAL_LIST_EMAILS_PLAN_2026-11-18.md` | Live with Share Proposals navigation; PDF/sections acceptance blocked on Connor; email deferred |
+| Initial Assessment | PRs #644–#646 | Last handoff: production-live, authenticated save rehearsal owner-deferred; verify before resuming |
+| Chairs production stages | `docs/plans/J27_CHAIRS_RECOMMENDATION_PRODUCTION_PLAN_2026-11-18.md` | Unchanged; separate owner approval per stage |
+| Intake/Executor | `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md`; `docs/plans/PARKED_EXECUTOR_BRANCH_INVENTORY_2026-11-19.md` | Backend adoption parked; do not merge parked lineage |
+| App-suite cleanup | `docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md`; PR #651 | DONE in Production; signed-in page/read checks passed; prompts/services/data preserved; future adaptation separate |
 
-Production access requires explicit owner authorization. The November 19 roster go-ahead authorizes scoped production reads/writes with the interlock and dated ACK; it does not authorize unrelated work. Never read main `.env.local`.
-Prior private roster inputs remain in owner-managed storage; do not commit them.
-Local containers use Colima, not Docker Desktop. Migration numbers 097 and 100 are
-claimed off `main`.
+App-suite feature branch: `codex/app-suite-cleanup-2026-11-19`.
+Receipt branch: `codex/app-suite-retirement-receipt-2026-11-19`; documentation
+destination: `main` after the documentation checks.
+Other worktrees are not authorized for disposal by this closeout. Earlier cleanup
+recommendations require a fresh preservation preflight.
+
+Production authorization for this app-suite change covers the approved source
+release and verification, not prompt/data deletion or backend automation. Roster
+permissions remain scoped to that separate authorized workstream. Never read root
+`.env.local`; private roster sources/mappings/receipts remain in owner-managed
+storage. Local containers use Colima. Recheck migration-number ownership before
+new schema work.
 
 ## Key Files Reference
 
 | File | Purpose |
 |---|---|
-| `lib/services/proposal-lists/list-snapshot-service.js` | Cycle snapshot; section and subsection from the keyword |
-| `lib/services/proposal-lists/list-link-service.js` | Create, highlight, switch off; who may receive a list |
-| `lib/services/proposal-lists/list-page-service.js` | Recipient page model (sections, groups, highlights) |
-| `pages/external/proposal-list/[token].js` | Recipient page |
-| `pages/api/external/proposal-list/[token]/document.js` | Staff-version PDF; readable refusal page |
-| `shared/components/proposal-lists/ProposalLists.js` | Staff page at `/proposal-lists` |
-| `scripts/probe-proposal-list-schema.mjs` | Read-only check that migrations 101/102 are in place |
-| `scripts/probe-keyword-taxonomy.cjs`, `scripts/probe-request-keywords.cjs` | Owner-run Production keyword probes |
+| `docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md` | Ten-app/thirteen-route manifest, preservation, tests and release evidence |
+| `docs/plans/EXPERTISE_ROSTER_PRODUCTION_EXECUTION_2026-11-19.md` | Separate roster migration acceptance and permission limits |
+| `docs/plans/EXPERTISE_FINDER_RETIREMENT_2026-11-19.md` | Separate Expertise Finder retirement and cleanup |
+| `docs/plans/EXPERTISE_ROSTER_CONNOR_HANDOFF_2026-11-19.md` | Backend roster table/field contract |
+| `docs/plans/EXPERTISE_ROSTER_CUTOVER_RUNBOOK_2026-11-19.md` | Roster recovery and identity/FK reconciliation |
+| `docs/atlas/dataverse-wmkf-expertiseprofile.md` | Roster source of truth and preserved consumers |
 
 ## Testing and Session Close
 
-```bash
-npx jest --runInBand --silent --testPathPatterns='tests/unit/proposal-list'
-node scripts/probe-proposal-list-schema.mjs
-```
+Release checks and limitations belong in the retirement manifest; avoid running
+archived interface tests as if they still described active behavior. Future
+capability adaptation requires fresh caller, authorization and persistence review.
 
-Milestone determination: **entry required and added** to DEVELOPMENT_LOG.md,
-"Proposal list pages for Chairs and Board members" (Session 684).
-CLAUDE.md needs no change. Claim-evidence pilot report ran with `--current`: no
-eligible edit recorded, so no observation row was added. No memory router edits.
+Milestone determination: **required and recorded**;
+added “Ten standalone apps retired; shared capabilities preserved” to DEVELOPMENT_LOG.md. No duplicate roster milestone is needed. CLAUDE.md's
+canonical pointers remain applicable. No memory-router edits or new debt in this
+app-suite closeout.

@@ -1,55 +1,38 @@
 ---
-name: Phase I summary app winddown
-description: Historical Phase I summary investment decision; retained app remains available as reference, while future Grant Reporting direction is undecided
+name: Phase I summary app retirement
+description: Phase I Dynamics and the four legacy upload apps are retired at their entry points; prompts, services, and stored outputs remain preserved.
 type: project
 originSessionId: e2e4c03f-8046-4d90-a1fd-93c1bb8256d1
 status: active
 scope: strategy
-last_verified: 2026-10-22
+last_verified: 2026-11-19 via owner retirement decision and source inventory
 ---
 
-**Verification scope:** the 2026-10-21 Grant Reporting owner direction and current app registry/extract route were checked on 2026-10-22. This does not establish current usage or authorize retirement.
+# Phase I summary app — retirement boundary
+
+[VERIFIED — owner direction, 2026-11-19] Retire `/phase-i-dynamics` alongside the
+four former sunset-candidate PDF-upload apps. Source implementation and validation
+are tracked in `docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md`; this memory is not a
+production deployment receipt.
+
+The pages become retirement notices and the old processing APIs return
+authenticated HTTP 410 responses. Original page/API implementations are retained
+under `_archived/`. Preserve `phase-i.summary`, Phase I prompt modules, the
+`lib/services/phase-i-dynamics/` services, Executor behavior, model configuration,
+existing grants, and prior `wmkf_ai_summary`/AI-run records. A future backend
+caller is a separately designed integration, not an existing replacement proved
+by this retirement.
 
 ## Recall Rule
 
-Read this when: deciding where to invest on `/phase-i-dynamics`, or weighing user-app polish vs backend automation for the Phase I summary workflow.
+Read before working on Phase I summary UI, removing its prompts/services, or
+planning backend adoption. Do not revive the retired pages for prompt development
+without a new decision. Keep the `batch-phase-i-summaries` identity in historical
+records; app retirement does not authorize purging access or usage history.
 
-Do:
-- Treat the winddown as strategic priority/UI-investment, not proof that the
-  retained `/phase-i-dynamics` source is deleted.
-- Prefer investment in Workbench and Expertise Finder where their current value supports it. For Grant Reporting, revisit product direction before proposing investment in the standalone workflow: the destination, scope, and timing are undecided. Verify `appRegistry` before naming an app current.
-- Author future intake prompts (compliance, fit-assessment, keywords) backend-first as PA-triggered Executor calls.
-
-Do not:
-- Over-invest in `/phase-i-dynamics` UI features (forms, polish, dashboards) — it's a direct-URL prompt-dev surface, hidden from nav by design.
-- Read "winddown" as a general retreat from user-facing apps — it's specific to Phase-I-summary-as-a-user-task.
-
-Ground truth: `/phase-i-dynamics` page + `/api/phase-i-dynamics/summarize{,-v2}`, `scripts/compare-phase-i-v1-v2.js`, `scripts/ab-phase-i-prompts.js`, `scripts/audit-system-prompt-sizes.js`; current Grant Reporting owner direction in `.claude-memory/project-grant-reporting-rework.md`; app registry `shared/config/appRegistry.js:131-139` and extraction route `pages/api/grant-reporting/extract.js:43-45`.
-
-The user-facing `/phase-i-dynamics` summary app was originally a quick way to produce template-conforming summaries when the workflow was human-driven. Post-May-2026 cycle:
-
-- **Cycle structure changes:** Phase I and Phase II merge into a streamlined single-phase process starting with J27 (June 2027 cycle; D26 is the last dual-phase cycle — corrected 2026-09-06, the original note said "the cycle after May 2026")
-- **Templates change:** the Phase I summary template will change (length, format) and most applications will use AI-generated summaries instead of human writeups
-- **Demand shifts:** user-facing summary apps see steeply reduced usage; backend automation owns the volume
-- **High-touch user apps stay valuable:** review finder + Phase II apps (low-volume, late-cycle, expert-driven). These get robust ongoing investment.
-
-**Why:** Justin's framing 2026-04-25 — backend-driven prompt automation will produce most summaries; UI app demand collapses for high-volume early-cycle work. Reviewer finder + Phase II tools remain because they're expert-driven late-cycle work.
-
-**Source boundary checked 2026-07-27:** `/phase-i-dynamics`,
-`summarize{,-v2}`, Executor wiring, and A/B scripts remain in the repository,
-while `appRegistry` does not present the page as an active app. That proves a
-retained prompt-development/reference surface, not current usage or active
-iteration.
-
-The Grant Reporting app remains registered in `shared/config/appRegistry.js` and its extract route remains present. The later 2026-10-21 owner decision concerns the future home of its capabilities; it does not retire the app, disable its route, or decide where backend automation will run.
-
-**How to apply:**
-- Don't over-invest in `/phase-i-dynamics` UI features (forms, polish, dashboards). It works for May 2026; details of its prompt may change but driven by backend needs not user request.
-- Backend automation owns Phase I volume; `/phase-i-dynamics` is the human-in-the-loop prompt-tuning surface.
-- Future intake prompts (compliance, fit-assessment, keywords) are **backend-first** — author them as PA-triggered Executor calls, not as new user-facing routes.
-- When weighing where to spend effort, prefer reviewer finder + Phase II apps + Executor/prompt-row infrastructure over new Phase I user routes.
-- "Production ready by next cycle" includes the backend automation, not user-app polish.
-- **User-driven Dynamics apps remain strategically valuable** (Justin,
-  2026-04-25), but the current names/statuses come from
-  `shared/config/appRegistry.js` and its lifecycle registry. Do not resurrect
-  retired standalone reviewer or Phase-II pages from this historical list.
+Historical rationale: on April 25 the owner prioritized backend-driven summaries
+over investment in the human-driven Phase I summary UI. The streamlined single-phase
+J27 process starts with the June 2027 cycle; D26 remains the last dual-phase cycle.
+That strategy was not itself proof of deletion. The November 19 retirement is the
+explicit later decision. Grant Reporting's future destination remains undecided;
+see `project-grant-reporting-rework.md`.

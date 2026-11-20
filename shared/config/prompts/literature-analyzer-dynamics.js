@@ -1,4 +1,7 @@
 /**
+ * Standalone interface retired 2026-11-19; prompts preserved for future reuse.
+ * Original interface/route implementations are under _archived/pages/.
+ *
  * Dynamics-backed prompt rows for the Literature Analyzer (convergence plan Stage 4).
  *
  * Source of truth for the `literature-analyzer.extract-paper`, `.synthesize` and

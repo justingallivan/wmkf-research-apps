@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## November 2026 — Ten standalone apps retired; shared capabilities preserved (Session 687)
+
+**Milestone:** Retired ten obsolete standalone interfaces while preserving their reusable prompts, services and historical data.
+**Sessions:** Codex app-suite stream, 2026-11-19; owner authorized merge/deploy after final CI.
+**Ship state:**
+- PR #651 / `ce4bc2618`, Production `dpl_2KcHR8Gd5vEUE9hxFBmd92mtNDBx` at `ce4bc2618`: READY on 2026-11-19 Pacific (2026-11-20 UTC), aliased to `applications.wmkeck.org`.
+- Ten notice pages and thirteen access-controlled HTTP 410 endpoints; Signed-in Chrome verified Home (eight active apps), all ten notices, Expense Reporter upload controls, and loaded Workbench D26 request data. No receipt upload or model call ran; authenticated API 410 behavior is automated-test-proved only.
+- Expense Reporter and shared Workbench/discovery dependencies remain; Expertise Finder runtime unchanged by this release. No prompt retirement, grant purge, schema change or data deletion.
+**Why it matters:** Unneeded entry points stop accepting work without discarding useful assessment/editing logic or weakening shared services.
+**Pointers:** `docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md`; source `1bcbab278`, prompt-retirement guard fix `274bfb72f`.
+
 ## November 2026 — Standalone Expertise Finder retired
 
 **Milestone:** Removed standalone matching while retaining the Dataverse roster and Admin editor.

@@ -54,8 +54,8 @@ invocations. Request linkage is present only when the Executor caller supplies
   every prompt run with `wmkf_ai_Prompt@odata.bind` and, when the caller passes
   `requestId`, `wmkf_ai_Request@odata.bind` (both capital — see nav-prop case
   warning above)
-- `pages/api/phase-i-dynamics/summarize.js` — Phase I summarization
-- `pages/api/grant-reporting/extract.js` — Grant Reporting extraction and goals assessment; writes a best-effort `wmkf_ai_run` audit row, not extracted values to `akoya_request` (`lib/services/grant-reporting/extract-service.js`)
+- Preserved `lib/services/phase-i-dynamics/summarize-service.js` — former standalone Phase I summarization writer; its API routes now return authenticated HTTP 410 in source. Existing run rows and prompts remain unchanged.
+- Preserved `lib/services/grant-reporting/extract-service.js` — Grant Reporting extraction and goals assessment; its API route now returns authenticated HTTP 410 in source. The retained service writes a best-effort `wmkf_ai_run` audit row, not extracted values to `akoya_request` (`lib/services/grant-reporting/extract-service.js`)
 - `scripts/probe-impersonation-resmoke.js`, `scripts/probe-impersonation-as-user.js` — write sentinel rows during impersonation testing (S135). Filter `wmkf_ai_model='impersonation-resmoke'` to find them.
 - `scripts/seed-phase-i-prompt.js` — `DynamicsService.updateRecord('wmkf_ai_runs', SCRATCH_GUID, ...)` to seed the v2 prompt scratch row (the one `prompt-resolver.js` reads)
 
@@ -394,7 +394,7 @@ reads return 400. See
 **The two prompt paths (important):**
 
 1. **v2 path (`prompt-resolver.js`)** — reads from a single scratch row on `wmkf_ai_runs`. **Used only by scripts** (no live API route uses it). Bundled-`.js` fallback when Dynamics is unreachable. Holdover from S103.
-2. **v3 path (`execute-prompt.js`)** — reads from `wmkf_ai_prompts` directly. The Executor contract destination. The `phase-i-dynamics-v2` route (`pages/api/phase-i-dynamics/summarize-v2.js`) calls `executePrompt`, NOT `prompt-resolver.js`.
+2. **v3 path (`execute-prompt.js`)** — reads from `wmkf_ai_prompts` directly. The Executor contract destination. The archived `phase-i-dynamics-v2` implementation (`_archived/pages/api/phase-i-dynamics/summarize-v2.js`) called `executePrompt`, NOT `prompt-resolver.js`; the current route is an authenticated HTTP 410 stub. This retirement does not remove the shared Executor or stored prompt rows (see [retirement manifest](../plans/APP_SUITE_RETIREMENT_2026-11-19.md)).
 
 These are independent. Don't conflate them.
 

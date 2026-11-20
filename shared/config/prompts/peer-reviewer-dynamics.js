@@ -2,7 +2,7 @@
  * Peer Review Summarizer — Phase 0 prompt templates for Executor / Dynamics
  * storage. Mirrors `phase-i-dynamics.js` and `reviewer-finder-dynamics.js`.
  *
- * Two live Claude calls; both seeded into `wmkf_ai_prompt`:
+ * Two preserved prompt definitions, originally seeded into `wmkf_ai_prompt`:
  *   - peer-review-summarizer.analyze   (combined SUMMARY + QUESTIONS pass)
  *   - peer-review-summarizer.questions (fallback when main-pass questions
  *     parsing comes back empty/short — the existing route makes a second
@@ -15,12 +15,11 @@
  *
  * SOURCE OF TRUTH RECONCILIATION
  * ──────────────────────────────────────────────────────────────────────────
- * WIRED S344 (2026-07-08): `pages/api/process-peer-reviews.js` now runs these
- * rows via `executePrompt('peer-review-summarizer.analyze'|'.questions', ...)`
- * — the templates below ARE the live execution source, and staff /admin edits
- * take effect. The function generators in `peer-reviewer.js` are retained only
- * as the rollback path (revert the route diff); do not delete them. The route
- * still owns per-review A7 wrapping and passes the preamble via `a7_preamble`.
+ * RETIRED 2026-11-19: the standalone route now returns authenticated 410.
+ * Its archived implementation used these rows through executePrompt and owned
+ * per-review A7 wrapping. These definitions, stored rows and the earlier
+ * generators in peer-reviewer.js are preserved for future adaptation.
+ * Active Workbench synthesis uses its separate review-synthesis.generate prompt.
  * See docs/PEER_REVIEW_EXECUTOR_MIGRATION_PLAN.md.
  *
  * VARIABLE CONVENTIONS
