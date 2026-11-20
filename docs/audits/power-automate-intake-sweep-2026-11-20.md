@@ -106,7 +106,7 @@ These gates check structure and pointers, not the truth of the flow facts.
 
 **Live STALE: 1.** `shared/config/requestReadiness.js:3` comment ("Power Automate owns
 real-intake `wmkf_readyforreview`"). The owner has since confirmed the flag is set manually
-by staff (2026-11-20). The comment is runtime code, so the one-line fix goes through a branch.
+by staff (2026-11-20). **Fixed the same day** in PR #665 (merge `996ba8187`); live STALE is now 0.
 
 **Out of scope, noted:**
 - Alignment log D64–D67 still say "Built on `claude/j27-cycle-page`, not promoted". Those features are cycle-page work, not intake.
