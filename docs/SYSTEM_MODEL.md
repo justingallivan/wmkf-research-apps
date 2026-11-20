@@ -240,7 +240,8 @@ to Dataverse); *turn-by-turn judgment* → stays user-facing (Mode 2).
 **throws if no current prompt row exists — there is no bundled fallback in that path**. Fallbacks exist
 only in non-Executor seams: `tool-prompt-resolver.js` (bundled text on transient Dataverse errors; live
 consumer Expense Reporter only since the 2026-11-19 retirements), `reviewer-prompt-resolver.js`
-(Reviewer Finder only: per-user Postgres override → Dataverse → code fallback), and the *legacy*
+(Reviewer Finder only: per-user override stored in Dataverse user preferences
+`wmkf_appuserpreferences` → Dataverse prompt row → code fallback; the Postgres `user_preferences` table was dropped 2026-05-12), and the *legacy*
 `prompt-resolver.js` (gated by `PROMPT_RESOLVER_STRICT`; maintenance scripts only). The three-tier order
 above, applied across all prompts, is the intended end-state, not today's behavior.
 

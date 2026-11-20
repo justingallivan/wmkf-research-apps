@@ -63,14 +63,19 @@ manifest-derived pattern found 22.
 Method: three read-only reviewers, one per group, briefed neutrally (classify
 every in-scope claim with evidence; falsification query for every negative
 claim; exact proposed text). The orchestrating session applied every edit
-itself and re-ran the cited query for each change to a status, a Do/Do-not, or
-a protective claim.
+itself. It re-ran the cited query for most changes to a status or Do/Do-not
+(Production receipts, the D60 loader order, the virus-scan and impersonation
+runbook rows, tool-prompt-resolver importers, the override store, the A7 count, the
+Factory helper importers). Three protective additions were applied on the
+reviewers' cited evidence without an independent re-run: the prompt-governance
+seed rule (seed `updateRecord` lines were spot-checked), the writeback retention
+note, and the cache-leaf R3/R5 notes.
 
 ## Retirement shapes (established first; every classification uses these)
 
 | Surface | What retired | What was preserved | Evidence |
 |---|---|---|---|
-| Ten suite apps (PR #651) | Pages show notices; 13 routes are authenticated 410 stubs | Original pages/routes under `_archived/`; prompt modules and stored rows; `phase-i-dynamics/summarize-service.js`; `grant-reporting/*` services; data | [VERIFIED] `APP_SUITE_RETIREMENT_2026-11-19.md` §Entry-point manifest, §Capability and dependency preservation, §Durable data boundary; all 13 route files contain the 410 stub; Production receipt §Production release receipt (merge `ce4bc2618`, READY 2026-11-20 UTC; anonymous probe saw 307) |
+| Ten suite apps (PR #651) | Pages show notices; the thirteen retired API URLs return authenticated 410 stubs | Original pages/routes under `_archived/`; prompt modules and stored rows; `phase-i-dynamics/summarize-service.js`; `grant-reporting/*` services; data | [VERIFIED] `APP_SUITE_RETIREMENT_2026-11-19.md` §Entry-point manifest, §Capability and dependency preservation, §Durable data boundary; each of those thirteen files contains the 410 stub; Production receipt §Production release receipt (merge `ce4bc2618`, READY 2026-11-20 UTC; anonymous probe saw 307) |
 | Expertise Finder (PR #650) | Page is a notice; the six APIs were removed (404), not stubbed; 344 history rows deliberately deleted | Shared roster in superuser-only Admin; stored prompt row as reference | [VERIFIED] `EXPERTISE_FINDER_RETIREMENT_2026-11-19.md`; `pages/api/expertise-finder/` absent; `pages/api/admin/expertise-roster.js:15` `requireSuperuser` |
 | Transcription pilot | Standalone page only | Engine, Workflow, protected pilot APIs, drain/recovery crons; Meeting Tracker uses the engine | [VERIFIED] `TRANSCRIPTION_PILOT_RETIREMENT_2026-11-19.md` §Interface change and invariants |
 
@@ -109,7 +114,7 @@ weakened; three protective omissions were added.
 | project-virus-scanning-it-context | fix | Pre-flip "before flipping `VIRUS_SCAN_ENABLED=true`" guidance; Production is `true` (runbook). |
 | project-intake-portal-institution-match | keep active, wording | Grant Reporting named as an `account` consumer. Build-parked status kept (owner decision). |
 
-Docs reconciled in the same pass: `docs/CURRENT_WORK_QUEUE.md` (said both apps
+Docs reconciled in the same pass (four of the five in-scope docs edited; `security-auth.md` unchanged): `docs/CURRENT_WORK_QUEUE.md` (said both apps
 "remain implemented … neither is an authorized retirement"; plus one dated
 Finder reference), `docs/agent-wiki/topics/strategy-roadmap.md`,
 `prompt-executor.md` (four tool apps → Expense Reporter only; peer-review
@@ -118,6 +123,28 @@ route tense), `submitted-reviews-and-documents.md` (Finder deep link),
 leaf), and `docs/J27_TRANSITION_REGISTER.md` row J27-065 (excerpt moved with the
 rewritten memory text). `security-auth.md`: no contradiction (its pilot
 reference is on the preserved engine).
+
+### Tallies (sweep Step 8)
+
+```text
+Claims (in-scope, from the three evidence tables): ~95 → VERIFIED-and-AGREE 52 /
+  STALE-CONFLICT 31 (all fixed) / HISTORICAL 9 / UNKNOWN 8 (probes below) /
+  ASSUMED 1 (the `processingMode` absence in the PDF leaf, not re-grepped)
+Restatement hits re-searched after fixes: 12 phrases → 0 live STALE in scope,
+  1 UNRELATED collision
+Leaves: 22 classified; 20 fixed; 2 unchanged apart from an added pointer; 0 demoted
+```
+
+Counts are approximate: they are tallied from the reviewers' per-claim tables
+(appendix), where some rows combine claims.
+
+Zero demotions (§9 justification): every leaf still governs action. Eight carry
+protective preservation rules for capabilities the retirement kept (Grant
+Reporting, Literature Analyzer, Phase I summary, peer-review prompts, the
+transcription engine). The rest describe live seams (Executor, prompt
+resolvers, cycle encodings, Reviewer Finder loading, impersonation, virus scan)
+where only individual claims were stale. Demoting the retirement-boundary leaves
+waits on the open owner decision about where the preserved capabilities live next.
 
 ## Falsification
 
@@ -154,12 +181,20 @@ Claim not reconciled outside the slice (queued, named):
   - `docs/PROMPT_CACHING_AUDIT.md:37,88-90,197-199` (retired targets)
   - `docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md:237,265` (wire retired `extract.js`)
   - `docs/CLOSEABLE_CLASS_INVARIANT_MAP.md` (A7 count 27; gate says 32)
-  - `strategy-roadmap.md` labels at about L488/L499
-  - `prompt-executor.md` 13 vs 14 tool rows
+
+In-scope residue found on review and fixed in a follow-up commit: the
+`strategy-roadmap.md` labels for the Phase I and new-AI-capabilities leaves;
+`prompt-executor.md` "the 14 rows" (13 live-manifest rows plus the archived
+Expertise Finder row, verified from `TOOL_PROMPT_ROWS`) and plural tool-app
+wording; the reviewer-apps leaf's dangling "S206 decisions block above" pointer;
+"per-user Postgres override" corrected to Dataverse user preferences
+(`lib/services/dataverse-prefs-service.js`: Postgres `user_preferences` dropped
+2026-05-12) in the system-model leaf and `docs/SYSTEM_MODEL.md`; virus-scan leaf
+now states the three-workstream shipment is UNKNOWN.
 
 Probes (not run; owner authorization or local access needed):
 
-- Live authenticated 410 on the 13 routes: a signed-in GET to each on `applications.wmkeck.org`.
+- Live authenticated 410 on the thirteen retired API URLs: a signed-in GET to each on `applications.wmkeck.org`.
 - Stored state of retired-interface prompt rows: a read-only `wmkf_ai_prompts` current-row query by name prefix.
 - Whether Connor's flow creates `Narrative-Bibliography_{Request#}.pdf`: a read-only listing of one J27 request's `AI Materials` folder.
 - Workbench Status tab absent in Production: signed-in observation.
@@ -177,5 +212,37 @@ Appended to `docs/MEMORY_HYGIENE_RUNBOOK.md` §18.
 
 ## Verdict
 
-RECONCILED WITH EXPLICIT UNKNOWNS for the 22-leaf slice and its five docs.
+RECONCILED WITH EXPLICIT UNKNOWNS for the 22-leaf slice and its five in-scope docs.
 CLAIM NOT RECONCILED for the D60 single-file input outside the slice (queued above).
+
+## Appendix — per-leaf evidence (AGREE / HISTORICAL / negative claims)
+
+Condensed from the three reviewers' tables. STALE rows are in Findings above.
+
+**Group A**
+- interim-report-automation: `compareProposalToReport` exported (`extract-service.js`) AGREE; "interim evaluation not built" — grep `interim_eval|interimeval` → 0, AGREE; Field Set B deployed 2026-05-07 per `DYNAMICS_AI_FIELDS_SPEC_v3_cn.md:237,265` AGREE (doc-cited); old Grant Reporting UI idea HISTORICAL (marked "dated design idea").
+- grant-reporting-rework: notice page + 410 routes + `_archived` copies AGREE; extraction does not save to `akoya_request` (`extract-service.js:24-30,513-515`) AGREE; "`classify-file` still imported by Workbench" — importer `load-proposal-service.js:36` AGREE; preserve-everything rule AGREE (retirement §Durable data boundary).
+- phase-i-summary-app-winddown: four upload apps + Phase I Dynamics `deprecated` in `appRegistry.js` AGREE; "no live invoker of `phase-i.summary`" — grep outside `_archived` finds config, seeds and the gate list only, AGREE.
+- new-ai-capabilities: Finder retirement live, Admin roster live AGREE; "`modules/expertise_matching` not production" — only `scripts/seed-expertise-roster.js` imports it, AGREE; "Connor's replacement flow not live" AGREE.
+- literature-analyzer-rework: page/route retired, archived copies exist, rows retained AGREE; "scholarly search still live" — `reviewer-finder/discover.js`, `enrich-contacts.js`, `cycle-dossier-generation.js` import PubMed/OpenAlex services, AGREE.
+- pdf-processing-tiers: Reviewer Finder text path and IA `proposal_text` override AGREE; historical rationale HISTORICAL; `processingMode` absence ASSUMED.
+- cache-hit-rate-review: R4 preamble without nonces (`execute-prompt.js`) AGREE; Executor does not write `api_usage_log` AGREE; Review Panel successor live AGREE.
+- vercel-workflow-runs: `recoverTerminalTranscriptionWorkflowDispatch` in `store.js`, called from `workflow-dispatch.js`; `/api/cron/drain-transcriptions?recovery=1` in `vercel.json` AGREE; S586 narrative HISTORICAL.
+
+**Group B**
+- peer-review-executor-migration: 410 stub, archived route, live `review-synthesis.generate`, commits `1559e8dc`/`4dd5c84b` exist, A7 contract in archived route + `execute-prompt.js` AGREE.
+- a7-prompt-injection-hardening: three `*-a7.test.js` files AGREE; "not in GitHub CI" — no prompt-injection step in `.github/workflows/test.yml`, AGREE.
+- dynamics-as-prompt-ground-truth: principle, naming convention, `overridePromptBody` not built AGREE/UNRELATED.
+- prompt-storage-strategy: v2 route is a 410 stub; Executor and rows not removed AGREE; historical v2 Executor import AGREE.
+- prompt-governance: Tier 2 per-user override via `prompt-override.js` → `setUserPreference` (Dataverse-backed) AGREE; dated metadata (39 rows) UNKNOWN current.
+- dynamics-ai-writeback: lookup-grant 410; no Field Set B save path AGREE; "no route calls `updateIfEmpty`" — grep finds definitions and one comment only, AGREE.
+- system-model: retired examples + preserved infrastructure AGREE; ~12 live `executePrompt` service consumers AGREE.
+
+**Group C**
+- reviewer-apps-redesign-direction: 10 Workbench tabs (`pages/workbench/[requestId].js` `TABS`) AGREE; "`writeup.*` rows absent" — grep outside `_archived` → 0, AGREE (source only; live rows UNKNOWN); "Reviewer Pool not shipped" — only an entity description hit, AGREE; "do not propose Finder/Manager cleanup" AGREE (consolidated, not retired); launcher and Tools-menu lists HISTORICAL.
+- dynamics-identity-reconciliation: ground-truth files exist AGREE; impersonation rollout lines HISTORICAL.
+- institution-foundation-liaison: `request-liaison.js` exists; PI resolver returns `no_project_leader` (`proposal-pi-identity.js`) AGREE.
+- akoya-temporal-axis-encodings: Finder link-filter and `conventionalCycles` caller notes AGREE; Reviewer Finder `linkedCycleFilter` users AGREE.
+- reviewer-finder-proposal-doc-context: protective "do not reintroduce `classifyFile` selection" AGREE; 2026-06 diagnosis HISTORICAL.
+- virus-scanning-it-context: no DFT-recipient path (owner decision) AGREE; 2026-05-26 quote HISTORICAL.
+- intake-portal-institution-match: "typeahead/dedup not built" — grep `typeahead|did you mean|akoya_aka` in intake surfaces → 0; `account.js` exports three readers only, AGREE.

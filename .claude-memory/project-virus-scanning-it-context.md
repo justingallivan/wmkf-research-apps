@@ -52,6 +52,6 @@ DFT email exchange 2026-05-26 — locked context for the `VIRUS_SCAN_ENABLED` ro
 **Why:** Justin's concern was "we still want the review (uninfected) and we would want the sender to be informed that they may have a problem." Reviewer text loss on detection (current behavior) is unacceptable UX.
 
 **How to apply:**
-- Production `VIRUS_SCAN_ENABLED` is `true` (verified 2026-10-02, `docs/CREDENTIALS_RUNBOOK.md`). For any new upload surface or environment, ship the three workstreams (sender UX + internal alert + operational enable) as a unit.
+- Production `VIRUS_SCAN_ENABLED` is `true` (verified 2026-10-02, `docs/CREDENTIALS_RUNBOOK.md`). For any new upload surface or environment, ship the three workstreams (sender UX + internal alert + operational enable) as a unit. Whether all three shipped for the current surfaces before the flag was turned on is UNKNOWN (not traced in the 2026-11-20 audit; probe: trace the `review-upload.js` rejection path, client form preservation and `system_alerts` writes on detection).
 - Do NOT build a DFT-recipient email path — it adds operational overhead with no signal value.
 - See [[project-bill-honorarium-integration]] for parallel pattern on integrating external services with internal notification routing.

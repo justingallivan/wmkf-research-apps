@@ -488,7 +488,7 @@ at `3101f067` in Ready deployment `dpl_AjT5FeDh5wkdeFSoZWJsVDM5oBqs`.
   `docs/J27_TRANSITION_REGISTER.md` row J27-051.
 - Strategy/system model: `project-system-model`, `project-strategy-direction`.
 - Virtual Review Panel (legacy, retired 2026-10-04): `project-virtual-review-panel`.
-- Roadmap snapshots: `project-app-roadmap-2026-04-25`, `project-phase-i-summary-app-winddown`.
+- Roadmap snapshot: `project-app-roadmap-2026-04-25`. Phase I summary retirement boundary: `project-phase-i-summary-app-winddown`.
 - Phasing/cycle scoping: `project-grant-phasing-evolution`, `feedback-cycle-vs-executor-scope`, `feedback-concepts-vs-phase-i`. Every J27-sensitive site (retire / persist / change / build / scale) lives in `docs/J27_TRANSITION_REGISTER.md`; add there, not here.
 - J27 document-capture & Proposal-tab evolution (document identity/metadata →
   typed Dataverse registry; file bytes and editable narrative remain in
@@ -497,7 +497,7 @@ at `3101f067` in Ready deployment `dpl_AjT5FeDh5wkdeFSoZWJsVDM5oBqs`.
 - Historical Group B writeup proposal: `docs/GROUP_B_WRITEUP_SPINE_DESIGN.md`. Its proposed
   URL fields and `writeup.*` prompt rows are not live, and its D26 pilot timing is obsolete.
 - Historical staged-review design and deferred proposal-context decisions: `project-staged-review-pipeline`, `project-proposal-context-extraction`. Neither is a ready-to-execute architecture.
-- Planned automation/reports/post-award/AI: `project-backend-automation`, `project-interim-report-automation`, `project-awardee-onboarding`, `project-new-ai-capabilities`.
+- Planned automation/reports/post-award: `project-backend-automation`, `project-interim-report-automation`, `project-awardee-onboarding`. Expertise Finder retirement and roster boundary, Compliance Screening (unbuilt): `project-new-ai-capabilities`.
 - IRS verify-EIN: `project-irs-exempt-verification`.
 
 ## Standard Probe
