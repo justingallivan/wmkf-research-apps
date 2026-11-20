@@ -77,7 +77,6 @@ test('keeps application use, stored reference and live publication state separat
   const active = await screen.findByRole('article', { name: 'Synthesize submitted human peer reviews' });
   expect(within(active).getByText('Application caller')).toBeInTheDocument();
   expect(within(active).getByText(/submitted reviewers’ ratings/)).toBeInTheDocument();
-  fireEvent.click(screen.getByText(/Legacy app prompts — stored reference/));
   const reference = screen.getByRole('article', { name: 'Legacy Phase II proposal Q&A' });
   expect(within(reference).getByText('Stored reference')).toBeInTheDocument();
   expect(within(reference).getByText(/current version/)).toHaveTextContent('v1');
@@ -144,18 +143,19 @@ test('collapses only audited stored references and preserves their drafts when t
     prompt('review-synthesis.generate'), prompt('executor.echo-parity'), prompt('phase-i.checkin', false), prompt('phase-ii.new-prompt'),
   ]);
   await renderOpenWorkflows();
-  const summary = await screen.findByText('Legacy app prompts — stored reference (4)');
+  const summary = await screen.findByText('Preserved capabilities (5)');
   const disclosure = summary.closest('details');
+  fireEvent.click(summary);
   expect(disclosure).not.toHaveAttribute('open');
   expect(screen.getByRole('article', { name: 'Legacy Phase II proposal Q&A' })).not.toBeVisible();
   expect(screen.getByRole('article', { name: 'Synthesize submitted human peer reviews' })).toBeVisible();
   expect(screen.getByRole('article', { name: 'Executor echo and cache diagnostic' })).toBeVisible();
-  expect(screen.getByRole('article', { name: 'Phase I application and budget checks' })).toBeVisible();
+  expect(screen.getByRole('article', { name: 'Phase I application and budget checks' })).not.toBeVisible();
   expect(screen.getByText('phase-ii.new-prompt')).toBeVisible();
 
   fireEvent.click(summary);
   expect(disclosure).toHaveAttribute('open');
-  expect(within(disclosure).getAllByRole('article')).toHaveLength(4);
+  expect(within(disclosure).getAllByRole('article')).toHaveLength(5);
   const reference = screen.getByRole('article', { name: 'Legacy Phase II proposal Q&A' });
   expect(reference).toBeVisible();
   expect(within(reference).getByText('phase-ii.qa')).toBeVisible();
@@ -194,7 +194,7 @@ test('search reveals matching legacy references and clearing restores the collap
   await renderOpenWorkflows();
   const input = await screen.findByLabelText('Search prompts');
   fireEvent.change(input, { target: { value: '  LEGACY   Q&A ' } });
-  const summary = screen.getByText('Legacy app prompts — stored reference (1)');
+  const summary = screen.getByText('Preserved capabilities (1)');
   expect(summary.closest('details')).toHaveAttribute('open');
   expect(screen.getByRole('article', { name: 'Legacy Phase II proposal Q&A' })).toBeVisible();
   expect(screen.getByText('phase-ii.refine')).not.toBeVisible();
@@ -230,18 +230,18 @@ test('shows workflow counts in collapsed sections, including Pre-flight, with di
     prompt('review-synthesis.generate'), prompt('review-panel.chair'), prompt('multi-perspective.optimist'),
   ]);
   render(<PromptTemplatesSection />);
-  const preflight = await screen.findByText('Pre-flight (4)', { selector: 'summary' });
-  const reviews = screen.getByText('Reviews and evaluations (3)', { selector: 'summary' });
+  const preflight = await screen.findByText('Pre-flight (3)', { selector: 'summary' });
+  const reviews = screen.getByText('Reviews and evaluations (2)', { selector: 'summary' });
   expect(preflight.closest('details')).not.toHaveAttribute('open');
   expect(reviews.closest('details')).not.toHaveAttribute('open');
   expect(screen.queryByText(/Proposal preparation/)).not.toBeInTheDocument();
   expect(screen.queryByText(/Reviewer selection/)).not.toBeInTheDocument();
   fireEvent.click(preflight);
-  expect(within(preflight.closest('details')).getAllByRole('article')).toHaveLength(4);
+  expect(within(preflight.closest('details')).getAllByRole('article')).toHaveLength(3);
   fireEvent.click(reviews);
   expect(screen.getByRole('region', { name: 'Human peer reviews' })).toBeVisible();
   expect(screen.getByRole('region', { name: 'AI Review Panel' })).toBeVisible();
-  expect(screen.getByRole('region', { name: 'Multi-Perspective Evaluator' })).toBeVisible();
+  expect(screen.queryByRole('region', { name: 'Multi-Perspective Evaluator' })).not.toBeInTheDocument();
 });
 
 test('searches workflow and subgroup labels, expands matching groups, and hides empty groups', async () => {
@@ -249,7 +249,7 @@ test('searches workflow and subgroup labels, expands matching groups, and hides 
   render(<PromptTemplatesSection />);
   const input = await screen.findByLabelText('Search prompts');
   fireEvent.change(input, { target: { value: 'Pre-flight' } });
-  expect(screen.getByText('Pre-flight (2)', { selector: 'summary' }).closest('details')).toHaveAttribute('open');
+  expect(screen.getByText('Pre-flight (1)', { selector: 'summary' }).closest('details')).toHaveAttribute('open');
   expect(screen.getByText('2 of 4 prompts')).toBeInTheDocument();
   expect(screen.getByText('Reviews and evaluations (0)', { selector: 'summary' })).not.toBeVisible();
   fireEvent.change(input, { target: { value: 'Human peer reviews' } });
@@ -265,21 +265,21 @@ test('all audited prompts appear once across the proposed workflow groups and th
   render(<PromptTemplatesSection />);
   await screen.findByLabelText('Search prompts');
   for (const label of [
-    'Pre-flight (4)', 'Reviewer selection (2)', 'Reviews and evaluations (11)',
-    'Meetings and briefings (7)', 'Awardee content (2)', 'Research and office tools (7)',
-    'Diagnostics and drafts (2)', 'Legacy app prompts — stored reference (5)',
-  ]) expect(screen.getByText(label)).toBeInTheDocument();
+    'Pre-flight (3)', 'Reviewer selection (2)', 'Reviews and evaluations (3)',
+    'Meetings and briefings (7)', 'Awardee content (2)', 'Research and office tools (2)',
+    'Diagnostics and drafts (1)', 'Legacy app prompts — stored reference (1)', 'Preserved capabilities (19)',
+  ]) expect(screen.getByText(label, { selector: 'summary' })).toBeInTheDocument();
   expect(screen.getAllByRole('article', { hidden: true })).toHaveLength(40);
-  fireEvent.click(screen.getByText('Reviews and evaluations (11)', { selector: 'summary' }));
-  expect(within(screen.getByRole('region', { name: 'Human peer reviews' })).getAllByRole('article')).toHaveLength(3);
+  fireEvent.click(screen.getByText('Reviews and evaluations (3)', { selector: 'summary' }));
+  expect(within(screen.getByRole('region', { name: 'Human peer reviews' })).getAllByRole('article')).toHaveLength(1);
   expect(within(screen.getByRole('region', { name: 'AI Review Panel' })).getAllByRole('article')).toHaveLength(2);
-  expect(within(screen.getByRole('region', { name: 'Multi-Perspective Evaluator' })).getAllByRole('article')).toHaveLength(6);
+  expect(screen.queryByRole('region', { name: 'Multi-Perspective Evaluator' })).not.toBeInTheDocument();
 });
 
 test('workflow disclosures expand independently and preserve an unsaved draft when collapsed', async () => {
   serve([prompt('phase-i.summary'), prompt('reviewer-finder.analyze')]);
   render(<PromptTemplatesSection />);
-  const preflight = await screen.findByText('Pre-flight (1)', { selector: 'summary' });
+  const preflight = await screen.findByText('Preserved capabilities (1)', { selector: 'summary' });
   const reviewers = screen.getByText('Reviewer selection (1)');
   fireEvent.click(preflight);
   expect(reviewers.closest('details')).not.toHaveAttribute('open');
@@ -300,7 +300,7 @@ test('a new search reopens matching workflow sections after a manual collapse', 
   render(<PromptTemplatesSection />);
   const input = await screen.findByLabelText('Search prompts');
   fireEvent.change(input, { target: { value: 'Pre-flight' } });
-  const summary = screen.getByText('Pre-flight (2)', { selector: 'summary' });
+  const summary = screen.getByText('Pre-flight (1)', { selector: 'summary' });
   fireEvent.click(summary);
   expect(summary.closest('details')).not.toHaveAttribute('open');
   fireEvent.change(input, { target: { value: 'Initial Assessment' } });
@@ -438,4 +438,31 @@ describe('Retire', () => {
     expect(within(retired).getByText('retired')).toBeInTheDocument();
     expect(within(retired).getByRole('button', { name: 'Review & publish' })).toBeInTheDocument();
   });
+});
+
+test('preserved prompts retain publication and retirement guards while active tools and unknown keys stay outside', async () => {
+  serve([prompt('funding-gap.analyze'), prompt('expense-reporter.extract-image'), prompt('meeting-transcript.speaker-alignment'), prompt('new.backend'), { ...prompt('phase-ii.qa'), isRetired: true }]);
+  render(<PromptTemplatesSection />);
+  const summary = await screen.findByText('Preserved capabilities (1)');
+  const preserved = summary.closest('details');
+  expect(preserved.open).toBe(false);
+  fireEvent.click(summary);
+  const card = within(preserved).getByRole('article');
+  expect(card).toHaveTextContent('current version v1');
+  expect(within(card).getByRole('button', { name: 'Retire' })).toBeDisabled();
+  for (const key of ['expense-reporter.extract-image', 'meeting-transcript.speaker-alignment', 'new.backend', 'phase-ii.qa']) {
+    expect(preserved).not.toContainElement(screen.getByText(key));
+  }
+  expect(screen.getByText('Retired prompts (1)')).toBeInTheDocument();
+  expect(global.fetch.mock.calls.every(([, init]) => !init?.method || init.method === 'GET')).toBe(true);
+});
+
+test('searching the preserved section label reveals only its inventory', async () => {
+  serve([prompt('phase-i.summary'), prompt('expense-reporter.extract-image')]);
+  render(<PromptTemplatesSection />);
+  fireEvent.change(await screen.findByLabelText('Search prompts'), { target: { value: 'Preserved capabilities' } });
+  expect(screen.getByText('Preserved capabilities (1)').closest('details')).toHaveAttribute('open');
+  expect(screen.getByText('phase-i.summary')).toBeVisible();
+  expect(screen.getByText('expense-reporter.extract-image')).not.toBeVisible();
+  expect(screen.getByText('1 of 2 prompts')).toBeInTheDocument();
 });

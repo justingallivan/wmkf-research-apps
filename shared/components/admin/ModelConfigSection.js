@@ -1,3 +1,4 @@
+import { PRESERVED_MODEL_KEYS } from '../../config/adminPreservedCapabilities';
 import { useEffect, useState } from 'react';
 import { requestJson, requestEnvelope } from '../../utils/api-request';
 import { buildModelOverrideMap, diffModelOverrides } from './model-override-utils';
@@ -112,6 +113,7 @@ export default function ModelConfigSection() {
 
   const { apps, availableModels, tiers = [], defaultModel, modelStatuses = {} } = serverState;
   const reviewPanel = apps.find(app => app.appKey === 'review-panel');
+  const standardApps = apps.filter(app => !app.providerBound);
 
   // Build server-side DB override map for diff calculation
   const serverDbOverrides = buildModelOverrideMap(apps);
@@ -163,47 +165,7 @@ export default function ModelConfigSection() {
 
   const shortModelName = shortModelLabel;
 
-  return (
-    <>
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-xs text-gray-500">
-          Tier picks (Fable / Opus / Sonnet / Haiku) auto-track the latest model in that family. Pin a specific version only if you need to reproduce historical behavior. Changes take effect within 5 minutes.
-        </p>
-        <div className="flex items-center gap-2 ml-3 shrink-0">
-          <button
-            onClick={() => fetchConfig({ refresh: true })}
-            disabled={refreshing || saving}
-            title="Re-fetch the Anthropic model list (bypasses the 24h cache)"
-            className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            {refreshing ? 'Refreshing…' : 'Refresh model list'}
-          </button>
-          {hasChanges && (
-            <button
-              onClick={discardChanges}
-              className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Discard
-            </button>
-          )}
-          <button
-            onClick={saveAll}
-            disabled={!hasChanges || saving}
-            className="px-4 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            {saving ? 'Saving...' : hasChanges ? 'Save Changes' : 'No Changes'}
-          </button>
-        </div>
-      </div>
-
-      {message && (
-        <div className={`mb-4 px-3 py-2 rounded-lg text-sm ${
-          message.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
-        }`}>
-          {message.text}
-        </div>
-      )}
-
+  const renderModelTable = rows => (
       <div className="overflow-x-auto">
         <table className="w-full text-sm border-collapse">
           <thead>
@@ -215,7 +177,7 @@ export default function ModelConfigSection() {
             </tr>
           </thead>
           <tbody>
-            {apps.filter(app => !app.providerBound).map(app => (
+            {rows.map(app => (
               <tr key={app.appKey} className="border-b border-gray-100 hover:bg-gray-50">
                 <td className="py-2 px-2 text-gray-900 font-medium whitespace-nowrap">
                   {APP_MODEL_NAMES[app.appKey] || app.appKey}
@@ -290,11 +252,62 @@ export default function ModelConfigSection() {
           </tbody>
         </table>
       </div>
+  );
+
+  return (
+    <>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-xs text-gray-500">
+          Tier picks (Fable / Opus / Sonnet / Haiku) auto-track the latest model in that family. Pin a specific version only if you need to reproduce historical behavior. Changes take effect within 5 minutes.
+        </p>
+        <div className="flex items-center gap-2 ml-3 shrink-0">
+          <button
+            onClick={() => fetchConfig({ refresh: true })}
+            disabled={refreshing || saving}
+            title="Re-fetch the Anthropic model list (bypasses the 24h cache)"
+            className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            {refreshing ? 'Refreshing…' : 'Refresh model list'}
+          </button>
+          {hasChanges && (
+            <button
+              onClick={discardChanges}
+              className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Discard
+            </button>
+          )}
+          <button
+            onClick={saveAll}
+            disabled={!hasChanges || saving}
+            className="px-4 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            {saving ? 'Saving...' : hasChanges ? 'Save Changes' : 'No Changes'}
+          </button>
+        </div>
+      </div>
+
+      {message && (
+        <div className={`mb-4 px-3 py-2 rounded-lg text-sm ${
+          message.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
+        }`}>
+          {message.text}
+        </div>
+      )}
+
+      {renderModelTable(standardApps.filter(app => !PRESERVED_MODEL_KEYS.has(app.appKey)))}
+      {standardApps.some(app => PRESERVED_MODEL_KEYS.has(app.appKey)) && (
+        <details className="mt-6 rounded-lg border border-gray-200 p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-gray-700">Preserved capabilities</summary>
+          <p className="my-3 text-sm text-gray-600">Model settings retained from retired interfaces for backend use or future adaptation. Saved overrides still apply wherever these capabilities are used.</p>
+          {renderModelTable(standardApps.filter(app => PRESERVED_MODEL_KEYS.has(app.appKey)))}
+        </details>
+      )}
 
       {reviewPanel && (
         <div className="mt-8">
           <div className="mb-3">
-            <h3 className="text-sm font-semibold text-gray-900">Virtual Review Panel</h3>
+            <h3 className="text-sm font-semibold text-gray-900">Review Panel</h3>
             <p className="text-xs text-gray-500 mt-1">
               Each slot has a fixed provider. Only reviewed models with pricing coverage can be selected.
             </p>

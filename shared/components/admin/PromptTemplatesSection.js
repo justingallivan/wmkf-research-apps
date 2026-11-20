@@ -1,3 +1,4 @@
+import { PRESERVED_PROMPT_NAMES } from '../../config/adminPreservedCapabilities';
 /**
  * Admin section for editing + versioned-publishing `wmkf_ai_prompt` rows (S222).
  *
@@ -130,7 +131,8 @@ export default function PromptTemplatesSection() {
   if (!prompts || prompts.length === 0) return <div className="text-gray-500 text-sm">No prompts found.</div>;
 
   const allGroups = groupState.groups;
-  const activePrompts = prompts.filter(prompt => !prompt.isRetired);
+  const preservedPrompts = prompts.filter(prompt => !prompt.isRetired && PRESERVED_PROMPT_NAMES.has(prompt.name));
+  const activePrompts = prompts.filter(prompt => !prompt.isRetired && !PRESERVED_PROMPT_NAMES.has(prompt.name));
   const retiredPrompts = prompts.filter(prompt => prompt.isRetired);
   const groups = allGroups.map(group => ({
     ...group, prompts: activePrompts.filter(prompt => resolveAdminPromptDescription(prompt, allGroups).group === group.id),
@@ -142,6 +144,7 @@ export default function PromptTemplatesSection() {
     const section = group?.sections?.find(candidate => candidate.id === sectionId);
     const destination = describePromptDestinations(prompt);
     const text = [prompt.name, title, description, usedBy, group?.label, section?.label,
+      !prompt.isRetired && PRESERVED_PROMPT_NAMES.has(prompt.name) ? 'Preserved capabilities' : '',
       destination.caller?.summary, ...(destination.caller?.fields || []),
       ...destination.configured.flatMap(item => [item.label, item.technical])].join(' ').toLowerCase();
     return terms.every(term => text.includes(term));
@@ -224,7 +227,7 @@ export default function PromptTemplatesSection() {
             onChange={event => {
               const value = event.target.value;
               setSearch(value);
-              setExpandedGroups(value.trim() ? { ...Object.fromEntries(allGroups.map(group => [group.id, true])), __retired: true } : {});
+              setExpandedGroups(value.trim() ? { ...Object.fromEntries(allGroups.map(group => [group.id, true])), __retired: true, __preserved: true } : {});
             }}
             placeholder="Search titles, descriptions, technical keys, Used by or destinations"
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-500"
@@ -257,6 +260,20 @@ export default function PromptTemplatesSection() {
             </div>
           </details>
         ))}
+        {preservedPrompts.length > 0 && (
+          <details hidden={matchCount(preservedPrompts) === 0} open={expandedGroups.__preserved || undefined} className="rounded-lg border border-gray-200">
+            <summary onClick={event => {
+              event.preventDefault();
+              setExpandedGroups(current => ({ ...current, __preserved: !current.__preserved }));
+            }} className="cursor-pointer rounded-lg bg-gray-50 p-4 text-sm font-semibold text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500">
+              Preserved capabilities ({matchCount(preservedPrompts)})
+            </summary>
+            <div className="space-y-6 p-4">
+              <p className="text-sm text-gray-600">Prompts retained from retired interfaces for backend use or future adaptation. Publication status and caller protections still apply; moving a prompt here does not retire it.</p>
+              {preservedPrompts.map(renderPrompt)}
+            </div>
+          </details>
+        )}
         {retiredPrompts.length > 0 && (
           <details hidden={matchCount(retiredPrompts) === 0} open={expandedGroups.__retired || undefined} className="rounded-lg border border-dashed border-gray-300">
             <summary onClick={event => {

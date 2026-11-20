@@ -32,14 +32,13 @@ export const ADMIN_WORKSPACES = Object.freeze([
     key: 'workflows',
     label: 'Workflows',
     title: 'Grant workflow configuration',
-    description: 'Settings organized around external review, Proposal Ranking, Final writeups, Research presentations, and governed workflow content.',
+    description: 'Settings organized around external review, Proposal Ranking, Research presentations, and governed workflow content.',
     defaultView: 'external-review',
     views: [
       { key: 'external-review', label: 'External review' },
       { key: 'cycle-calendar', label: 'Cycle calendar' },
       { key: 'review-form', label: 'Review form' },
       { key: 'proposal-ranking', label: 'Proposal Ranking' },
-      { key: 'final-writeups', label: 'Final writeups' },
       { key: 'site-visits', label: 'Research presentations' },
       { key: 'governance', label: 'Messages & policies' },
     ],
@@ -88,6 +87,10 @@ export const LEGACY_ADMIN_HASH_LOCATIONS = Object.freeze({
 });
 
 export function resolveAdminLocation(rawWorkspace, rawView) {
+  // Keep existing bookmarks pointed at the editor that replaced this landing page.
+  if (rawWorkspace === 'workflows' && rawView === 'final-writeups') {
+    return { workspace: WORKSPACE_BY_KEY.get('people'), view: 'staffing' };
+  }
   const workspace = WORKSPACE_BY_KEY.get(rawWorkspace) || WORKSPACE_BY_KEY.get('overview');
   const view = workspace.views.some((candidate) => candidate.key === rawView)
     ? rawView
