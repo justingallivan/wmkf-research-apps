@@ -72,7 +72,10 @@ Staff write through `POST /api/workbench/proposal-lists`
   Scoring decision is Scored and a Board-role roster member; `GET ?requestId=`
   reads the request's picks. The staff detail read (`GET ?linkId=`) adds each
   item's `tickedFor` names from `proposal_list_advisor_picks` and the Board
-  roster; the external recipient routes never read the picks table.
+  roster; the external recipient routes never read the picks table. The names
+  are best effort: if the picks or roster read fails, the detail (and a `marks`
+  or `rebuild` that has already committed) still succeeds, with
+  `tickedForUnavailable: true`.
 - `marks` sets `highlighted` and `own_institution`; only requests already on the
   link can be marked.
 - `revoke` sets `revoked_at` once.

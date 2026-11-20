@@ -68,3 +68,13 @@ test('the highlight editor shows who each proposal was ticked for', async () => 
   expect(await screen.findByText('Ticked for: Edward M. Stolper, Kelsey C. Martin')).toBeInTheDocument();
   expect(screen.getAllByText(/^Ticked for:/)).toHaveLength(1);
 });
+
+test('the editor says when the ticked-for names cannot be shown', async () => {
+  const item = { requestId: 'r-1', requestNumber: '1001', title: 'Proposal 1', institution: 'U', projectLeader: 'P', section: 'Unassigned', subsection: null, highlighted: false, ownInstitution: false, tickedFor: [] };
+  global.fetch = jest.fn((url) => Promise.resolve(String(url).includes('linkId=')
+    ? json({ success: true, link: link('JunePerson'), items: [item], tickedForUnavailable: true })
+    : json(overview('J27', [link('JunePerson')]))));
+  render(<ProposalLists />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Choose highlights' }));
+  expect(await screen.findByText(/can’t be shown right now/)).toBeInTheDocument();
+});

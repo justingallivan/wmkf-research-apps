@@ -107,6 +107,9 @@ function ListEditor({ linkId, onChanged }) {
         They appear at the top of the page. Every other proposal stays available below.
         Tick <span className="font-medium">Own institution</span> to mark a proposal from this person’s institution.
       </p>
+      {detail.tickedForUnavailable && (
+        <p className="mt-2 text-sm text-gray-600">Who each proposal was ticked for can’t be shown right now. Highlights and saving still work.</p>
+      )}
       <div className="mt-3 space-y-2">
         {sections.map(([name, items]) => (
           <details key={name} className="rounded-lg border border-gray-200">

@@ -395,3 +395,43 @@ describe('ticked-for note in the staff highlight editor', () => {
     expect(deps.getDirectory).not.toHaveBeenCalled();
   });
 });
+
+describe('ticked-for names never turn a committed change into an error', () => {
+  async function withTickedList() {
+    const made = makeDeps();
+    await createProposalList({ cycleCode: 'J27', listKind: 'ordinary', rosterId: 7, actor: ACTOR }, made.deps);
+    made.picks.add(`${REQ_A}:7`);
+    made.deps.getDirectory.mockRejectedValue(new Error('roster down'));
+    return made;
+  }
+  beforeEach(() => jest.spyOn(console, 'warn').mockImplementation(() => {}));
+  afterEach(() => console.warn.mockRestore());
+
+  test('the editor still opens, with the names reported unavailable', async () => {
+    const { deps } = await withTickedList();
+    const detail = await getProposalListDetail({ linkId: LINK_ID }, deps);
+    expect(detail.tickedForUnavailable).toBe(true);
+    expect(detail.items.map((i) => i.tickedFor)).toEqual([[], []]);
+  });
+
+  test('a marks save that committed reports success', async () => {
+    const { deps } = await withTickedList();
+    const result = await setProposalListMarks({ linkId: LINK_ID, highlightedRequestIds: [REQ_A], ownInstitutionRequestIds: [], actor: ACTOR }, deps);
+    expect(deps.store.setMarks).toHaveBeenCalled();
+    expect(result.tickedForUnavailable).toBe(true);
+  });
+
+  test('a rebuild that committed reports success', async () => {
+    const { deps } = await withTickedList();
+    deps.store.listPicksForRequests.mockRejectedValue(new Error('picks read failed'));
+    const result = await rebuildProposalList({ linkId: LINK_ID, actor: ACTOR }, deps);
+    expect(deps.store.replaceItems).toHaveBeenCalled();
+    expect(result.tickedForUnavailable).toBe(true);
+  });
+
+  test('names that load report available', async () => {
+    const { deps } = makeDeps();
+    await createProposalList({ cycleCode: 'J27', listKind: 'ordinary', rosterId: 7, actor: ACTOR }, deps);
+    expect((await getProposalListDetail({ linkId: LINK_ID }, deps)).tickedForUnavailable).toBe(false);
+  });
+});
