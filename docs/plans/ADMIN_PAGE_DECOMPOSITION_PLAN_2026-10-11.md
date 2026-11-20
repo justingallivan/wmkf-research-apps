@@ -376,3 +376,10 @@ before trying it (`admin-view-coverage` covers first render only).
   “Site Visit recipient directory” to “Research presentation recipient directory” to match
   the approved Admin vocabulary. This changes the pinned heading only; fetch URLs, request
   payloads, setting keys, and recipient behavior remain unchanged.
+
+- 2026-11-19: **Authorized roster migration, characterization coverage correction.**
+  The new `people:expertise-roster` view was omitted from the pinned expectation maps.
+  Reproduced the failing coverage test, then added its exact initial fetch
+  `/api/admin/expertise-roster?includeInactive=true` and `Expertise Roster` heading.
+  This covers the intentionally added Admin editor without weakening the full-URL,
+  duplicate-fetch or heading assertions; no runtime behavior changes.

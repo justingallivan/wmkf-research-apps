@@ -82,6 +82,7 @@ const EXPECTED_FETCHES = {
   ],
   'workflows:final-writeups': [],
   'people:staffing': ['/api/admin/final-writeup-matrix-audiences', '/api/workbench/staffing'],
+  'people:expertise-roster': ['/api/admin/expertise-roster?includeInactive=true'],
   'workflows:site-visits': [
     '/api/admin/meeting-tracker-defaults',
     '/api/admin/site-visit-materials-defaults',
@@ -163,6 +164,7 @@ const EXPECTED_HEADINGS = {
   ],
   'workflows:final-writeups': ['Final writeup staffing'],
   'people:staffing': ['Final writeup staffing', 'Program review audiences', 'Related assignments', 'Shared roles', 'Staff responsibilities'],
+  'people:expertise-roster': ['Expertise Roster'],
   'workflows:site-visits': [
     'Consultants and Board',
     'Materials defaults',
