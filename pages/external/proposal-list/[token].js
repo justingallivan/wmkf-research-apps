@@ -13,7 +13,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { requestEnvelope } from '../../../shared/utils/api-request';
 
-const PAGE_TITLE = 'Submitted proposals';
+const PAGE_TITLE = 'Proposals for review';
 
 const REASON_MESSAGE = {
   no_token: 'This link is missing its access token.',
