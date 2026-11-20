@@ -69,7 +69,7 @@ Decisions 6, 11 and 13 above are edited to match.
 | 16 | During Scoring, any staff member with Workbench access ticks the Chairs and Board members who should see a scored proposal ("advisor picks"). Those ticks set the highlights on that person's list, so the CSO does not highlight by hand. PDs are unlikely to change ticks after lists go out, so a tick does not change a list already made, except that a refresh highlights newly listed ticked proposals. |
 | 17 | The CSO sends each link by pasting it into their own email. The app sends nothing. |
 | 18 | No roster chair marker; the list-type picker is not remembered. |
-| — | Open: whether `/proposal-lists` should be narrowed to the CSO. Not changed. |
+| 19 | `/proposal-lists` stays open to all staff with Request Workbench access; it is not narrowed to the CSO (owner, 2026-11-20). |
 
 ## Advisor picks and scored-only lists [LIVE]
 
