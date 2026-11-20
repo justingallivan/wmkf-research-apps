@@ -658,6 +658,48 @@ test('T2 finalize (attachment-only create): non-2xx falls back to the fixed atta
   await waitFor(() => expect(screen.getByText('The attachment could not be saved.')).toBeInTheDocument());
 });
 
+test('a malware-scan rejection drops the file and its staged upload, so the next save re-stages a new file', async () => {
+  put.mockResolvedValue({});
+  let tokens = 0;
+  const finalizeStagingIds = [];
+  global.fetch = jest.fn((url, options) => {
+    const href = String(url);
+    if (href.includes('/consultants')) return Promise.resolve(jsonResponse({ items: [] }));
+    if (href.includes('/upload-token')) {
+      tokens += 1;
+      return Promise.resolve(jsonResponse({ ok: true, stagingId: `staging-${tokens}`, pathname: 'x', clientToken: 'tok', contentType: 'application/pdf' }));
+    }
+    if (href.includes('/finalize')) {
+      const { stagingId } = JSON.parse(options.body);
+      finalizeStagingIds.push(stagingId);
+      if (stagingId === 'staging-1') {
+        return Promise.resolve({ ok: false, status: 422, json: async () => ({ ok: false, reason: 'scan_infected', error: 'The file failed the malware scan.' }) });
+      }
+      return Promise.resolve(jsonResponse({ ok: true, requestdocumentId: 'doc-2', feedbackId: '6' }));
+    }
+    return Promise.resolve(jsonResponse({ items: [] }));
+  });
+  render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+  await waitFor(() => expect(screen.getByText('No consultant feedback recorded yet.')).toBeInTheDocument());
+  await userEvent.click(screen.getByRole('button', { name: 'Add feedback' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Add person…' }));
+  await userEvent.type(screen.getByPlaceholderText('Name'), 'Jane Doe');
+  const input = document.getElementById('consultant-feedback-attachment');
+  await userEvent.upload(input, pdfFile('infected.pdf'));
+  await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+  await waitFor(() => expect(screen.getByText('The file failed the malware scan and was not attached. Choose a different file.')).toBeInTheDocument());
+  expect(input.value).toBe('');
+  expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+
+  // A different file re-stages (new token, new staging id) instead of replaying
+  // the rejected staging row.
+  await userEvent.upload(input, pdfFile('clean.pdf'));
+  await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(finalizeStagingIds).toEqual(['staging-1', 'staging-2']));
+  expect(tokens).toBe(2);
+});
+
 test('T2 handleDelete: attachment_removal_pending clears the row via reload (the branch never throws)', async () => {
   // The branch calls setError('Attachment removed, delete again.') and then
   // immediately await load(), whose own setError(null) at the top of the

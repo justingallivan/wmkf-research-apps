@@ -1,6 +1,8 @@
 /**
  * PD discovery prerequisite, independent of lifecycle/action eligibility.
- * Power Automate owns real-intake wmkf_readyforreview; the prepared Factory
+ * Staff set real-intake wmkf_readyforreview by hand in Dynamics (no Power
+ * Automate flow writes it; withheld from non-compliant applications —
+ * docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md); the prepared Factory
  * has a separate guarded test-fixture finalizer. This predicate only reads. Only an
  * explicitly linked pre-J27 cycle is exempt. No request-date fallback.
  * Callers must fetch the complete roster before filtering/counting, select

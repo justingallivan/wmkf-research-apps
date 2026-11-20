@@ -553,10 +553,21 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
         // The stale operation must not write any of it.
         return;
       }
-      // Leave mutationIdRef and any staged upload untouched so a retry
-      // replays the same mutation id and reuses the already-staged bytes
-      // instead of uploading again.
-      setSaveError(e.message);
+      // A malware-scan rejection is permanent for those bytes: the server
+      // marks the staging row rejected, and a replay of the same staging id
+      // only gets a bare 409. Drop the file and its staged upload so the next
+      // Save cannot reuse them, and say what to do. Any other failure leaves
+      // mutationIdRef and the staged upload untouched so a retry replays the
+      // same mutation id and reuses the already-staged bytes.
+      if (e?.payload?.reason === 'scan_infected') {
+        setAttachFile(null);
+        setAttachStagingId(null);
+        setAttachUploadProgress(null);
+        if (attachInputRef.current) attachInputRef.current.value = '';
+        setSaveError('The file failed the malware scan and was not attached. Choose a different file.');
+      } else {
+        setSaveError(e.message);
+      }
       setSaving(false);
     }
   }, [form, editingId, requestId, closeForm, load, attachFile, attachStagingId, editingAttachment, consultants]);
