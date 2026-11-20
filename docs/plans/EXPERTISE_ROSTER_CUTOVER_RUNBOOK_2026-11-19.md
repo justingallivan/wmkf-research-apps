@@ -70,7 +70,10 @@ node scripts/provision-expertise-roster.cjs --apply
 
 Creates/verifies the schema and two dedicated roles, enables table/column audit,
 and publishes this table only. No automatic role assignments. Verify organization
-auditing; wait until all alternate keys are Active. Existing metadata is not
+auditing; wait until all alternate keys are Active. Confirm multiple null key
+values are permitted, the primary ID can be caller-supplied on POST (including
+inactive-create changesets), and the actual Staff User navigation name is
+`wmkf_StaffUser` with impersonated atomic reference-clear support. Existing metadata is not
 silently redefined: the import preflight rejects type/length/key/audit mismatches.
 Assign Editor to intended maintainers and the application identity as needed;
 verify impersonation privilege intersection, Contact reads and Staff User lookup

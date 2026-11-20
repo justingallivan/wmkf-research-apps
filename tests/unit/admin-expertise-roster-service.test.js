@@ -25,7 +25,7 @@ test('missing actor or disabled impersonation cannot write', async () => {
   await expect(saveRoster(input, actor, { create: true })).rejects.toMatchObject({ status: 503 });
   expect(profiles.create).not.toHaveBeenCalled();
 });
-test('binding failure after create is retryable under same key', async () => {
+test('binding failure before create is retryable under same key', async () => {
   profiles.byCreationKey.mockResolvedValueOnce(null).mockResolvedValue(record);
   ensureProfileBinding.mockRejectedValueOnce(Error('DB down')).mockResolvedValueOnce(40);
   await expect(saveRoster(input, actor, { create: true })).rejects.toThrow('DB down');
@@ -84,4 +84,12 @@ test.each([null, {isdisabled:true}])('missing/disabled User gives actionable val
 test('missing Contact 404 gives actionable validation', async()=>{
   contacts.getByIdWithSelect.mockRejectedValue(Object.assign(Error('raw provider 404'),{status:404}));
   await expect(saveRoster({...input,dataverse_contact_id:contact},actor,{create:true})).rejects.toMatchObject({status:400,message:'That Contact no longer exists. Choose another Contact.'});
+});
+
+test('failed binding confirmation after create retries the existing keyed person', async () => {
+  profiles.byCreationKey.mockResolvedValueOnce(null).mockResolvedValue(record);
+  ensureProfileBinding.mockResolvedValueOnce(40).mockRejectedValueOnce(Error('confirmation unavailable')).mockResolvedValueOnce(40);
+  await expect(saveRoster(input,actor,{create:true})).rejects.toThrow('confirmation unavailable');
+  expect(await saveRoster(input,actor,{create:true})).toMatchObject({member:{id}});
+  expect(profiles.create).toHaveBeenCalledTimes(1);
 });

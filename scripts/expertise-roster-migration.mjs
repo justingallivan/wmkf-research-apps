@@ -104,7 +104,7 @@ try {
         if (row.values.wmkf_leadpdeligible && user.isdisabled !== false) throw Error(`Lead-eligible source ${row.legacyId} has a disabled User.`);
       }
     }
-    plan.summary.blocked = plan.rows.filter(r => r.action === 'blocked').length;
+    for (const action of ['create', 'unchanged', 'blocked', 'exclude']) plan.summary[action] = plan.rows.filter(r => r.action === action).length;
     if (plan.blocked && mode === 'import') { writeReceipt(plan); throw Error('Import blocked; see the private per-row report.'); }
     if (mode === 'plan') { writeReceipt(plan); if (plan.blocked) process.exitCode = 1; }
     else if (mode === 'verify') {

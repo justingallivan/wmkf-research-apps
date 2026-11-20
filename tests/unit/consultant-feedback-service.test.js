@@ -4,6 +4,7 @@
  *
  * @jest-environment node
  */
+jest.mock('../../lib/dataverse/adapters/expertise-profile', () => ({ list: jest.fn() }));
 jest.mock('@vercel/postgres', () => ({ db: { connect: jest.fn() }, sql: { query: jest.fn() } }));
 import { db, sql } from '@vercel/postgres';
 import {
@@ -679,4 +680,26 @@ describe('downloadConsultantFeedbackAttachment', () => {
     await expect(downloadConsultantFeedbackAttachment({ requestId: REQUEST_ID, entryId: 9 }, failed))
       .rejects.toMatchObject({ httpStatus: 502, body: { reason: 'download_failed' } });
   });
+});
+
+
+test('Dataverse outage does not block one-off-only feedback create or update', async () => {
+  const { list } = require('../../lib/dataverse/adapters/expertise-profile');
+  process.env.EXPERTISE_ROSTER_BACKEND = 'dataverse';
+  process.env.DYNAMICS_URL = 'https://wmkf.crm.dynamics.com';
+  list.mockRejectedValue(Error('roster outage'));
+  const row = { id: 1, consultant_roster_id: null, one_off_name: 'Visiting scientist', one_off_affiliation: null,
+    received_on: '2026-09-01', body_html: '<p>Good.</p>', shared: true, requestdocument_id: null, updated_at: new Date() };
+  client.query.mockImplementation(async q => ({ rows: q.includes('SELECT') || q.startsWith('UPDATE') ? [row] : [] }));
+  try {
+    const created = await writeFeedbackEntry({ requestId: REQUEST_ID, actorProfileId: ACTOR_ID, mutationId: MUTATION_ID,
+      oneOff: { name: 'Visiting scientist' }, bodyHtml: '<p>Good.</p>', receivedOn: '2026-09-01', shared: true });
+    expect(created.oneOff).toBe(true); expect(list).not.toHaveBeenCalled();
+    const updated = await updateFeedbackEntry({id:1,requestId:REQUEST_ID,actorProfileId:ACTOR_ID,patch:{shared:false}});
+    expect(updated.oneOff).toBe(true); expect(client.query).toHaveBeenLastCalledWith('COMMIT');
+    client.query.mockClear(); row.consultant_roster_id = 5; row.one_off_name = null;
+    await expect(updateFeedbackEntry({id:1,requestId:REQUEST_ID,actorProfileId:ACTOR_ID,patch:{shared:false}})).rejects.toMatchObject({httpStatus:503});
+    expect(client.query.mock.calls.some(([q]) => q.startsWith('UPDATE'))).toBe(false);
+    expect(client.query).toHaveBeenLastCalledWith('ROLLBACK');
+  } finally { delete process.env.EXPERTISE_ROSTER_BACKEND; }
 });

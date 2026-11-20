@@ -42,7 +42,7 @@ test('lost create response plus failed binding retries same row without duplicat
     create: jest.fn(async values => { persisted = { profileGuid: PROFILE, values }; throw Error('lost response'); }),
     bind: jest.fn().mockRejectedValueOnce(Error('binding unavailable')).mockResolvedValueOnce(1),
   };
-  const first = await executeImport(p, store, { apply: true }); expect(first.verified).toBe(false); expect(first.rows[0].status).toBe('failed');
+  const first = await executeImport(p, store, { apply: true }); expect(first.verified).toBe(false); expect(first.rows[0].status).toBe('failed'); expect(first.rows[0]).toMatchObject({error:'binding unavailable',errorCode:null,httpStatus:null});
   const next = await executeImport(p, store, { apply: true }); expect(next.verified).toBe(true); expect(next.rows[0].rosterId).toBe(1);
   expect(store.create).toHaveBeenCalledTimes(1);
 });

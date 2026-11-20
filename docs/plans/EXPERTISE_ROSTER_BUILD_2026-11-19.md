@@ -1,6 +1,6 @@
 # Roster migration and Admin editor — build evidence
 
-Status: implementation and focused verification completed; review correction verification pending on `codex/expertise-roster-admin-2026-11-19`.
+Status: implementation and focused verification completed; Opus correction verification returned code ready; production execution pending on `codex/expertise-roster-admin-2026-11-19`.
 No production changes. Backend automation and app retirement remain separate.
 
 | Invariant | Surface | Verification |
@@ -20,7 +20,7 @@ Concurrency/draining/sandbox subsystems: N/A by owner direction.
 
 ## Verification and scope
 
-[VERIFIED via local commands, November 19] 363 tests across 32 focused suites pass.
+[VERIFIED via local commands, November 19] 365 tests across 32 focused suites pass.
 Includes Admin authorization/identity, create retry/prebinding failure, null User
 bind omission and atomic clear, Contact preservation across category changes,
 import field/key conflicts and health acknowledgement, historical/excluded author
@@ -32,8 +32,9 @@ invariants, API matrix, Atlas, doc currency, canonical facts/pointers, docs cata
 doc symbols/build-claim freshness, prompt-injection tagging, GUID boundaries,
 Dataverse/context/service boundaries, route lifecycle auth, secret scan, types.
 Production-mode Next.js webpack compile passed from an env-file-free source copy;
-existing dependency/dynamic-import warnings remain. A final compile after review
-corrections is pending. No application credentials or external data calls in that build.
+existing dependency/dynamic-import warnings remain. The compile after the major review
+corrections also passed. Final bounded feedback/diagnostic refinements passed their
+focused suites and scoped gates; they introduced no new imports or build configuration. No application credentials or external data calls in that build.
 
 Desktop (1280px) and mobile (390px) fixture screenshots inspected: list/editor,
 category change, text fields, identity controls, active state and Save/Cancel;
@@ -46,7 +47,9 @@ Opus 5.5 via host OAuth found two blockers in the initial implementation: null
 lookup bind and post-create binding window. Both corrected, along with save
 recovery/Contact-health/diagnostic issues; see
 [verbatim report and dispositions](EXPERTISE_ROSTER_BUILD_OPUS_REVIEW_2026-11-19.md).
-Follow-up is checking those corrections. No Ultrareview or agent API-key session.
+Follow-up verified the corrections and returned code ready with no new blockers.
+Nonblocking summary/one-off feedback outage refinements were then tested; see the
+saved review dispositions. No Ultrareview or agent API-key session.
 
 ## Contract and sweep evidence
 
@@ -76,3 +79,11 @@ null identity values), effective editor/application/Connor permissions, exact pr
 owner mappings, pending migration ledger/FK name, reference repairs, and signed-in
 acceptance. No migration/schema/role/env/deployment production action was executed.
 Use [the cutover runbook](EXPERTISE_ROSTER_CUTOVER_RUNBOOK_2026-11-19.md).
+
+Implementation commit: `40588fca3` on `codex/expertise-roster-admin-2026-11-19`.
+
+Reproduce focused tests with:
+
+```bash
+npx jest --runInBand --silent --testPathPatterns='(admin-expertise-roster|expertise-roster|expertise-finder-match-route|expertise-finder-batch|consultant-feedback|site-visit-recipient-directory|proposal-list|dynamics-service-changeset|link-roster-contacts|roster-contact)'
+```
