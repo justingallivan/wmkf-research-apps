@@ -1115,12 +1115,22 @@ const v49Statements = [
 ];
 
 // V50: Consultant Feedback slice 1 (docs/plans/CONSULTANT_FEEDBACK_PLAN_2026-09-14.md §4).
-// Mirrors migration 048.
+// Mirrors migrations 048, 103 and 104 (numeric identity exists before feedback).
 const v50Statements = [
+  `CREATE TABLE IF NOT EXISTS expertise_roster_identity (
+    id INTEGER PRIMARY KEY CHECK (id > 0)
+  )`,
+  `CREATE TABLE IF NOT EXISTS expertise_roster_binding (
+    roster_id INTEGER NOT NULL REFERENCES expertise_roster_identity(id),
+    target_host TEXT NOT NULL CHECK (target_host = lower(target_host)),
+    dataverse_profile_guid UUID NOT NULL,
+    PRIMARY KEY (roster_id, target_host),
+    UNIQUE (target_host, dataverse_profile_guid)
+  )`,
   `CREATE TABLE IF NOT EXISTS consultant_feedback (
     id                     BIGSERIAL PRIMARY KEY,
     request_id             UUID NOT NULL,
-    consultant_roster_id   INTEGER REFERENCES expertise_roster(id),
+    consultant_roster_id   INTEGER REFERENCES expertise_roster_identity(id),
     one_off_name           TEXT,
     one_off_affiliation    TEXT,
     body_html              TEXT,
@@ -2054,16 +2064,6 @@ const v25Statements = [
     output_tokens INTEGER,
     estimated_cost_cents NUMERIC(10,4),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  )`,
-  `CREATE TABLE IF NOT EXISTS expertise_roster_identity (
-    id INTEGER PRIMARY KEY CHECK (id > 0)
-  )`,
-  `CREATE TABLE IF NOT EXISTS expertise_roster_binding (
-    roster_id INTEGER NOT NULL REFERENCES expertise_roster_identity(id),
-    target_host TEXT NOT NULL CHECK (target_host = lower(target_host)),
-    dataverse_profile_guid UUID NOT NULL,
-    PRIMARY KEY (roster_id, target_host),
-    UNIQUE (target_host, dataverse_profile_guid)
   )`,
   `CREATE INDEX IF NOT EXISTS idx_expertise_roster_role_type ON expertise_roster(role_type)`,
   `CREATE INDEX IF NOT EXISTS idx_expertise_roster_active ON expertise_roster(is_active)`,
