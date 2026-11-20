@@ -18,7 +18,7 @@ Do:
 - Treat app-side Cloudmersive scanning as the approved primary defense for external upload paths (reviewer, intake), based on the tenant posture documented in the 2026-05-26 DFT exchange; verify current licensing and controls before describing that posture as current.
 - On detection, write a `system_alerts` row AND email the union of resolved category recipients plus per-event explicit recipients (the PD on the related request when resolvable). Resolve order is category → `default` → active-superuser roster; category is optional when explicit recipients are present and a sender is configured.
 - Configure the intended category and default recipients deliberately; an absent or empty category entry does not itself suppress an alert email because fallback routing exists.
-- Ship sender UX + internal alert + operational enable as a unit before flipping the flag; preserve typed text on rejection.
+- Ship sender UX + internal alert + operational enable as a unit before enabling scanning on a new surface or environment; preserve typed text on rejection.
 
 Do not:
 - Build a DFT-recipient email path — DFT does not need per-detection notifications.
@@ -52,6 +52,6 @@ DFT email exchange 2026-05-26 — locked context for the `VIRUS_SCAN_ENABLED` ro
 **Why:** Justin's concern was "we still want the review (uninfected) and we would want the sender to be informed that they may have a problem." Reviewer text loss on detection (current behavior) is unacceptable UX.
 
 **How to apply:**
-- Before flipping `VIRUS_SCAN_ENABLED=true`, ship the three workstreams (sender UX + internal alert + operational enable) as a unit.
+- Production `VIRUS_SCAN_ENABLED` is `true` (verified 2026-10-02, `docs/CREDENTIALS_RUNBOOK.md`). For any new upload surface or environment, ship the three workstreams (sender UX + internal alert + operational enable) as a unit.
 - Do NOT build a DFT-recipient email path — it adds operational overhead with no signal value.
 - See [[project-bill-honorarium-integration]] for parallel pattern on integrating external services with internal notification routing.

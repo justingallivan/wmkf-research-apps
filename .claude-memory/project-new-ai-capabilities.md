@@ -1,6 +1,6 @@
 ---
 name: AI capabilities — matching and compliance
-description: Standalone Expertise Finder retirement is production-live; Dataverse roster/Admin remain live. Backend matching is separate. Compliance status requires a fresh check.
+description: Standalone Expertise Finder retirement is production-live; Dataverse roster/Admin remain live. Backend matching is separate. Compliance screening is unbuilt; owner priority unconfirmed.
 type: project
 status: active
 scope: strategy
@@ -15,7 +15,7 @@ Do:
 - Read `docs/plans/EXPERTISE_FINDER_RETIREMENT_2026-11-19.md` for retirement release status.
 - Use the production Dataverse roster contract in `docs/plans/EXPERTISE_ROSTER_CONNOR_HANDOFF_2026-11-19.md`.
 - Keep backend matching in Connor's flow separate from the retired standalone app.
-- Recheck Compliance Screening source and owner priority; its absence was last checked July 27, not established currently.
+- Compliance Screening has no implementation in source (grep of lib/pages/shared, 2026-11-20); it exists only as a plan concept in `docs/BACKEND_AUTOMATION_PLAN.md`. Owner priority is unconfirmed.
 
 Do not:
 - Restore standalone matching as part of roster maintenance.

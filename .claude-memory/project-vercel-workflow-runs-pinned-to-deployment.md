@@ -10,7 +10,7 @@ metadata:
 ## Recall Rule
 
 Read before shipping a fix to `lib/services/transcription-pilot/worker.js` (or anything a
-transcription workflow step calls), or when a transcription job keeps failing after a deploy.
+transcription workflow step calls), or when a transcription job keeps failing after a deploy. Still current after 2026-11-19: only the standalone pilot page was retired; the shared engine, Workflow, protected pilot APIs and drain/recovery crons remain, and Meeting Tracker uses them (`docs/plans/evidence/TRANSCRIPTION_PILOT_RETIREMENT_2026-11-19.md`).
 
 [VERIFIED 2026-10-08, S586] During the transcription-queue incident, the 20,000-character cap fix
 (PR #465) deployed at about 12:55 PT, but the stuck job kept failing. Vercel logs showed the

@@ -10,7 +10,7 @@ metadata:
 
 ## Recall Rule
 
-Read before reusing peer-review upload prompts or changing Executor A7 assertions.
+Read before reusing peer-review upload prompts or changing Executor A7 assertions (`assertSystemIncludes`; live consumer today: `lib/services/pre-site-visit/proposal-core-service.js`).
 The standalone Summarize Peer Reviews page/API is retired by the November 19
 source change; see `docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md` for the source
 and deployment boundary. Its stored prompt rows, history, and original route

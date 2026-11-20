@@ -12,8 +12,7 @@ last_verified: 2026-11-19 via owner retirement decision and source inventory
 
 [VERIFIED — owner direction, 2026-11-19] Retire `/phase-i-dynamics` alongside the
 four former sunset-candidate PDF-upload apps. Source implementation and validation
-are tracked in `docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md`; this memory is not a
-production deployment receipt.
+and the Production release receipt (2026-11-20 UTC, PR #651, signed-in notice smoke) are in `docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md`; this memory is not itself a receipt.
 
 The pages become retirement notices and the old processing APIs return
 authenticated HTTP 410 responses. Original page/API implementations are retained

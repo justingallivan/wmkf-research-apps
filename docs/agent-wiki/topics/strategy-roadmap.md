@@ -84,8 +84,9 @@ document inventory, and individual implementation plans do not establish priorit
 - **Unfinished product threads:** the [bounded backlog audit](../../audits/product-backlog-reconciliation-2026-10-31.md)
   separates J27 intake/triage, corpus extraction/browsing, cycle readiness,
   calendar-event agendas and Chairs-specific work from existing foundations.
-  Grant Reporting integration and Literature Analyzer disposition remain owner
-  decisions. Bulk Export and corpus indexing partly supersede the historical
+  The standalone Grant Reporting and Literature Analyzer apps were retired 2026-11-19
+  (`docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md`); the reuse destination for their
+  preserved capabilities remains an owner decision. Bulk Export and corpus indexing partly supersede the historical
   retrospective plan; concept eligibility and the successor Review Panel do not
   implement the old staged proposal pipeline. The canonical queue retains priority.
 - **S2AFF:** retained as a possible comparator after the prior skip recommendation was

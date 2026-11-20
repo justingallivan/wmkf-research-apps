@@ -1,23 +1,23 @@
 ---
 name: Interim grant report auto-evaluation
-description: Interim-report evaluation concept with reusable extraction plumbing; destination and implementation scope are undecided pending product-direction review
+description: Interim-report evaluation concept with reusable extraction plumbing; destination and implementation scope remain undecided after the 2026-11-19 standalone Grant Reporting retirement
 type: project
 originSessionId: 855d17dc-8935-4bc6-88a5-cb73f4cb1b2d
 status: active
 scope: dynamics
-last_verified: 2026-10-22
+last_verified: 2026-11-20 via source (lookup/extract services, 410 routes) and the APP_SUITE retirement receipt
 ---
 
-**Verification scope:** owner direction recorded 2026-10-21 was read alongside the current source pointers on 2026-10-22. No privilege or live SharePoint probe was run.
+**Verification scope:** owner direction recorded 2026-10-21 and the 2026-11-19 retirement record were read alongside the current source pointers on 2026-11-20. No privilege or live SharePoint probe was run.
 
 ## Recall Rule
 
 Read this when: revisiting whether and where to automate yearly interim-report evaluation after the Grant Reporting product direction is decided.
 
 Do:
-- Reuse the bucket + Graph plumbing from `lib/services/grant-reporting/extract-service.js` and `lib/utils/sharepoint-buckets.js` if the owner selects this capability for implementation. The proposal-versus-report evaluation purpose and reusable document-discovery plumbing remain useful.
+- Reuse the preserved document-discovery plumbing (`lib/services/grant-reporting/lookup-grant-service.js` with `lib/utils/sharepoint-buckets.js`) and the preserved `compareProposalToReport` in `lib/services/grant-reporting/extract-service.js` if the owner selects this capability for implementation. Both are preserved for reuse; no live route calls them since the 2026-11-19 retirement.
 - First confirm with Connor which `akoya_request` field holds the staff evaluation (or whether a new `wmkf_ai_interim_evaluation` field is needed); get real past examples before writing the prompt.
-- Read `.claude-memory/project-grant-reporting-rework.md` before choosing a destination, scope, or timeline: the 2026-10-21 owner direction leaves those undecided and supersedes this older plan's fixed Grant Reporting UI and Power Automate endpoint proposal.
+- Read `.claude-memory/project-grant-reporting-rework.md` before choosing a destination, scope, or timeline: the 2026-11-19 retirement (which followed the 2026-10-21 direction) leaves those undecided and supersedes this older plan's fixed Grant Reporting UI and Power Automate endpoint proposal.
 
 Do not:
 - Treat the older small-UI plus PA-callable endpoint proposal below as an approved destination or build order. It is historical planning pending the owner direction review.
@@ -33,7 +33,7 @@ The retired Grant Reporting interface handled final reports; its assessment and 
 This older proposal suggested the following implementation path. It is retained as a dated design idea, not current direction:
 
 - PowerAutomate triggers on a Dynamics status change (e.g., interim report attached / status flips to "interim received")
-- Backend endpoint pulls the new report from SharePoint (via the same `getRequestSharePointBuckets` + `GraphService.listFiles` path Grant Reporting already uses)
+- Backend endpoint pulls the new report from SharePoint (via the same `getRequestSharePointBuckets` + `GraphService.listFiles` path the now-retired Grant Reporting lookup used; preserved in `lookup-grant-service.js`)
 - Claude generates the evaluation against the original proposal — likely a thinner version of the existing `compareProposalToReport` helper, focused on year-over-year progress rather than final-narrative completeness
 - Result is written back to the staff evaluation field on the request record
 
@@ -46,5 +46,5 @@ checks before implementation or smoke. Steps:
 
 1. Identify (with Connor) which `akoya_request` field holds the staff evaluation today, or whether a new `wmkf_ai_interim_evaluation` field is needed. (Field Set B fields were deployed 2026-05-07; check if there's already a suitable target.)
 2. Build the prompt to mirror what staff actually write — get a few real examples from past evaluations first.
-3. Reuse the bucket + Graph plumbing from `lib/services/grant-reporting/extract-service.js` and `lib/utils/sharepoint-buckets.js`; the document discovery work is already done.
+3. Reuse the bucket + Graph plumbing from `lib/services/grant-reporting/lookup-grant-service.js` and `lib/utils/sharepoint-buckets.js`; the document discovery work is already done.
 4. The old proposal selected a stateless Power Automate-callable endpoint (service-token auth) and a small Grant Reporting UI for staff preview/override. Revisit this destination only after the owner selects the future home and scope.

@@ -1,6 +1,6 @@
 ---
 name: project-reviewer-finder-proposal-doc-context
-description: Current-cycle Reviewer Finder keeps its exact Reviewer Materials/Phase I resolver; next cycle uses separate exact AI Materials narrative and bibliography inputs.
+description: Reviewer Finder loads exactly one proposal file, in order AI Materials/Narrative-Bibliography (J27, D60), Reviewer Materials/Proposal, Phase I/ProjectDescription, then the picker; never heuristic selection.
 metadata:
   type: project
   status: active
@@ -30,7 +30,7 @@ reviewer package at exactly:
 Reviewer Finder's default load prefers that exact file in the active
 Dynamics-associated request folder. When it is absent, the current-cycle
 compatibility rule selects exactly one active `Phase I/ProjectDescription.pdf`.
-It does not use `classifyFile`, best-guess selection, archive files, or
+It does not select by `classifyFile` (which only labels the listed files), best-guess selection, archive files, or
 neighboring PDFs. A duplicate canonical file remains an error; a missing or
 ambiguous fallback returns the server-listed picker before download/Blob write.
 An explicit authenticated `fileKey` remains available only for deliberate
@@ -55,19 +55,27 @@ selected it without staff input. [VERIFIED via source + focused tests; request
 file availability verified 2026-08-01 via owner correction + read-only
 Dataverse/SharePoint probe]
 
-Initial Assessment and Field Primer no longer share that source. Their exact
-internal input is `AI Materials/ProposalNarrative_{Request#}.pdf`; the
-current-cycle Reviewer Finder resolver above is intentionally unchanged.
+J27 (D23/D60 in `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`, owner-confirmed
+2026-11-10): Reviewer Finder's input is one combined
+`AI Materials/Narrative-Bibliography_{Request#}.pdf`, built by Connor's flow. The
+loader takes it first when exactly one exists, and only then falls back to the
+`Reviewer Materials/Proposal_` and `Phase I/ProjectDescription.pdf` rules above
+[VERIFIED 2026-11-20 via `lib/services/reviewer-finder/load-proposal-service.js`
+combined-then-canonical-then-fallback order; commit `f43f2db77` is an ancestor of
+Production merge SHA `ce4bc2618`]. More than one combined file is a 409. Whether
+Connor's flow now creates the file on real J27 requests is UNKNOWN (probe: an
+owner-run read-only listing of one J27 request's `AI Materials` folder). The
+existing reviewer prompt ranks names mentioned in the proposal first and authors
+from references second, so the bibliography should improve proposal-grounded yield.
 
-The next cycle combines Phase I + Phase II into a single submission and will
-collect a bibliography at initial submission. The exact forward contract is
-two separate files: `AI Materials/ProposalNarrative_{Request#}.pdf` and
-`AI Materials/ProposalBibliography_{Request#}.pdf`. Reviewer Finder will load
-and separately label both for Claude, dropping budget PDF/Excel,
-governing-board material, and biosketches. The existing reviewer prompt ranks
-names mentioned in the proposal first and authors from references/citations
-second, so the bibliography should improve proposal-grounded reviewer yield.
-The filenames are decided; the Reviewer Finder cutover remains planned.
+Initial Assessment and Field Primer read a different source: exactly one of
+`AI Materials/ProposalNarrative_`, `AI Materials/Project-Narrative_` or
+`Submission-Documents/Project-Narrative_` `{Request#}.pdf` (D59;
+`lib/utils/proposal-document-names.js`).
+
+Superseded intent (2026-10, before D60): two separate files,
+`AI Materials/ProposalNarrative_` and `AI Materials/ProposalBibliography_`, loaded and
+labeled separately. Not built; do not plan from it.
 
 ## Why
 Reviewer-finder quality is gated by the proposal context it sees. Phase I's thin, bibliography-less narrative starves Claude's named/cited reviewer sources. The combined cycle is the moment to fix the inputs with a clean narrative plus a separately governed bibliography, which is higher-leverage than tweaking discovery code.

@@ -46,15 +46,15 @@ Read this before adding a new prompt, writing/editing a seed script, or touching
   the Codex pre-impl BLOCKER — the old seeds did an in-place overwrite + `version:1` reset.)
 - Duplicate-current → force refuses (resolve in Dynamics; no auto-repair). Post-create verification
   asserts exactly one current (no alternate key on `promptname` — probed S269).
-- Current callers are the grantee title/abstract, Initial Assessment, Review
-  Synthesis, and Pre-Site Visit proposal-core seed scripts. The Pre-Site seed
+- Current `prompt-seed.js` importers (grep 2026-11-20) are the grantee title/abstract, Initial Assessment, Review
+  Synthesis, Pre-Site Visit proposal-core, review-panel, cycle-dossier, four meeting-prompt, and tool-app (`seed-tool-prompts.js`) seed scripts. The Pre-Site seed
   published v1, then version-preserving `--force` published sole-current v2
   after the first controlled document failed layout acceptance. Signed-in Admin
   publication subsequently created sole-current v3 with the revised page-length
   and personnel instructions. On 2026-08-18 the audited Admin publisher created
   sole-current v4 with the tracked resilience output schema and preserved body,
   system prompt, variables, model, temperature, and token settings. Legacy upsert seeds (`phase-ii`, `reviewer-finder`,
-  `peer-review-summarizer`, `phase-i-summary`) remain a separate audited sweep.
+  `peer-review-summarizer`, `phase-i-summary`, `field-primer`, `echo-parity`) still update the existing row in place at version 1 and remain a separate audited sweep. Do not re-run them against rows preserved by the 2026-11-19 interface retirement (`phase-ii.*`, `peer-review-summarizer.*`, `phase-i.summary`): those rows stay stored as they were, and Admin's `application` usage fallback still blocks retiring them (`docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md` § Durable data boundary).
 
 **Pre-Site resilience boundary recorded 2026-08-18:** that review reported
 pre-side-effect validation of body, variables, schema and assertions, full

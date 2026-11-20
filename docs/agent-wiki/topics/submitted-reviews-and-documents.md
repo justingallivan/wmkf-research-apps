@@ -90,8 +90,9 @@ membership plus one same-request Ready/non-Superseded Consultant Feedback
 registry row before Graph. PDFs open inline and DOCX files download. The tab
 also has local All / Shared / Not shared filters and a name/affiliation-searchable,
 keyboard-first roster combobox; neither adds persistence or roster writes. A
-profile link remains deferred because Expertise Finder exposes no stable
-consultant deep-link and is separately access-gated.
+profile link remains deferred: the standalone Expertise Finder was retired
+2026-11-19, and the shared roster now lives in superuser-only Admin
+(`/admin?workspace=people&view=expertise-roster`), which has no per-consultant deep link.
 
 **Phase 1 LIVE (S326; deployed, browser-drive-verified against live acceptance data; reminder safety production-observed 2026-09-01):** outstanding tracking + manual nudge. The owner lifted the procedural manual reminder freeze after the incident-session deployment/smoke observations and a post-deploy D26 liveness audit of 51 never-reminded sweep candidates found zero blocked rows. The deployment metadata did not expose a source SHA, and the authenticated smoke has no tracked artifact. The DTO
 (`reviewers.js` GET) adds `submitted` (accepted-reviewer submission status),

@@ -5,7 +5,7 @@ type: project
 originSessionId: e2e4c03f-8046-4d90-a1fd-93c1bb8256d1
 status: active
 scope: prompt
-last_verified: 2026-07-27 via owner decision, docs/EXECUTOR_CONTRACT.md, and current prompt-resolution source
+last_verified: 2026-11-20 via retirement docs and tool-prompt-resolver caller search (principle: owner decision 2026-07-27)
 ---
 
 ## Recall Rule
@@ -15,7 +15,7 @@ Read this when: creating a new staff-facing prompt, or deciding where a prompt s
 Do:
 - Default new staff-facing prompts to `wmkf_ai_prompt`, not `.js`; treat `shared/config/prompts/*.js` as legacy/fallback.
 - Keep the `<domain>.<purpose>` naming convention (e.g. `phase-i.summary`).
-- Decide prompt storage separately from execution. A Dataverse-backed prompt may be consumed through the shared Executor or through an app-specific resolver/composer and LLM client; Expertise Finder's tool path uses the latter.
+- Decide prompt storage separately from execution. A Dataverse-backed prompt may be consumed through the shared Executor or through an app-specific resolver/composer and LLM client; Expense Reporter (`pages/api/process-expenses.js` via `tool-prompt-resolver.js`) and Reviewer Finder (`reviewer-prompt-resolver.js`) use the latter.
 - When touching a user-driven app for any reason, consider moving staff-editable prompt content to Dataverse when the migration is small. That does not by itself require Executor adoption.
 
 Do not:
@@ -33,6 +33,6 @@ A user can run with their own customized variant — the Executor supports `over
 **How to apply:**
 - New prompts default to `wmkf_ai_prompt`, not `.js`. The `.js` modules in `shared/config/prompts/` should be considered legacy / fallback only.
 - When a user-driven app gets touched for any other reason, consider moving staff-editable prompt content to Dynamics if the storage change is small. Choose the execution path separately from the storage location.
-- Expertise Finder's tool-app prompt rows are already read from Dataverse through `tool-prompt-resolver.js`; the apps retain their own `LLMClient` calls and do not thereby become Executor consumers. See `docs/agent-wiki/topics/prompt-executor.md` for that current seam. Grant Reporting remains subject to its own owner and contract decisions; this principle does not require retrofitting it.
+- Since the 2026-11-19 retirements, the only live tool-app consumer of `tool-prompt-resolver.js` is Expense Reporter (`pages/api/process-expenses.js`); it keeps its own `LLMClient` call and is not an Executor consumer. The multi-perspective, funding-gap, literature-analyzer and Expertise Finder rows remain stored after their interfaces retired (`docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md`, `docs/plans/EXPERTISE_FINDER_RETIREMENT_2026-11-19.md`); retirement is not unpublication. See `docs/agent-wiki/topics/prompt-executor.md` for that seam. Grant Reporting's interface is retired; its preserved assessment service remains subject to its own owner and contract decisions, and this principle does not require retrofitting it.
 - Truly internal/plumbing prompts (e.g., contact enrichment, email personalization) can stay in `.js` indefinitely — they're not staff-facing and Justin is the only person who'd ever read them.
 - Naming: keep the `<domain>.<purpose>` convention (`phase-i.summary`, `phase-ii.summary`, `peer-review.summary`, `grant-report.extract`).

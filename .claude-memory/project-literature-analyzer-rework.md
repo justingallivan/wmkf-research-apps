@@ -11,8 +11,7 @@ last_verified: 2026-11-19 via owner retirement decision and caller inventory
 
 [VERIFIED — owner direction, 2026-11-19] Retire the standalone Literature Analyzer.
 This resolves the October 21 request to reassess the outdated app. The source
-change is tracked in `docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md`; deployment is
-a separate step.
+change and its Production release receipt (2026-11-20 UTC, PR #651) are in `docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md`.
 
 The uploaded-paper extraction, cross-paper synthesis/comparison, and JSON/Markdown
 export implementations are preserved under `_archived/`. Prompt templates,

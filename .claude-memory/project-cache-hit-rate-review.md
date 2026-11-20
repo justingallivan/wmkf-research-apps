@@ -11,7 +11,7 @@ metadata:
 
 The project-wide prompt-caching audit is complete. Its root remediation merged as `4fa53c7e`
 (S341): R1 added keyed stable nonces for opt-in untrusted-content wrappers, R3 applied them
-to Q&A, and the Executor now uses the same approach for identical reruns. See
+to Q&A (`/api/qa`, retired to a 410 stub 2026-11-19, so R3 yield is now moot), and the Executor now uses the same approach for identical reruns. See
 `docs/PROMPT_CACHING_AUDIT.md` for the July 2026 census and implementation record.
 
 **R4 closed 2026-09-19 (Session 524):** the July belief that the Executor needed a
@@ -27,14 +27,14 @@ the Executor prompts that batch are `cycle-dossier.entry` (Opus 5, measured mark
 1841–2258). Pre-fix rows show every document writing its own entry and none reading; the
 post-fix cross-document read is pending the first post-fix batch (closing check:
 `--since 2026-09-19T19:48:00Z`, expect later documents' `cache_read` ≈ first document's
-`cache_create`). `phase-i.summary` has been idle since 2026-04-25.
+`cache_create`). `phase-i.summary` has been idle since 2026-04-25 and has had no live caller since its routes were retired on 2026-11-19.
 
 **Remaining work (data-gated, not code-gated):** the review panel system blocks DO cache
 on Opus 5 (seat row v2 measured 552, chair v3 801; the seat resolved to Opus 5 in the
 2026-09-17 row although source defaults it to Fable 5.1 — override config not read). The
 open panel question is only the unmarked user turn holding the proposal. A user-turn
 breakpoint is net-negative unless the same proposal is re-sent within the TTL; check
-`wmkf_ai_run` timestamps first. R5 remains conditional on repeat-within-TTL usage from
+`wmkf_ai_run` timestamps first. R5's live item (`composeScorePrompt`) remains conditional on repeat-within-TTL usage (its `process-phase-i-writeup` item is moot; that route was retired 2026-11-19) from
 `api_usage_log`. The Executor does not write `api_usage_log`, so its hit rate is visible
 only in run-row notes (`wmkf_ai_run` in Dataverse, not Postgres).
 

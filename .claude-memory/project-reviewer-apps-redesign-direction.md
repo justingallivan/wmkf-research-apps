@@ -36,7 +36,7 @@ History: dated release checkpoints (2026-07-29 → 2026-09-02), the S194–S206 
 
 ## Current source-backed state (verified 2026-08-31)
 
-- [VERIFIED via local `pages/workbench/[requestId].js`, 2026-11-04] The Workbench has [10](../docs/CANONICAL_COUNTS.md#workbench-tab-count) top-level tabs, with zero placeholders. The redundant Status tab is removed in local source; Overview retains the read-only status display. Deployment of this removal has not been verified.
+- [VERIFIED via local `pages/workbench/[requestId].js`, 2026-11-04] The Workbench has [10](../docs/CANONICAL_COUNTS.md#workbench-tab-count) top-level tabs, with zero placeholders. The redundant Status tab is removed in local source; Overview retains the read-only status display. Removal commit `dc3eb5233` is an ancestor of Production merge SHA `ce4bc2618` (READY 2026-11-20 UTC per the APP_SUITE_RETIREMENT receipt); the live tab bar has not been observed.
   The former Pre-Site/Site
   Visit pair now presents as the unified Staff Deliberations workspace, and
   Final Writeup is a readiness-gated same-item handoff/workspace rather than a
@@ -124,8 +124,10 @@ The following preserves the S195 product framing. It is not proof that the
 listed automation or staged-pipeline contracts were built or remain approved.
 Current J27 intake decisions are in `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`;
 source/Git boundaries are in `docs/audits/product-backlog-reconciliation-2026-10-31.md`.
-Grant Reporting integration and Literature Analyzer disposition remain owner
-decisions recorded in their separate memories.
+Grant Reporting and Literature Analyzer standalone interfaces were retired
+2026-11-19 (owner decision; capabilities, prompts and data preserved); see their
+separate memories and `docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md`. The launcher
+list below predates that retirement and is historical only.
 
 **Three tiers considered then, per-request as the spine:**
 

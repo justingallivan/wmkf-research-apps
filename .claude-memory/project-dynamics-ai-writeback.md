@@ -53,7 +53,7 @@ Note: "compliance" task label was renamed to **Check-in** in v3.
 
 - `wmkf__ai_summary` (double underscore) exists on `akoya_request` alongside the real `wmkf_ai_summary` — cruft, Connor will delete. **Still present as of S209 (2026-06-01) — not yet deleted; akoya_request now carries 39 `wmkf_ai_*` attributes total, field sets A–D all confirmed deployed.** Do not target it.
 - `wmkf_ai_rundatetime` exists on `wmkf_ai_run` but is vestigial — use built-in `createdon` instead. Do not write to `wmkf_ai_rundatetime`.
-- **`wmkf_ai_rawoutput` cap is 1,000,000 chars** (Connor raised it from the 2000-char default on 2026-04-14). `DynamicsService.logAiRun` still truncates with a `…[truncated N chars]` marker as a safety valve, but real Grant Reporting payloads (5-15k) are nowhere near the cap. `wmkf_ai_notes` is still on the 2000-char default — keep notes short.
+- **`wmkf_ai_rawoutput` cap is 1,000,000 chars** (Connor raised it from the 2000-char default on 2026-04-14). `DynamicsService.logAiRun` still truncates with a `…[truncated N chars]` marker as a safety valve, but historical Grant Reporting payloads (5-15k; interface retired 2026-11-19) were nowhere near the cap. `wmkf_ai_notes` is still on the 2000-char default — keep notes short.
 
 ## Deployment snapshot (last probed through 2026-06-01/S209)
 
@@ -85,6 +85,6 @@ Verified 2026-05-14: `wmkf_ai_run` is not in `TABLE_ANNOTATIONS` (the `entitySet
 
 ## Writeback TODOs
 
-- **Reusable "don't clobber" helper.** `DynamicsService.updateIfEmpty(entitySet, guid, fieldName, value, { overwrite })` now exists and is covered by unit tests. Remaining work is production route adoption for additional user-initiated writebacks; server-side 409-on-conflict is the contract, so do not reimplement the pattern in individual endpoints.
-- **Historical standalone lookup UX proposal:** `/api/grant-reporting/lookup-grant` is an authenticated HTTP 410 stub in the 2026-11-19 retirement source. Do not extend that retired endpoint. If a future reviewed adapter introduces writeback, revisit showing existing target values before submit; the preserved Grant Reporting extraction service has no Field Set B save-to-request implementation.
+- **Reusable "don't clobber" helper.** `DynamicsService.updateIfEmpty(entitySet, guid, fieldName, value, { overwrite })` now exists and is covered by unit tests. No production route calls it (grep 2026-11-20); remaining work is route adoption for user-initiated writebacks. The preserved `lib/services/phase-i-dynamics/summarize-service.js` (no active route since the 2026-11-19 retirement) remains the reference preflight-409 + If-Match pattern; server-side 409-on-conflict is the contract, so do not reimplement the pattern in individual endpoints.
+- **Historical standalone lookup UX proposal:** `/api/grant-reporting/lookup-grant` is an authenticated HTTP 410 stub in the 2026-11-19 retirement source. Do not extend that retired endpoint. If a future reviewed adapter introduces writeback, revisit showing existing target values before submit; the preserved Grant Reporting extraction service has no Field Set B save-to-request implementation, so its best-effort `wmkf_ai_run` raw output may be the only durable copy of a generated assessment — do not delete or hash historical outputs as incidental cleanup (`docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md`).
 - **Rule of thumb:** user-initiated flows check for existing data; backend/PowerAutomate flows can overwrite freely (they're authoritative reruns, not accidents).

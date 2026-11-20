@@ -26,7 +26,7 @@ Do not:
 
 Ground truth: `docs/EXECUTOR_CONTRACT.md`, `docs/PROMPT_STORAGE_DESIGN.md`,
 `docs/WORKFLOW_CHAINING_DESIGN.md`, `lib/services/execute-prompt.js`, and the
-preserved Phase I summarize-v2 service and archived route implementation. The standalone route is an authenticated HTTP 410 stub in the 2026-11-19 retirement source; this does not remove the Executor or stored prompt rows. The prompt schema was probed live
+archived Phase I summarize-v2 route implementation (`_archived/pages/api/phase-i-dynamics/summarize-v2.js`, which called `executePrompt` directly; the preserved `lib/services/phase-i-dynamics/summarize-service.js` is the legacy v1 LLMClient path, not an Executor consumer). The standalone route is an authenticated HTTP 410 stub in the 2026-11-19 retirement source; this does not remove the Executor or stored prompt rows. The prompt schema was probed live
 2026-04-24; the most recent retained row-count snapshot is 2026-07-12.
 
 ## Current boundary

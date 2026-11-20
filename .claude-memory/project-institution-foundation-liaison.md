@@ -12,7 +12,7 @@ metadata:
 
 ## Recall Rule
 
-Read this when: surfacing `akoya_request` person fields anywhere (bulk export, Grant Reporting auto-fill, contact enrichment, Reviewer Finder COI).
+Read this when: surfacing `akoya_request` person fields anywhere (bulk export, contact enrichment, Reviewer Finder COI; the standalone Grant Reporting auto-fill was retired 2026-11-19).
 
 Do:
 - For Research, take the Liaison from the applicant account's `primarycontactid` via `lib/services/contacts/request-liaison.js`; label `akoya_primarycontactid` as the Request's copy ("Request Primary Contact (copy)"). Either way the Primary Contact is the foundation liaison / grant steward role (President's office for large gifts) — NOT the PI.
@@ -37,4 +37,4 @@ Ground truth: user-attested S159 (WMKF authority, behavioral-signature corrobora
 
 **Why:** a populated, real-looking person-name column labeled "Primary Contact" is the *plausible-wrong-answer* trap — an analyst will assume it's the researcher and mis-attribute (e.g. a genomics grant to a university President or a grants officer). The field is the institution's contact-of-record, a relationship/stewardship role, not scientific authorship.
 
-**How to apply:** any surface exposing these (Power Tools bulk export [[project-dataverse-power-tools]], Grant Reporting auto-fill, contact enrichment, Reviewer Finder COI) must label `akoya_primarycontactid` as the foundation liaison / grant steward (President's office for large gifts) **never as the PI**, and surface `wmkf_projectleader` as the PI for research-scoped data (with `N/A — no PI (non-research process)` where structurally absent, never blank). Fill is 70%/77% mig/nat globally but **migrated-era fill is institution-variable (~41–79% observed)** — render null as the not-captured sentinel, never blank. Distinct from the reviewer-identity fragmentation problem ([[reviewer-identity-fragmentation]]) and contact promotion ([[project-contact-promotion-permission]]), though all three concern the dirty/auto-created `contact` surface.
+**How to apply:** any surface exposing these (Power Tools bulk export [[project-dataverse-power-tools]], contact enrichment, Reviewer Finder COI, and any future home of the preserved Grant Reporting lookup service) must label `akoya_primarycontactid` as the foundation liaison / grant steward (President's office for large gifts) **never as the PI**, and surface `wmkf_projectleader` as the PI for research-scoped data (with `N/A — no PI (non-research process)` where structurally absent, never blank). Fill is 70%/77% mig/nat globally but **migrated-era fill is institution-variable (~41–79% observed)** — render null as the not-captured sentinel, never blank. Distinct from the reviewer-identity fragmentation problem ([[reviewer-identity-fragmentation]]) and contact promotion ([[project-contact-promotion-permission]]), though all three concern the dirty/auto-created `contact` surface.

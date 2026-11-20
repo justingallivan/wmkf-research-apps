@@ -270,10 +270,11 @@ search limits: `docs/audits/product-backlog-reconciliation-2026-10-31.md`.
   scaled text extraction, admin browsing/analyses, scheduled refresh and
   Dataverse promotion remain separately approved work. Pre-2018 stays parked.
   Plan: `docs/plans/RESEARCH_REQUEST_FILE_CORPUS_PLAN_2026-10-25.md`.
-- **Grant Reporting and Literature Analyzer — product decisions open.** Both
-  standalone apps remain implemented. Grant Reporting's future integration
-  destination and Literature Analyzer's role/reuse need owner decisions;
-  neither is an unbuilt app or authorized retirement. Read their routed memories.
+- **Grant Reporting and Literature Analyzer — standalone apps retired 2026-11-19; reuse destinations open.**
+  Both interfaces are 410/notice retirements in Production (PR #651); capabilities,
+  prompts and data are preserved. Where the preserved assessment and paper-analysis
+  capabilities should live next still needs an owner decision. See
+  `docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md` and their routed memories.
 - **Interim-report evaluation — contract undecided.** Existing final-report
   comparison and document-discovery plumbing are not a dedicated annual
   progress evaluation or staff-field writeback. See
@@ -427,7 +428,7 @@ search limits: `docs/audits/product-backlog-reconciliation-2026-10-31.md`.
   applies the owner's Awardees rule below; `InitialAssessmentsPanel.js` takes the shell's
   cycle and a D26 deep link renders the existing explanatory card; the two legacy pages
   redirect; (5) the approved stragglers, split read-side / write-side: (5a) read-side —
-  **built 2026-09-08 in PR #208 (`claude/cycle-stragglers-read`)**: Expertise Finder's Batch tab
+  **built 2026-09-08 in PR #208 (`claude/cycle-stragglers-read`)**: Expertise Finder's Batch tab (retired 2026-11-19; APIs removed)
   opens on the working cycle and `/api/expertise-finder/proposals` takes `cycleCode`
   (compiled to a `wmkf_meetingdate` range) instead of the `akoya_fiscalyear` string,
   and request search rejects an unknown cycle label with a 400 instead of falling

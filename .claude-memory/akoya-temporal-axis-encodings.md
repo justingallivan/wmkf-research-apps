@@ -18,7 +18,7 @@ Read this when: building any cohorting/cycle-filter or temporal-axis UI over `ak
 
 Do:
 - A request's cycle is the Grant Cycle row it links to (`akoya_request.wmkf_grantcycle`), never its meeting date (owner, 2026-10-29; `docs/plans/MEETING_DATE_RETIREMENT_PLAN_2026-10-29.md`). In app code use `lib/dataverse/adapters/operations-grant-cycle.js`: `linkedCycleFilter(code)` for "in cycle X", `noLinkedCycleFilter()` for "No cycle", `linkedCycleExpand()` on the read, `linkedCycleCode(row)` for membership. Every read whose rows reach `linkedCycleCode` must carry the expand, or the row silently has no cycle. No meeting-date fallback; a gap is fixed in Dynamics data.
-- No link, or a link to a historical (non-J/D) row, means no cycle; never coerce it into a cycle. Surface it explicitly where the consumer supports that path. `meetingDateToCycleCode` / `cycleCodeToOdataFilter` remain in `lib/utils/cycle-code.js` for scripts and the Test Request Factory only (Factory moves in build step 5).
+- No link, or a link to a historical (non-J/D) row, means no cycle; never coerce it into a cycle. Surface it explicitly where the consumer supports that path. `meetingDateToCycleCode` / `cycleCodeToOdataFilter` remain in `lib/utils/cycle-code.js` for scripts only (the meeting-date check and several probe/backfill scripts); the Test Request Factory now uses `linkedCycleCode`.
 - In Workbench, use the shell-supplied cycle for Final Writeups and Initial Assessments. Final Writeups has an explicit selector and a manual newest-cycle fallback when no usable rows are available; that fallback does not automatically select a cycle. Awardees shares the shell cycle and offers last-decided as an alternative (`shared/components/workbench/WorkbenchShell.js:77-147,297-329`; `shared/components/workbench/InitialAssessmentsPanel.js:21-56`; `shared/components/final-writeups/FinalWriteupsViews.js:552-578,633-694,805-814`).
 - Use `wmkf_meetingdate` only as a date (display, ordering) until the later retirement steps move those too; Board dates come from the cycle calendar (`listBoardDates`).
 
@@ -42,7 +42,7 @@ Related: [[dataverse-export-floor-scoping]]
 
 ## Historical implementation snapshot — superseded design notes (source state reviewed through S499)
 
-The following body is preserved verbatim from the prior memory. Its rollout assumptions and consumer predictions are historical; use the Recall Rule and current Workbench propagation above for current guidance.
+The following body is preserved from the prior memory, except that two caller notes were updated on 2026-11-20 for the Expertise Finder retirement. Its rollout assumptions and consumer predictions are historical; use the Recall Rule and current Workbench propagation above for current guidance.
 
 On `akoya_request`, `wmkf_meetingdate` is the single canonical temporal field for board-cycle work. There are not multiple independent time dimensions for cohorting — there is one, with three encodings:
 
