@@ -67,6 +67,11 @@ Admin roster reload passed with the active roster, including Amy.
 
 All PR CI checks passed (Tests run `44657934091`), including full Jest, production
 build, repository gates and Postgres integration; security scans and CodeQL passed.
+Post-merge verification also passed: runtime merge `6ae809f98` has green Tests,
+Postgres integration, E2E and all scans. Documentation head `09041225a` has green
+Tests, all scans and Vercel; CodeQL run `44660911502` completed successfully.
+Docs-only integration/E2E reruns were skipped appropriately. This is the verified
+pre-stop CI checkpoint; the later stop commit changes documentation only.
 The first CI attempt caught a historical document pointer to the archived route;
 that pointer was corrected before the successful run.
 
