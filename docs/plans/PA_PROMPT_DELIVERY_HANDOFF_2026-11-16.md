@@ -42,9 +42,9 @@ the older `wmkf_ai_summary`, not Executive Summary.
 
 ## Worksheet baseline, not silently replaced by experiments
 
-Historical extraction: `docs/plans/PREFLIGHT_PROMPTS_HANDOFF_2026-11-10.md` on
-`codex/power-automate-integration-2026-11-11` (also inherited by the retained Summary
-branch). Original uncommitted workbook:
+Historical extraction: [pre-flight prompts handoff](PREFLIGHT_PROMPTS_HANDOFF_2026-11-10.md)
+(copied to `main` 2026-11-19 from the parked branches; branch contents:
+[parked branch inventory](PARKED_EXECUTOR_BRANCH_INVENTORY_2026-11-19.md)). Original uncommitted workbook:
 `J27_Review_Workbook_Mockup_v10.1 (edited by SH, JG, CN, DS 11.10.26).xlsx`,
 sheet `1 Review (staff master)`.
 
