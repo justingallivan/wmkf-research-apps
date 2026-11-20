@@ -11,7 +11,7 @@ related:
   - pages/api/dynamics-explorer/chat.js
   - scripts/ab-phase-i-prompts.js
   - lib/services/multi-llm-service.js
-  - pages/api/expertise-finder/match.js
+  - _archived/pages/api/expertise-finder/match.js
 ---
 
 # Prompt Caching Plan
