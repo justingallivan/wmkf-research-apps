@@ -48,7 +48,8 @@ async function main() {
     if (privileges.missing.length) throw Error('Roster privileges are not ready; retry after schema publishing.');
     // Staff User lookup requires AppendTo on User; reader needs none of those rights.
     if (operations.includes('Append')) {
-      const userPrivileges = await roles.resolvePrivilegeIds(client, 'systemuser', ['Read', 'AppendTo']);
+      // systemuser metadata names these prvReadUser/prvAppendToUser.
+      const userPrivileges = await roles.resolvePrivilegeIds(client, 'User', ['Read', 'AppendTo']);
       if (userPrivileges.missing.length) throw Error('User lookup privileges unavailable.');
       privileges.resolved.push(...userPrivileges.resolved);
     }

@@ -1,7 +1,9 @@
 # Expertise Profiles and numeric roster bridge
 
-**[VERIFIED via branch source, 2026-11-19; not deployed or provisioned here.]**
-Production cutover remains an operator action. `EXPERTISE_ROSTER_BACKEND` unset,
+**[VERIFIED via production preflight and deployment, 2026-11-19.]**
+Schema, roles and migration 103 are provisioned; new code is deployed in Postgres mode.
+Import/cutover await the Amy Rowat active-state decision; see the
+[execution checkpoint](../plans/EXPERTISE_ROSTER_PRODUCTION_EXECUTION_2026-11-19.md). `EXPERTISE_ROSTER_BACKEND` unset,
 empty, or `postgres` retains Postgres; `dataverse` selects the production-only
 adapter; unknown values fail closed. See the [runbook](../plans/EXPERTISE_ROSTER_CUTOVER_RUNBOOK_2026-11-19.md).
 
@@ -15,14 +17,16 @@ reference string, intentionally not a cascading relationship. It survives catego
 changes and deactivation. Contact/User alternate keys reserve links across inactive
 and active rows; creation key makes create retries recoverable. No hard delete.
 Auditing at organization, entity and editable-column levels and all three Active
-keys are import prerequisites. Actual metadata/effective rights need production proof.
+keys passed the live import preflight. Editor/application effective rights were verified;
+Connor retains broader existing rights.
 
 Writes: `/api/admin/expertise-roster` (`requireSuperuser`, trusted DAL context,
 authenticated mapped User, impersonation required, no fallback) → `roster-service`
 → adapter. POST requires a stable mutation UUID; PATCH carries the loaded ETag.
 Admin UI: People & Access → Expertise Roster. Contact and User lookups use that
 same Admin guard, independent of Expertise Finder grants. Import is an explicit
-operator process, not a web endpoint. Connor receives read-only access; direct CRM
+operator process, not a web endpoint. Connor has the Reader role but his broader existing roles also permit writes; his
+connection/read-only acceptance remains open. Direct CRM
 creation is not supported because numeric consumers require a binding.
 
 Reads: Admin list; single/batch Expertise Finder matching; consultant eligibility,

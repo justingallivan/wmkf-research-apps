@@ -1,6 +1,6 @@
 # Expertise roster: production migration and Admin editor
 
-**Status: PLANNED — two Claude Opus 5.5 OAuth adversarial reviews completed. Second verdict: READY WITH CHANGES; all earlier findings closed, with two Contact-preservation corrections incorporated below. See [review 1](EXPERTISE_ROSTER_OPUS_5_5_REVIEW_2026-11-19.md) and [review 2 with disposition](EXPERTISE_ROSTER_OPUS_5_5_REVIEW_2_2026-11-19.md). Owner subsequently authorized implementation on November 19; see [build evidence](EXPERTISE_ROSTER_BUILD_2026-11-19.md). Production execution remains pending.**
+**Status: IMPLEMENTED; PRODUCTION CUTOVER PARTIAL — two Claude Opus 5.5 OAuth adversarial reviews completed. Second verdict: READY WITH CHANGES; all earlier findings closed, with two Contact-preservation corrections incorporated below. See [review 1](EXPERTISE_ROSTER_OPUS_5_5_REVIEW_2026-11-19.md) and [review 2 with disposition](EXPERTISE_ROSTER_OPUS_5_5_REVIEW_2_2026-11-19.md). Owner subsequently authorized implementation on November 19; see [build evidence](EXPERTISE_ROSTER_BUILD_2026-11-19.md). Production schema/roles, migration 103 and Postgres-mode deployment are complete; import/cutover await Amy status clarification. See [execution checkpoint](EXPERTISE_ROSTER_PRODUCTION_EXECUTION_2026-11-19.md).**
 
 Owner direction, November 19, 2026: move the small, infrequently used roster from
 Postgres to Dataverse and move its editor into Admin. Treat the roster as static
@@ -45,8 +45,8 @@ new roster source; do not import a new recommendation product as part of this wo
 | Earlier schema/import/consumer work exists on the parked branch | `git diff --stat main...origin/codex/expertise-roster-import-2026-11-10` | VERIFIED branch work; not proof of deployment or production readiness |
 | No competing roster edits need accommodation | Owner instruction in this chat | Accepted operating premise |
 
-No fresh production probe was performed for this plan. Production table state,
-row counts, permissions, and the migration ledger are execution-time checks.
+No fresh production probe was performed during planning. The execution checkpoint
+now records fresh production state, counts, permissions and the migration ledger.
 Do not read main `.env.local`, self-enable production access flags, or copy
 sandbox identities into production. Use the repository's existing authorized
 production tooling and target/write interlock when execution is approved.
@@ -82,8 +82,7 @@ an administrator to clear the old link before reassignment. Optional Contact
 references must stay optional: do not create Contacts for Board members. Preserve linked-contact email resolution; missing/inactive linked Contacts
 must not silently fall back to a manual address.
 
-Reuse the small numeric identity/binding bridge from the parked branch (not yet on
-main) to preserve references from
+The implemented small numeric identity/binding bridge, now on main, preserves references from
 Postgres feedback and saved recipient selections. It stores IDs, not a synchronized
 copy of roster content. Retarget the feedback foreign key only after every referenced
 numeric ID exists in the bridge. New people added in Admin receive a numeric mapping

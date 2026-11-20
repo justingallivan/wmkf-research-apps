@@ -1,7 +1,8 @@
 # Roster migration and Admin editor — build evidence
 
-Status: implementation and focused verification completed; Opus correction verification returned code ready; production execution pending on `codex/expertise-roster-admin-2026-11-19`.
-No production changes. Backend automation and app retirement remain separate.
+Status: implementation and focused verification completed; Opus correction verification returned code ready. Production execution is partial: schema/roles, migration 103 and Postgres-mode deployment are complete; import/cutover await Amy status clarification. See [execution checkpoint](EXPERTISE_ROSTER_PRODUCTION_EXECUTION_2026-11-19.md). Backend automation and app retirement remain separate.
+
+The verification sections below record the pre-deployment build/review snapshot.
 
 | Invariant | Surface | Verification |
 |---|---|---|
@@ -74,10 +75,10 @@ creates cannot publish without prebinding; old scripts/routes refuse after marke
 unknown save outcomes remain retryable with the same key or explicit saved-version
 reload. No silent fallback, API hard-delete, mirror, synchronization or worker.
 
-Residual production prerequisites: live schema and Active keys (including multiple
+At the pre-deployment build checkpoint, production prerequisites were: live schema and Active keys (including multiple
 null identity values), effective editor/application/Connor permissions, exact private
 owner mappings, pending migration ledger/FK name, reference repairs, and signed-in
-acceptance. No migration/schema/role/env/deployment production action was executed.
+acceptance. No production action was executed during that build/review checkpoint; subsequent production actions are recorded in the execution report.
 Use [the cutover runbook](EXPERTISE_ROSTER_CUTOVER_RUNBOOK_2026-11-19.md).
 
 Implementation commit: `40588fca3` on `codex/expertise-roster-admin-2026-11-19`.

@@ -29,8 +29,9 @@
    are selectable on the staff page, so the planned roster "chair marker" is not
    needed to send.
 5. **Roster location clarified at stop.** The roster is still the Postgres table
-   `expertise_roster`, visible on the Roster tab of `/expertise-finder`. It has not
-   moved to Dataverse; that work is unmerged and parked (see below).
+   `expertise_roster`, visible on the Roster tab of `/expertise-finder`. At that stop it had not
+   moved to Dataverse. November 19 execution has since provisioned the target and
+   deployed the new code in Postgres mode; import/cutover await Amy status clarification (see below).
 
 ### Commits (all on `main`)
 
@@ -83,11 +84,10 @@
    `docs/plans/EXPERTISE_ROSTER_PRODUCTION_MIGRATION_PLAN_2026-11-19.md`.
    Opus 5.5 OAuth review returned READY WITH CHANGES; required corrections are
    incorporated, with verbatim review/disposition saved beside the plan. Build is committed on `codex/expertise-roster-admin-2026-11-19` (`40588fca3`);
-   Opus implementation review and correction verification completed; no production execution.
+   Opus implementation review and correction verification completed. Production schema/roles, migration 103 and Postgres-mode deployment are complete; import/cutover await Amy status clarification. See `docs/plans/EXPERTISE_ROSTER_PRODUCTION_EXECUTION_2026-11-19.md`.
    See `docs/plans/EXPERTISE_ROSTER_BUILD_2026-11-19.md`.
 5. **Earlier roster implementation reference.** Preserve
-   `origin/codex/expertise-roster-import-2026-11-10` (tip `754acf09a`). Current owner authorized the revised build; production migration execution,
-   backend switch and cutover remain pending.
+   `origin/codex/expertise-roster-import-2026-11-10` (tip `754acf09a`). Current owner authorized the revised build and production migration/deployment. The older branch remains a reference; resume the November 19 execution checkpoint, not that branch.
 6. **Backend prompt adoption/scheduling** (`codex/executive-summary-generation-2026-11-16`).
 
 ### Owner Decisions Preserved — Not Resolved This Session
@@ -137,12 +137,12 @@ current permission or live-state evidence.
 |---|---|---|
 | Proposal lists | `docs/plans/J27_PROPOSAL_LIST_EMAILS_PLAN_2026-11-18.md`; `docs/atlas/postgres-proposal-list-links.md` | Production-live; PDF open and two-level sections unproven live; email send not built |
 | Initial Assessment | PRs #644–#646; `assessment-service.js`, `AssessmentForm.js` | Production-live; authenticated save acceptance unverified |
-| Roster migration and Admin editor | `docs/plans/EXPERTISE_ROSTER_PRODUCTION_MIGRATION_PLAN_2026-11-19.md` | Production-only plan saved; Opus 5.5 reviewed, corrections incorporated; Admin editor and migration implemented/tested on the new November 19 branch; Opus correction verification returned code ready; backend automation and retirement separate; no production execution |
+| Roster migration and Admin editor | `docs/plans/EXPERTISE_ROSTER_PRODUCTION_MIGRATION_PLAN_2026-11-19.md` | Production-only plan saved; Opus 5.5 reviewed, corrections incorporated; Admin editor and migration implemented/tested on the new November 19 branch; Opus correction verification returned code ready; backend automation and retirement separate; production schema/roles/103 and Postgres-mode deployment complete; import/cutover await Amy status decision |
 | Older roster cutover | `origin/codex/expertise-roster-import-2026-11-10:SESSION_PROMPT.md` | Preserve branch/private inputs; reconcile direction before resuming |
 | Chairs Production stages | `docs/plans/J27_CHAIRS_RECOMMENDATION_PRODUCTION_PLAN_2026-11-18.md` | Not changed here; owner approval per stage |
 | Intake prompt delivery | `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md` | Owner-run flow/prompt work; backend adoption parked |
 
-Never set `DATAVERSE_ALLOW_PROD_READS` yourself. Never read main `.env.local`.
+Production access requires explicit owner authorization. The November 19 roster go-ahead authorizes scoped production reads/writes with the interlock and dated ACK; it does not authorize unrelated work. Never read main `.env.local`.
 Prior private roster inputs remain in owner-managed storage; do not commit them.
 Local containers use Colima, not Docker Desktop. Migration numbers 097 and 100 are
 claimed off `main`.

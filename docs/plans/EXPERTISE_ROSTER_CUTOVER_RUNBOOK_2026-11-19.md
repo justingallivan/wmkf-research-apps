@@ -1,6 +1,6 @@
 # Expertise roster — production cutover and recovery
 
-Status: implementation branch; **no production actions executed**. This runbook
+Status: **production schema/roles, migration 103 and Postgres-mode deployment complete; import/cutover pending Amy status clarification**. See [execution checkpoint](EXPERTISE_ROSTER_PRODUCTION_EXECUTION_2026-11-19.md). This runbook
 implements the [accepted plan](EXPERTISE_ROSTER_PRODUCTION_MIGRATION_PLAN_2026-11-19.md).
 One operator, static dataset. No sandbox, locks, synchronization or automated rollback.
 
