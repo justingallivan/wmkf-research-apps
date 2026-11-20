@@ -116,7 +116,21 @@ flow names); no request or applicant rows were read.
 ### Verify Before Acting
 
 1. **Executive Summary trial batch-2 cleanup after November 23:** needs a fresh expiry
-   check and the owner's preflight. It is destructive.
+   check and the owner's preflight. It is destructive. The owner chose to wait for the
+   expiry rather than delete directly (Session 692, 2026-11-20); run on Monday Nov 23
+   after 18:31:58 UTC (10:32 Pacific).
+   - **Checked 2026-11-20:** `/private/tmp/wmkf-summary-live-20261116` (with
+     `development.env` and `http-state.json`) and the parked worktree
+     `/private/tmp/wmkf-summary-generation-20261116` at `d86870146` both exist
+     [VERIFIED via ls / `git worktree list`].
+   - **No automatic expiry:** rows are deleted only when a prompt-job worker runs;
+     neither the branch nor `main` schedules one [VERIFIED via parked-branch
+     `vercel.json` and `lib/services/prompt-jobs/store.js` `expireContent`].
+   - **Database:** the Preview deployment's Postgres host differs from `.env.local`'s.
+     Whether it is the Production database is not yet confirmed [ASSUMED unknown].
+   - **Steps:** refresh the token, confirm the Preview deployment and its pilot setting
+     exist, run `expire` once, then do a read-only row count for the job. The count
+     also settles whether batch 1 deleted anything.
 2. **Merged remote branches** `claude/prompt-seed-untrusted-guard` and
    `claude/consultant-feedback-scan-retry` could be deleted. Both are merged into
    `origin/main`; confirm before deleting.
