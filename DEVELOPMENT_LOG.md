@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## November 2026 — Standalone transcription pilot retired; shared engine preserved (Session 688)
+
+**Milestone:** Retired the standalone transcription evaluation interface in the main suite and isolated deployment while preserving Meeting Tracker transcription.
+**Sessions:** Codex, 2026-11-19; owner separately authorized retirement and expired-recording cleanup.
+**Ship state:**
+- Main PR #653 / `b869fdf85` deployed; Admin link removed and old page replaced by a retirement notice.
+- Separate isolated source `1b8f51787` retained its October runtime and two cleanup/recovery schedules; the legacy pilot alias was removed.
+- Cleanup receipt PR #656 / `5738341008` records the authorized expired-recording tombstone repair: Blob store was already empty, stale cleanup references cleared, audit row and infrastructure retained.
+**Why it matters:** The obsolete upload/evaluation surface is closed without disabling the shared transcription engine, Meeting Tracker, recovery, or cleanup.
+**Pointers:** `docs/plans/evidence/TRANSCRIPTION_PILOT_RETIREMENT_2026-11-19.md`; bounded documentation reconciliation PR #655. Verification limits remain in the receipt; no new end-to-end transcription proof is claimed.
+
 ## November 2026 — Ten standalone apps retired; shared capabilities preserved (Session 687)
 
 **Milestone:** Retired ten obsolete standalone interfaces while preserving their reusable prompts, services and historical data.
