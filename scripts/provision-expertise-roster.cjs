@@ -8,6 +8,19 @@ const schema = require('../lib/dataverse/schema-apply.js');
 const roles = require('../lib/dataverse/role-apply.js');
 const spec = require('../lib/dataverse/schema/wave-expertise-roster/wmkf_expertiseprofile.json');
 const solution = require('../lib/dataverse/schema/solution.json');
+// Metadata uses replacement PUT, not row PATCH. Preserve the full definition.
+async function enableAudit(client, path) {
+  const current = await client.get(path);
+  if (!current.ok) throw Error(`Audit metadata read failed (${current.status}).`);
+  if (current.body.IsAuditEnabled?.Value === true) return;
+  if (current.body.IsAuditEnabled?.CanBeChanged === false) throw Error('Audit setting is locked.');
+  const body = { ...current.body, IsAuditEnabled: { ...current.body.IsAuditEnabled, Value: true } };
+  delete body['@odata.context'];
+  const result = await client.raw('PUT', path, body, {
+    'MSCRM.MergeLabels': 'true', 'MSCRM.SolutionUniqueName': solution.uniqueName,
+  });
+  if (!result.ok) throw Error(`Audit metadata update failed (${result.status}): ${result.body?.error?.message || ''}`);
+}
 async function main() {
   if (process.argv.slice(2).join(' ') !== '--apply') throw Error('Requires --apply and explicitly authorized production environment.');
   const resourceUrl = resolveTargetResource({ target: 'prod', write: true });
@@ -19,15 +32,9 @@ async function main() {
   for (const rel of spec.relationships) await schema.ensureLookupRelationship(client, { ...rel, referencingEntity: logical });
   for (const key of spec.alternateKeys) await schema.ensureAlternateKey(client, logical, key);
   const entityPath = `/EntityDefinitions(LogicalName='${logical}')`;
-  const result = await client.patch(entityPath, { IsAuditEnabled: { Value: true } }, { 'MSCRM.MergeLabels': 'true' });
-  if (!result.ok) throw Error(`Table audit configuration failed (${result.status}).`);
+  await enableAudit(client, entityPath);
   for (const name of ['wmkf_name', 'statecode', 'wmkf_staffuser', ...spec.attributes.map(a => a.schemaName.toLowerCase())]) {
-    const attribute = await client.get(`${entityPath}/Attributes(LogicalName='${name}')`);
-    if (!attribute.ok) throw Error(`Attribute metadata unavailable: ${name}.`);
-    const r = await client.patch(`${entityPath}/Attributes(LogicalName='${name}')`, {
-      '@odata.type': attribute.body['@odata.type'], IsAuditEnabled: { Value: true },
-    }, { 'MSCRM.MergeLabels': 'true' });
-    if (!r.ok) throw Error(`Attribute auditing failed: ${name} (${r.status}).`);
+    await enableAudit(client, `${entityPath}/Attributes(LogicalName='${name}')`);
   }
   const published = await client.post('/PublishXml', { ParameterXml: `<importexportxml><entities><entity>${logical}</entity></entities></importexportxml>` });
   if (!published.ok) throw Error(`Publish failed (${published.status}).`);
@@ -51,4 +58,4 @@ async function main() {
   console.log('Schema and roles provisioned. Wait for all keys to become Active; verify auditing, effective permissions and role assignments before import. No role was assigned and no roster row was imported.');
 }
 if (require.main === module) main().catch(error => { console.error('Provisioning stopped:', String(error.message || error.name).slice(0, 1000)); process.exitCode = 1; });
-module.exports = { main };
+module.exports = { main, enableAudit };
