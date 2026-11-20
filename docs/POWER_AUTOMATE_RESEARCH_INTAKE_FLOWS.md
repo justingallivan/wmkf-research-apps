@@ -69,7 +69,9 @@ Do not upgrade other lines to verified without a named, owner-approved read.
 
 At 2026-11-20: steps 1 and 2 are **LIVE**; step 3 (AI review) is **PLANNED**;
 step 5 (staff version) is **BUILT but not live** (it waits on step 3); steps 6–7
-are **PLANNED**; steps 0 and 4 are vendor/manual.
+are **PLANNED**; steps 0 and 4 are vendor/manual. The owner expects step 3 to be
+live before J27 proposals arrive in early December 2026 (owner, 2026-11-20; an
+expectation, not a status change).
 
 **Scope:** Research applications on the production phase only (phase
 `51cf300c-f2b1-f111-aaac-000d3a361c1f`). All names are Dataverse logical names;

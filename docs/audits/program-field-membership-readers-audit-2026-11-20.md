@@ -39,7 +39,10 @@ not a decision: it is filled only by the planned step 3.
 Connor then said (2026-11-20) MR/SE "is set at the same time as the primary keyword";
 the owner's understanding is that step 3 writes the request's `akoya_programid`, as
 today, so the Program-field readers work for J27 once step 3 is live. Until then J27
-requests have a blank Program field and the class A readers below still miss them. Item 2 (title cron) also changes once
+requests have a blank Program field and the class A readers below still miss them.
+The owner expects step 3 to be live before proposals arrive (2026-11-20), so no app
+change to the class A readers is planned; revisit only if step 3 slips past the
+first J27 submissions. Item 2 (title cron) also changes once
 step 3 is live, because step 3 writes the short title itself.
 
 ## Live readers that decide membership (class A)
