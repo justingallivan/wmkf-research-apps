@@ -1,27 +1,15 @@
 ---
-name: project-j27-cycle-page-redesign-pending
-description: "J27 Workbench cycle and request page phase layout (Research, 2027-or-later cycles): owner decisions that still bind (tab order, retired First Cut/Semi-finalist wording, what Initial Assessment means). The 2026-11-09 to 2026-11-14 plan/build/promotion chronology is history; state lives in the plans."
+name: project-j27-cycle-page-redesign-history
+description: "Closed history of the J27 cycle-page redesign, 2026-11-09 to 2026-11-14: decision, plan, design brief, build, later phases, Production promotion, request-page rollout. Point-in-time; rules that still bind are in project-j27-cycle-page-rules."
 metadata:
   node_type: memory
   type: project
-  status: active
-  originSessionId: 90b09a89-3fb2-4b7a-9bce-c5fb5d8ee6b4
-  modified: 2026-11-09T21:01:47.288Z
+  status: closed
+  last_verified: 2026-11-20 via split of the former pending leaf
 ---
 
 ## Recall Rule
-Read before touching the Workbench cycle-level tabs (`shared/components/workbench/WorkbenchViewsNav.js`) or starting a J27 session.
-
-**Current shape [VERIFIED 2026-11-20 via `shared/components/workbench/WorkbenchViewsNav.js`]:** 2027-or-later Research cycles use `J27_VIEWS` (All requests, the four request-page phases, then Awardees); earlier cycles keep the legacy `VIEWS` tabs. Build, promotion and rollout state lives in `docs/plans/J27_CYCLE_PAGE_REDESIGN_PLAN_2026-11-09.md` and `docs/plans/J27_CYCLE_PAGE_BUILD_PLAN_2026-11-09.md`, not here.
-
-**What "Initial Assessment" means (owner, 2026-11-09):** the Initial Assessment Word document was a previous-cycle placeholder to ease the move to single-phase submission; that role is done. The phrase now covers the material AI generates automatically at submission (triggered by Power Automate). Do not plan J27 surfaces around the old document list.
-
-**Terminology (owner, 2026-11-09):** "First Cut" and "Semi-finalist" are retired, in staff-facing text and in code. Use the Dataverse choice names (Scored, Not Scored, Recommended Invite, Recommended Do Not Invite, Invited, Not Invited); the stage strip shows "Recommended to Chairs" and "Not Recommended"; the steps are "Scoring" and "Recommendation to Chairs" for now. The owner wants internal names kept in line with staff-facing ones rather than left as loose ends. Renamed on `claude/j27-read-model` (route `/api/workbench/scoring`, settings `J27_CHAIRS_RECOMMENDATION_*`); `main` and Production still carry the old names until that branch is promoted.
-
-Do: change cycle-page tabs through a plan the owner reviews, and log the decision in `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`.
-Do not: reintroduce "First Cut" or "Semi-finalist", or plan J27 surfaces around the old Initial Assessment Word document.
-
-## History (point-in-time, 2026-11-09 to 2026-11-14; not current state)
+Read only to recover why the cycle page is shaped as it is or when a step shipped. Active rules: [[project-j27-cycle-page-rules]]. Everything below is point-in-time (2026-11-09 to 2026-11-14); "next session", "not promoted" and similar describe that week, not today. Current state: `docs/plans/J27_WORKBENCH_PRODUCTION_ROLLOUT_2026-11-07.md`.
 
 The entries below record decisions and steps as they happened. "Next session", "not promoted" and similar wording describe that week, not today.
 
@@ -43,4 +31,4 @@ The entries below record decisions and steps as they happened. "Next session", "
 
 **Request page on 2026-11-14 (Session 676, owner-run script):** pilot of test #1003456 (rationale, review summary and visit assessment saved and reloaded; AkoyaGO Audit History names the owner as editor), then `workbench.phase_rollout` = `{"mode":"on"}` the same day, with no observation window because no real J27 applications arrive for about three weeks (owner). `on` still admits only 2027-or-later cycles. Attendance is untested until a real request has a presentation. Rollback: the same script with `off`. Change record: the rollout plan above. The "request pages stay on the old layout" sentence above is historical.
 
-**How to apply:** plan before building; owner reviews the plan; log the decision in `docs/plans/J27_ALIGNMENT_LOG_2026-10-24.md`. Related: [[project-workbench-is-research-only]], [[feedback-anchor-multisession-features-to-the-original-ask]].
+Active rules: [[project-j27-cycle-page-rules]].

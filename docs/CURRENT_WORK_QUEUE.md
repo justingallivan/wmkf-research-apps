@@ -329,7 +329,7 @@ search limits: `docs/audits/product-backlog-reconciliation-2026-10-31.md`.
      plan `docs/plans/J27_FACTORY_SANDBOX_SCENARIOS_PLAN_2026-11-08.md` there,
      §6). Titles such as `03`/`04 First Cut …`, `05`/`06 Semi-finalist …` and
      `07 Chairs approved` use names retired from Production with the J27
-     merge (`.claude-memory/project-j27-cycle-page-redesign-pending.md`) and
+     merge (`.claude-memory/project-j27-cycle-page-rules.md`) and
      predate the shipped labels in
      `shared/config/j27Labels.js` (Recommendation to Chairs, Not Recommended,
      Not Invited) [ASSUMED mapping; confirm against the labels before renaming].

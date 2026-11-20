@@ -57,3 +57,5 @@ These items are **done, closed, or point-in-time** and no longer earn a slot in 
 - **D26 reviewer-inputs probe (S209)** — 35 D26 reqs: 0 existing candidates (Manage tabs empty), 5/5 legacy slots (~175 recs), excluded text mostly N/A. Was Phase-3 ground truth; Phase 3 (Find tab) has since shipped. [[project-d26-reviewer-inputs-probe]].
 
 The durable slice-0 invariant (deactivate-not-delete roster rollup) now lives in `docs/agent-wiki/topics/intake-portal.md` and `lib/dataverse/schema/wave4/wmkf_proposalbudgetline.json`; the memory entry above is historical.
+
+- **J27 cycle-page redesign chronology (2026-11-09 to 2026-11-14)** — decision, plan, design brief, build, later phases, Production promotion, request-page rollout. Rules that still bind: [[project-j27-cycle-page-rules]]. History: [[project-j27-cycle-page-redesign-history]].

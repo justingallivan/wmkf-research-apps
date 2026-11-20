@@ -23,7 +23,7 @@
 ## Working Norms
 - Performance/caching/refactor plans; safety machinery vs usage volume: feedback-latency-plan-scope-accretion-postmortem.md; feedback-scale-safety-machinery-to-usage.md
 - Multi-session features / MVP drift / owner review burden: feedback-anchor-multisession-features-to-the-original-ask.md; feedback-owner-review-burden-must-shrink.md; changing the owner's named input source: feedback-keep-the-owners-named-input-source.md
-- J27 Workbench Research-only scope / Research membership by Grant program (not Program field) / SoCal separate app, Final Writeup parked (Stage 4–5 recipient hazard): project-workbench-is-research-only.md; project-program-field-retired-use-grant-program.md; project-j27-cycle-page-redesign-pending.md; project-socal-writeup-workflow-parked.md
+- J27 Workbench Research-only scope / Research membership by Grant program (not Program field) / SoCal separate app, Final Writeup parked (Stage 4–5 recipient hazard): project-workbench-is-research-only.md; project-program-field-retired-use-grant-program.md; project-j27-cycle-page-rules.md; project-socal-writeup-workflow-parked.md
 - Git / releases: ../docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md; feedback-verify-branch-before-git-action.md; feedback-scope-git-stash-in-shared-worktrees.md
 - Migration numbers / schema_migrations / branch-applied migrations: project-migration-numbers-claimed-off-main.md
 - Action affordances / UI gating: feedback-ui-gates-must-mirror-server-guards.md; feedback-match-existing-ui-patterns.md; ordered workflows as one guided action: feedback-ordered-workflows-as-one-action.md
