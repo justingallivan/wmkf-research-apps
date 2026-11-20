@@ -2,7 +2,6 @@
 
 import { fireEvent, render, screen } from '@testing-library/react';
 import DataverseBulkExport from '../../pages/dataverse-bulk-export';
-import PhaseIDynamics from '../../pages/phase-i-dynamics';
 
 jest.mock('../../shared/components/Layout', () => ({
   __esModule: true,
@@ -28,17 +27,4 @@ test('Dataverse bulk export renders the real ErrorAlert for a metadata failure',
   fireEvent.click(await screen.findByRole('button', { name: /Preview \(true count/ }));
   fireEvent.click(await screen.findByRole('button', { name: 'Show details' }));
   expect(await screen.findByText('gateway HTML')).toBeInTheDocument();
-});
-
-test('Phase I Dynamics renders the real ErrorAlert for a lookup failure', async () => {
-  global.fetch = jest.fn(async () => ({
-    ok: false,
-    status: 503,
-    json: async () => ({ error: 'Lookup unavailable' }),
-  }));
-  render(<PhaseIDynamics />);
-  fireEvent.change(screen.getByPlaceholderText('e.g. 1002807'), { target: { value: '1002807' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Look up' }));
-  fireEvent.click(await screen.findByRole('button', { name: 'Show details' }));
-  expect(await screen.findByText('Lookup unavailable')).toBeInTheDocument();
 });

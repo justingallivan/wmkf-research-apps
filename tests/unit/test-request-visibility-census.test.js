@@ -31,8 +31,8 @@ const REPORT_EXPORT_ROUTES = {
   'pages/api/dataverse-export/preview.js': { class: 'exclude', guard: 'excludeMarkedTestRequests' },
   'pages/api/dataverse-export/run.js': { class: 'exclude', guard: 'excludeMarkedTestRequests' },
   // Single-request actions stay available for test requests (owner decision 2026-09-23).
-  'pages/api/grant-reporting/extract.js': { class: 'single-request', guard: 'handleFullExtract' },
-  'pages/api/grant-reporting/lookup-grant.js': { class: 'single-request', guard: 'lookupGrant' },
+  'pages/api/grant-reporting/extract.js': { class: 'retired', guard: 'APP_RETIRED' },
+  'pages/api/grant-reporting/lookup-grant.js': { class: 'retired', guard: 'APP_RETIRED' },
   // Tracker downloads are one staff-authorized, request/visit-bound read, not a corpus export.
   'pages/api/meeting-tracker/visits/[requestId]/transcriptions/[jobId]/download.js': {
     class: 'single-request', guard: 'downloadMeetingTranscriptionJob',

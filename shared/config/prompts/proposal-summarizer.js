@@ -1,4 +1,7 @@
 /**
+ * Standalone interface retired 2026-11-19; prompts preserved for future reuse.
+ * Original interface/route implementations are under _archived/pages/.
+ *
  * Prompt templates for the Proposal Summarizer app
  * Used for creating Phase II writeup drafts from research proposals
  *

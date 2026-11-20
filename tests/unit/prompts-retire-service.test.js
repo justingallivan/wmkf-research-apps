@@ -54,9 +54,17 @@ it('is blocked for a prompt marked Application caller, before any audit or write
   expect(aiPrompt.retire).not.toHaveBeenCalled();
 });
 
-it('uses the code catalog usage when the row has none (a cataloged app prompt stays blocked)', async () => {
-  aiPrompt.queryCurrentRows.mockResolvedValue({ records: [row({ wmkf_ai_promptname: 'phase-i.summary', wmkf_ai_usagecategory: null })] });
-  await expect(retirePrompt({ name: 'phase-i.summary', profileId: 7 })).rejects.toMatchObject({ body: expect.objectContaining({ status: 'retire_blocked_application' }) });
+it.each([
+  'phase-i.summary',
+  'funding-gap.extract', 'funding-gap.analyze',
+  'literature-analyzer.extract-paper', 'literature-analyzer.synthesize', 'literature-analyzer.compare',
+  'multi-perspective.initial-analysis', 'multi-perspective.proposal-summary',
+  'multi-perspective.optimist', 'multi-perspective.skeptic', 'multi-perspective.neutral', 'multi-perspective.integrator',
+  'peer-review-summarizer.analyze', 'peer-review-summarizer.questions',
+])('preserves retirement protection for %s when stored usage is blank', async (name) => {
+  aiPrompt.queryCurrentRows.mockResolvedValue({ records: [row({ wmkf_ai_promptname: name, wmkf_ai_usagecategory: null })] });
+  await expect(retirePrompt({ name, profileId: 7 })).rejects.toMatchObject({ body: expect.objectContaining({ status: 'retire_blocked_application' }) });
+  expect(auditInserts()).toHaveLength(0);
   expect(aiPrompt.retire).not.toHaveBeenCalled();
 });
 

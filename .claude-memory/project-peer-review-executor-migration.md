@@ -1,41 +1,36 @@
 ---
 name: project-peer-review-executor-migration
-description: "SHIPPED S344: peer-review-summarizer wired to the Executor (admin rows drive it); route-owned A7 preamble guarded by executePrompt assertSystemIncludes. Do not revert without a decision."
+description: Historical peer-review upload Executor migration; standalone entry point retired, prompt rows and A7 contract preserved for reuse.
 metadata:
   node_type: memory
   status: active
   type: project
-  last_verified: 2026-07-22 via process-peer-reviews.js and execute-prompt.js
+  last_verified: 2026-11-19 via retirement decision and caller inventory
 ---
 
 ## Recall Rule
 
-Read before changing the peer-review summarizer prompt path or Executor A7
-assertions. Preserve route-owned wrapping plus `assertSystemIncludes`; the
-Dataverse prompt rows are live input, not documentation.
+Read before reusing peer-review upload prompts or changing Executor A7 assertions.
+The standalone Summarize Peer Reviews page/API is retired by the November 19
+source change; see `docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md` for the source
+and deployment boundary. Its stored prompt rows, history, and original route
+implementation are preserved. Workbench review synthesis uses the separate
+`review-synthesis.generate` prompt and remains live.
 
-**Shipped S344 (2026-07-08).** `pages/api/process-peer-reviews.js` now runs the
-`peer-review-summarizer.analyze`/`.questions` `wmkf_ai_prompt` rows via
-`executePrompt()` instead of the hardcoded generators in
-`shared/config/prompts/peer-reviewer.js`, so staff `/admin` prompt-edits take
-effect. Owner ask; Codex-reviewed twice (design SOUND-WITH-CHANGES, shipped-diff
-REWORK→fixed). Plan: `docs/PEER_REVIEW_EXECUTOR_MIGRATION_PLAN.md`. Commits
-`1559e8dc` (impl), `4dd5c84b` (A7 hardening).
+## Historical implementation — S344, 2026-07-08
 
-**Do NOT reopen / revert without a new decision.** The legacy generators
-(`createPeerReviewAnalysisPrompt`/`Questions`) are retained ONLY as the rollback
-path (`git revert` the route diff) — they are no longer the live source. Rows are
-published in Dataverse (`sonnet`, maxTokens 2500/16384, temp 0.3, `parseMode:raw`,
-`kind:none`, vars `review_count`/`review_count_suffix`/`reviews_block`/`a7_preamble`).
+The original `/api/process-peer-reviews` implementation used
+`peer-review-summarizer.analyze`/`.questions` through `executePrompt()` rather than
+the legacy code generators. Its archived implementation preserves that behavior
+as reference. Commits `1559e8dc` and `4dd5c84b` implemented and hardened it; the
+historical migration plan is `docs/PEER_REVIEW_EXECUTOR_MIGRATION_PLAN.md`.
 
-**Durable lesson (why the A7 wiring is subtle):** wiring a prompt to the Executor
-makes its A7 preamble delivery staff-mutable. Per-review nonce wrapping (owner's
-choice) is route-owned, so `reviews_block` is a PLAIN override — the Executor does
-NOT auto-inject a preamble. The route supplies it via `{{a7_preamble}}` in the row
-system prompt, BUT a `/admin` edit dropping that placeholder would silently send
-review content unprotected. Closed with `executePrompt({ assertSystemIncludes:
-reviewNonces })` — the Executor throws after compose / before the Claude call if
-the composed system prompt lacks the nonces (fail closed, tied to the REAL prompt,
-not caller inputs). Reusable pattern + hazard live in the agent wiki:
-`docs/agent-wiki/topics/prompt-executor.md`. Related: [[project-prompt-legacy-audit-followup]],
-[[project-a7-prompt-injection-hardening]].
+The durable A7 lesson still applies to future reuse: per-review nonce wrapping
+was route-owned, and `reviews_block` was a plain override. The route supplied
+`{{a7_preamble}}` and `assertSystemIncludes: reviewNonces`; the Executor refused
+to call the model when the composed system prompt omitted a required nonce.
+Removing the placeholder from a staff-editable prompt must never silently strip
+that protection. Preserve this contract when adapting the archived route.
+
+Published prompt status is separate from app lifecycle. Retirement does not
+unpublish/delete rows or claim that an external caller cannot use them.

@@ -110,19 +110,19 @@ naming-debt. (Folded from the S290 Codex adversarial review.)
   `review-manager` → `reviewers`). [VERIFIED: `appRegistry.js:70-74`]
 - `deprecated` — retired; fields `deprecatedAt`, `archivedTo`, `successorKey`/reason,
   grants-retained flag. (Concept Evaluator.) [VERIFIED: `_archived/README.md:15-17`]
-- `direct-url-test` / `sunset-candidate` — not navigable but still routable, pending a
-  usage decision (`phase-i-dynamics`, `test-email`; and, from S344 2026-07-08, the four
-  sunset PDF-upload document-processing apps `batch-phase-i-summaries`,
-  `batch-proposal-summaries`, `phase-i-writeup`, `phase-ii-writeup` — code retained for a
-  planned Dataverse-native migration, routes left routable). [VERIFIED: `appRegistry.js`
-  `APP_LIFECYCLE_REGISTRY`]
+- `direct-url-test` / `sunset-candidate` — non-active lifecycle states whose exact
+  members come from `APP_LIFECYCLE_REGISTRY`; `test-email` remains a direct-URL test
+  surface. The November 19 retirement moves Phase I Dynamics and the four former
+  PDF-upload sunset candidates to deprecated entry points. Their pages are notices
+  and APIs retain authentication before HTTP 410; implementations and prompts are
+  preserved. See `docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md` for the full ten-app
+  scope and separate deployment boundary.
 - `borrowed-live-infra` — for route namespaces whose owner app is now `reviewers`.
 
 **Consumer behavior:** navigation/home/grants/`ALL_APP_KEYS` keep reading `APP_REGISTRY`
 only. [VERIFIED: `appRegistry.js:161-168`] Docs/CI read the lifecycle map to explain
 historical keys and block stale claims. `scripts/lib/canonical-facts.js` derives
-`APP_REGISTRY.length` (currently **12**, after the S344 sunset of the four PDF-upload
-apps) from the array literal — do not hand-write the
+`APP_REGISTRY.length` from the array literal — do not hand-write the
 count, and don't change that deriver unless intentionally changing the active-app fact.
 [VERIFIED via `scripts/lib/canonical-facts.js:81-115` — it locates the exact `APP_REGISTRY`
 export identifier before counting elements, so it's robust to a second export. NOTE: a bare
@@ -180,7 +180,7 @@ or migrate only with an explicit stored-key migration, never a bare rename.
 
 ---
 
-## 5. Phased Plan (each phase independently shippable + verifiable)
+## 5. Historical S290–S292 phased execution record
 
 Honors the consolidation memory: **dead-end UI removal first, then rename the smaller
 live surface.** Run each gate and its `:self-test` sequentially.
@@ -194,7 +194,7 @@ live surface.** Run each gate and its `:self-test` sequentially.
   it like the other direct-URL surfaces until access logs prove no use. **[DONE S291 2026-06-26: Vercel
   runtime-log retention is ~1 day so logs cannot prove months of non-use; owner confirmed the
   page is invisible to all suite users and not in active use → archived in Phase 1 / Commit 2.]**
-  **`phase-i-dynamics` and `test-email` are live direct-URL/test surfaces — NOT to be archived.** [VERIFIED: `pages/phase-i-dynamics.js:7-16`; `pages/api/test-email.js:1-7,18-23`;
+  **At S290, `phase-i-dynamics` and `test-email` were retained direct-URL/test surfaces. Phase I Dynamics was subsequently included in the November 19 retirement; Test Email remains outside it.** [VERIFIED: `pages/phase-i-dynamics.js:7-16`; `pages/api/test-email.js:1-7,18-23`;
   `docs/API_ROUTE_SECURITY_MATRIX.md:121-122,154`]
 - **Phase 1 — Retire confirmed dead ends.** Concept-Evaluator archive pattern: move
   page/API/prompt to `_archived/`, update `_archived/README.md`, mark API-matrix/docs/tests
@@ -260,7 +260,7 @@ to maintain). If built, ship its fixture self-test first.
 
 ---
 
-## 7. First 2–3 Commits
+## 7. Historical S291 first commits
 
 1. **`Add app lifecycle registry + nomenclature glossary`** — additive, zero-risk.
    `appRegistry.js` gains `APP_LIFECYCLE_REGISTRY` + `ROUTE_NAMESPACE_LIFECYCLE`;
@@ -285,7 +285,7 @@ to maintain). If built, ship its fixture self-test first.
 
 ---
 
-## 8. Verified Inventory Snapshot (S290)
+## 8. Historical verified inventory snapshot (S290)
 
 - `APP_REGISTRY`: **16** active apps; no `reviewer-finder`/`review-manager` key (only
   `reviewers` → `/workbench`, "successor to Reviewer Finder + Review Manager").

@@ -1,4 +1,7 @@
 /**
+ * Standalone interface retired 2026-11-19; prompts preserved for future reuse.
+ * Original interface/route implementations are under _archived/pages/.
+ *
  * Prompt templates for Batch Phase I Summaries app
  * Used for analyzing Phase I proposals with Keck Foundation alignment evaluation
  *

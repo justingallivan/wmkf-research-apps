@@ -86,6 +86,8 @@ const WRAP_MARKER = 'wrapUntrustedContent';
  * cannot escape A7 tracking. Pending surfaces still list `promptFiles` for
  * that reason; the marker enforcement only runs for `migrated` surfaces.
  */
+// Retired standalone handlers are checked at their archived reference paths.
+// Their live routes return 410; retain these checks while preserving prompt builders.
 const SURFACES = [
   {
     id: 'grant-reporting-extract',
@@ -106,7 +108,7 @@ const SURFACES = [
     inv: 1,
     status: 'migrated',
     promptFiles: ['shared/config/prompts/phase-i-writeup.js'],
-    callSiteFiles: ['pages/api/process-phase-i-writeup.js'],
+    callSiteFiles: ['_archived/pages/api/process-phase-i-writeup.js'],
   },
   // ── Pending (later A7 Parts) ──────────────────────────────────────────
   {
@@ -114,7 +116,7 @@ const SURFACES = [
     inv: 2,
     status: 'migrated',
     promptFiles: ['shared/config/prompts/phase-i-summaries.js'],
-    callSiteFiles: ['pages/api/process-phase-i.js'],
+    callSiteFiles: ['_archived/pages/api/process-phase-i.js'],
   },
   {
     id: 'process-phase-ii',
@@ -124,7 +126,7 @@ const SURFACES = [
       'shared/config/prompts/proposal-summarizer.js',
       'shared/config/prompts/phase-ii-dynamics.js',
     ],
-    callSiteFiles: ['pages/api/process.js'],
+    callSiteFiles: ['_archived/pages/api/process.js'],
   },
   // process-legacy (page + /api/process-legacy + proposal-summarizer-legacy prompt)
   // archived to _archived/ in S291 (2026-06-26) — removed from the active
@@ -139,7 +141,7 @@ const SURFACES = [
     // carries the per-builder coverage for the whole file (#3 references the
     // same file but adds phase-ii-dynamics.js, so it stays file-level).
     promptFiles: ['shared/config/prompts/proposal-summarizer.js'],
-    callSiteFiles: ['pages/api/qa.js'],
+    callSiteFiles: ['_archived/pages/api/qa.js'],
     // createSummarizationPrompt / createStructuredDataExtractionPrompt
     // (called by process.js) and createQASystemPrompt (called by qa.js) all
     // self-carry the preamble. createRefinementPrompt / createQAPrompt are
@@ -158,7 +160,7 @@ const SURFACES = [
     inv: 6,
     status: 'migrated',
     // Route-local REFINEMENT_PROMPT — wrapper + preamble both live in refine.js.
-    callSiteFiles: ['pages/api/refine.js'],
+    callSiteFiles: ['_archived/pages/api/refine.js'],
   },
   {
     id: 'process-peer-reviews',
@@ -171,7 +173,7 @@ const SURFACES = [
       // it carries no source markers; the Executor (#20) handles its wrapping.
       'shared/config/prompts/peer-reviewer-dynamics.js',
     ],
-    callSiteFiles: ['pages/api/process-peer-reviews.js'],
+    callSiteFiles: ['_archived/pages/api/process-peer-reviews.js'],
   },
   {
     id: 'evaluate-multi-perspective',
@@ -185,7 +187,7 @@ const SURFACES = [
       'shared/config/prompts/multi-perspective-dynamics.js',
     ],
     callSiteFiles: [
-      'pages/api/evaluate-multi-perspective.js',
+      '_archived/pages/api/evaluate-multi-perspective.js',
       // The A7 preamble is composed in code at the resolver seam.
       'lib/services/tool-prompt-resolver.js',
       'lib/services/tool-prompt-composer.js',
@@ -203,7 +205,7 @@ const SURFACES = [
       'shared/config/prompts/literature-analyzer-dynamics.js',
     ],
     callSiteFiles: [
-      'pages/api/analyze-literature.js',
+      '_archived/pages/api/analyze-literature.js',
       // The A7 preamble is composed in code at the resolver seam.
       'lib/services/tool-prompt-resolver.js',
       'lib/services/tool-prompt-composer.js',
@@ -218,7 +220,7 @@ const SURFACES = [
       'shared/config/prompts/funding-gap-dynamics.js',
     ],
     callSiteFiles: [
-      'pages/api/analyze-funding-gap.js',
+      '_archived/pages/api/analyze-funding-gap.js',
       // The A7 preamble is composed in code at the resolver seam.
       'lib/services/tool-prompt-resolver.js',
       'lib/services/tool-prompt-composer.js',

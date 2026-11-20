@@ -141,7 +141,7 @@ test('admin grant failure is fail-loud and reports only completed grants', async
     query: {},
     body: {
       userProfileId: 8,
-      apps: ['dynamics-explorer', 'literature-analyzer'],
+      apps: ['dynamics-explorer', 'expense-reporter'],
     },
   }, res);
 
@@ -164,7 +164,7 @@ test('admin revoke failure is fail-loud and reports only completed revocations',
     query: {},
     body: {
       userProfileId: 8,
-      apps: ['dynamics-explorer', 'literature-analyzer'],
+      apps: ['dynamics-explorer', 'expense-reporter'],
     },
   }, res);
 

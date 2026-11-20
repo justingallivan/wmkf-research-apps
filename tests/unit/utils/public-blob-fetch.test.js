@@ -72,10 +72,6 @@ describe('public Blob destination boundary', () => {
 // complement (not replace) the real helper rejection tests above.
 const read = file => fs.readFileSync(path.join(process.cwd(), file), 'utf8');
 const directReaders = [
-  'pages/api/analyze-literature.js', 'pages/api/analyze-funding-gap.js',
-  'pages/api/evaluate-multi-perspective.js',
-  'pages/api/process-phase-i-writeup.js', 'pages/api/process-peer-reviews.js',
-  'pages/api/process-phase-i.js', 'pages/api/process.js',
   'pages/api/reviewer-finder/analyze.js',
   'lib/services/workbench/enrich-recommended-service.js',
   'lib/services/review-manager/cycle-materials-attachments.js',
@@ -88,9 +84,8 @@ it.each(directReaders)('%s uses only the public storage transport for public fil
   expect(source).not.toMatch(/\bsafeFetch\(/);
 });
 
-it('keeps the remaining four input routes on the private-aware uploaded-file chain', () => {
+it('keeps Expense Reporter and preserved service helpers on the private-aware uploaded-file chain', () => {
   expect(read('pages/api/process-expenses.js')).toMatch(/readUploadedBlobBuffer\(/);
-  expect(read('pages/api/phase-i-dynamics/summarize-v2.js')).toMatch(/loadFile\(/);
   expect(read('lib/services/phase-i-dynamics/summarize-service.js')).toMatch(/loadFile\(/);
   expect(read('lib/services/grant-reporting/extract-service.js')).toMatch(/loadFile\(/);
   expect(read('lib/utils/file-loader.js')).toMatch(/readUploadedBlobBuffer\(/);

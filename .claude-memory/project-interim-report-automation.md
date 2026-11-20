@@ -15,7 +15,7 @@ last_verified: 2026-10-22
 Read this when: revisiting whether and where to automate yearly interim-report evaluation after the Grant Reporting product direction is decided.
 
 Do:
-- Reuse the bucket + Graph plumbing from `pages/api/grant-reporting/extract.js` and `lib/utils/sharepoint-buckets.js` if the owner selects this capability for implementation. The proposal-versus-report evaluation purpose and reusable document-discovery plumbing remain useful.
+- Reuse the bucket + Graph plumbing from `lib/services/grant-reporting/extract-service.js` and `lib/utils/sharepoint-buckets.js` if the owner selects this capability for implementation. The proposal-versus-report evaluation purpose and reusable document-discovery plumbing remain useful.
 - First confirm with Connor which `akoya_request` field holds the staff evaluation (or whether a new `wmkf_ai_interim_evaluation` field is needed); get real past examples before writing the prompt.
 - Read `.claude-memory/project-grant-reporting-rework.md` before choosing a destination, scope, or timeline: the 2026-10-21 owner direction leaves those undecided and supersedes this older plan's fixed Grant Reporting UI and Power Automate endpoint proposal.
 
@@ -24,11 +24,11 @@ Do not:
 - Reopen architecture solely because old write-access checks passed; they were dated results, not current privilege evidence.
 - Build a final-narrative-completeness prompt; the proposed evaluation purpose is year-over-year progress, a thinner `compareProposalToReport`.
 
-Ground truth: owner direction in `.claude-memory/project-grant-reporting-rework.md`; reusable plumbing in `pages/api/grant-reporting/extract.js`, `lib/utils/sharepoint-buckets.js`, and `compareProposalToReport`; Field Set B fields deployed 2026-05-07. This memory does not establish the destination, prompt input contract, or current access.
+Ground truth: owner direction in `.claude-memory/project-grant-reporting-rework.md`; reusable plumbing in `lib/services/grant-reporting/extract-service.js`, `lib/utils/sharepoint-buckets.js`, and `compareProposalToReport`; Field Set B fields deployed 2026-05-07. This memory does not establish the destination, prompt input contract, or current access.
 
 # Interim grant report auto-evaluation
 
-In addition to the final reports the Grant Reporting app currently handles, grantees submit **yearly interim reports** during multi-year grants. Today, staff read each interim report manually and write their evaluation into a field on the corresponding `akoya_request` record in Dynamics.
+The retired Grant Reporting interface handled final reports; its assessment and editing capabilities are preserved for reuse (see `docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md`). In addition, grantees submit **yearly interim reports** during multi-year grants. Today, staff read each interim report manually and write their evaluation into a field on the corresponding `akoya_request` record in Dynamics.
 
 This older proposal suggested the following implementation path. It is retained as a dated design idea, not current direction:
 
@@ -46,5 +46,5 @@ checks before implementation or smoke. Steps:
 
 1. Identify (with Connor) which `akoya_request` field holds the staff evaluation today, or whether a new `wmkf_ai_interim_evaluation` field is needed. (Field Set B fields were deployed 2026-05-07; check if there's already a suitable target.)
 2. Build the prompt to mirror what staff actually write — get a few real examples from past evaluations first.
-3. Reuse the bucket + Graph plumbing from `pages/api/grant-reporting/extract.js` and `lib/utils/sharepoint-buckets.js`; the document discovery work is already done.
+3. Reuse the bucket + Graph plumbing from `lib/services/grant-reporting/extract-service.js` and `lib/utils/sharepoint-buckets.js`; the document discovery work is already done.
 4. The old proposal selected a stateless Power Automate-callable endpoint (service-token auth) and a small Grant Reporting UI for staff preview/override. Revisit this destination only after the owner selects the future home and scope.
