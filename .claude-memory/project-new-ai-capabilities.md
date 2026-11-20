@@ -1,6 +1,6 @@
 ---
 name: AI capabilities — matching and compliance
-description: Standalone Expertise Finder retirement is production-live; Dataverse roster/Admin remain live. Backend matching is separate. Compliance screening is unbuilt; owner priority unconfirmed.
+description: Standalone Expertise Finder retirement is production-live; Dataverse roster/Admin remain live. Backend matching is separate. Compliance screening will not be built in the app (owner, 2026-11-20).
 type: project
 status: active
 scope: strategy
@@ -15,7 +15,7 @@ Do:
 - Read `docs/plans/EXPERTISE_FINDER_RETIREMENT_2026-11-19.md` for retirement release status.
 - Use the production Dataverse roster contract in `docs/plans/EXPERTISE_ROSTER_CONNOR_HANDOFF_2026-11-19.md`.
 - Keep backend matching in Connor's flow separate from the retired standalone app.
-- Compliance Screening has no implementation in source (grep of lib/pages/shared, 2026-11-20); it exists only as a plan concept in `docs/BACKEND_AUTOMATION_PLAN.md`. Owner priority is unconfirmed.
+- Compliance Screening is not an app capability (owner decision 2026-11-20). Connor's planned step 3 writes advisory compliance fields; staff do not set `wmkf_readyforreview` on a non-compliant application, and the app requires that flag for most J27 surfaces. See `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md` section 9 items 4 and 8. Do not propose an app compliance screen.
 
 Do not:
 - Restore standalone matching as part of roster maintenance.

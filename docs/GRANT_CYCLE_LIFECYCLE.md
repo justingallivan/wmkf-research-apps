@@ -83,7 +83,7 @@ This document maps the full lifecycle of a grant application from submission thr
 
 | Task | Lifecycle Step | Input | Output | Prompt Status |
 |------|---------------|-------|--------|---------------|
-| Compliance check | 4, 14 | Application/proposal PDF text | Pass/fail + reasons | To be developed |
+| Compliance check | 4, 14 | Application/proposal PDF text | Pass/fail + reasons | J27: advisory output from Connor's planned step 3; not an app capability (owner, 2026-11-20) |
 | Summary + keywords | 4 | Application PDF text | Summary text, keywords → Dynamics fields | To be developed |
 | PD assignment | 6 | Application text + staff roster + specialty rules | Recommended PD | **Expertise Finder app built** — prompt + roster in Vercel; hand to Connor for PA flow when validated |
 

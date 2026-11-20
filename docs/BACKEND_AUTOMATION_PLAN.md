@@ -114,7 +114,10 @@ Where their implementation contracts call for it, reviewer-finding and review-ma
 
 ### Prompt Development (Vercel App → Batch Evaluation)
 
-New AI capabilities (compliance screening, PD assignment, staff matching) are developed by:
+New AI capabilities (PD assignment, staff matching) are developed by:
+
+> Compliance screening is not an app capability (owner, 2026-11-20): Connor's flow writes advisory compliance fields and staff gate on `wmkf_readyforreview`. See `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`.
+
 1. Building and testing prompts against historical proposals via batch evaluation tools in the Vercel app
 2. Iterating with staff feedback until accuracy is acceptable
 3. Handing proven prompts to Connor for deployment in PowerAutomate flows

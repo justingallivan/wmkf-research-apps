@@ -497,7 +497,7 @@ at `3101f067` in Ready deployment `dpl_AjT5FeDh5wkdeFSoZWJsVDM5oBqs`.
 - Historical Group B writeup proposal: `docs/GROUP_B_WRITEUP_SPINE_DESIGN.md`. Its proposed
   URL fields and `writeup.*` prompt rows are not live, and its D26 pilot timing is obsolete.
 - Historical staged-review design and deferred proposal-context decisions: `project-staged-review-pipeline`, `project-proposal-context-extraction`. Neither is a ready-to-execute architecture.
-- Planned automation/reports/post-award: `project-backend-automation`, `project-interim-report-automation`, `project-awardee-onboarding`. Expertise Finder retirement and roster boundary, Compliance Screening (unbuilt): `project-new-ai-capabilities`.
+- Planned automation/reports/post-award: `project-backend-automation`, `project-interim-report-automation`, `project-awardee-onboarding`. Expertise Finder retirement and roster boundary, Compliance Screening (not an app capability, owner 2026-11-20): `project-new-ai-capabilities`.
 - IRS verify-EIN: `project-irs-exempt-verification`.
 
 ## Standard Probe

@@ -47,12 +47,13 @@ reconciliation committed on top.
 | `wmkf_ai_run` PA tagging | PA | `wmkf_ai_run` | app run views | runsource/tasktype values exist (extra values present) | VERIFIED (schema) / ASSUMED (behavior) |
 | Keyword table, MR/SE bucket | Connor (seed); step 3 (coined) | `wmkf_programlevel3` | app keyword sections | `wmkf_keywordinternalprogram` → `akoya_program`; 247 seeded rows (other docs say 259 total / 247 active) | VERIFIED (schema) / UNKNOWN (row counts, fill rate) |
 | Staff version, Narrative-Bibliography, derived files in `Submission-Documents` | PA step 5 (built) | SharePoint | Workbench Proposal tab, Reviewer Finder | App matcher accepts the keyword name (`workbench-proposal-documents.js:212-228`) | PARTIAL (app side verified; files not yet produced) |
-| `wmkf_readyforreview` is manual | staff | `akoya_request` | Workbench discovery, Reviewer Finder, readiness | App gates 2027+ visibility on it (`workbenchVisibility.js:74`, `requestReadiness.js:17`, `my-proposals-service.js:153`); app writes it only for Factory test requests (`readiness-finalizer.js:113`) | **CONFLICT**: app comment and older plans assume PA sets it |
+| `wmkf_readyforreview` is manual | staff | `akoya_request` | Workbench discovery, Reviewer Finder, readiness | App gates 2027+ visibility on it (`workbenchVisibility.js:74`, `requestReadiness.js:17`, `my-proposals-service.js:153`); app writes it only for Factory test requests (`readiness-finalizer.js:113`) | VERIFIED (app gate) / owner-confirmed manual (2026-11-20); app comment and older plans that assume PA sets it are stale |
 
 Claims: 10. Each row is graded on two axes: the field schema and the flow behaviour.
 - Schema: 7 VERIFIED.
 - Flow behaviour (Connor-reported): 5 ASSUMED.
-- Other grades: 1 PARTIAL, 1 PLANNED, 2 CONFLICT (the v3 compliance spec, now annotated; ready-for-review, open), 2 UNKNOWN (flow existence, keyword-table row counts).
+- Other grades: 1 PARTIAL, 1 PLANNED, 1 CONFLICT (the v3 compliance spec, now annotated), 2 UNKNOWN (flow existence, keyword-table row counts).
+- The ready-for-review row was a CONFLICT when written. Later the same day the owner confirmed the flag is a deliberate manual gate that staff withhold from non-compliant applications. Only the app code comment is now stale.
 
 ## Restatement classification
 
@@ -104,15 +105,14 @@ These gates check structure and pointers, not the truth of the flow facts.
 ## Remaining
 
 **Live STALE: 1.** `shared/config/requestReadiness.js:3` comment ("Power Automate owns
-real-intake `wmkf_readyforreview`"). It is left unedited because the fix depends on the
-open owner/Connor decision about who sets the flag. It is runtime code, so a change goes
-through a branch.
+real-intake `wmkf_readyforreview`"). The owner has since confirmed the flag is set manually
+by staff (2026-11-20). The comment is runtime code, so the one-line fix goes through a branch.
 
 **Out of scope, noted:**
 - Alignment log D64–D67 still say "Built on `claude/j27-cycle-page`, not promoted". Those features are cycle-page work, not intake.
 - `docs/CURRENT_WORK_QUEUE.md` says the Factory has no J27 `Submission-Documents` support, but `lib/services/test-requests/file-plan.js:23-30` has it.
 
-**Open questions:** for Connor, see map section 10, nine items; the most urgent is who sets ready-for-review.
+**Open questions:** for Connor, see map section 10 (seven items, ordered by urgency; the most urgent is the staff-version file on re-run).
 
 **Step-3 limits:** the handoffs differ from the map in 12 places. Group 3 listed them; the owner reviews them and they were not reconciled.
 

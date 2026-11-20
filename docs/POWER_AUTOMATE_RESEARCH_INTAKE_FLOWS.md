@@ -350,14 +350,21 @@ Checked against our source on 2026-11-20 unless labeled.
    legacy, how many discipline rows have it filled is unknown (no row data read),
    coined keywords' value is unstated, and the request lookup is filled only by
    step 3, which is not live.
-4. **Compliance (owner decision deferred 2026-11-20).**
-   - Connor's design is advisory: `wmkf_ai_compliancecheck` plus
-     `wmkf_ai_complianceissues`, with acceptance (`akoya_submissionaccepted`)
-     manual. The older v3 spec (`docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md`) had the
-     AI write `akoya_submissionaccepted` [ASSUMED superseded until Connor
-     confirms].
-   - `wmkf_ai_compliancesummary` exists in Dataverse [VERIFIED 2026-11-20
-     metadata read] but is not in Connor's map.
+4. **Compliance: no screening in the app (owner decision 2026-11-20).**
+   - The app does not build compliance screening. Compliance lives in Connor's
+     flow and with staff: step 3 writes advisory `wmkf_ai_compliancecheck` and
+     `wmkf_ai_complianceissues`; acceptance (`akoya_submissionaccepted`) is manual
+     [REPORTED by Connor]; and staff do not set the ready flag
+     (`wmkf_readyforreview`, item 8) on a non-compliant application, so it never
+     reaches the app surfaces that require it (owner, 2026-11-20).
+   - The older v3 spec (`docs/DYNAMICS_AI_FIELDS_SPEC_v3_cn.md`) had the AI write
+     `akoya_submissionaccepted`; Connor's map supersedes that for J27 [ASSUMED
+     until Connor confirms; low priority, nothing in the app reads acceptance
+     except the Factory clone, `lib/services/test-requests/basic-clone-steps.js`].
+   - `wmkf_ai_compliancesummary` exists in Dataverse [VERIFIED 2026-11-20 metadata
+     read] but is not in Connor's map; no app code reads it. The Dynamics Explorer
+     prompt describes it as a report (interim/final) check-in summary
+     (`shared/config/prompts/dynamics-explorer.js:112`).
    - Fit (`wmkf_ai_fitassessment`, `wmkf_ai_fitrationale`) and the injection
      screen are separate step-3 tasks.
 5. **Files.**
@@ -383,22 +390,21 @@ Checked against our source on 2026-11-20 unless labeled.
    `"applicant"`, appending to an existing row's sources. The app also writes this
    table through `lib/services/reviewer-engagement/`, so the two writers share
    rows.
-8. **Ready-for-review gates J27 visibility, and no flow sets it.** For 2027+
-   cycles the Workbench discovery filter, Reviewer Finder "my proposals" and the
-   readiness rule admit a Research request only when `wmkf_readyforreview` is true
+8. **The ready flag is a deliberate manual gate.** For 2027+ cycles the Workbench
+   discovery filter, Reviewer Finder "my proposals" and the readiness rule admit a
+   Research request only when `wmkf_readyforreview` is true
    [VERIFIED via `shared/config/workbenchVisibility.js:74`,
    `shared/config/requestReadiness.js:17`,
-   `lib/services/reviewer-finder/my-proposals-service.js:153`]. The app's own
-   comment says "Power Automate owns real-intake wmkf_readyforreview"
-   (`shared/config/requestReadiness.js:3`), and older plans (alignment log D25/D56)
-   assumed a flow-set files-ready flag. Connor's map says the field is **[MANUAL]:
-   no flow writes it**. The app itself writes it only for Factory test requests
+   `lib/services/reviewer-finder/my-proposals-service.js:153`]. No flow writes it
+   [REPORTED by Connor]; staff set it, and do not set it on a non-compliant
+   application, so the gate also keeps non-compliant applications out of most of
+   the app (owner, 2026-11-20). The app writes it only for Factory test requests
    [VERIFIED via `lib/services/test-requests/readiness-finalizer.js:113`; no other
-   writer in `lib/`, `shared/`, `pages/`, `scripts/`], so staff have no control for it
-   in the app. Unless staff set it in Dynamics, real J27 proposals stay hidden from
-   the Workbench and Reviewer Finder. Which person sets it, when (after step 4
-   acceptance? after step 5?), and whether the app should gate on
-   `wmkf_phistaffversioncompleteflag` instead is an owner/Connor decision.
+   writer in `lib/`, `shared/`, `pages/`, `scripts/`], so staff set it in Dynamics.
+   Older plans (alignment log D25/D56) and the code comment at
+   `shared/config/requestReadiness.js:3` ("Power Automate owns real-intake
+   wmkf_readyforreview") assumed a flow-set flag; the comment is stale and is a
+   code change (branch).
 9. **Step-3 output limits.** Compare with
    `docs/plans/PREFLIGHT_PROMPTS_HANDOFF_2026-11-10.md` and
    `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md` before changing a
@@ -406,18 +412,21 @@ Checked against our source on 2026-11-20 unless labeled.
 
 ## 10. Open questions for Connor
 
+Ordered by urgency (2026-11-20).
+
 1. When step 5 re-runs after the primary keyword changes, is the earlier
    staff-version file (different name) removed or replaced? Two files would make
-   our matcher fail closed.
-2. Is `akoya_submissionaccepted` now always manual (superseding the v3 spec's AI
-   write), and is `wmkf_ai_compliancesummary` retired or still planned?
-3. Is `wmkf_ai_methodologies` written by `intake.keywords` or a separate prompt?
-4. What produces the J27 reviewer copy (D26's `Reviewer Materials/Proposal_`)?
-5. Is `wmkf_keywordinternalprogram` reliable enough to drive the S&E/MR split for
-   J27 briefings and ranking, or is it being retired?
-6. Does any step set `akoya_programid`, or is it permanently blank for J27?
-8. Who sets `wmkf_readyforreview` for J27, and at what point? The app hides
-   2027+ Research requests until it is true (section 9 item 8).
-9. Does step 1 set `wmkf_applicantdisposition` (or any disposition) on the
+   our matcher fail closed and the Workbench would show no staff version.
+2. Is `wmkf_keywordinternalprogram` reliable and maintained enough to drive the
+   S&E/MR split for J27 briefings and ranking (including coined disciplines), or
+   is it being retired?
+3. Does any step set `akoya_programid`, or is it permanently blank for J27?
+4. What produces the J27 reviewer copy (D26's `Reviewer Materials/Proposal_`)? The
+   external reviewer portal serves only that file
+   (`lib/external/reviewer-materials.js`).
+5. Does step 1 set `wmkf_applicantdisposition` (or any disposition) on the
    `wmkf_appreviewersuggestion` rows it writes? The app's applicant-recommended
    and not-excluded reader filters depend on it.
+6. Is `wmkf_ai_methodologies` written by `intake.keywords` or a separate prompt?
+7. Low priority: confirm `akoya_submissionaccepted` is always manual (superseding
+   the v3 spec's AI write), and whether `wmkf_ai_compliancesummary` is retired.
