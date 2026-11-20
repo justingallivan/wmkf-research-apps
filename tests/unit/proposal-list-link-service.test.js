@@ -9,9 +9,11 @@ import { hashToken } from '../../lib/services/external-token';
 import {
   computeProposalListExpiry,
   createProposalList,
+  getAdvisorPicks,
   getProposalListOverview,
   rebuildProposalList,
   revokeProposalList,
+  setAdvisorPick,
   setProposalListMarks,
 } from '../../lib/services/proposal-lists/list-link-service';
 
@@ -39,6 +41,7 @@ function snapshotItem(requestId, number, institution = 'Caltech') {
 function makeDeps(overrides = {}) {
   const rows = new Map();
   const items = new Map();
+  const picks = new Set(); // `${requestId}:${rosterId}`
   const store = {
     listLiveLinks: jest.fn(async () => [...rows.values()].filter((row) => !row.revoked_at)),
     getLinkById: jest.fn(async (id) => rows.get(id) || null),
@@ -56,16 +59,26 @@ function makeDeps(overrides = {}) {
       })));
       return row;
     }),
-    // Like the real store: marks are read at replacement time, not passed in.
+    // Like the real store: marks on listed proposals are read at replacement
+    // time; only a proposal new to the list takes the caller's highlight.
     replaceItems: jest.fn(async (id, snapshot) => {
       const before = new Map((items.get(id) || []).map((i) => [i.request_id, i]));
       items.set(id, snapshot.map((i) => ({
         request_id: i.requestId, request_number: i.requestNumber, title: i.title, institution: i.institution,
         project_leader: i.projectLeader, section: i.section,
-        highlighted: before.get(i.requestId)?.highlighted === true,
+        highlighted: before.has(i.requestId) ? before.get(i.requestId).highlighted === true : i.highlighted === true,
         own_institution: before.get(i.requestId)?.own_institution === true,
       })));
       return true;
+    }),
+    listPickedRequestIds: jest.fn(async (rosterId) => [...new Set([...picks]
+      .map((key) => key.split(':'))
+      .filter(([, roster]) => rosterId === null || Number(roster) === rosterId)
+      .map(([request]) => request))]),
+    listPicksForRequest: jest.fn(async (requestId) => [...picks]
+      .map((key) => key.split(':')).filter(([request]) => request === requestId).map(([, roster]) => Number(roster))),
+    setPick: jest.fn(async (requestId, rosterId, picked) => {
+      if (picked) picks.add(`${requestId}:${rosterId}`); else picks.delete(`${requestId}:${rosterId}`);
     }),
     setMarks: jest.fn(async () => true),
     revokeLink: jest.fn(async (id) => {
@@ -79,6 +92,7 @@ function makeDeps(overrides = {}) {
   return {
     rows,
     items,
+    picks,
     deps: {
       schemaReady: () => true,
       getBoardDates: jest.fn(async () => ({ wmkf_cyclecode: 'J27', wmkf_meetingdate: '2027-06-09T00:00:00Z' })),
@@ -91,6 +105,13 @@ function makeDeps(overrides = {}) {
         ],
       })),
       loadSnapshot: jest.fn(async () => [snapshotItem(REQ_A, '1001'), snapshotItem(REQ_B, '1002', 'MIT')]),
+      previewReadOnly: () => false,
+      // REQ_A and REQ_B are Scored (J27); REQ_C is a J27 request not yet scored.
+      readRequest: jest.fn(async (id) => ({
+        [REQ_A]: { akoya_requestid: REQ_A, wmkf_phaseistatus: 100000004, wmkf_GrantCycle: { wmkf_cyclecode: 'J27' } },
+        [REQ_B]: { akoya_requestid: REQ_B, wmkf_phaseistatus: 707510005, wmkf_GrantCycle: { wmkf_cyclecode: 'J27' } },
+        [REQ_C]: { akoya_requestid: REQ_C, wmkf_phaseistatus: null, wmkf_GrantCycle: { wmkf_cyclecode: 'J27' } },
+      })[id] || null),
       store,
       mint: jest.fn(async () => ({ jwt: `jwt-${++n}`, jti: `jti-${n}`, hash: hashToken(`jwt-${n}`) })),
       seal: (value) => `sealed:${value}`,
@@ -241,8 +262,8 @@ describe('marks, rebuild, revoke, overview', () => {
     });
     const { items: after } = await rebuildProposalList({ linkId: LINK_ID, actor: ACTOR }, deps);
     expect(after.find((i) => i.requestNumber === '1001').highlighted).toBe(true);
-    // The service hands the store the bare snapshot; it never supplies marks of its own.
-    expect(deps.store.replaceItems.mock.calls[0][1].every((i) => !('highlighted' in i) && !('ownInstitution' in i))).toBe(true);
+    // The service supplies only pick highlights; the store keeps listed proposals' marks.
+    expect(deps.store.replaceItems.mock.calls[0][1].every((i) => !('ownInstitution' in i))).toBe(true);
   });
 
   test('revoke switches the link off once; a second revoke is a 404', async () => {
@@ -259,5 +280,87 @@ describe('marks, rebuild, revoke, overview', () => {
     expect(overview.sectionSource.placeholder).toBe(false);
     expect(overview.links).toHaveLength(1);
     expect(JSON.stringify(overview)).not.toMatch(/sealed:|token_digest|token_ciphertext/);
+  });
+});
+
+describe('advisor picks', () => {
+  test('a Board member’s list highlights only the proposals ticked for them', async () => {
+    const { deps, items } = makeDeps();
+    await setAdvisorPick({ requestId: REQ_B, rosterId: 7, picked: true, actor: ACTOR }, deps);
+    await setAdvisorPick({ requestId: REQ_A, rosterId: 8, picked: true, actor: ACTOR }, deps);
+    const { link } = await createProposalList({ cycleCode: 'J27', listKind: 'ordinary', rosterId: 7, actor: ACTOR }, deps);
+    expect(items.get(LINK_ID).map((i) => [i.request_number, i.highlighted])).toEqual([['1001', false], ['1002', true]]);
+    expect(link.highlightedCount).toBe(1);
+    expect(deps.store.listPickedRequestIds).toHaveBeenCalledWith(7);
+  });
+
+  test('a test list highlights a proposal ticked for anyone', async () => {
+    const { deps, items } = makeDeps();
+    await setAdvisorPick({ requestId: REQ_A, rosterId: 8, picked: true, actor: ACTOR }, deps);
+    await createProposalList({ cycleCode: 'J27', listKind: 'test', rosterId: 7, actor: ACTOR }, deps);
+    expect(deps.store.listPickedRequestIds).toHaveBeenCalledWith(null);
+    expect(items.get(LINK_ID).map((i) => [i.request_number, i.highlighted])).toEqual([['1001', true], ['1002', false]]);
+  });
+
+  test('rebuild highlights a newly listed ticked proposal but leaves marks on listed ones alone', async () => {
+    const { deps, items } = makeDeps();
+    await createProposalList({ cycleCode: 'J27', listKind: 'ordinary', rosterId: 7, actor: ACTOR }, deps);
+    // Ticked after the list was made: REQ_B is already listed (unmarked), REQ_C is new.
+    await deps.store.setPick(REQ_B, 7, true);
+    await deps.store.setPick(REQ_C, 7, true);
+    deps.loadSnapshot.mockResolvedValue([snapshotItem(REQ_B, '1002', 'MIT'), snapshotItem(REQ_C, '1003', 'UCLA')]);
+    const { items: after } = await rebuildProposalList({ linkId: LINK_ID, actor: ACTOR }, deps);
+    expect(after.map((i) => [i.requestNumber, i.highlighted])).toEqual([['1002', false], ['1003', true]]);
+    expect(items.get(LINK_ID)).toHaveLength(2);
+  });
+
+  test('reads every Board member with their tick, and whether the request is Scored', async () => {
+    const { deps } = makeDeps();
+    await setAdvisorPick({ requestId: REQ_A, rosterId: 7, picked: true, actor: ACTOR }, deps);
+    expect(await getAdvisorPicks({ requestId: REQ_A.toUpperCase() }, deps)).toEqual({
+      scored: true,
+      readOnly: false,
+      advisors: [
+        { rosterId: 7, name: 'Board Member', picked: true },
+        { rosterId: 8, name: 'No Email', picked: false },
+      ],
+    });
+    expect((await getAdvisorPicks({ requestId: REQ_C }, deps)).scored).toBe(false);
+  });
+
+  test('an untick removes the pick', async () => {
+    const { deps, picks } = makeDeps();
+    await setAdvisorPick({ requestId: REQ_A, rosterId: 7, picked: true, actor: ACTOR }, deps);
+    const result = await setAdvisorPick({ requestId: REQ_A, rosterId: 7, picked: false, actor: ACTOR }, deps);
+    expect(picks.size).toBe(0);
+    expect(result.advisors.find((a) => a.rosterId === 7).picked).toBe(false);
+  });
+
+  test.each([
+    [{ requestId: REQ_C, rosterId: 7, picked: true }, 'proposal_list_pick_not_scored'],
+    [{ requestId: REQ_A, rosterId: 9, picked: true }, 'proposal_list_recipient_unresolved'],
+    [{ requestId: REQ_A, rosterId: 7, picked: 'yes' }, 'proposal_list_pick_invalid'],
+    [{ requestId: 'not-a-guid', rosterId: 7, picked: true }, 'proposal_list_request_invalid'],
+    [{ requestId: LINK_ID, rosterId: 7, picked: true }, 'proposal_list_request_not_found'],
+  ])('refuses %p', async (args, code) => {
+    const { deps } = makeDeps();
+    await expect(setAdvisorPick({ ...args, actor: ACTOR }, deps)).rejects.toMatchObject({ code });
+    expect(deps.store.setPick).not.toHaveBeenCalled();
+  });
+
+  test('refuses a request outside a J27-or-later cycle, a staff account with no Dynamics identity, the flag off, and a read-only preview', async () => {
+    const legacy = makeDeps({ readRequest: jest.fn(async () => ({ akoya_requestid: REQ_A, wmkf_phaseistatus: 100000004, wmkf_GrantCycle: { wmkf_cyclecode: 'J26' } })) });
+    await expect(setAdvisorPick({ requestId: REQ_A, rosterId: 7, picked: true, actor: ACTOR }, legacy.deps))
+      .rejects.toMatchObject({ httpStatus: 404 });
+    const noActor = makeDeps();
+    await expect(setAdvisorPick({ requestId: REQ_A, rosterId: 7, picked: true, actor: { ...ACTOR, systemUserId: null } }, noActor.deps))
+      .rejects.toMatchObject({ httpStatus: 403 });
+    const off = makeDeps({ schemaReady: () => false });
+    await expect(getAdvisorPicks({ requestId: REQ_A }, off.deps)).rejects.toMatchObject({ httpStatus: 503 });
+    const preview = makeDeps({ previewReadOnly: () => true });
+    expect((await getAdvisorPicks({ requestId: REQ_A }, preview.deps)).readOnly).toBe(true);
+    await expect(setAdvisorPick({ requestId: REQ_A, rosterId: 7, picked: true, actor: ACTOR }, preview.deps))
+      .rejects.toMatchObject({ code: 'proposal_list_preview_read_only' });
+    for (const made of [legacy, noActor, off, preview]) expect(made.deps.store.setPick).not.toHaveBeenCalled();
   });
 });

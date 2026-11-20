@@ -3,6 +3,7 @@ import { Button } from '../Layout';
 import { requestJson } from '../../utils/api-request';
 import { OTHER_TRIAGE_REASON } from '../../config/triageReasons';
 import NotScoredReasonFields from './NotScoredReasonFields';
+import AdvisorPicks from './AdvisorPicks';
 
 const endpoint = '/api/workbench/initial-assessment-rationale';
 const read = requestId => requestJson(`${endpoint}?mode=assessment&requestId=${encodeURIComponent(requestId)}`);
@@ -106,6 +107,7 @@ export default function AssessmentForm({ requestId, canManage, onSaved }) {
       </>}
       <Button type="submit" size="sm" loading={busy} disabled={!record.version || !dirty || !valid}>Save assessment</Button>
     </form>}
+    {record?.decision === 'yes' && <AdvisorPicks key={requestId} requestId={requestId} />}
     {!record && busy && <p role="status">Loading assessment…</p>}
     {saved && <p role="status" className="mt-2 text-sm">Assessment saved.</p>}
     {error && <p role="alert" className="mt-2 text-sm text-red-700">{error}</p>}
