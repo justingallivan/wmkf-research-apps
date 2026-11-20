@@ -44,6 +44,7 @@
 - BILL / honoraria / payment semantics: ../docs/agent-wiki/topics/finance-honoraria.md
 - Auth / admin / access / org-open reviewer access / private Blob: ../docs/agent-wiki/topics/security-auth.md; ../docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md
 - Intake portal / attachments / institution match / virus scan / pre-flight prompts (CSO workbook): ../docs/agent-wiki/topics/intake-portal.md
+- Connor's PA intake flows (what each step writes, where, when, status): project-connor-intake-flow-map.md
 - Site Visit materials / applicant additional materials / briefing room: ../docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md; project-site-visit-materials-planning-handoff.md
 - Research request file corpus / SharePoint file inventory / pre-2018 parked (microfiche): ../docs/plans/RESEARCH_REQUEST_FILE_CORPUS_PLAN_2026-10-25.md
 - Cross-visit D26 sentiment vs ranking / discussion misattribution diagnosis: project-d26-cross-visit-sentiment-ranking-study.md; ../docs/plans/DISCUSSION_MISATTRIBUTION_BRIEF_2026-10-17.md

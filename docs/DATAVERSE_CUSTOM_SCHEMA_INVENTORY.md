@@ -234,8 +234,11 @@ appear to be vendor- or migration-provided that our app only reads — please co
 
 1. **`wmkf__ai_summary`** (double underscore on `akoya_request`) — accidental duplicate of
    `wmkf_ai_summary`. Not written by app. **Delete candidate.**
-2. **`wmkf_ai_compliancecheck`** (numeric, `akoya_request`) — vestigial from an earlier draft;
-   app is instructed NOT to write it. **Reconcile/delete candidate.**
+2. **`wmkf_ai_compliancecheck`** (`akoya_request`) — ~~vestigial; delete candidate~~ **Resolved
+   2026-11-20:** a live Choice (Compliant / Non-Compliant / Human Review / Reviewed, global option set
+   `wmkf_wmkf_ai_compliance`; Production metadata read) that Connor's planned step-3 compliance
+   prompt writes. Not a delete candidate. The app still does not write it. See
+   `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`.
 3. **`wmkf_billcomid`** (on `contact`) and **`wmkf_paymentnetworkidpni`** — used by code but not in
    our schema-as-code files; please confirm these are provisioned and where they live.
 4. **`wmkf_app_AvatarColor` / `wmkf_app_NeedsLinking`** (on `systemuser`) — provisioned in wave 1 but

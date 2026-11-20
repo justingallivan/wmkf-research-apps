@@ -84,6 +84,7 @@ intake-to-Dataverse mapping.
 - Virus scan and Cloudmersive: `project-intake-portal-virus-scan-e2e-deferred`, `project-virus-scanning-it-context`, `project-cloudmersive-advanced-endpoint`.
 - Cross-topic hard constraint: `project-no-banking-pii-in-dataverse`.
 - Pre-flight prompts (CSO review-workbook intent; Connor PA prompt delivery): `project-j27-review-workbook-reflects-cso-intent`, `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md`.
+- Connor's Research intake Power Automate map (what each step writes, where, when; LIVE/PLANNED status): `project-connor-intake-flow-map`, `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`.
 
 ## Operating Notes
 

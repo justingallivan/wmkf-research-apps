@@ -128,6 +128,7 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
 - Research award scope (special grants, Keck Court Biomedical Initiative, `wmkf_type = Program` filter hazard): `project-research-special-grants-in-cohorts`.
 - SharePoint package-promotion samples and governed DOCX hash coverage (routed here from the memory router 2026-10-05): `project-sharepoint-property-promotion-rewrites-docx`.
 - Explorer behavior campaign (SoCal vernacular; plan `docs/DYNAMICS_EXPLORER_BEHAVIOR_CAMPAIGN_PLAN.md`): `project-dynamics-explorer-socal-campaign`.
+- Connor's Research intake Power Automate map (what each step writes, where, when; LIVE/PLANNED status): `project-connor-intake-flow-map`, `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`.
 
 ## Operating Notes
 

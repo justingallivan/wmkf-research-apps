@@ -144,6 +144,7 @@ related:
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
 | [POWER_AUTOMATE_PROPOSAL_FILE_CONTRACT.md](POWER_AUTOMATE_PROPOSAL_FILE_CONTRACT.md) | spec | active | yes | Required SharePoint folders and exact proposal PDF filenames for Power Automate. | 2026-10-26 |
+| [POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md](POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md) | spec | active | yes | Connor's Research intake flow map (2026-11-20): what each Power Automate step writes, where, in what format, and when it runs. | 2026-11-20 |
 
 ## email
 

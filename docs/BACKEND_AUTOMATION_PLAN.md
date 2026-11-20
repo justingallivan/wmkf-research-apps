@@ -97,6 +97,8 @@ or the WMKF Vercel app. The corresponding PA prompt flows,
 triggers, retries, and prompt-parity behavior are therefore **not deployed in
 the visible production flow metadata**; Phase 4 below remains planned work.
 
+> **Status 2026-11-20 (Connor's flow map, reported not probed):** for Research intake, steps 1–2 (application data, documents) are live Power Automate flows; the step-3 AI review that runs `wmkf_ai_prompt` rows is planned, and the step-5 staff version is built but waits on step 3. The current map is `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`.
+
 > **Decision (2026-04-16, Session 102):** Full PA composition confirmed. PA owns the entire Claude call lifecycle for automated backend jobs — no Vercel dependency at runtime. This matches the original architecture above. Rationale: easier to debug PA-native flows, and backend automation is mission-critical. PA handles PDF extraction natively (confirmed 2026-04-15). Retry, `cache_control`, and JSON validation will be implemented in PA flows. See `PROMPT_STORAGE_DESIGN.md` for full decision record.
 
 ### Human-Initiated Tasks (Vercel App → Dynamics)

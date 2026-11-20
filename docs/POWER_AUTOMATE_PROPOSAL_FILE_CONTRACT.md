@@ -39,6 +39,15 @@ AI Materials/ProposalBibliography_1002379.pdf
 
 ### J27 names (owner decision 2026-10-26)
 
+> **Status 2026-11-20:** Connor's full Research intake map is now
+> `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md` (reported by Connor, not probed). Per that map:
+> step 2 (live) writes the applicant files to `Submission-Documents/`; step 5 (built, not live)
+> writes the staff version as `<AKA>_<Primary Keyword>_Staff-Version_<num>.pdf` (or
+> `<AKA>_Staff-Version_<num>.pdf` with no keyword), `AI Materials/Narrative-Bibliography_<num>.pdf`,
+> and **derived** files into `Submission-Documents/` (`Front-Matter_<num>.pdf` and four `.docx`
+> working files), so that folder no longer holds only applicant originals. No step produces a
+> J27 `Reviewer Materials/Proposal_` file. Where this section disagrees, the intake map is newer.
+
 For J27, GOApply places the applicant's documents in a `Submission-Documents`
 subfolder, and the J27 flows put the documents below in `AI Materials`, named
 `{Type}_{Request#}` (Connor, email 2026-10-26). Rather than renaming them, the
@@ -96,7 +105,9 @@ file, and still accepts the earlier `Phase_I_Staff_Version` name. The J27 review
 
 1. Use the folder names, filenames, and capitalization exactly as shown.
 2. Keep the proposal narrative and bibliography as separate PDFs.
-3. Do not create a combined canonical AI-input PDF.
+3. Do not create a combined canonical AI-input PDF. (J27 exception, D60: step 5 builds
+   `AI Materials/Narrative-Bibliography_<num>.pdf` for Reviewer Finder; the governed
+   Pre-Site/Initial Assessment/Field Primer readers still use the separate files.)
 4. Do not add dates, version numbers, spaces, or suffixes such as `(1)` to the
    filenames.
 5. When regenerating a file, update or replace the exact existing file so

@@ -202,6 +202,7 @@ audit 2026-09-18: 8 current prompts, e.g. `cycle-dossier.research-plan` on Opus 
 - PDF/document processing: `project-pdf-processing-tiers`.
 - Reviewer prompt migration: `project-reviewer-prompt-dataverse-migration`.
 - Prompt injection/security: `project-a7-prompt-injection-hardening`.
+- Prompts Connor's planned step-3 intake flow runs (`intake.*`, `grantee-title.generate`), their target fields and `wmkf_ai_run` tagging: `project-connor-intake-flow-map`, `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`.
 - Thinking-default budget truncation (zero-text `max_tokens`): `project-executor-thinking-budget-truncation`.
 - Tool-app prompt rows (Plan A: the resolver/composer seam beside the Executor, 14 rows in the 2026-10-11 plan; since the 2026-11-19 retirements only Expense Reporter's rows are read by a live route, no fallback model): `docs/plans/AI_TOOL_APPS_EXECUTOR_CONVERGENCE_PLAN_2026-10-11.md` §8.
 - Prompt governance (Tier-1 rows, create-only seeds, versioned admin publish; routed here from the memory router 2026-10-05): `project-prompt-governance`.

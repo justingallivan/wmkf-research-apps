@@ -30,6 +30,14 @@ that split and Proposal Ranking compares within it (`programKey`). For J27, thos
 readers need another S&E/MR source, or J27 must stop splitting. Decide that before
 fixing items 1 and 4 below.
 
+Later the same day, Connor's intake map (`docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`)
+showed two relevant facts [REPORTED by Connor]: (a) step 1 sets `wmkf_grantprogram` = Research
+and does not list `akoya_programid`, so blank Program is the expected J27 state; (b) discipline
+keywords carry `wmkf_keywordinternalprogram` ("legacy MR/SE bucket"), reachable from the
+request's primary discipline `wmkf_programareaserved`. That is a **candidate** S&E/MR source,
+not a decision: it is filled only by the planned step 3. Item 2 (title cron) also changes once
+step 3 is live, because step 3 writes the short title itself.
+
 ## Live readers that decide membership (class A)
 
 Ordered by when a real J27 request first reaches them. Real J27 proposals arrive

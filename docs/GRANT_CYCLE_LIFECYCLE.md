@@ -18,6 +18,8 @@ related:
 
 **Status:** Mixed — some AI fields and post-approval flows are live; PA-orchestrated flows are still pending. See "What's live now (2026-05-08)" below.
 **Created:** Session 94, 2026-04-08
+
+> **J27 intake (2026-11-20):** this lifecycle describes the earlier two-phase design. For the single-phase J27 Research intake as Connor built it (stage relay, what each Power Automate step writes, status of each step), see `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md`.
 **Stakeholders:** Justin (prompt development, Vercel app), Connor (PowerAutomate flows, Dynamics admin)
 
 > **Cycle redesign decided (owner, 2026-09-06).** D26 is the last cycle with different submitted materials for Phase I and Phase II; the tables below describe it. From J27 (June 2027) the standalone "Concept" stage is gone and applicants submit once. Staff and back-end workflows keep the Phase I / Phase II terminology, but the advance is a status change with no separate materials. Proposals arrive in early December 2026 (date TBD). The J27 sites and open decisions are in `docs/J27_TRANSITION_REGISTER.md`. The lifecycle below describes the **current cycle**; the redesigned cycle will need its own pass once Sarah/Connor lock the new shape. See memory entries `project_grant_phasing_evolution.md` and `project_app_roadmap_2026-04-25.md`.
