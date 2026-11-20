@@ -100,6 +100,7 @@
     "101_proposal_list_links.sql",
     "102_proposal_list_item_subsection.sql",
     "103_expertise_roster_identity.sql",
-    "104_expertise_roster_feedback_identity.sql"
+    "104_expertise_roster_feedback_identity.sql",
+    "105_proposal_list_advisor_picks.sql"
   ]
 }

@@ -46,11 +46,13 @@ test('locks the link, then reads the marks, then replaces the items with those m
   expect(texts.at(-1)).toBe('COMMIT');
 });
 
-test('marks handed in by a caller are ignored; only stored marks count', async () => {
-  script({ marks: [] });
+test('a caller highlight (advisor pick) counts only for a newly listed proposal; stored marks win', async () => {
+  // REQ_A is already listed and unmarked; REQ_B is new to the list.
+  script({ marks: [{ request_id: REQ_A, highlighted: false, own_institution: false }] });
   await replaceItems(LINK, snapshot.map((item) => ({ ...item, highlighted: true, ownInstitution: true })));
   const inserts = mockClient.query.mock.calls.filter(([text]) => /INSERT INTO proposal_list_items/.test(text)).map(([, params]) => params);
-  expect(inserts.map((p) => [p[8], p[9]])).toEqual([[false, false], [false, false]]);
+  // Own institution never comes from the caller.
+  expect(inserts.map((p) => [p[2], p[8], p[9]])).toEqual([['1001', false, false], ['1002', true, false]]);
 });
 
 test('a link that is not live is left untouched', async () => {

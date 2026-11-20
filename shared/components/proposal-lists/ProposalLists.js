@@ -15,7 +15,7 @@ import { requestJson } from '../../utils/api-request';
 import { conventionalCycles } from '../../../lib/utils/cycle-code';
 
 const API = '/api/workbench/proposal-lists';
-const KIND_LABEL = { ordinary: 'Submitted proposals', test: 'Test requests (for checking the page)' };
+const KIND_LABEL = { ordinary: 'Scored proposals', test: 'Test requests (for checking the page)' };
 
 function formatDay(iso) {
   if (!iso) return null;
@@ -259,10 +259,11 @@ export default function ProposalLists() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Proposal lists" subtitle="Personal links to the submitted proposals for Program Chairs and Board members." />
+      <PageHeader title="Proposal lists" subtitle="Personal links to the scored proposals for Program Chairs and Board members." />
       <Card hover={false}>
         <p className="text-sm text-gray-700">
-          Give a Board member a personal link to a page listing every submitted proposal in a cycle.
+          Give a Board member a personal link to a page listing every scored proposal in a cycle.
+          Proposals staff ticked for that person during Scoring start out highlighted.
           Each title opens that proposal’s staff version. No login is needed, so treat a link like the proposals themselves.
         </p>
         <div className="mt-4 flex flex-wrap items-end gap-4">

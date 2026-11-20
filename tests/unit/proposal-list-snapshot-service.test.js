@@ -37,6 +37,7 @@ function request(n, overrides = {}) {
     wmkf_GrantCycle: { wmkf_cyclecode: 'J27' },
     wmkf_istestrequest: null,
     wmkf_testcreationrunid: null,
+    wmkf_phaseistatus: 100000004, // Scored
     ...overrides,
   };
 }
@@ -76,6 +77,22 @@ afterAll(() => {
 });
 
 describe('loadCycleProposalSnapshot', () => {
+  test('lists only scored proposals, including those past Scoring', async () => {
+    const statuses = [
+      [1, 100000004], // Scored
+      [2, 707510005], // Recommended to Chairs
+      [3, 707510006], // Not recommended to Chairs
+      [4, 100000005], // Not Scored
+      [5, 100000000], // Pending Committee Review
+      [6, null],
+      [7, 123456789], // unmapped
+    ];
+    const d = deps(statuses.map(([n, status]) => request(n, { wmkf_phaseistatus: status })));
+    const rows = await loadCycleProposalSnapshot({ cycleCode: 'J27', listKind: 'ordinary' }, d);
+    expect(rows.map((row) => row.requestNumber)).toEqual(['1001', '1002', '1003']);
+    expect(d.queryRequests.mock.calls[0][0].select).toContain('wmkf_phaseistatus');
+  });
+
   test('lists every ready proposal in the cycle with title, institution, PI, and section', async () => {
     const d = deps([request(1), request(2, { _wmkf_programareaserved_value: null })]);
     const rows = await loadCycleProposalSnapshot({ cycleCode: 'j27', listKind: 'ordinary' }, d);

@@ -18,6 +18,8 @@ jest.mock('../../lib/services/proposal-lists/list-page-service', () => ({
 }));
 jest.mock('../../lib/services/proposal-lists/list-link-service', () => ({
   createProposalList: jest.fn(),
+  getAdvisorPicks: jest.fn(),
+  setAdvisorPick: jest.fn(),
   getProposalListDetail: jest.fn(),
   getProposalListOverview: jest.fn(),
   rebuildProposalList: jest.fn(),
@@ -34,6 +36,8 @@ import {
   getProposalListOverview,
   revokeProposalList,
   setProposalListMarks,
+  getAdvisorPicks,
+  setAdvisorPick,
 } from '../../lib/services/proposal-lists/list-link-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 import staffHandler from '../../pages/api/workbench/proposal-lists';
@@ -86,6 +90,7 @@ describe('staff route', () => {
     [{ action: 'revoke', linkId: LINK_ID, cycle: 'J27' }],
     [{ action: 'send', linkId: LINK_ID }],
     [{ action: 'constructor' }],
+    [{ action: 'pick', requestId: LINK_ID, rosterId: 7, picked: true, pickedBy: ACTOR_ID }],
     [{ action: 'toString', linkId: LINK_ID }],
     [[]],
   ])('rejects the unsupported body %j', async (body) => {
@@ -103,6 +108,25 @@ describe('staff route', () => {
     expect(setProposalListMarks).toHaveBeenCalledWith(expect.objectContaining({ linkId: LINK_ID, highlightedRequestIds: ['a'], ownInstitutionRequestIds: [] }));
     expect(res.statusCode).toBe(409);
     expect(res.body.code).toBe('proposal_list_marks_not_on_list');
+  });
+
+  test('advisor picks: GET by request, POST takes the actor from the session', async () => {
+    getAdvisorPicks.mockResolvedValueOnce({ scored: true, advisors: [] });
+    const read = mockRes();
+    await staffHandler({ method: 'GET', query: { requestId: ` ${LINK_ID} ` } }, read);
+    expect(read.body).toEqual({ success: true, scored: true, advisors: [] });
+    expect(getAdvisorPicks).toHaveBeenCalledWith({ requestId: LINK_ID });
+    expect(getProposalListOverview).not.toHaveBeenCalled();
+
+    setAdvisorPick.mockResolvedValueOnce({ scored: true, advisors: [] });
+    const write = mockRes();
+    await staffHandler({ method: 'POST', body: { action: 'pick', requestId: LINK_ID, rosterId: 7, picked: false } }, write);
+    expect(write.statusCode).toBe(200);
+    expect(setAdvisorPick).toHaveBeenCalledWith({
+      requestId: LINK_ID, rosterId: 7, picked: false,
+      actor: { systemUserId: ACTOR_ID, name: 'Staff', email: 'staff@example.org' },
+    });
+    expect(setProposalListMarks).not.toHaveBeenCalled();
   });
 
   test('other methods are refused', async () => {

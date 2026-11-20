@@ -31,6 +31,15 @@ revoked_at IS NULL` holds at most one live link per recipient.
 `(link_id, request_id)`; `(link_id, request_number)` is unique. These rows are
 the only requests a link may open.
 
+`proposal_list_advisor_picks` (migration 105, **[BRANCH-BUILT 2026-11-19 on
+`claude/session-2026-11-19b`; not applied, not merged]**) records the Chairs and
+Board members staff ticked during Scoring to see a proposal: `request_id`,
+`roster_id` (numeric roster identity from migration 103; no foreign key, like
+`recipient_source`), `picked_by` (staff Dynamics system-user id), `picked_at`.
+Primary key `(request_id, roster_id)`; an index on `roster_id`. A repeat tick
+keeps the first row (`ON CONFLICT DO NOTHING`); an untick deletes the row. No
+cleanup: at most one row per scored request per Board member.
+
 `section` is the discipline branch and `subsection` the discipline group of the
 request's keyword (`_wmkf_programareaserved_value`) in the Keywords table
 `wmkf_programlevel3`, copied when the
@@ -52,9 +61,18 @@ Staff write through `POST /api/workbench/proposal-lists`
   and its items in one transaction. The items come from
   `list-snapshot-service.js`: every Research request linked to the cycle that
   passes the Workbench discovery predicate, with no Program Director or caller
-  scope. An incomplete read fails the create.
+  scope (on the advisor-picks branch: and whose Scoring decision is Scored or
+  later). An incomplete read fails the create. On the advisor-picks branch,
+  items ticked for the recipient in `proposal_list_advisor_picks` start
+  highlighted (a `test` list: ticked for anyone).
 - `rebuild` replaces a live link's items in one transaction and keeps the link,
-  its URL, and the marks on requests that are still listed.
+  its URL, and the marks on requests that are still listed. On the advisor-picks
+  branch, a newly listed request starts highlighted when it is ticked for the
+  recipient.
+- `pick` (advisor-picks branch) inserts or deletes one
+  `proposal_list_advisor_picks` row, only for a J27-or-later request whose
+  Scoring decision is Scored and a Board-role roster member; `GET ?requestId=`
+  reads the request's picks.
 - `marks` sets `highlighted` and `own_institution`; only requests already on the
   link can be marked.
 - `revoke` sets `revoked_at` once.
@@ -82,4 +100,4 @@ cycle.
 
 ## Not built
 
-Email sending, a chair marker on the roster, and open tracking.
+Open tracking. Email sending and a chair marker on the roster are not to be built (owner, 2026-11-19).

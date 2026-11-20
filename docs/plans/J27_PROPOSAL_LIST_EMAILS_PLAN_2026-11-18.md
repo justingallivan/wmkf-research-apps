@@ -3,7 +3,7 @@ title: J27 proposal lists for Program Chairs and Board experts
 domain: workbench
 kind: plan
 status: active
-summary: "Personal no-login pages listing every submitted J27 proposal for Program Chairs and Board members, with staff-highlighted proposals on top and a link to each proposal's staff version. The page and staff compose surface are merged to main behind a flag that is off; the email, chair marker, and keyword sections are not built."
+summary: "Personal no-login pages listing the scored J27 proposals for Program Chairs and Board members, with highlighted proposals on top and a link to each proposal's staff version. Production-live with keyword sections; the CSO pastes each link into their own email. Advisor picks during Scoring (which pre-fill highlights) and scored-only membership are branch-built on claude/session-2026-11-19b, awaiting migration 105."
 canonical: false
 cataloged: 2026-11-18
 last_verified: 2026-11-19
@@ -58,6 +58,44 @@ same list mechanism could carry that packet later.
 | 12 | Volume: up to 300 proposals; two chairs today, both Board members. |
 | 13 | Sender is a staff member, to be named. Whether Production allows sending as a staff member is for the owner to determine. |
 | 14 | Tabled: a staff note beside a highlighted proposal. |
+
+## Owner decisions (2026-11-19)
+
+These replace decisions 6, 11 and 13 where they differ.
+
+| # | Decision |
+|---|---|
+| 15 | A list holds only the scored proposals (about 50), not every submission. The Chairs get the titles of all submissions in advance by another route. Lists go out after Scoring and before finalists are selected. Everyone with a link can still open every proposal **on their list**. |
+| 16 | During Scoring, any staff member with Workbench access ticks the Chairs and Board members who should see a scored proposal ("advisor picks"). Those ticks set the highlights on that person's list, so the CSO does not highlight by hand. PDs are unlikely to change ticks after lists go out, so a tick does not change a list already made, except that a refresh highlights newly listed ticked proposals. |
+| 17 | The CSO sends each link by pasting it into their own email. The app sends nothing. |
+| 18 | No roster chair marker; the list-type picker is not remembered. |
+| — | Open: whether `/proposal-lists` should be narrowed to the CSO. Not changed. |
+
+## Advisor picks and scored-only lists [BRANCH-BUILT]
+
+Built on `claude/session-2026-11-19b` (2026-11-19); not merged.
+
+- **Where:** the Initial Assessment form, below the Scoring decision, once the saved
+  decision is Scored (`shared/components/workbench/AdvisorPicks.js`). One checkbox per
+  Board-role roster member; each tick saves on its own. The section does not render
+  where proposal lists are off.
+- **Storage:** Postgres `proposal_list_advisor_picks` (migration 105): request id,
+  numeric roster id, who ticked, when. An untick deletes the row.
+- **Route:** `/api/workbench/proposal-lists`, `GET ?requestId=` and
+  `POST { action: 'pick', requestId, rosterId, picked }`. The server refuses a tick on a
+  request that is not Scored, not J27-or-later, or for someone who is not a Board-role
+  roster member.
+- **Membership:** the snapshot keeps only requests whose Scoring decision is Scored,
+  including those that have since moved to a recommendation to Chairs or a Chairs
+  outcome (`isScoredRow` in `list-snapshot-service.js`).
+- **Highlights:** creating a Board member's list highlights the proposals ticked for
+  them. A **test** list highlights a test proposal ticked for anyone, so the whole path
+  can be checked on test requests without a real Board list. A refresh keeps the marks
+  on proposals already listed and highlights newly listed ones from their ticks.
+- **Release order:** the owner applies migration 105 to Production **before** the
+  branch merges, because Production list creation reads the new table at once.
+- **Rehearsal:** score a Production test request, tick an advisor on it, create a test
+  list, and check the proposal is highlighted at the top.
 
 ## What is built [MERGED, OFF]
 
@@ -123,7 +161,8 @@ the link off and create a new list.
 ### Which proposals are listed
 
 Every Research request linked to the cycle that passes the Workbench discovery rule
-(for 2027 and later cycles: Power Automate has marked it ready), read the same way for
+(for 2027 and later cycles: Power Automate has marked it ready) and whose Scoring
+decision is Scored (decision 15; branch-built, see above), read the same way for
 every staff member, with no Program Director or "my proposals" scope. The read is
 refused, never shortened, if it is incomplete, over 600 proposals, or the readiness
 scope cannot be read.
@@ -138,7 +177,8 @@ cycle (keeps the link and saved marks); switch a link off.
 A second list type, **test requests**, holds Factory test requests only and is always
 addressed to the signed-in staff member, so the page can be checked without a Board
 address and test data cannot reach one.
-The staff page always opens on **Submitted proposals** and does not remember the
+The staff page always opens on **Scored proposals** (labelled Submitted proposals
+before the advisor-picks branch) and does not remember the
 test-requests choice across reloads (owner decision, 2026-11-19).
 
 ### Stand-ins in this build
@@ -153,7 +193,7 @@ test-requests choice across reloads (owner decision, 2026-11-19).
   There is no chair marker.
 - **Own-institution marks** are suggested when the roster's institution text exactly
   matches the applicant institution; staff confirm or change them.
-- **Delivery**: staff copy the link into their own email. The app sends nothing.
+- **Delivery**: the CSO copies the link into their own email (decision 17). The app sends nothing.
 
 ## Not built [PLANNED]
 
@@ -161,8 +201,8 @@ test-requests choice across reloads (owner decision, 2026-11-19).
 |---|---|
 | Keyword sections (decision 1): first real use | Built and merged to `main` 2026-11-19; migration 102 applied by the owner first [VERIFIED via `node scripts/probe-proposal-list-schema.mjs`, 2026-11-19]. Not yet run in a browser or against Dataverse; the keyword-table read first runs when a list is created or refreshed. Settled: which request field holds the main discipline keyword. A request has two lookups to the Keywords table, `wmkf_programlevel3` and `wmkf_programareaserved`, plus the `wmkf_ai_keywords` text list [VERIFIED via the owner-run `node scripts/probe-keyword-taxonomy.cjs --target=prod`, 2026-11-19]. The build reads `wmkf_programareaserved`; the choice is one constant, `SECTION_KEYWORD_LOOKUP`. Evidence for that field: [VERIFIED via the owner-run `node scripts/probe-request-keywords.cjs --target=prod`, 2026-11-19: one request in all of Production has any of the three fields filled, intake test 1003526, whose `wmkf_programareaserved` points at the Discipline keyword "Structural Biology" (Life Sciences / Molecular and Cellular Biology); `wmkf_programlevel3` and `wmkf_ai_keywords` are empty on every request]. The owner accepted that request as the guide on 2026-11-19, so the staff-page warning is removed. |
 | Chair marker on the roster (decision 3) | Not needed to send: the two Program Chairs are Edward M. Stolper and James S. Economou (owner, 2026-11-19), and both appear in the staff page's Board member picker in Production alongside Board members Andrea M. Ghez and Kelsey C. Martin [VERIFIED via the live staff page, 2026-11-19], so staff create their lists by name. **Dropped by the owner 2026-11-19; not to be built.** |
-| Sending the email from the app, with an exact preview | Owner: the sender, and whether `DYNAMICS_IMPERSONATION_ENABLED` is `true` in Production (the Board share path refuses to send without it [VERIFIED via `lib/services/pre-site-visit/distribution/send.js:45`]). |
-| Pre-filling highlights from expert matching | The matching output on the other branch; its shape is [ASSUMED]. |
+| Sending the email from the app, with an exact preview | **Not to be built** (decision 17, owner 2026-11-19): the CSO pastes the link into their own email. |
+| Pre-filling highlights from expert matching | Replaced by advisor picks (decision 16): PDs tick advisors during Scoring. |
 | A link to the staff page from the Workbench navigation | Owner: where it should appear. |
 
 Not planned: open tracking, an "extend link" action, per-chair personalization.

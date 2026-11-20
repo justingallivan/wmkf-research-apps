@@ -5,9 +5,11 @@
  * (docs/plans/J27_PROPOSAL_LIST_EMAILS_PLAN_2026-11-18.md).
  *   GET  ?cycle=&kind=            → { success, overview }
  *   GET  ?linkId=                 → { success, link, items }
+ *   GET  ?requestId=              → { success, scored, advisors } (advisor picks)
  *   POST { action: 'create', cycle, kind, rosterId? }
  *   POST { action: 'rebuild' | 'revoke', linkId }
  *   POST { action: 'marks', linkId, highlightedRequestIds, ownInstitutionRequestIds }
+ *   POST { action: 'pick', requestId, rosterId, picked }
  * The actor comes only from the authenticated session; a `test` list always
  * goes to that signed-in staff member. The raw token leaves the server only
  * inside `link.url` for the signed-in staff caller.
@@ -18,9 +20,11 @@ import { ServiceHttpError } from '../../../lib/services/service-http-error';
 import {
   createProposalList,
   getProposalListDetail,
+  getAdvisorPicks,
   getProposalListOverview,
   rebuildProposalList,
   revokeProposalList,
+  setAdvisorPick,
   setProposalListMarks,
 } from '../../../lib/services/proposal-lists/list-link-service';
 
@@ -31,6 +35,7 @@ const FIELDS = {
   rebuild: new Set(['action', 'linkId']),
   revoke: new Set(['action', 'linkId']),
   marks: new Set(['action', 'linkId', 'highlightedRequestIds', 'ownInstitutionRequestIds']),
+  pick: new Set(['action', 'requestId', 'rosterId', 'picked']),
 };
 
 function sendError(res, error) {
@@ -58,6 +63,10 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     return withDalContext('workbench-proposal-lists-read', async () => {
       try {
+        if (req.query?.requestId !== undefined) {
+          const picks = await getAdvisorPicks({ requestId: String(req.query.requestId || '').trim() });
+          return res.status(200).json({ success: true, ...picks });
+        }
         if (req.query?.linkId !== undefined) {
           const detail = await getProposalListDetail({ linkId: String(req.query.linkId || '').trim() });
           return res.status(200).json({ success: true, ...detail });
@@ -97,6 +106,13 @@ export default async function handler(req, res) {
         result = await rebuildProposalList({ linkId, actor });
       } else if (body.action === 'revoke') {
         result = await revokeProposalList({ linkId, actor });
+      } else if (body.action === 'pick') {
+        result = await setAdvisorPick({
+          requestId: String(body.requestId || '').trim(),
+          rosterId: body.rosterId,
+          picked: body.picked,
+          actor,
+        });
       } else {
         result = await setProposalListMarks({
           linkId,
