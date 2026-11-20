@@ -82,7 +82,8 @@ flow names); no request or applicant rows were read.
    1 and 4. Step 1 setting `wmkf_applicantdisposition` = Recommended is done for new
    requests (Connor, 2026-11-20). **But the Find tab will not show them:** its
    applicant list and verification come only from the request's deprecated
-   `wmkf_potentialreviewer1`–`5` lookups (map section 9, item 7; traced in code).
+   `wmkf_potentialreviewer1`–`5` lookups (map section 9, item 7; traced in code and
+   confirmed on test request 1003526: five applicant rows, all lookups empty).
    Owner decision: Connor refills the lookups, or the app lists existing Recommended
    rows (runtime branch + `/contract-reconcile`). Also: text exclusions are enforced
    only in search, not on manual add, save or promotion (map section 9, item 6).

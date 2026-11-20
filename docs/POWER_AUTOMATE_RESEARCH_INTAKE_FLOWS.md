@@ -174,7 +174,7 @@ section 9).
   `wmkf_applicantdisposition` = Recommended (`100000000`) [REPORTED by Connor
   2026-11-20: already added; every request from now on gets it. Test requests
   written before the change have a blank disposition]. `wmkf_selected` is not in
-  Connor's list (the app's own applicant path writes `false`).
+  Connor's list but reads `false` [VERIFIED 2026-11-20 via owner-approved read-only Production read of test request 1003526 (created 2026-11-17): five suggestion rows with `wmkf_sources` = `"applicant"`, blank disposition (created before Connor's change), `wmkf_selected` = false; all five request lookups empty].
 - **Not written:** the request's legacy reviewer lookups
   `wmkf_potentialreviewer1`–`5`. Connor calls them deprecated [REPORTED by Connor
   2026-11-20].
@@ -417,8 +417,8 @@ Checked against our source on 2026-11-20 unless labeled.
    `"applicant"` (appending to an existing row's sources) and
    `wmkf_applicantdisposition` = Recommended [REPORTED by Connor 2026-11-20; not yet
    seen on a J27 row]. Step 1 does not fill the request's
-   `wmkf_potentialreviewer1`–`5` lookups. **Gap (traced in code 2026-11-20, not seen
-   live):** the Find tab's applicant list comes only from the slots (`lib/services/workbench/applicant-reviewers-service.js:111-139`), and verification (`findApplicantRecommendedByRequest`, called only from `lib/services/workbench/enrich-recommended-service.js:511`) starts only when that list is non-empty (`shared/components/reviewers/search/useApplicantReviewerEnrichment.js:107-119`). So on a J27 request the Find tab says the applicant listed no
+   `wmkf_potentialreviewer1`–`5` lookups [VERIFIED 2026-11-20 via owner-approved read-only Production read of test request 1003526 (created 2026-11-17): five suggestion rows with `wmkf_sources` = `"applicant"`, blank disposition (created before Connor's change), `wmkf_selected` = false; all five request lookups empty]. **Gap (traced in code 2026-11-20;
+   the data condition is confirmed on 1003526, the UI was not opened):** the Find tab's applicant list comes only from the slots (`lib/services/workbench/applicant-reviewers-service.js:111-139`), and verification (`findApplicantRecommendedByRequest`, called only from `lib/services/workbench/enrich-recommended-service.js:511`) starts only when that list is non-empty (`shared/components/reviewers/search/useApplicantReviewerEnrichment.js:107-119`). So on a J27 request the Find tab says the applicant listed no
    reviewers, and the PubMed check and conflict flags never run for Connor's rows.
    Fix not chosen: Connor refills the lookups, or the app lists existing Recommended
    rows (a runtime change on shared-writer rows: branch and `/contract-reconcile`). The app also writes this
