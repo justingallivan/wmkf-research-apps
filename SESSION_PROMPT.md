@@ -1,149 +1,132 @@
-# Session 690 Prompt: Proposal lists carry advisor picks; retirement closeout complete
+# Session 691 Prompt: Memory audits done; prompt-publish A7 guard live
 
-Two concurrent sessions closed on 2026-11-19: Codex Session 688 (app/pilot
-retirement and Admin cleanup; full handoff at `git show 2e6153a84:SESSION_PROMPT.md`)
-and Claude Session 689 (proposal lists, below). Codex's open items are kept under
-Next Items.
+Previous handoff (Session 690 prompt, written at the end of Session 689 and Codex
+Session 688): `git show 643ff4298:SESSION_PROMPT.md`.
 
-## Session 689 Summary — 2026-11-19 (Claude, worktree `WMKF_Apps-claude-2026-11-19b`)
+## Session 690 Summary — 2026-11-20 (Claude, main checkout)
 
 ### What Was Completed
 
-1. **Advisor picks during Scoring, live.** PR #654 (merge `8819feb62`). Once a request's
-   saved Initial Assessment decision is Scored, an "Advisors who should see this"
-   section lists the Board-role roster members; any Workbench staff member ticks them,
-   each tick saved on its own (Postgres `proposal_list_advisor_picks`, migration 105,
-   applied to Production by the owner before merge and confirmed by the probe).
-   Creating a Board member's list highlights the proposals ticked for them; a refresh
-   highlights newly listed ticked proposals and keeps existing marks; a test list
-   highlights a test proposal ticked for anyone. Read-only Preview refuses ticks.
-2. **Lists hold only scored proposals** (Scored or any later Phase I status). Recipient
-   page titled "Proposals for review". The CSO pastes each link into their own email.
-3. **J27+ membership uses Grant program, not the Program field.** PR #658 (merge
-   `2ecd5384c`). Found in the Production rehearsal: Scored test request 1003528 had
-   Grant program Research but a blank Program field (owner-authorized read-only probe).
-   Owner: the Program field plays no part. Pre-2027 cycles keep it.
-4. **"Ticked for: …" note in the CSO's highlight editor** (staff only; the recipient page
-   never reads picks). PR #659 (merge `acb10dce4`), with a Codex-review fix so a failed
-   names read never turns a committed save into an error (`tickedForUnavailable`).
-5. **Red startup gate fixed:** `check:j27-register` (row J27-026 cited files removed with
-   the Finder; Codex's PR #651 landed the same fix, resolved in favor of main).
-6. **Production rehearsal passed** (Claude in the owner's Chrome, owner's test list):
-   1003528 listed, highlighted from the Stolper tick, "Ticked for: Edward M. Stolper".
-   The owner's earlier test list was switched off and a new one created; it is still on.
+1. **Memory router diet.** `MEMORY.md` went from 8,247 to 7,510 bytes (74→59 lines). Lines that
+   pointed at the same place were merged, and three pointers moved to their wiki hubs. No leaf
+   was deleted. The router is now under the 8,192-byte trigger. `b535d6cc2`, `9518775a2`.
+2. **Routine memory audit (runbook §6).** All 21 health flags have a written disposition
+   (21→18). Five weak-basis flags were honest uncertainty introduced by the 2026-10-22 rewrites.
+   A five-leaf sample found three stale retirement-era claims; all were fixed. Report:
+   `docs/audits/memory-routine-audit-2026-11-20.md`. `9518775a2`.
+3. **Deep audit, retirement slice (runbook §7, sweep Mode B).**
+   - Scope: 22 active leaves and 5 wiki/queue pages that mention surfaces retired on 2026-11-19.
+   - Result: all 22 classified, 20 fixed, none demoted, and three protective notes added.
+   - The queue no longer says Grant Reporting and Literature Analyzer "remain implemented".
+   - The D60 Reviewer Finder combined-file loader replaces the two-file plan in the memory.
+   - The A7 surface count is now 32.
+   - The per-user prompt override is recorded as stored in Dataverse user preferences, not Postgres.
+   - Report: `docs/audits/memory-retirement-slice-deep-audit-2026-11-20.md`. `8eae55d72`, `8d7de43ff`.
+4. **Owner-approved read-only checks**, run in a signed-in browser tab, with two read-only
+   production scripts, and with local `gh`/Colima (`c9ad724ca`, `3cca1527a`):
+   - **Retired APIs:** all thirteen return 405 to GET and 410 `APP_RETIRED` to POST.
+   - **Prompt rows:** all 19 retired-interface rows are current, Published, v1. There are no
+     `writeup.*` rows.
+   - **Workbench:** the Status tab is gone.
+   - **Typo field:** `wmkf__ai_summary` has been removed.
+   - **Caching:** one cross-document cache read on review synthesis is confirmed.
+   - **Local and GitHub:** Colima is running and the ledger container is stopped. The repo is
+     public and CodeQL is configured.
+5. **A7 hardening, live in Production.**
+   - Admin prompt publish now refuses an edit that weakens a variable declared
+     `untrusted: true` (`assertUntrustedDeclarationsPreserved`).
+   - Tests: six new tests; a mutation check confirms them.
+   - Shipped: PR #663 merged as `a0baa4c94`, and Production deployed that commit successfully.
+   - Recorded as fixed: `0a3c937fd`.
 
-### Owner decisions recorded (plan decisions 15–18, 2026-11-19)
+### Commits
+`b535d6cc2`, `9518775a2`, `8eae55d72`, `8d7de43ff`, `c9ad724ca`, `3cca1527a`, `30ed4d79f` /
+`a0baa4c94` (PR #663), `0a3c937fd`.
 
-Lists hold only the ~50 scored proposals (all titles reach the Chairs another way);
-PD ticks set highlights; CSO sends from their own email (app sends nothing); no roster
-chair marker; list-type picker not remembered.
-
-### Verification
-
-72 gates and self-tests; full unit suite; Playwright 77/77; migration 105 and pick
-queries on a throwaway postgres:17; two Codex adversarial reviews (#654 approve;
-#658+#659 one medium finding, fixed); all CI green before each merge; Vercel Production
-deploys succeeded. One CI Jest flake (integrity deadline test) passed on rerun.
-
-## Proposal lists — Next Items
+## Next Items
 
 ### Verified Open
 
-1. **Check real J27 membership once proposals are scored.** Codex review recommendation:
-   compare the Scored proposals list against the Workbench's Scored J27 Research
-   requests; source inspection cannot prove data completeness.
-2. **Two-level sections and a real staff-version PDF** remain unproven live: no test
-   request carries a keyword. Blocked on Connor; real proposals after December 7.
+1. **Reconcile the remaining two-file restatements of D60.** These still describe the replaced
+   two-file plan: `.claude-memory/project-j27-doc-capture-evolution.md:52`,
+   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md:197` and
+   `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md:373-376`. Update the excerpts in register
+   row J27-065 in the same pass. J27 log D59/D60 still says "not promoted"; `f43f2db77` is in
+   Production.
+2. **Other stale docs outside the slice** (listed in the deep-audit report, Unknowns section):
+   - `DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md:97,108`
+   - `PROMPT_CACHING_AUDIT.md:37,88-90,197-199`
+   - `DYNAMICS_AI_FIELDS_SPEC_v3_cn.md:237,265`
+   - `CLOSEABLE_CLASS_INVARIANT_MAP.md` (A7 count 27)
+3. **Split `project-j27-cycle-page-redesign-pending.md`** (8.7 KB, routed, oversize) into a short
+   active-rules leaf plus a closed history leaf, and rename it away from "pending".
+4. **Still open, waiting on data:**
+   - `cycle-dossier.entry` cache read: no runs since the fix. Re-run
+     `scripts/probe-ai-run-cache-reads.js --prompt cycle-dossier.entry` after the next dossier
+     batch. Production read; it needs the owner's OK.
+   - `Narrative-Bibliography_` file: absent on all four J27 test requests. Check after real J27
+     proposals arrive (after December 7).
+5. **Virus-scan sender UX is partly verified.** The staff upload client's handling of the 422
+   `infected` response was not traced.
 
 ### Owner Decision Needed
 
-1. Whether `/proposal-lists` (and its menu link) should be limited to the CSO. Not changed.
-2. 21 runtime files still read the Program field (`_akoya_programid_value`). The owner
-   decision covered list membership only; ask before changing others. Memory:
-   `project-program-field-retired-use-grant-program`.
+1. Compliance Screening priority (unbuilt; evidence in `project-new-ai-capabilities`).
+2. Where the preserved Grant Reporting and Literature Analyzer capabilities live next.
+3. From Session 689: limit `/proposal-lists` to the CSO? Change the 21 remaining Program-field
+   readers? See `project-program-field-retired-use-grant-program`.
+4. Whether the A7 guard should also cover seed scripts and direct Dataverse prompt edits. They are
+   outside PR #663.
+
+### Carried From Session 689 (unchanged; see the previous handoff)
+
+- Proposal lists:
+  - Check the real J27 Scored membership once proposals are scored.
+  - Two-level sections and the staff-version PDF are blocked on Connor's keywords.
+  - The owner's J27 test list is live; switching it off is harmless.
+- Connor's roster connection read check (`docs/plans/EXPERTISE_ROSTER_CONNOR_HANDOFF_2026-11-19.md`).
+- Parked:
+  - Do not merge the Executor lineage branch.
+  - Chairs stages and automatic Integrity Screen need separate approval.
 
 ### Verify Before Acting
 
-- The owner's J27 test list (to the owner, 4 test requests) is live; switching it off
-  is harmless. Do not create a list for a real Board member to test.
-- Memory router is 8,247 bytes, over the 8,192-byte routine-audit trigger after this
-  session's one-line addition; run the router diet (`docs/MEMORY_HYGIENE_RUNBOOK.md` §10).
-
-### Do Not Reopen Without New Decision
-
-- Proposal-list decisions 1–18 in the plan (supersede the earlier "every submitted
-  proposal" wording); ticks do not live-sync to existing highlights by design.
-
-## Other Streams — Next Items (from Codex Session 688)
-
-### Verified Open
-
-- No additional retirement implementation is queued. Reusable capabilities stay
-  preserved until the owner chooses a new source/workflow and authorizes adaptation.
-- Connor's actual production roster connection still needs a read check according
-  to `docs/plans/EXPERTISE_ROSTER_CONNOR_HANDOFF_2026-11-19.md`; backend automation is
-  separate work. Do not change effective permissions or remove unrelated roles.
-
-### Parked / Owner Decisions Preserved
-
-- Backend expertise matching stays in Connor's existing flow; no replacement flow
-  or second matching call authorized.
-- Parked Executor lineage: do not merge `codex/executive-summary-generation-2026-11-16`.
-  Owning inventory: `docs/plans/PARKED_EXECUTOR_BRANCH_INVENTORY_2026-11-19.md`.
-- Recommendation to Chairs Production stages and paid automatic Integrity Screen
-  each require separate owner approval; do not enable `AUTOMATIC_INTEGRITY_SCREENING`.
-- Intake prompt choices, Connor notification, missing-PI handling, Feb 24 D39 status
-  choice and dependency/Node decisions remain earlier owner boundaries, not new tasks.
-
-### Verify Before Acting
-
-- Initial Assessment authenticated save rehearsal was owner-deferred in the prior
-  handoff. Recheck that decision before any write rehearsal.
-- Dated Executive Summary trial batch-2 cleanup after November 23 remains a carryover
-  requiring fresh expiry/owner preflight, not authorization to delete now. See
-  `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md`.
-- Worktree disposal remains outside this closeout. Check open processes, dirtiness,
-  unique commits and the runbook preservation preflight before removing anything.
-- Dependency alert #144 and old request statuses require fresh probes, not inference
-  from prior handoffs.
+- The Executive Summary trial batch-2 cleanup after November 23 needs a fresh expiry check and the
+  owner's preflight.
+- Worktree disposal: follow the runbook's preservation preflight.
+- Dependency alert #144 is still open (GitHub printed it on every push today). Probe before acting.
 
 ## Concurrent Workstreams
 
 | Stream | Owning reference | Resume boundary |
 |---|---|---|
-| App-suite retirement | `docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md` | PR #651 DONE; interfaces retired, backend capabilities/data retained |
-| Pilot retirement | `docs/plans/evidence/TRANSCRIPTION_PILOT_RETIREMENT_2026-11-19.md` | DONE; cleanup receipt recorded, shared engine and infrastructure retained |
-| Admin cleanup | PRs #657 and #660 | DONE after release verification; display-only preservation |
-| Expertise roster | `docs/plans/EXPERTISE_FINDER_RETIREMENT_2026-11-19.md`; Connor handoff | Other owner; connection check/backend adoption separate |
-| Proposal lists | `docs/plans/J27_PROPOSAL_LIST_EMAILS_PLAN_2026-11-18.md` | Claude, Session 689: PRs #654, #658, #659 live; see Proposal lists below |
+| Memory hygiene | `docs/MEMORY_HYGIENE_RUNBOOK.md` §18 rows 2026-11-20 | Routine and retirement-slice deep audits done; follow-ups above |
+| Prompt A7 publish guard | PR #663 | Live; seed/Dataverse coverage is an owner decision |
+| Proposal lists | `docs/plans/J27_PROPOSAL_LIST_EMAILS_PLAN_2026-11-18.md` | Session 689 state |
+| App-suite / Finder / pilot retirement | `docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md` and siblings | Done; capabilities preserved |
 | Chairs | `docs/plans/J27_CHAIRS_RECOMMENDATION_PRODUCTION_PLAN_2026-11-18.md` | Separate approval per stage |
-| Intake/Executor | `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md` | Parked lineage retained; no merge |
+| Intake/Executor | `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md` | Parked lineage; no merge |
 
-## Key Files (proposal lists)
+## Key Files Reference
 
 | File | Purpose |
 |---|---|
-| `lib/services/proposal-lists/list-snapshot-service.js` | Scored-only membership; Grant program for 2027+ |
-| `lib/services/proposal-lists/list-link-service.js` | Create/rebuild highlights from picks; pick read/write; ticked-for names |
-| `lib/services/proposal-lists/list-store.js` | Picks storage (migration 105) |
-| `shared/components/workbench/AdvisorPicks.js` | Checkboxes in Initial Assessment |
-| `shared/components/proposal-lists/ProposalLists.js` | CSO page; "Ticked for" note |
-| `scripts/probe-proposal-list-schema.mjs` | Read-only check for migrations 101/102/105 |
+| `lib/services/admin/prompts-publish-service.js` | Publish guard `assertUntrustedDeclarationsPreserved` |
+| `tests/unit/prompts-publish-service.test.js` | A7 guard tests (describe "A7: untrusted declarations cannot be weakened") |
+| `docs/audits/memory-routine-audit-2026-11-20.md` | Routine audit report |
+| `docs/audits/memory-retirement-slice-deep-audit-2026-11-20.md` | Deep audit report, probes and follow-ups |
+
+## Testing
 
 ```bash
-npx jest --runInBand --silent --testPathPatterns='tests/unit/(proposal-list|workbench-advisor)'
+npx jest --runInBand --silent tests/unit/prompts-publish-service.test.js tests/unit/admin-prompt
+npm run check:memory-router && npm run check:memory-router:self-test
+npm run check:memory-health
 ```
 
 ## Closeout
 
-Docs landed on `main` from `claude/session-stop-2026-11-19b`. Runtime branches
-(`claude/session-2026-11-19b`, `claude/proposal-list-grant-program`,
-`claude/proposal-list-ticked-for`) are merged. The worktree has a gitignored
-`.env.local` symlink the owner created for the migration. Milestone: entry added to
-DEVELOPMENT_LOG.md. CLAUDE.md unchanged. Claim-evidence report: no eligible
-plan/design edit recorded, so no observation row. Never read root `.env.local`.
-
-Codex Session 688 closeout notes (preserved): documentation landed from
-`codex/retirement-session-close`; pilot retirement received a milestone entry; do not
-delete retained data, grants, settings, prompt versions, pilot infrastructure or shared
-services as a consequence of retirement.
+Milestone determination: no DEVELOPMENT_LOG entry. The A7 guard is a contained hardening, not a
+new capability or cutover, and the memory audits are maintenance. CLAUDE.md unchanged.
+Claim-evidence report: no eligible plan/design edit recorded, so no observation row.
+Production reads this session were owner-approved, in chat, for that run only.
