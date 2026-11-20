@@ -346,10 +346,9 @@ Checked against our source on 2026-11-20 unless labeled.
    `akoya_program`, the same table as the request Program field
    [VERIFIED via lookup metadata 2026-11-20], so request → `wmkf_programareaserved`
    → keyword → `wmkf_keywordinternalprogram` yields the same program IDs the app's
-   `RESEARCH_PROGRAM_IDS` use. This is a candidate, not a decision: Connor calls it
-   legacy, how many discipline rows have it filled is unknown (no row data read),
-   coined keywords' value is unstated, and the request lookup is filled only by
-   step 3, which is not live.
+   `RESEARCH_PROGRAM_IDS` use. Connor confirmed (2026-11-20) that every keyword has
+   a default MR/SE assignment and that MR/SE is set at the same time as the primary
+   keyword (section 10 question 2). Until step 3 is live, J27 requests have neither.
 4. **Compliance: no screening in the app (owner decision 2026-11-20).**
    - The app does not build compliance screening. Compliance lives in Connor's
      flow and with staff: step 3 writes advisory `wmkf_ai_compliancecheck` and
@@ -371,16 +370,18 @@ Checked against our source on 2026-11-20 unless labeled.
    - Our staff-version matcher requires exactly one root file whose lowercased
      name ends `_staff-version_{num}.pdf`
      [VERIFIED via `lib/services/workbench-proposal-documents.js:212-228`], so
-     Connor's keyword-segment name matches. If a re-run after a keyword change
-     left both the keyword-less and the keyword file, the match would fail closed.
+     Connor's keyword-segment name matches. Connor's planned keyword-change flow
+     deletes the old documents before creating updated ones (section 10 question 1),
+     so the single-file match holds.
    - `AI Materials/Narrative-Bibliography_<num>.pdf` is produced by step 5, which
      is not live; this explains its absence on the J27 test requests.
    - Step 5 writes derived files into `Submission-Documents/` (`Front-Matter_`,
      four `.docx` working files). That contradicts the earlier understanding that
      `Submission-Documents` holds only applicant originals.
-   - No listed step produces `Reviewer Materials/Proposal_<num>.pdf`, which
-     Reviewer Finder still uses as a fallback. The J27 reviewer copy remains
-     unspecified.
+   - No step produces `Reviewer Materials/Proposal_<num>.pdf` yet. It is the only
+     file the external reviewer portal serves, and Reviewer Finder's fallback.
+     Connor can build it; trigger and contents await an owner decision (section 10
+     question 4).
 6. **Excluded reviewers become structured.** Step 1 writes one reviewer per line
    (`{first} {last} ({info}) — {reason}`). Our parser
    (`lib/services/reviewer-exclusion-parser.js`) was built for heterogeneous D26
@@ -412,18 +413,29 @@ Checked against our source on 2026-11-20 unless labeled.
 
 ## 10. Open questions for Connor
 
-Ordered by urgency (2026-11-20).
+Asked 2026-11-20, ordered by urgency. Connor answered three the same day
+`[REPORTED by Connor 2026-11-20]`.
 
-1. When step 5 re-runs after the primary keyword changes, is the earlier
-   staff-version file (different name) removed or replaced? Two files would make
-   our matcher fail closed and the Workbench would show no staff version.
-2. Is `wmkf_keywordinternalprogram` reliable and maintained enough to drive the
-   S&E/MR split for J27 briefings and ranking (including coined disciplines), or
-   is it being retired?
-3. Does any step set `akoya_programid`, or is it permanently blank for J27?
-4. What produces the J27 reviewer copy (D26's `Reviewer Materials/Proposal_`)? The
-   external reviewer portal serves only that file
-   (`lib/external/reviewer-materials.js`).
+1. **Staff version after a keyword change — answered.** Connor will build a
+   separate keyword-change flow that deletes the old documents and creates updated
+   ones, so only the new-named staff version remains (the app's single-file matcher
+   keeps working). Not yet built.
+2. **S&E/MR source — answered.** "MR/SE is set at the same time as the primary
+   keyword. Each keyword has a default MR/SE assignment." So step 3 sets the
+   request's MR/SE from the primary keyword's default
+   (`wmkf_keywordinternalprogram`). [ASSUMED: "set" means step 3 writes the
+   request's Program field `akoya_programid`, which would also answer question 3
+   and make the Program-field readers work for J27 once step 3 is live. Confirm the
+   target field, and whether the keyword-change flow and a coordinator's step-4
+   repoint also update it.]
+3. Does any step set `akoya_programid`, or is it permanently blank for J27? (See
+   question 2.)
+4. **J27 reviewer copy — answered: nothing produces it yet.** Connor says it is an
+   easy flow to build and asks what should trigger it (he suggests
+   `wmkf_phaseistatus` = Recommended). Owner decision pending: trigger and contents.
+   The external reviewer portal serves only `Reviewer Materials/Proposal_<num>.pdf`
+   (`lib/external/reviewer-materials.js`), and J27 reviewer invitations need the
+   PDF (alignment log D48; invitations start at the 2027-02-24 Chairs meeting).
 5. Does step 1 set `wmkf_applicantdisposition` (or any disposition) on the
    `wmkf_appreviewersuggestion` rows it writes? The app's applicant-recommended
    and not-excluded reader filters depend on it.
