@@ -80,9 +80,12 @@ flow names); no request or applicant rows were read.
 2. **Connor builds that are promised but not yet confirmed:** the keyword-change flow
    and the reviewer-copy flow (Recommended trigger). Evidence: map section 10, items
    1 and 4. Step 1 setting `wmkf_applicantdisposition` = Recommended is done for new
-   requests (Connor, 2026-11-20). Confirm on the first new J27 test request
-   (owner-approved read) that its five suggested reviewers show as
-   applicant-suggested in the Workbench (map section 10, item 5).
+   requests (Connor, 2026-11-20). **But the Find tab will not show them:** its
+   applicant list and verification come only from the request's deprecated
+   `wmkf_potentialreviewer1`–`5` lookups (map section 9, item 7; traced in code).
+   Owner decision: Connor refills the lookups, or the app lists existing Recommended
+   rows (runtime branch + `/contract-reconcile`). Also: text exclusions are enforced
+   only in search, not on manual add, save or promotion (map section 9, item 6).
 3. **Low-priority questions for Connor:** whether `wmkf_ai_methodologies` comes from
    `intake.keywords` or another prompt, whether `akoya_submissionaccepted` is always
    manual, and whether the parenthesized part of an excluded-reviewer line is always

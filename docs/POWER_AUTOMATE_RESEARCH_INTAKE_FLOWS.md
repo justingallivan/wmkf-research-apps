@@ -406,16 +406,22 @@ Checked against our source on 2026-11-20 unless labeled.
    prose and uses an LLM; J27 text could be parsed deterministically. Search blocks
    excluded names by exact normalized name (`filterExcluded`,
    `shared/components/reviewers/reviewer-search-logic.js:661`), which needs no
-   email.
+   email. That is the only enforcement of the text exclusions: the names go to the
+   analyze/discover calls and the client filter from an editable box the PD can
+   change. Manual add, save-candidates and applicant promotion refuse only rows
+   whose disposition is Excluded (`skippedExcluded`, from `isExcluded` in
+   `lib/dataverse/adapters/reviewer-suggestion.js`), and nothing writes Excluded, so
+   they never check names [traced in code 2026-11-20].
 7. **Suggested reviewers arrive as rows.** Step 1 writes five
    `wmkf_appreviewersuggestion` rows per request with `wmkf_sources` =
    `"applicant"` (appending to an existing row's sources) and
-   `wmkf_applicantdisposition` = Recommended, so the Workbench applicant check
-   (`findApplicantRecommendedByRequest`) finds them [REPORTED by Connor 2026-11-20;
-   not yet seen on a J27 row]. Step 1 does not fill the request's
-   `wmkf_potentialreviewer1`–`5` lookups, so the app's slot ingestion
-   (`lib/services/workbench/applicant-reviewers-service.js`) finds nothing on J27
-   requests; it still serves earlier cycles. The app also writes this
+   `wmkf_applicantdisposition` = Recommended [REPORTED by Connor 2026-11-20; not yet
+   seen on a J27 row]. Step 1 does not fill the request's
+   `wmkf_potentialreviewer1`–`5` lookups. **Gap (traced in code 2026-11-20, not seen
+   live):** the Find tab's applicant list comes only from the slots (`lib/services/workbench/applicant-reviewers-service.js:111-139`), and verification (`findApplicantRecommendedByRequest`, called only from `lib/services/workbench/enrich-recommended-service.js:511`) starts only when that list is non-empty (`shared/components/reviewers/search/useApplicantReviewerEnrichment.js:107-119`). So on a J27 request the Find tab says the applicant listed no
+   reviewers, and the PubMed check and conflict flags never run for Connor's rows.
+   Fix not chosen: Connor refills the lookups, or the app lists existing Recommended
+   rows (a runtime change on shared-writer rows: branch and `/contract-reconcile`). The app also writes this
    table through `lib/services/reviewer-engagement/`, so the two writers share
    rows.
 8. **The ready flag is a deliberate manual gate.** For 2027+ cycles the Workbench
@@ -472,9 +478,9 @@ acceptance half of question 7 the same day `[REPORTED by Connor 2026-11-20]`.
    already done. Step 1 sets Recommended (`100000000`) on the five
    applicant-suggested rows for every request from now on; earlier test requests
    have a blank disposition. Connor also says step 1 does not fill the request's
-   `wmkf_potentialreviewer1`–`5` lookups, which are deprecated. To confirm on the
-   first new J27 test request (owner-approved read): the five rows show as
-   applicant-suggested in the Workbench.
+   `wmkf_potentialreviewer1`–`5` lookups, which are deprecated. **That breaks the
+   Find tab for J27** (section 9 item 7): the applicant list and its verification
+   are driven only by those lookups. Owner decision needed on the fix.
 6. Is `wmkf_ai_methodologies` written by `intake.keywords` or a separate prompt?
    Asked again 2026-11-20; not answered.
 7. Low priority: confirm `akoya_submissionaccepted` is always manual (superseding
