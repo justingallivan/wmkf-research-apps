@@ -1,4 +1,48 @@
-# Session 685 Prompt: Proposal lists live; prove a PDF and two-level sections on a real test request
+# Session 686 Prompt: Proposal lists live; prove a PDF and two-level sections on a real test request
+
+## Session 685 Summary — 2026-11-19 (Claude, concurrent with Codex roster work)
+
+Claude worked in worktree `/Users/gallivan/Code/WMKF_Apps-claude-2026-11-19`
+while Codex worked the roster stream in the main checkout. Codex's roster
+results are recorded under Parked item 4 and the workstream table below.
+
+### What Was Completed
+
+1. **E2E (Playwright) green on `main` again.** Red since `1037d2dbd` (2026-11-16):
+   the Overview tab's request-text card fetches `/api/workbench/request-narratives`,
+   which two strict fixtures refused. Both now stub it. Full suite 77/77 locally;
+   CI E2E and Tests green on `97399470c`.
+2. **Share Proposals link live.** Tools menu entry to `/proposal-lists` for
+   Workbench (`reviewers`) grant holders, mirroring the API guard; nav unit test
+   updated with a negative case. PR #648, merge `97399470c`, Vercel Production
+   deploy succeeded.
+3. **Owner decisions recorded** in `docs/plans/J27_PROPOSAL_LIST_EMAILS_PLAN_2026-11-18.md`:
+   roster chair marker dropped; list-type picker not remembered (page always opens
+   on Submitted proposals).
+4. **Parked Executor branch explained and inventoried.** Owner parked it
+   2026-11-16; it stacks a week of backend work (111 commits). Nothing on it is
+   wanted in Production; Production Admin already edits the `wmkf_ai_prompt` rows.
+   `docs/plans/PARKED_EXECUTOR_BRANCH_INVENTORY_2026-11-19.md` (new);
+   `docs/plans/PREFLIGHT_PROMPTS_HANDOFF_2026-11-10.md` copied to `main` with a
+   superseded-sections banner.
+5. **Worktree and branch cleanup (owner-approved).** Removed 24 merged/clean
+   worktrees and their local branches; deleted the 10 local
+   `codex/executor-*` / `codex/staff-draft-*` branches after `git cherry` showed
+   zero commits missing from `origin/codex/executive-summary-generation-2026-11-16`;
+   pruned stale records. Codex's read-only review of its three dirty worktrees
+   (`codex/leadership-dashboard-testing`, `codex/board-archive-rehearsal`,
+   `codex/j27-factory-scenarios`) recommends keeping all three.
+6. **Beth Pruitt Admin access confirmed** via the owner-run access census:
+   superuser, active, linked systemuser, 8 app grants including `reviewers` and
+   `proposal-ranking`.
+7. **PR #630 closed unmerged;** its Session 661 reminder-history milestone was
+   carried into `DEVELOPMENT_LOG.md`.
+
+### Commits
+
+- `38aa02a8e`, `ceb8cd1da`, `3e0dd6269`, `78d5b138a`, `37f9bdfd8` (PR #648, merge
+  `97399470c`); `76c0492fc` and this stop commit on `claude/session-685-stop`.
+
 
 ## Session 684 Summary — 2026-11-18/19 (Claude)
 
@@ -45,10 +89,8 @@
 
 - 72 scoped gates and self-tests passed before each merge; unit suites for the
   snapshot, store, link, page, route and view passed.
-- Vercel deployments for each push succeeded. The E2E (Playwright) workflow failed
-  on each of the last 14 `main` runs, back to `1037d2dbd` on 2026-11-16, before
-  this work (`distribution-defaults-navigation.spec.js`,
-  `workbench-responsiveness.spec.js` seen); not investigated.
+- Vercel deployments for each push succeeded. E2E was red from 2026-11-16; fixed in
+  Session 685 (PR #648).
 
 ## Next Items
 
@@ -58,19 +100,18 @@
    Evidence: `docs/plans/J27_PROPOSAL_LIST_EMAILS_PLAN_2026-11-18.md` (first
    Production run). Request 1003518 has no staff version and no J27 test request has
    a keyword, so only "Unassigned" has been seen in Production. Needs a J27 test
-   request carrying both, from Connor's intake flow or by marking 1003526 as a J27
-   test request. Owner-supplied; do not create a list for a real Board member to
-   test this.
+   request carrying both; **blocked on Connor**, the only one who can supply it
+   (owner, 2026-11-19). Do not create a list for a real Board member to test this.
 
 ### Owner Decision Needed
 
-1. Whether the app should send the email, and from whom (`DYNAMICS_IMPERSONATION_ENABLED`
-   and "send as" in Production undetermined). Pasting the link into the owner's own
-   email works today. Send with preview is not built.
-2. Where a menu link to `/proposal-lists` belongs (none exists; reached by URL).
-3. Whether to drop the roster chair marker (recommended: not needed).
-4. Whether the staff page should remember the list-type picker across reloads.
-5. Confirm the staff-version contents on a real J27 proposal after December 7.
+1. **Deferred by owner (2026-11-19):** whether the app should send the email, and
+   from whom. Owner first wants to settle whether every PD sends lists or only the
+   CSO (suspects only the CSO). If CSO-only, narrow the page guard and the Share
+   Proposals link together. Pasting the link into the owner's own email works today.
+2. Confirm the staff-version contents on a real J27 proposal after December 7.
+3. Optional: whether any tests/tools on Codex's three kept dirty worktrees are worth
+   recovering (Codex recommendation: keep all three for selective recovery).
 
 ### Parked
 
@@ -102,15 +143,16 @@
 
 ### Verify Before Acting
 
-- Merged branches `claude/proposal-list-pages`, `claude/proposal-list-keyword-sections`
-  and `claude/proposal-list-first-run-fixes`, and the worktree
-  `/Users/gallivan/Code/WMKF_Apps-claude-2026-11-18`, still exist. Deleting them
-  needs the owner's go and the preservation preflight in
-  `docs/PARALLEL_AGENT_WORKTREE_RUNBOOK.md`.
-- E2E (Playwright) is red on `main` from before this session. Confirm the cause
-  before attributing it to any stream.
+- Worktrees held back from the Session 685 cleanup because Codex processes had
+  files open: `WMKF_Apps-claude-2026-11-18`, `WMKF_Apps-claude-j27-read-model`,
+  `WMKF_Apps-claude-production-admission`; also `/private/tmp/wmkf-coordinated-start-20261119`
+  (created that day). All merged; remove after rechecking open files,
+  dirty state and the runbook preservation preflight.
+- **Dated: Executive Summary Sandbox trial cleanup batch 2,** due after 2026-11-23
+  18:31:58 UTC, from the parked worktree `/private/tmp/wmkf-summary-generation-20261116`
+  (volatile). Steps in `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md`.
 - Initial Assessment (Session 683, PRs #644–#646) is Production-live but an
-  authenticated save rehearsal was not run.
+  authenticated save rehearsal was not run (deferred by owner 2026-11-19).
 - Request 1003528's status in older handoffs is stale; do not infer it or reset it.
 - Owner explicitly requested discarding untracked `commit-times-exact.txt` during November 19 startup; discarded. No preservation action remains.
 - Older carryover (Chairs Stage 1, trial batch-2 expiry, real-proposal prompt
@@ -121,7 +163,10 @@
 - Proposal lists, owner decisions of 2026-11-18: one link per person; everyone can
   open every proposal; sections collapsed with no per-chair personalization;
   highlights only at the top; own institution flagged; links last until the Board
-  meeting; the list is a frozen snapshot; staff version only.
+  meeting; the list is a frozen snapshot; staff version only. 2026-11-19: no roster
+  chair marker; list-type picker not remembered.
+- Do not merge `codex/executive-summary-generation-2026-11-16`; it is the only copy
+  of the parked Executor lineage. See `docs/plans/PARKED_EXECUTOR_BRANCH_INVENTORY_2026-11-19.md`.
 - Do not replace Connor's proposal-processing flow or add a second Claude matching
   call; do not migrate all Postgres data as a consequence of that discussion.
 - Preserve the owner's simplified roster cutover decision if that stream resumes.
@@ -135,12 +180,12 @@ current permission or live-state evidence.
 
 | Stream | Owning reference | Latest recorded boundary |
 |---|---|---|
-| Proposal lists | `docs/plans/J27_PROPOSAL_LIST_EMAILS_PLAN_2026-11-18.md`; `docs/atlas/postgres-proposal-list-links.md` | Production-live; PDF open and two-level sections unproven live; email send not built |
+| Proposal lists | `docs/plans/J27_PROPOSAL_LIST_EMAILS_PLAN_2026-11-18.md`; `docs/atlas/postgres-proposal-list-links.md` | Production-live; Share Proposals menu link live; PDF open and two-level sections unproven live (needs Connor's J27 test request); email send deferred |
 | Initial Assessment | PRs #644–#646; `assessment-service.js`, `AssessmentForm.js` | Production-live; authenticated save acceptance unverified |
 | Roster migration and Admin editor | `docs/plans/EXPERTISE_ROSTER_PRODUCTION_MIGRATION_PLAN_2026-11-19.md` | Production-only plan saved; Opus 5.5 reviewed, corrections incorporated; Admin editor and migration implemented/tested on the new November 19 branch; Opus correction verification returned code ready; backend automation and retirement separate; production cutover complete: migrations 103/104, backend dataverse, 39 imported profiles and 10 exact Contact links; Amy active/lead eligible, no app access or sends; test profile retained inactive; Connor connection/effective-rights follow-up separate |
 | Older roster cutover | `origin/codex/expertise-roster-import-2026-11-10:SESSION_PROMPT.md` | Preserve branch/private inputs; reconcile direction before resuming |
 | Chairs Production stages | `docs/plans/J27_CHAIRS_RECOMMENDATION_PRODUCTION_PLAN_2026-11-18.md` | Not changed here; owner approval per stage |
-| Intake prompt delivery | `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md` | Owner-run flow/prompt work; backend adoption parked |
+| Intake prompt delivery | `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md` | Owner-run flow/prompt work; backend adoption parked; branch inventory in `docs/plans/PARKED_EXECUTOR_BRANCH_INVENTORY_2026-11-19.md` |
 
 Production access requires explicit owner authorization. The November 19 roster go-ahead authorizes scoped production reads/writes with the interlock and dated ACK; it does not authorize unrelated work. Never read main `.env.local`.
 Prior private roster inputs remain in owner-managed storage; do not commit them.
