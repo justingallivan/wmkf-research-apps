@@ -82,11 +82,12 @@
    Claude Opus 5.5 OAuth adversarial review on November 19; see
    `docs/plans/EXPERTISE_ROSTER_PRODUCTION_MIGRATION_PLAN_2026-11-19.md`.
    Opus 5.5 OAuth review returned READY WITH CHANGES; required corrections are
-   incorporated, with verbatim review/disposition saved beside the plan. No build
-   or production execution yet.
+   incorporated, with verbatim review/disposition saved beside the plan. Build is in
+   progress on `codex/expertise-roster-admin-2026-11-19`; no production execution.
+   See `docs/plans/EXPERTISE_ROSTER_BUILD_2026-11-19.md`.
 5. **Earlier roster implementation reference.** Preserve
-   `origin/codex/expertise-roster-import-2026-11-10` (tip `754acf09a`). No migration,
-   backend switch or cutover is authorized.
+   `origin/codex/expertise-roster-import-2026-11-10` (tip `754acf09a`). Current owner authorized the revised build; production migration execution,
+   backend switch and cutover remain pending.
 6. **Backend prompt adoption/scheduling** (`codex/executive-summary-generation-2026-11-16`).
 
 ### Owner Decisions Preserved — Not Resolved This Session
@@ -136,7 +137,7 @@ current permission or live-state evidence.
 |---|---|---|
 | Proposal lists | `docs/plans/J27_PROPOSAL_LIST_EMAILS_PLAN_2026-11-18.md`; `docs/atlas/postgres-proposal-list-links.md` | Production-live; PDF open and two-level sections unproven live; email send not built |
 | Initial Assessment | PRs #644–#646; `assessment-service.js`, `AssessmentForm.js` | Production-live; authenticated save acceptance unverified |
-| Roster migration and Admin editor | `docs/plans/EXPERTISE_ROSTER_PRODUCTION_MIGRATION_PLAN_2026-11-19.md` | Production-only plan saved; Opus 5.5 reviewed, corrections incorporated; Admin editor included; backend automation and retirement separate; no build yet |
+| Roster migration and Admin editor | `docs/plans/EXPERTISE_ROSTER_PRODUCTION_MIGRATION_PLAN_2026-11-19.md` | Production-only plan saved; Opus 5.5 reviewed, corrections incorporated; Admin editor implementation in progress on the new November 19 branch; backend automation and retirement separate; no production execution |
 | Older roster cutover | `origin/codex/expertise-roster-import-2026-11-10:SESSION_PROMPT.md` | Preserve branch/private inputs; reconcile direction before resuming |
 | Chairs Production stages | `docs/plans/J27_CHAIRS_RECOMMENDATION_PRODUCTION_PLAN_2026-11-18.md` | Not changed here; owner approval per stage |
 | Intake prompt delivery | `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md` | Owner-run flow/prompt work; backend adoption parked |

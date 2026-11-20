@@ -1,3 +1,5 @@
+import { withDalContext } from '../../../lib/dataverse/core/context';
+import { matchingRoster } from '../../../lib/services/expertise-finder/roster-consumer-service';
 import { requireAcceptedLlmResponse } from '../../../lib/utils/llm-response';
 /**
  * API Route: /api/expertise-finder/match
@@ -46,6 +48,7 @@ export default async function handler(req, res) {
   const access = await requireAppAccess(req, res, APP_KEY);
   if (!access) return;
 
+  return withDalContext('expertise-finder-match', async () => {
   const startTime = Date.now();
   let resolved = null; // set once the prompt row resolves; used for error-path usage logging
 
@@ -77,9 +80,7 @@ export default async function handler(req, res) {
     }
 
     // Fetch active roster
-    const rosterResult = await sql`
-      SELECT * FROM expertise_roster WHERE is_active = true ORDER BY role_type, name
-    `;
+    const rosterResult = { rows: await matchingRoster() };
 
     if (rosterResult.rows.length === 0) {
       return res.status(400).json({ error: 'No active roster members found. Please add members to the roster first.' });
@@ -209,12 +210,14 @@ export default async function handler(req, res) {
 
     // Missing/ambiguous prompt row: actionable 503 for staff, not the generic 500.
     if (unavailable) return res.status(503).json(unavailable);
+    if (error.httpStatus === 503) return res.status(503).json({ error: 'The roster is unavailable. Try again later.' });
 
     return res.status(500).json({
       error: BASE_CONFIG.ERROR_MESSAGES.PROCESSING_FAILED,
       details: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
+  });
 }
 
 async function callClaude(apiKey, model, maxTokens, systemPrompt, userPrompt) {

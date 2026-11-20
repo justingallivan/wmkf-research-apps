@@ -153,7 +153,12 @@ RBAC scaffolding for the explorer write tools. Restrictions table is empty; a 27
 ## Expertise Finder
 
 ### `expertise_roster` (39 rows), `expertise_matches` (344 rows)
-**Source of truth:** Postgres.
+**Source of truth:** Postgres by default; production cutover not executed here.
+[VERIFIED via branch source 2026-11-19] The Admin editor and consumer backend switch
+are implemented; Dataverse mode uses Expertise Profiles and a numeric bridge. See
+[Expertise Profiles](dataverse-wmkf-expertiseprofile.md) for `expertise_roster_identity`,
+`expertise_roster_binding`, migration 103, and the separately staged feedback FK.
+The following production description is the retained Postgres-mode baseline.
 Internal staff/consultant/board roster + per-proposal match history. Production
 consumers are `pages/api/expertise-finder/{match,batch-match,roster,history}.js`;
 production prompt rules live in the Dataverse `expertise-finder.match`
@@ -168,7 +173,7 @@ active roster row per Contact. For an unlinked Board/Consultant row, the Site
 Visit recipient directory continues to use `preferred_email`. For a linked row,
 it resolves the active Contact's current `emailaddress1`; a missing, inactive,
 or email-less Contact yields no email and never falls back to the manual copy.
-The Expertise Finder editor is the interactive link writer, and
+In Postgres mode the Expertise Finder editor is the interactive link writer, and
 `scripts/link-roster-contacts.js` is a dry-run-first owner-operated backfill.
 The immutable roster row ID remains the external recipient identity; names and
 email addresses are never join keys. **[HISTORICAL LIVE SNAPSHOT 2026-08-24:
@@ -1125,7 +1130,8 @@ visit with no background job), `created_by`/`updated_by`/`created_at`/`updated_a
 Constraints: `consultant_feedback_has_content` (`body_html IS NOT NULL OR
 requestdocument_id IS NOT NULL`); `consultant_feedback_one_author` (exactly
 one of `consultant_roster_id` / `one_off_name`). Server-side eligibility
-(`is_active = true AND role_type = 'Consultant'` against `expertise_roster`)
+(`is_active = true AND role_type = 'Consultant'` against the selected roster backend;
+Postgres by default, Dataverse plus numeric bridge after cutover)
 is enforced in the service on create and on any author change — the FK alone
 would accept a Board member or an inactive roster row.
 

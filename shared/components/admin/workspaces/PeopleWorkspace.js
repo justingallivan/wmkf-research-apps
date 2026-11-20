@@ -1,3 +1,4 @@
+import ExpertiseRosterSection from '../ExpertiseRosterSection';
 import StaffingPanel from '../../staffing/StaffingPanel';
 import { AdminEditorPanel } from '../AdminWorkspaceNavigation';
 import AppAccessSection from '../AppAccessSection';
@@ -6,6 +7,8 @@ import RoleManagementSection from '../RoleManagementSection';
 
 export function PeopleWorkspace({ view }) {
   switch (view) {
+    case 'expertise-roster':
+      return <AdminEditorPanel id="expertise-roster" title="Expertise Roster" description="Maintain expertise profiles for staff, consultants, and Board members." scope="Shared roster"><ExpertiseRosterSection /></AdminEditorPanel>;
     case 'staffing':
       return <StaffingPanel includeFinalWriteups />;
     case 'app-access':

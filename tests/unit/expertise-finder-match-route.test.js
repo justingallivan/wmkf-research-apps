@@ -116,3 +116,28 @@ test('400 when the file is missing', async () => {
   await handler({ method: 'POST', body: {} }, res);
   expect(res.statusCode).toBe(400);
 });
+
+test('Dataverse mode uses real DAL/context and numeric projection through mocked HTTP', async () => {
+  const { DynamicsService } = require('../../lib/services/dynamics-service');
+  const { hasTrustedDalContext } = require('../../lib/dataverse/core/context');
+  process.env.EXPERTISE_ROSTER_BACKEND = 'dataverse';
+  process.env.DYNAMICS_URL = 'https://wmkf.crm.dynamics.com';
+  process.env.DATAVERSE_DAL_ENFORCEMENT = 'on';
+  const token = jest.spyOn(DynamicsService, 'getAccessToken').mockResolvedValue('fixture-token');
+  const profileId = '11111111-1111-4111-8111-111111111111';
+  const transport = jest.spyOn(global, 'fetch').mockImplementation(async url => {
+    expect(hasTrustedDalContext()).toBe(true);
+    expect(String(url)).toContain('/wmkf_expertiseprofiles?');
+    return { ok: true, json: async () => ({ value: [{ wmkf_expertiseprofileid: profileId, wmkf_name: 'Dataverse person', wmkf_category: 100000001, statecode: 0 }] }) };
+  });
+  sql.query = jest.fn(async () => ({ rows: [{ roster_id: 5, dataverse_profile_guid: profileId }] }));
+  const complete = jest.fn().mockResolvedValue({ content: [{ text: OK_TEXT }], usage: { inputTokens: 10, outputTokens: 20 } });
+  prime(complete); sql.mockReset().mockResolvedValue({ rows: [{ id: 'match-dv' }] });
+  try {
+    const res = mockRes(); await handler(req(), res);
+    expect(res.statusCode).toBe(200); expect(res.body.metadata.rosterSize).toBe(1);
+    expect(complete.mock.calls[0][0].system[0].text).toContain('Dataverse person');
+    expect(transport).toHaveBeenCalledTimes(1);
+    expect(hasTrustedDalContext()).toBe(false);
+  } finally { delete process.env.EXPERTISE_ROSTER_BACKEND; token.mockRestore(); transport.mockRestore(); }
+});

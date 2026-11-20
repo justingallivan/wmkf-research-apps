@@ -1,6 +1,6 @@
 # Expertise roster: production migration and Admin editor
 
-**Status: PLANNED — two Claude Opus 5.5 OAuth adversarial reviews completed. Second verdict: READY WITH CHANGES; all earlier findings closed, with two Contact-preservation corrections incorporated below. See [review 1](EXPERTISE_ROSTER_OPUS_5_5_REVIEW_2026-11-19.md) and [review 2 with disposition](EXPERTISE_ROSTER_OPUS_5_5_REVIEW_2_2026-11-19.md). No third review or implementation verification claimed. No build or production execution authorized by this planning task.**
+**Status: PLANNED — two Claude Opus 5.5 OAuth adversarial reviews completed. Second verdict: READY WITH CHANGES; all earlier findings closed, with two Contact-preservation corrections incorporated below. See [review 1](EXPERTISE_ROSTER_OPUS_5_5_REVIEW_2026-11-19.md) and [review 2 with disposition](EXPERTISE_ROSTER_OPUS_5_5_REVIEW_2_2026-11-19.md). Owner subsequently authorized implementation on November 19; see [build evidence](EXPERTISE_ROSTER_BUILD_2026-11-19.md). Production execution remains pending.**
 
 Owner direction, November 19, 2026: move the small, infrequently used roster from
 Postgres to Dataverse and move its editor into Admin. Treat the roster as static
@@ -264,8 +264,10 @@ confirm `claude-opus-5-5`. Review 2 closed all prior findings and returned READY
 CHANGES for two exact-preservation conflicts in parked code; the required importer
 and category-rule changes are now explicit above. Its stated readiness condition
 was inclusion of those corrections. Both verbatim reports and author dispositions
-are saved alongside this plan. No third review, API-key session, Ultrareview, live
-probe, or implementation verification is claimed.
+are saved alongside this plan. Those are historical planning reviews. Subsequent
+implementation review and verification are tracked separately in
+`EXPERTISE_ROSTER_BUILD_2026-11-19.md`. No API-key agent session, Ultrareview or live
+production probe was used for the planning task.
 
 Sweep Mode A: the changed fact is owner direction, not deployed storage. This plan
 supersedes the Postgres-plus-HTTP proposal in

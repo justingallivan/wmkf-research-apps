@@ -259,6 +259,7 @@ function MatchTab() {
 // ─── Roster Tab ───
 
 function RosterTab() {
+  const [moved, setMoved] = useState(false);
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -280,6 +281,7 @@ function RosterTab() {
 
       const { ok, data, error } = await requestEnvelope(`/api/expertise-finder/roster?${params}`);
 
+      if (data?.code === 'roster_moved') { setMoved({ adminUrl: data.adminUrl }); return; }
       if (!ok) throw new Error(data.error || error.message);
       setMembers(data.members);
     } catch (err) {
@@ -362,6 +364,8 @@ function RosterTab() {
       default: return 'bg-gray-100 text-gray-800';
     }
   };
+
+  if (moved) return <Card><h2 className="text-lg font-semibold">Expertise Roster</h2><p className="mt-2 text-sm text-gray-600">Administrators now manage the roster in Admin → People &amp; Access.</p>{moved.adminUrl && <a href={moved.adminUrl} className="mt-3 inline-block underline">Open Admin roster</a>}</Card>;
 
   return (
     <div className="space-y-4">

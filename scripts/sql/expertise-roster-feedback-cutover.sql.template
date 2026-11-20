@@ -1,0 +1,5 @@
+-- Introduce as a NEW numbered migration only AFTER verified import, via apply-migrations.js.
+-- ADD validates all existing rows. Failure rolls back the entire migration.
+ALTER TABLE consultant_feedback DROP CONSTRAINT consultant_feedback_consultant_roster_id_fkey;
+ALTER TABLE consultant_feedback ADD CONSTRAINT consultant_feedback_consultant_roster_id_fkey
+  FOREIGN KEY (consultant_roster_id) REFERENCES expertise_roster_identity(id);

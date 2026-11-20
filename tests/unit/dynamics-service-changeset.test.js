@@ -396,3 +396,13 @@ describe('executeChangeset — input validation', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 });
+
+test('noFallback refuses outer 403 without retrying as the application identity', ctx(async () => {
+  const token = jest.spyOn(DynamicsService, 'getAccessToken').mockResolvedValue('fixture-token');
+  fetch.mockResolvedValue({ ok: false, status: 403, headers: { get: () => 'application/json' }, text: async () => '{"error":{"message":"denied"}}' });
+  try {
+    await expect(DynamicsService.executeChangeset([{ method: 'POST', url: 'wmkf_expertiseprofiles', body: { wmkf_name: 'Person' } }], { actingUserSystemId: ACTING_GUID, noFallback: true })).rejects.toMatchObject({ status: 403 });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch.mock.calls[0][1].headers.MSCRMCallerID).toBe(ACTING_GUID);
+  } finally { token.mockRestore(); }
+}));

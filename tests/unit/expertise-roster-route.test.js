@@ -1,3 +1,4 @@
+jest.mock('../../lib/services/expertise-finder/roster-cutover-marker.cjs', () => ({ assertLegacyRosterWritable: jest.fn() }));
 /** @jest-environment node */
 
 const mockSqlTag = jest.fn();
@@ -10,6 +11,7 @@ jest.mock('@vercel/postgres', () => {
 });
 jest.mock('../../lib/utils/auth', () => ({
   requireAppAccess: jest.fn(async () => ({ profileId: 42 })),
+  requireSuperuser: jest.fn(async () => ({ profileId: 42 })),
 }));
 
 import handler from '../../pages/api/expertise-finder/roster';

@@ -11,6 +11,7 @@ const REASON_LABELS = Object.freeze({
 
 export default function RosterContactField({
   contactId,
+  endpoint = '/api/expertise-finder/contact-search',
   memberName = '',
   onSelect,
   onClear,
@@ -49,7 +50,7 @@ export default function RosterContactField({
     resolutionControllerRef.current = controller;
     (async () => {
       try {
-        const data = await requestJson(`/api/expertise-finder/contact-search?contactId=${encodeURIComponent(normalizedContactId)}`, {
+        const data = await requestJson(`${endpoint}?contactId=${encodeURIComponent(normalizedContactId)}`, {
           signal: controller.signal,
           fallbackMessage: 'Linked contact read failed.',
         });
@@ -68,7 +69,7 @@ export default function RosterContactField({
       resolutionGenerationRef.current += 1;
       controller.abort();
     };
-  }, [contactId]);
+  }, [contactId, endpoint]);
 
   const runSearch = async () => {
     const clean = query.trim().replace(/\s+/g, ' ');
@@ -86,7 +87,7 @@ export default function RosterContactField({
     setLoading(true);
     setError(null);
     try {
-      const data = await requestJson(`/api/expertise-finder/contact-search?q=${encodeURIComponent(clean)}`, {
+      const data = await requestJson(`${endpoint}?q=${encodeURIComponent(clean)}`, {
         signal: controller.signal,
         fallbackMessage: 'Contact search failed.',
       });

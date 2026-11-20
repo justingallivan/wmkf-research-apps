@@ -194,6 +194,7 @@ async function main() {
     import('../lib/utils/orcid-normalize.js'),
     import('../lib/services/dynamics-context.js'),
   ]);
+  if (options.apply) await require('../lib/services/expertise-finder/roster-cutover-marker.cjs').assertLegacyRosterWritable((text, params) => sql.query(text, params));
   enterDynamicsBypassForScript('link-roster-contacts');
 
   const roster = await sql`

@@ -2,7 +2,7 @@
  * API: /api/workbench/consultant-feedback/consultants
  * (docs/plans/CONSULTANT_FEEDBACK_PLAN_2026-09-14.md §3.4)
  *
- * GET → active `expertise_roster` rows with `role_type = 'Consultant'`,
+ * GET → active rows from the selected roster backend with `role_type = 'Consultant'`,
  * id/name/affiliation only. Dropdown source for the "Add feedback" form's
  * consultant combobox.
  *

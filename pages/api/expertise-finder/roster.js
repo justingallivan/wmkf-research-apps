@@ -2,7 +2,8 @@
  * API Route: /api/expertise-finder/roster
  *
  * CRUD for the internal expertise roster (consultants, board members, staff).
- * Any user with expertise-finder app access can read and write.
+ * Legacy Postgres reads require app access; writes require a superuser.
+ * Dataverse mode moves roster administration to Admin.
  *
  * GET:    Fetch roster members (with search, filter, pagination)
  * POST:   Create new roster member
@@ -21,8 +22,11 @@
  */
 
 import { sql } from '@vercel/postgres';
-import { requireAppAccess } from '../../../lib/utils/auth';
+import { requireAppAccess, requireSuperuser, getUserRole } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
+
+import { usesDataverseRoster } from '../../../lib/services/expertise-finder/roster-mode';
+import marker from '../../../lib/services/expertise-finder/roster-cutover-marker.cjs';
 
 const CONTACT_LINK_INDEX = 'idx_expertise_roster_active_contact';
 
@@ -98,6 +102,18 @@ export default async function handler(req, res) {
   const access = await requireAppAccess(req, res, 'expertise-finder');
   if (!access) return;
 
+  try {
+    if (usesDataverseRoster()) {
+      const isAdmin = await getUserRole(access.profileId) === 'superuser';
+      return res.status(409).json({ error: 'Roster editing has moved to Admin.', code: 'roster_moved', ...(isAdmin ? { adminUrl: '/admin?workspace=people&view=expertise-roster' } : {}) });
+    }
+    if (['POST', 'PATCH', 'DELETE'].includes(req.method)) {
+      if (!await requireSuperuser(req, res)) return;
+      await marker.assertLegacyRosterWritable((text, values) => sql.query(text, values));
+    }
+  } catch (error) {
+    return res.status(error.httpStatus || error.status || 503).json({ error: error.httpStatus || error.status ? error.message : 'Roster availability could not be checked.' });
+  }
   switch (req.method) {
     case 'GET':
       return handleGet(req, res);

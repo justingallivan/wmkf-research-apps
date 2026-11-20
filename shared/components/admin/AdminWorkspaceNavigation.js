@@ -72,6 +72,7 @@ export const ADMIN_WORKSPACES = Object.freeze([
     defaultView: 'roles',
     views: [
       { key: 'staffing', label: 'Staffing' },
+      { key: 'expertise-roster', label: 'Expertise Roster' },
       { key: 'roles', label: 'Users & roles' },
       { key: 'app-access', label: 'App access' },
       { key: 'identity', label: 'Identity linkage' },

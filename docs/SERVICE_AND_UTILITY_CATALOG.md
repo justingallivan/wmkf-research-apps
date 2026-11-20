@@ -398,6 +398,12 @@ If you're touching a service or utility, read its header before this catalog. If
   failures. Stores only stage/category/status/declared size/type plus the
   server-resolved request identity and labels every row `clientReported:true`.
 
+### Expertise roster (branch source, 2026-11-19; cutover not executed)
+
+- **`expertise-finder/roster-service.js`** — Admin list/save contract; caller supplies superuser authorization, trusted DAL context and authenticated User. Preserves Contact across categories; validates identity uniqueness including inactive profiles; stable create replay and binding completion.
+- **`expertise-finder/roster-consumer-service.js`** — Numeric projection for matching, consultant feedback/history and recipient directory. Inactive history retained; unbound profiles/outages fail closed, excluded authors explicitly unavailable. No automation.
+- **`expertise-finder/roster-mode.js`**, **`roster-contract.cjs`**, **`roster-binding.js`**, **`roster-cutover-marker.cjs`** — Closed backend selection, lossless DTO rules, numeric identity allocation, and legacy write refusal after first production binding. Default remains Postgres. Schema/read/write adapter: `lib/dataverse/adapters/expertise-profile.js`. See the roster Atlas and production runbook.
+
 ### Other
 
 - **`request-file-corpus/filename-rules.js`** — **[Offline only; not wired into any route or worker.]** Pure tier-1 classifier for the Research request file corpus: subfolder + filename → document type, reading priority (`read` / `already-legible` / `type-only` / `uncertain` / `deferred` for PowerPoint this round) and rule id, plus `phaseOf`. Opaque names stay `uncertain`; Type-only rules fire only on specific phrases. Measured by `scripts/report-request-file-rule-coverage.mjs`. Plan: `docs/plans/RESEARCH_REQUEST_FILE_CORPUS_PLAN_2026-10-25.md`.

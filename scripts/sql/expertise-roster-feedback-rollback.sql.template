@@ -1,0 +1,5 @@
+-- Reconcile ALL roster identities/content in Postgres FIRST. Introduce as a new
+-- numbered recovery migration and apply using apply-migrations.js before changing mode.
+ALTER TABLE consultant_feedback DROP CONSTRAINT consultant_feedback_consultant_roster_id_fkey;
+ALTER TABLE consultant_feedback ADD CONSTRAINT consultant_feedback_consultant_roster_id_fkey
+  FOREIGN KEY (consultant_roster_id) REFERENCES expertise_roster(id);
