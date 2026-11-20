@@ -212,8 +212,10 @@ production scripts; local `gh`/Colima):
 - Cache cross-document read: confirmed once for `review-synthesis.generate`
   (2026-09-22). No `cycle-dossier.entry` runs since the fix, so that check is still open.
 - `wmkf__ai_summary` field: gone (metadata read, no `wmkf__` attributes).
-- Admin prompt edit validation: hazard still open by source. Sentinel markers are
-  rejected; dropping `untrusted: true` declarations is not checked.
+- Admin prompt edit validation: hazard confirmed open by source, then fixed the same
+  day (PR #663, merge `a0baa4c94`): publish refuses edits that weaken an
+  `untrusted: true` declaration. Seed scripts and direct Dataverse edits are out of
+  scope.
 - Routine-audit items: Colima running, ledger container exited; repository PUBLIC
   with CodeQL default setup configured.
 
