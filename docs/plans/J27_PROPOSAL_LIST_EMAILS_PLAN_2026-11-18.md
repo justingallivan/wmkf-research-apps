@@ -138,6 +138,8 @@ cycle (keeps the link and saved marks); switch a link off.
 A second list type, **test requests**, holds Factory test requests only and is always
 addressed to the signed-in staff member, so the page can be checked without a Board
 address and test data cannot reach one.
+The staff page always opens on **Submitted proposals** and does not remember the
+test-requests choice across reloads (owner decision, 2026-11-19).
 
 ### Stand-ins in this build
 
