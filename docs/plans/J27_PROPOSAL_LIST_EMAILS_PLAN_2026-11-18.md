@@ -3,7 +3,7 @@ title: J27 proposal lists for Program Chairs and Board experts
 domain: workbench
 kind: plan
 status: active
-summary: "Personal no-login pages listing the scored J27 proposals for Program Chairs and Board members, with highlighted proposals on top and a link to each proposal's staff version. Production-live with keyword sections; the CSO pastes each link into their own email. Advisor picks during Scoring (which pre-fill highlights) and scored-only membership are branch-built on claude/session-2026-11-19b, migration 105 applied 2026-11-19, merge pending."
+summary: "Personal no-login pages listing the scored J27 proposals for Program Chairs and Board members, with highlighted proposals on top and a link to each proposal's staff version. Production-live with keyword sections; the CSO pastes each link into their own email. Advisor picks during Scoring (which pre-fill highlights) and scored-only membership are live (PR #654). For J27 and later, membership uses the Grant program, not the Program field."
 canonical: false
 cataloged: 2026-11-18
 last_verified: 2026-11-19
@@ -71,9 +71,9 @@ Decisions 6, 11 and 13 above are edited to match.
 | 18 | No roster chair marker; the list-type picker is not remembered. |
 | — | Open: whether `/proposal-lists` should be narrowed to the CSO. Not changed. |
 
-## Advisor picks and scored-only lists [BRANCH-BUILT]
+## Advisor picks and scored-only lists [LIVE]
 
-Built on `claude/session-2026-11-19b` (2026-11-19); not merged. Migration 105 applied to Production by the owner on 2026-11-19 [VERIFIED via the owner-run `node scripts/apply-migrations.js` and `node scripts/probe-proposal-list-schema.mjs`: 0 pending, table present, recorded].
+Merged to `main` in PR #654 (merge `8819feb62`) and deployed to Production on 2026-11-19. Migration 105 applied to Production by the owner on 2026-11-19 [VERIFIED via the owner-run `node scripts/apply-migrations.js` and `node scripts/probe-proposal-list-schema.mjs`: 0 pending, table present, recorded].
 
 - **Where:** the Initial Assessment form, below the Scoring decision, once the saved
   decision is Scored (`shared/components/workbench/AdvisorPicks.js`). One checkbox per
@@ -162,10 +162,18 @@ the link off and create a new list.
 
 Every Research request linked to the cycle that passes the Workbench discovery rule
 (for 2027 and later cycles: Power Automate has marked it ready) and whose Scoring
-decision is Scored (decision 15; branch-built, see above), read the same way for
+decision is Scored (decision 15), read the same way for
 every staff member, with no Program Director or "my proposals" scope. The read is
 refused, never shortened, if it is incomplete, over 600 proposals, or the readiness
 scope cannot be read.
+
+For 2027 and later cycles, "Research" means the request's **Grant program** is
+Research, the same rule the Workbench uses; the older **Program** field (Science and
+Engineering Research, Medical Research) plays no part (owner, 2026-11-19, as the
+Program field is being retired for these purposes). Earlier cycles keep the Program
+field. Found in the first Production rehearsal: Scored test request 1003528 has Grant
+program Research but a blank Program field, so the Program check left it off the list
+[VERIFIED via an owner-authorized read-only Production probe, 2026-11-19].
 
 ### The staff page
 
@@ -178,7 +186,7 @@ A second list type, **test requests**, holds Factory test requests only and is a
 addressed to the signed-in staff member, so the page can be checked without a Board
 address and test data cannot reach one.
 The staff page always opens on **Scored proposals** (labelled Submitted proposals
-before the advisor-picks branch) and does not remember the
+before PR #654) and does not remember the
 test-requests choice across reloads (owner decision, 2026-11-19).
 
 ### Stand-ins in this build

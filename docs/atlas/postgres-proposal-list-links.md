@@ -13,7 +13,7 @@ Nothing reads or writes these tables until that flag is the literal `on`. Plan:
 
 `proposal_list_links` is one expiring, revocable personal link per grant cycle,
 list type, and recipient address. The link opens a no-login page listing that
-cycle's submitted proposals (scored proposals only on the advisor-picks branch). Columns: `id`, `cycle_code`, `list_kind`
+cycle's scored proposals. Columns: `id`, `cycle_code`, `list_kind`
 (`ordinary` for real proposals, `test` for Factory test requests),
 `recipient_name`, `recipient_email` (lower case), `recipient_source` (a display
 reference such as `expertise_roster:7` or `staff:self`; deliberately not a
@@ -31,8 +31,7 @@ revoked_at IS NULL` holds at most one live link per recipient.
 `(link_id, request_id)`; `(link_id, request_number)` is unique. These rows are
 the only requests a link may open.
 
-`proposal_list_advisor_picks` (migration 105, **[BRANCH-BUILT 2026-11-19 on
-`claude/session-2026-11-19b`; not merged. The owner applied migration 105 on 2026-11-19 [VERIFIED via the owner-run `node scripts/apply-migrations.js` ("1 applied") and `node scripts/probe-proposal-list-schema.mjs` readback: 0 pending, table present with 4 columns, recorded in the tracker]]**) records the Chairs and
+`proposal_list_advisor_picks` (migration 105, **[LIVE: live in Production since PR #654 (merge `8819feb62`, 2026-11-19). The owner applied migration 105 on 2026-11-19 [VERIFIED via the owner-run `node scripts/apply-migrations.js` ("1 applied") and `node scripts/probe-proposal-list-schema.mjs` readback: 0 pending, table present with 4 columns, recorded in the tracker]]**) records the Chairs and
 Board members staff ticked during Scoring to see a proposal: `request_id`,
 `roster_id` (numeric roster identity from migration 103; no foreign key, like
 `recipient_source`), `picked_by` (staff Dynamics system-user id), `picked_at`.
@@ -61,15 +60,14 @@ Staff write through `POST /api/workbench/proposal-lists`
   and its items in one transaction. The items come from
   `list-snapshot-service.js`: every Research request linked to the cycle that
   passes the Workbench discovery predicate, with no Program Director or caller
-  scope (on the advisor-picks branch: and whose Scoring decision is Scored or
-  later). An incomplete read fails the create. On the advisor-picks branch,
-  items ticked for the recipient in `proposal_list_advisor_picks` start
+  scope, and whose Scoring decision is Scored or later. For J27 and later,
+  Research is the request's Grant program (`_wmkf_grantprogram_value`), not the
+  Program field. An incomplete read fails the create. Items ticked for the recipient in `proposal_list_advisor_picks` start
   highlighted (a `test` list: ticked for anyone).
 - `rebuild` replaces a live link's items in one transaction and keeps the link,
-  its URL, and the marks on requests that are still listed. On the advisor-picks
-  branch, a newly listed request starts highlighted when it is ticked for the
+  its URL, and the marks on requests that are still listed. A newly listed request starts highlighted when it is ticked for the
   recipient.
-- `pick` (advisor-picks branch) inserts or deletes one
+- `pick` inserts or deletes one
   `proposal_list_advisor_picks` row, only for a J27-or-later request whose
   Scoring decision is Scored and a Board-role roster member; `GET ?requestId=`
   reads the request's picks.
