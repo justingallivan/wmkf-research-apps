@@ -380,8 +380,9 @@ Checked against our source on 2026-11-20 unless labeled.
      `Submission-Documents` holds only applicant originals.
    - No step produces `Reviewer Materials/Proposal_<num>.pdf` yet. It is the only
      file the external reviewer portal serves, and Reviewer Finder's fallback.
-     Connor can build it; trigger and contents await an owner decision (section 10
-     question 4).
+     Connor will build it, triggered at `wmkf_phaseistatus` = Recommended (owner,
+     2026-11-20); staff decide its contents; the portal serves it unchanged
+     (section 10 question 4).
 6. **Excluded reviewers become structured.** Step 1 writes one reviewer per line
    (`{first} {last} ({info}) — {reason}`). Our parser
    (`lib/services/reviewer-exclusion-parser.js`) was built for heterogeneous D26
@@ -432,7 +433,9 @@ Asked 2026-11-20, ordered by urgency. Connor answered three the same day
    question 2.)
 4. **J27 reviewer copy — answered: nothing produces it yet.** Connor says it is an
    easy flow to build and asks what should trigger it (he suggests
-   `wmkf_phaseistatus` = Recommended). Owner decision pending: trigger and contents.
+   `wmkf_phaseistatus` = Recommended). **Owner decision 2026-11-20:** trigger on
+   Recommended (sent to Connor). The owner and staff decide the file's contents; the
+   app only serves the file and needs no change.
    The external reviewer portal serves only `Reviewer Materials/Proposal_<num>.pdf`
    (`lib/external/reviewer-materials.js`), and J27 reviewer invitations need the
    PDF (alignment log D48; invitations start at the 2027-02-24 Chairs meeting).
