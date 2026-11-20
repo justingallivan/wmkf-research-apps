@@ -270,10 +270,11 @@ search limits: `docs/audits/product-backlog-reconciliation-2026-10-31.md`.
   scaled text extraction, admin browsing/analyses, scheduled refresh and
   Dataverse promotion remain separately approved work. Pre-2018 stays parked.
   Plan: `docs/plans/RESEARCH_REQUEST_FILE_CORPUS_PLAN_2026-10-25.md`.
-- **Grant Reporting and Literature Analyzer — standalone apps retired 2026-11-19; reuse destinations open.**
-  Both interfaces are 410/notice retirements in Production (PR #651); capabilities,
-  prompts and data are preserved. Where the preserved assessment and paper-analysis
-  capabilities should live next still needs an owner decision. See
+- **Grant Reporting and Literature Analyzer — retired 2026-11-19; capabilities archived 2026-11-20.**
+  Both interfaces are 410/notice retirements in Production (PR #651); code, prompts
+  and data are preserved as reference. Owner decision 2026-11-20: no app destination
+  for either. Report assessment is expected as an expanded capability inside the
+  automatic flows (fresh design); paper analysis is not planned. See
   `docs/plans/APP_SUITE_RETIREMENT_2026-11-19.md` and their routed memories.
 - **Interim-report evaluation — contract undecided.** Existing final-report
   comparison and document-discovery plumbing are not a dedicated annual

@@ -1,10 +1,10 @@
 ---
 name: Literature Analyzer retirement and preservation
-description: Standalone Literature Analyzer retirement preserves paper-analysis prompts and implementations; shared scholarly search remains live elsewhere.
+description: Closed 2026-11-20 — the paper-analysis capability is archived with no destination (an early idea never fleshed out); shared scholarly search remains live elsewhere.
 type: project
-status: active
+status: closed
 scope: strategy
-last_verified: 2026-11-19 via owner retirement decision and caller inventory
+last_verified: 2026-11-20 via owner decision in chat
 ---
 
 # Literature Analyzer — retire the standalone surface, preserve the capability
@@ -17,7 +17,9 @@ The uploaded-paper extraction, cross-paper synthesis/comparison, and JSON/Markdo
 export implementations are preserved under `_archived/`. Prompt templates,
 stored prompt rows/history, shared resolver/composer, and model infrastructure
 are retained. Do not infer that another app completely replaces these capabilities.
-The future home of uploaded-paper analysis remains undecided.
+[VERIFIED — owner decision, 2026-11-20] Uploaded-paper analysis is **archived with no
+new home**: it was an early-stage idea that was never fleshed out. Do not propose a
+destination for it.
 
 Scholarly search in reviewer discovery and scientific-dossier workflows remains
 live. Retiring this page does not authorize removing shared PubMed/OpenAlex or

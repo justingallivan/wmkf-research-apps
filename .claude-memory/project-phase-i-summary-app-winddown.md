@@ -33,5 +33,5 @@ Historical rationale: on April 25 the owner prioritized backend-driven summaries
 over investment in the human-driven Phase I summary UI. The streamlined single-phase
 J27 process starts with the June 2027 cycle; D26 remains the last dual-phase cycle.
 That strategy was not itself proof of deletion. The November 19 retirement is the
-explicit later decision. Grant Reporting's future destination remains undecided;
-see `project-grant-reporting-rework.md`.
+explicit later decision. Grant Reporting's preserved capability was archived with no
+app destination on 2026-11-20; see `project-grant-reporting-rework.md`.

@@ -59,3 +59,4 @@ These items are **done, closed, or point-in-time** and no longer earn a slot in 
 The durable slice-0 invariant (deactivate-not-delete roster rollup) now lives in `docs/agent-wiki/topics/intake-portal.md` and `lib/dataverse/schema/wave4/wmkf_proposalbudgetline.json`; the memory entry above is historical.
 
 - **J27 cycle-page redesign chronology (2026-11-09 to 2026-11-14)** — decision, plan, design brief, build, later phases, Production promotion, request-page rollout. Rules that still bind: [[project-j27-cycle-page-rules]]. History: [[project-j27-cycle-page-redesign-history]].
+- **Grant Reporting and Literature Analyzer capabilities — archived, no new home (owner, 2026-11-20).** Standalone apps retired 2026-11-19; preserved code stays as reference; report assessment will be designed fresh in the automatic flows. [[project-grant-reporting-rework]]; [[project-literature-analyzer-rework]].

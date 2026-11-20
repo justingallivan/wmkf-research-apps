@@ -25,6 +25,11 @@ including Grant Reporting's proposal-versus-report assessment and editing flow.
 Expense Reporter remains active. Expertise Finder belongs to a separate workstream
 and is not modified by this retirement.
 
+[VERIFIED — owner decision, 2026-11-20] The preserved Grant Reporting and Literature
+Analyzer capabilities are archived with no app destination. Report assessment is
+expected as an expanded capability inside the automatic flows and will be designed
+fresh; uploaded-paper analysis is not planned. No code was moved and no data changed.
+
 The source change replaces the pages with retirement notices and the thirteen
 processing/lookup API routes with authenticated HTTP 410 responses. Each API keeps
 its previous accepted app-grant set and method boundary. Old page and API

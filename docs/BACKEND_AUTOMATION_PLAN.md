@@ -3,7 +3,7 @@ title: Long-Term Plan: Event-Driven Backend Automation via PowerAutomate
 domain: general
 kind: plan
 status: active
-summary: "Executor foundations are built; Power Automate automation remains planned. Grant Reporting integration destination is undecided."
+summary: "Executor foundations are built; Power Automate automation remains planned. Grant Reporting archived 2026-11-20."
 canonical: false
 cataloged: 2026-07-02
 owner: product-engineering
@@ -58,6 +58,8 @@ See `docs/GRANT_CYCLE_LIFECYCLE.md` for the full proposal lifecycle with stage-b
 > 4. **Strategic shift on user-facing intake apps** — see `memory/project_phase_i_summary_app_winddown.md`. Phase I summary as a user-facing task is winding down post-May-2026 cycle; future intake prompts (compliance, fit-assessment, keywords) should be designed **backend-first** (PA-triggered) rather than as new Vercel routes. At the time, user-driven apps including reviewer finder, Phase II tools, Expertise Finder, Grant Reporting, and Review Manager were described as staying in active development.
 
 > **Later Grant Reporting direction (owner, 2026-10-21):** the standalone Grant Reporting app is out of date; the owner intends to integrate useful features elsewhere, but destination, scope, and timing remain undecided and no implementation has been requested. The active app still exists, but this older roadmap's Grant Reporting placement and any assumed PA/UI writeback destination are not current direction. See `.claude-memory/project-grant-reporting-rework.md`. Interim-report evaluation also remains undecided pending that product-direction review; see `.claude-memory/project-interim-report-automation.md`.
+>
+> **Status 2026-11-20 (owner):** the standalone app was retired 2026-11-19 and the preserved capability is archived with no app destination. An expanded report-assessment capability is expected inside the automatic flows and will be designed fresh.
 >
 > **Phase 1 implications for Connor:** the `ExecutePrompt` PA child flow builds against `docs/EXECUTOR_CONTRACT.md` — same 10 steps, same prompt-row schema, same `wmkf_ai_run` write contract. The Vercel implementation is the test oracle (echo-prompt parity). PA-side `forceOverwrite` defaults to caller's choice — see contract § "Notes for caller authors" for explicit guidance per parent flow type. The `phase-i.compliance` prompt row was deferred from Phase 0; when authored, it's a backend-first prompt.
 >

@@ -34,7 +34,6 @@
 - Search / schema language: feedback-grep-general-codebase-terms.md; feedback-human-legibility-schema-principle.md; feedback-staff-ui-never-shows-internal-ids.md; feedback-staff-ui-desktop-first.md
 
 ## Task Routing
-- Grant Reporting / Literature Analyzer: project-grant-reporting-rework.md; project-literature-analyzer-rework.md
 - Reviewer origination / retrieval / find and search follow-ups / excluded-reviewer intake: ../docs/agent-wiki/topics/reviewer-origination.md; ../docs/agent-wiki/topics/reviewer-find-applicant-flow.md; ../docs/EXCLUDED_REVIEWERS_STRUCTURED_INTAKE_PLAN.md
 - Reviewer identity / finding / contact / COI / verify-fail safety / contact promotion / address lifecycle and trust / product decisions: ../docs/agent-wiki/topics/reviewer-identity.md (Durable Memory); ../docs/agent-wiki/topics/reviewer-address-referrals.md; ../docs/REVIEWER_IDENTITY_CONTACT_PLAN.md; ../docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md; feedback-prioritize-contact-recall-over-identity-precision.md
 - Reviewer workbench / lifecycle / roster / referral / closeout / invite capture / candidate card / stabilization (1002912): ../docs/agent-wiki/topics/reviewer-workbench-lifecycle.md (Durable Memory)

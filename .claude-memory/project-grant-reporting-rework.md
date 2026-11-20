@@ -1,13 +1,22 @@
 ---
 name: Grant Reporting capability preservation
-description: Standalone Grant Reporting retirement; preserve assessment, editing, export, prompts, services, and historical data for a future home.
+description: Closed 2026-11-20 — preserved Grant Reporting capabilities are archived with no app destination; an expanded version is expected inside the automatic flows and will be designed fresh.
 type: project
-status: active
+status: closed
 scope: strategy
-last_verified: 2026-11-19 via owner retirement decision and preservation inventory
+last_verified: 2026-11-20 via owner decision in chat and caller grep of lib/services/grant-reporting/
 ---
 
 # Grant Reporting — retirement and capability preservation
+
+[VERIFIED — owner decision, 2026-11-20] **Archived; no new home.** Staff are not
+using the preserved assessment flow. The owner expects an expanded version that
+runs inside the automatic (Power Automate) flows; that will be designed fresh, not
+built by re-homing this code. Do not propose Workbench or other app destinations
+for it. The preserved code stays where it is as reference (no code was moved):
+`extract-service.js`, `lookup-grant-service.js` and `grant-report-word-export.js`
+have no live callers; `classify-file.js` remains live (Reviewer Finder proposal
+loader, request file corpus rules). Nothing in Dataverse was changed.
 
 [VERIFIED — owner direction, 2026-11-19] Retire the standalone Grant Reporting
 application while preserving its useful capabilities. This advances the October 21
@@ -34,7 +43,7 @@ The lookup service and shared SharePoint discovery helpers are also preserved.
 ## Recall Rule
 
 Read before reusing Grant Reporting capabilities or considering data cleanup.
-Choose the new destination and persistence contract with the owner before building
-an integration. Do not reconstruct the assessment/editing flow from memory: use
-the preserved page and service. Do not reopen standalone UI development without a
+The capability is archived (2026-11-20); report-assessment automation will be a
+fresh design in the automatic flows. Treat the preserved page and service as
+reference for that design, not as code to re-home. Do not reopen standalone UI development without a
 new decision. Earlier roadmap/Power Automate proposals are historical alternatives.

@@ -1,6 +1,6 @@
 ---
 name: Interim grant report auto-evaluation
-description: Interim-report evaluation concept with reusable extraction plumbing; destination and implementation scope remain undecided after the 2026-11-19 standalone Grant Reporting retirement
+description: Interim-report evaluation concept; the owner expects report assessment inside the automatic flows (2026-11-20), but its scope, contract and timing are undecided
 type: project
 originSessionId: 855d17dc-8935-4bc6-88a5-cb73f4cb1b2d
 status: active
@@ -17,7 +17,7 @@ Read this when: revisiting whether and where to automate yearly interim-report e
 Do:
 - Reuse the preserved document-discovery plumbing (`lib/services/grant-reporting/lookup-grant-service.js` with `lib/utils/sharepoint-buckets.js`) and the preserved `compareProposalToReport` in `lib/services/grant-reporting/extract-service.js` if the owner selects this capability for implementation. Both are preserved for reuse; no live route calls them since the 2026-11-19 retirement.
 - First confirm with Connor which `akoya_request` field holds the staff evaluation (or whether a new `wmkf_ai_interim_evaluation` field is needed); get real past examples before writing the prompt.
-- Read `.claude-memory/project-grant-reporting-rework.md` before choosing a destination, scope, or timeline: the 2026-11-19 retirement (which followed the 2026-10-21 direction) leaves those undecided and supersedes this older plan's fixed Grant Reporting UI and Power Automate endpoint proposal.
+- Read `.claude-memory/project-grant-reporting-rework.md` before choosing scope or timeline. Owner decision 2026-11-20: the preserved Grant Reporting capability is archived with no app destination, and an expanded report-assessment capability is expected inside the automatic flows, designed fresh. That supersedes this older plan's fixed Grant Reporting UI and Power Automate endpoint proposal; scope, contract and timing remain undecided.
 
 Do not:
 - Treat the older small-UI plus PA-callable endpoint proposal below as an approved destination or build order. It is historical planning pending the owner direction review.
