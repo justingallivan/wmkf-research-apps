@@ -205,7 +205,7 @@ export function ReviewPanelWorkspace() {
 
   return (
     <Layout>
-      <PageHeader title="Review Panel" subtitle="Virtual Review Panel — Phase A foundation (narrative-only, blind seat reviews synthesized by a Claude chair)" />
+      <PageHeader title="Review Panel" subtitle="Independent AI reviews synthesized by a Claude chair" />
       <div className="mx-auto max-w-5xl space-y-6 px-4 pb-16">
         {error && <Card><p className="text-sm text-red-700">{error}</p></Card>}
 

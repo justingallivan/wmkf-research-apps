@@ -71,15 +71,15 @@ test('save follows server-key order, waits per request, and stops after a partia
   expect(screen.getByRole('button', { name: 'Save Changes' })).toBeEnabled();
 });
 
-test('preserved overrides stay intact when an active model is saved and drafts survive collapsing', async () => {
-  const preserved = { appKey: 'grant-reporting', models: { model: info('old'), visionModel: info(), fallback: info() } };
+test.each([['grant-reporting', 'Grant Reporting'], ['reviewers', 'Reviewers'], ['email-personalization', 'Email Personalization']])('preserved %s overrides stay intact when an active model is saved and drafts survive collapsing', async (appKey, label) => {
+  const preserved = { appKey, models: { model: info('old'), visionModel: info(), fallback: info() } };
   const mixed = { ...config, apps: [...config.apps, preserved] };
   global.fetch = jest.fn(async () => response(200, mixed));
   render(<ModelConfigSection />);
   const summary = await screen.findByText('Preserved capabilities');
   const details = summary.closest('details');
   expect(details.open).toBe(false);
-  expect(screen.getByText('Grant Reporting')).not.toBeVisible();
+  expect(screen.getByText(label)).not.toBeVisible();
   expect(screen.getByText('sample:app')).toBeVisible();
   expect(puts()).toHaveLength(0);
   fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: 'new' } });

@@ -64,16 +64,6 @@ export default function LandingPage({ runtimeAppStatus = {} }) {
           </button>
           <button
             className={`px-6 py-3 font-semibold rounded-lg transition-all duration-200 ${
-              selectedCategory === 'concepts'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-            }`}
-            onClick={() => setSelectedCategory('concepts')}
-          >
-            Concepts ({apps.filter(a => a.categories.includes('concepts')).length})
-          </button>
-          <button
-            className={`px-6 py-3 font-semibold rounded-lg transition-all duration-200 ${
               selectedCategory === 'phase-i'
                 ? 'bg-white text-gray-900 shadow-sm'
                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'

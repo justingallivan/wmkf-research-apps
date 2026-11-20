@@ -299,7 +299,7 @@ export default function ModelConfigSection() {
       {standardApps.some(app => PRESERVED_MODEL_KEYS.has(app.appKey)) && (
         <details className="mt-6 rounded-lg border border-gray-200 p-4">
           <summary className="cursor-pointer text-sm font-semibold text-gray-700">Preserved capabilities</summary>
-          <p className="my-3 text-sm text-gray-600">Model settings retained from retired interfaces for backend use or future adaptation. Saved overrides still apply wherever these capabilities are used.</p>
+          <p className="my-3 text-sm text-gray-600">Model settings retained for backend use or future adaptation. Saved overrides still apply wherever these capabilities are used.</p>
           {renderModelTable(standardApps.filter(app => PRESERVED_MODEL_KEYS.has(app.appKey)))}
         </details>
       )}

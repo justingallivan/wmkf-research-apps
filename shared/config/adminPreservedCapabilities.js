@@ -1,5 +1,5 @@
 /**
- * Admin display placement only. These exact keys belong to retired interfaces.
+ * Admin display placement only. These exact keys identify retired interfaces or dormant model controls.
  * Do not use this list to gate execution, delete settings, or retire prompts:
  * preserved services and external backend flows can still use their contracts.
  * Unknown/new keys stay in the normal inventory for review.
@@ -7,6 +7,7 @@
 export const PRESERVED_MODEL_KEYS = new Set([
   'batch-phase-i', 'batch-phase-ii', 'phase-i-writeup', 'phase-ii-writeup',
   'peer-review-summarizer', 'qa', 'refine', 'grant-reporting',
+  'reviewers', 'email-personalization',
 ]);
 
 export const PRESERVED_PROMPT_NAMES = new Set([
