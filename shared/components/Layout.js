@@ -132,6 +132,8 @@ export default function Layout({
     if (boardAccess) tools.push({ name: 'Board writeups', href: '/board-writeups' });
     if (staffingAccess) tools.push({ name: 'Staffing', href: isSuperuser ? '/admin?workspace=people&view=staffing' : '/staffing' });
     if (boardSetupAccess) tools.push({ name: 'Board cycle setup', href: '/board-cycle-setup' });
+    // Mirrors /api/workbench/proposal-lists, which requires only the Workbench grant.
+    if (hasAccess('reviewers')) tools.push({ name: 'Share Proposals', href: '/proposal-lists' });
     // Every signed-in staff member may view; the API decides who may edit.
     if (currentProfile?.id) tools.push({ name: 'Cycle calendar', href: '/cycle-calendar' });
 
