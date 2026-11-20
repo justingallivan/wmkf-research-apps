@@ -3,7 +3,7 @@ title: "Atlas: AssemblyAI transcription pilot (Postgres)"
 domain: postgres
 kind: state-page
 status: meeting-tracker-production-staff-enabled; isolated-pilot-interface-retired; shared-interface-retired
-summary: "Meeting Tracker transcription remains staff-enabled. The isolated standalone interface is retired live; shared PR #653 is Production-live (`b869fdf85`). November 19 isolated review found one expired owner-visible recording with local cleanup pending. Protected APIs, storage and shared cleanup/recovery remain preserved."
+summary: "Meeting Tracker transcription remains staff-enabled. The isolated standalone interface is retired live; shared PR #653 is Production-live (`b869fdf85`). November 19 follow-up verified one expired audit row, an empty dedicated Blob store and completed local cleanup. Protected APIs, storage and shared cleanup/recovery remain preserved."
 canonical: true
 cataloged: 2026-10-01
 owner: product-engineering
@@ -34,13 +34,18 @@ schedules; see the release evidence for the manifest packaging correction.
 The legacy `wmkf-transcription-pilot.vercel.app` alias was removed on November 19;
 its public pilot path now returns 404. The old deployment and data were retained.
 
-The isolated project was still on October deployment
-`dpl_EtKyWuWqTHXuXGQNUGUhTQGFrBhY` at inspection, with one owner-visible
-**Expired** recording and inaccessible content. Local cleanup was **pending**;
-provider deletion was recorded confirmed. No database-wide/Blob inventory or
-successful evaluation export was obtained. Preserve unresolved cleanup state and
-resources; do not infer physical erasure or resurrect expired content. See the
-[retirement evidence](../plans/evidence/TRANSCRIPTION_PILOT_RETIREMENT_2026-11-19.md).
+The initial owner-scoped inspection found one expired recording with local
+cleanup pending and no database-wide/Blob inventory. **[VERIFIED via authenticated
+Neon Console, Vercel Blob CLI/UI and application GET, November 19 PT / November 20 UTC]**
+The authorized follow-up found exactly one `transcription_jobs` audit row and an
+empty dedicated Blob store (zero objects/bytes). Content and references were
+already purged. A guarded exact-row repair cleared the stale input-cleanup pointer,
+closed upload window and expired lease; version 131 records local completion at
+`2026-11-20T04:08:55.550532Z`. Application readback reports `cleanupPending:false`
+and `providerCleanupPending:false`. No content deletion was needed; the audit row
+and infrastructure remain. Evaluation export is still unavailable; provider API
+deletion is a receipt, not independent physical-erasure proof. See the
+[cleanup and retirement evidence](../plans/evidence/TRANSCRIPTION_PILOT_RETIREMENT_2026-11-19.md).
 
 ### Historical shared-engine and pilot release checkpoints
 
