@@ -495,8 +495,10 @@ export function getCandidateCardStatus(candidate) {
         tone: 'neutral',
         text: decision.reason === 'identity_not_resolved'
           ? (pubs > 0
-            ? `We couldn't tell which researcher this is. Check the ${pubs} paper${pubs === 1 ? '' : 's'} found under this name`
-            : 'No publications found under this name')
+            ? `We couldn't confirm which researcher this is. Check the ${pubs} paper${pubs === 1 ? '' : 's'} found under this name`
+            // The server withholds papers for an unconfirmed identity, so an
+            // empty list does not mean none were found.
+            : "We couldn't confirm which researcher this is")
           : 'Confirm this is the right person before adding them',
       },
       primary: 'confirm_identity',

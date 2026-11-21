@@ -570,7 +570,13 @@ export function CandidateCard({ candidate, applicantListed = null, checked, onTo
                   )}
                 </p>
                 {pubs.length === 0
-                  ? <p className="text-gray-500">{hasPubCount ? 'None found.' : 'Publication count unavailable.'}</p>
+                  ? (
+                    <p className="text-gray-500">
+                      {identityUnverified
+                        ? "Papers aren't shown until this person's identity is confirmed."
+                        : (hasPubCount ? 'None found.' : 'Publication count unavailable.')}
+                    </p>
+                  )
                   : (
                     <>
                       <p className="text-gray-500">Do these match what the proposal is about? This is the check the other details can&apos;t make.</p>

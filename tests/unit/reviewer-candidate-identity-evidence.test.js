@@ -112,7 +112,7 @@ describe('CandidateCard identity evidence disclosure', () => {
 
     expect(screen.getByTestId('candidate-compare-details')).not.toHaveAttribute('open');
     expect(screen.getByTestId('candidate-status-chip')).toHaveTextContent('Confirm identity');
-    expect(screen.getByTestId('candidate-match-line')).toHaveTextContent("We couldn't tell which researcher this is");
+    expect(screen.getByTestId('candidate-match-line')).toHaveTextContent("We couldn't confirm which researcher this is");
   });
 
   test('does not label a resolved candidate\'s details as unconfirmed', () => {
@@ -223,7 +223,7 @@ describe('CandidateCard identity evidence disclosure', () => {
     await openCompare(user);
 
     expect(screen.getAllByText('None found')).toHaveLength(2);
-    expect(screen.getByText('Publication count unavailable.')).toBeInTheDocument();
+    expect(screen.getByText("Papers aren't shown until this person's identity is confirmed.")).toBeInTheDocument();
     expect(screen.queryByText(/showing/)).not.toBeInTheDocument();
   });
 });
