@@ -4,6 +4,8 @@ import { requestJson } from '../../utils/api-request';
 import useAdminUnsavedChangesGuard from './useAdminUnsavedChangesGuard';
 import { CATEGORIES, COST_MODES, UPDATE_MODES, DECISIONS, REVIEW_STATES, isCorporateService, serviceStatus, reviewToday, nextReviewDate, defaultCadence } from '../../../lib/services/external-services/model';
 
+import ExternalServiceCheckResults from './ExternalServiceCheckResults';
+
 const API = '/api/admin/external-services';
 const inputClass = 'w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-500';
 const today = reviewToday;
@@ -35,6 +37,9 @@ export default function ExternalServicesSection() {
   const [filter, setFilter] = useState('All services');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(null);
+  const [updateCheck, setUpdateCheck] = useState(null);
+  const [checking, setChecking] = useState(false);
+  const [checkError, setCheckError] = useState('');
   const [reviews, setReviews] = useState([]);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewError, setReviewError] = useState('');
@@ -61,11 +66,11 @@ export default function ExternalServicesSection() {
   useEffect(() => {
     const controller = new AbortController();
     generation.current += 1;
-    setReviews([]); setReviewError('');
+    setReviews([]); setReviewError(''); setUpdateCheck(null); setChecking(false); setCheckError('');
     if (selected) {
       setReviewLoading(true);
       requestJson(`${API}?id=${encodeURIComponent(selected)}`, { signal: controller.signal }).then(data => {
-        if (!controller.signal.aborted) { setReviews(data.reviews || []); setReviewLoading(false); }
+        if (!controller.signal.aborted) { setReviews(data.reviews || []); setUpdateCheck(data.check || null); setReviewLoading(false); }
       }).catch(() => { if (!controller.signal.aborted) { setReviewError('Could not load review history. Please retry.'); setReviewLoading(false); } });
     }
     return () => { controller.abort(); generation.current += 1; };
@@ -111,6 +116,25 @@ export default function ExternalServicesSection() {
             : 'We could not confirm the save. Copy any unsaved notes, then Cancel to reload saved records and check whether it succeeded.');
       }
     } finally { if (generation.current === token) setSaving(false); }
+  }
+  async function checkUpdates() {
+    if (checking) return;
+    const token = generation.current;
+    setChecking(true); setCheckError('');
+    try {
+      const result = await requestJson(API, { method:'POST', body:{action:'check',id:selected} });
+      if (generation.current === token) setUpdateCheck(result.check);
+    } catch (err) {
+      if (generation.current === token) setCheckError([400,409].includes(err.status) ? err.message : 'Could not confirm the check. Reload results before retrying.');
+    } finally { if (generation.current === token) setChecking(false); }
+  }
+  function reviewFromCheck() {
+    openEditor('review');
+    const sources = updateCheck.sources || [];
+    setReview(previous=>({...previous, trigger:'Manual service update check',decision:'Investigate',
+      changes:sources.map(s=>`${s.label}: ${s.status}. ${s.summary}\n${(s.lines||[]).join('\n')}`).join('\n\n').slice(0,6000),
+      evidence:`Checked ${updateCheck.checkedAt}. Provider statements and account observations; not independently benchmarked. ${sources.filter(s=>s.status==='unavailable').map(s=>`${s.label} could not be checked.`).join(' ')}`,
+      links:sources.map(s=>({label:s.label,href:s.url}))}));
   }
   const setField = (key, value) => {
     if (key === 'nextReviewOn') nextDateEdited.current = true;
@@ -175,6 +199,13 @@ export default function ExternalServicesSection() {
           {current.data.notes && <div><h4 className="text-sm font-semibold">Account and service notes</h4><p className="mt-1 whitespace-pre-wrap break-words text-sm text-gray-700">{current.data.notes}</p></div>}
           <References links={current.data.links} />
         </div>
+        {['assemblyai','anthropic','serpapi'].includes(selected) && <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-lg font-semibold">Update checks</h3><Button disabled={checking || reviewLoading} onClick={checkUpdates}>{checking ? 'Checking…' : 'Check for updates'}</Button></div>
+          <p className="text-sm text-gray-600">Manual only. Reads official references or account metrics; no AI generation, purchases, or automatic changes. Checks within one minute reuse the saved result.</p>
+          {checkError && <p role="alert" className="text-sm text-red-700">{checkError}</p>}
+          <Button variant="link" disabled={checking} onClick={()=>setReload(v=>v+1)}>Reload check results</Button>
+          <ExternalServiceCheckResults check={updateCheck} serviceVersion={current.version} onReview={reviewFromCheck} />
+        </div>}
         <div className="space-y-3"><h3 className="text-lg font-semibold">Review history</h3>{reviewLoading && <p role="status">Loading reviews…</p>}{reviewError && <p role="alert">{reviewError} <Button variant="link" onClick={() => setReload(v => v + 1)}>Retry history</Button></p>}
           {!reviewLoading && !reviewError && !reviews.length && <p className="text-sm text-gray-600">No reviews yet. Record the first review when you have checked this service.</p>}
           {reviews.map(item => <details key={item.id} className="rounded-lg border border-gray-200 bg-white p-4"><summary className="cursor-pointer text-sm font-medium">{item.data.reviewedOn} · {item.data.decision} · {item.data.status}</summary><div className="mt-4 space-y-4">{[['Trigger', item.data.trigger], ['Findings', item.data.changes], ['Evidence and limitations', item.data.evidence], ['Rationale', item.data.rationale], ['Follow-up', item.data.followUp]].map(([label, value]) => <div key={label}><h4 className="text-sm font-semibold">{label}</h4><p className="mt-1 whitespace-pre-wrap break-words text-sm text-gray-700">{value || 'None recorded'}</p></div>)}<References links={item.data.links} /><Button variant="link" onClick={() => openEditor('review', item)}>Update review</Button></div></details>)}

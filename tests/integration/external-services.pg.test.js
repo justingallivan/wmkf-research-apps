@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { Pool } from 'pg';
 import { listServices, listReviews, saveService } from '../../lib/services/external-services/store';
+import { claimCheck, finishCheck, readCheck } from '../../lib/services/external-services/check-store';
 import seed from '../../lib/services/external-services/seed.json';
 const connectionString=process.env.EXTERNAL_SERVICES_TEST_URL || process.env.TEST_REQUEST_LEDGER_TEST_URL;
 if(connectionString && !['127.0.0.1','localhost','[::1]'].includes(new URL(connectionString).hostname)) throw new Error('Loopback test database required');
@@ -17,6 +18,7 @@ jest.mock('@vercel/postgres',()=>({db:{connect:()=>mockPool.connect()},sql:{quer
     await mockPool.query('CREATE TABLE user_profiles(id INTEGER PRIMARY KEY); INSERT INTO user_profiles VALUES (42)');
     await mockPool.query(fs.readFileSync('lib/db/migrations/106_external_service_reviews.sql','utf8'));
     await mockPool.query(fs.readFileSync('lib/db/migrations/107_external_service_inventory_followups.sql','utf8'));
+    await mockPool.query(fs.readFileSync('lib/db/migrations/108_external_service_checks.sql','utf8'));
   });
   afterAll(async()=>{await mockPool.end();await admin.query(`DROP SCHEMA ${schema} CASCADE`);await admin.end();});
   test('migration seeds match public inventory and preserve first implemented review',async()=>{
@@ -102,6 +104,25 @@ jest.mock('@vercel/postgres',()=>({db:{connect:()=>mockPool.connect()},sql:{quer
     expect(after.version).toBe(before.version+1);expect(after.data).toEqual(before.data);
     const review=(await listReviews('assemblyai')).find(r=>r.id===id);
     expect(review.data).toEqual({...edited,links:[...edited.links,{label:'Vendor benchmark comparison',href:'https://www.assemblyai.com/benchmarks'}]});
+  });
+
+  test('manual checks are fenced, recoverable, and never change service/review state',async()=>{
+    const before=(await listServices()).find(s=>s.id==='assemblyai');const reviews=await listReviews('assemblyai');
+    const claim=await claimCheck('assemblyai',42);
+    await expect(claimCheck('assemblyai',42)).rejects.toMatchObject({status:409});
+    expect((await readCheck('assemblyai')).running).toBe(true);
+    await mockPool.query("UPDATE external_service_checks SET lease_expires_at=now()-interval '1 second' WHERE service_id='assemblyai'");
+    expect((await readCheck('assemblyai')).interrupted).toBe(true);
+    const replacement=await claimCheck('assemblyai',42);
+    await expect(finishCheck('assemblyai',claim.token,{checkedAt:'old'})).rejects.toMatchObject({status:409});
+    const snapshot={checkedAt:new Date().toISOString(),sources:[],baselines:{pricing:{fingerprint:'retained',lines:[],observedAt:'today'}}};
+    await finishCheck('assemblyai',replacement.token,snapshot);
+    expect((await claimCheck('assemblyai',42)).cached.checkedAt).toBe(snapshot.checkedAt);
+    expect((await listServices()).find(s=>s.id==='assemblyai')).toEqual(before);expect(await listReviews('assemblyai')).toEqual(reviews);
+    expect((await mockPool.query("SELECT checked_by FROM external_service_checks WHERE service_id='assemblyai'")).rows[0].checked_by).toBe(42);
+  });
+  test.each(['microsoft','openai','service-custom',null,['assemblyai']])('unsupported manual-check target rejects before SQL: %j',async id=>{
+    const query=jest.spyOn(mockPool,'query');await expect(claimCheck(id,42)).rejects.toMatchObject({status:400});expect(query).not.toHaveBeenCalled();query.mockRestore();
   });
 
 });

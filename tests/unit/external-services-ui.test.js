@@ -114,3 +114,50 @@ test('typing through a corporate name does not exclude the completed non-corpora
   const body=JSON.parse(global.fetch.mock.calls.find(([,o])=>o?.method==='PUT')[1].body);
   expect(body.data).toMatchObject({provider:'ZoomInfo',costTracking:'Review costs'});
 });
+
+const checked = {checkedAt:'2026-11-21T12:00:00Z',serviceVersion:1,sources:[
+  {key:'pricing',label:'Public pricing',status:'changed',summary:'Reference changed.',lines:['Recorded audio rate changed'],previousLines:['Prior rate'],url:'https://www.assemblyai.com/pricing.md'},
+  {key:'models',label:'Models',status:'unavailable',summary:'Could not check this source.',lines:[],url:'https://www.assemblyai.com/llms/models.md'},
+]};
+test('manual check shows partial results and drafts an unsaved proposed review',async()=>{
+  global.fetch.mockImplementation(async(url,options)=>response(options?.method==='POST'?{check:checked}:url.includes('?id=')?{reviews:[],check:null}:{services:[assembly]}));
+  render(<ExternalServicesSection/>);fireEvent.click(await screen.findByRole('button',{name:'AssemblyAI · Recorded-audio transcription'}));
+  await waitFor(()=>expect(screen.getByRole('button',{name:'Check for updates'})).toBeEnabled());
+  fireEvent.click(screen.getByRole('button',{name:'Check for updates'}));
+  expect(await screen.findByText('Recorded audio rate changed')).toBeInTheDocument();
+  expect(screen.getByText('Could not check')).toBeInTheDocument();
+  const post=global.fetch.mock.calls.find(([,o])=>o?.method==='POST');
+  expect(JSON.parse(post[1].body)).toEqual({action:'check',id:'assemblyai'});
+  fireEvent.click(screen.getByRole('button',{name:'Start review from findings'}));
+  expect(screen.getByLabelText('What changed / findings').value).toContain('Models: unavailable');
+  expect(screen.getByLabelText('Decision rationale')).toHaveValue('');
+  expect(global.fetch.mock.calls.some(([,o])=>o?.method==='PUT')).toBe(false);
+});
+test('lost check response can be recovered by reloading saved results',async()=>{
+  let saved=null;
+  global.fetch.mockImplementation(async(url,options)=>{
+    if(options?.method==='POST'){saved=checked;throw new Error('lost reply');}
+    return response(url.includes('?id=')?{reviews:[],check:saved}:{services:[assembly]});
+  });
+  render(<ExternalServicesSection/>);fireEvent.click(await screen.findByRole('button',{name:'AssemblyAI · Recorded-audio transcription'}));
+  await waitFor(()=>expect(screen.getByRole('button',{name:'Check for updates'})).toBeEnabled());
+  fireEvent.click(screen.getByRole('button',{name:'Check for updates'}));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Could not confirm the check');
+  fireEvent.click(screen.getByRole('button',{name:'Reload check results'}));
+  expect(await screen.findByText('Recorded audio rate changed')).toBeInTheDocument();
+  expect(global.fetch.mock.calls.filter(([,o])=>o?.method==='POST')).toHaveLength(1);
+});
+test('late check response cannot overwrite a different service selection',async()=>{
+  let resolveCheck;
+  const other={...assembly,id:'other',data:{...assembly.data,name:'Other',provider:'Other',purpose:'Example'}};
+  global.fetch.mockImplementation(async(url,options)=>options?.method==='POST'?new Promise(resolve=>{resolveCheck=resolve;}):response(url.includes('?id=')?{reviews:[],check:null}:{services:[assembly,other]}));
+  render(<ExternalServicesSection/>);fireEvent.click(await screen.findByRole('button',{name:'AssemblyAI · Recorded-audio transcription'}));
+  await waitFor(()=>expect(screen.getByRole('button',{name:'Check for updates'})).toBeEnabled());
+  fireEvent.click(screen.getByRole('button',{name:'Check for updates'}));
+  expect(screen.getByRole('button',{name:'Checking…'})).toBeDisabled();
+  fireEvent.click(screen.getByRole('button',{name:/Back/}));
+  fireEvent.click(await screen.findByRole('button',{name:'Other · Other'}));
+  await require('@testing-library/react').act(async()=>{resolveCheck(response({check:checked}));});
+  expect(screen.queryByText('Recorded audio rate changed')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button',{name:'Check for updates'})).not.toBeInTheDocument();
+});

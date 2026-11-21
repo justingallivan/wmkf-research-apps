@@ -23,14 +23,14 @@
  * Auth: Vercel CRON_SECRET (dev mode bypasses).
  */
 
-import { classifyRegistryCoverage } from '../../../lib/services/model-resolver';
+import { findUnreviewedLiveClaudeModels, classifyRegistryCoverage } from '../../../lib/services/pricing-checks';
 import { sql } from '@vercel/postgres';
 import { verifyCronSecret } from '../../../lib/utils/cron-auth';
 import NotificationService from '../../../lib/services/notification-service';
 import AlertService from '../../../lib/services/alert-service';
 import MaintenanceService from '../../../lib/services/maintenance-service';
-import { MODEL_CAPABILITIES, LAST_CAPABILITY_REVIEWED_AT } from '../../../lib/services/model-capabilities';
-import { lookupPricing, MODEL_PRICING, LAST_REVIEWED_AT } from '../../../lib/utils/model-pricing';
+import { LAST_CAPABILITY_REVIEWED_AT } from '../../../lib/services/model-capabilities';
+import { lookupPricing, LAST_REVIEWED_AT } from '../../../lib/utils/model-pricing';
 
 const STALE_DAYS = 60;
 const ALERT_KEY_UNKNOWN = 'pricing:unknown-models';
@@ -215,42 +215,4 @@ async function checkLiveModelRegistry() {
   };
 }
 
-export function findUnreviewedLiveClaudeModels(models, { reviewedAt = LAST_CAPABILITY_REVIEWED_AT } = {}) {
-  return (models || [])
-    .filter((model) => model?.id && String(model.id).startsWith('claude-'))
-    .filter((model) => isCreatedAfterReview(model.created_at, reviewedAt))
-    .map((model) => {
-      const id = String(model.id);
-      const capabilityCoverage = classifyRegistryCoverage(id, MODEL_CAPABILITIES);
-      const pricingCoverage = classifyRegistryCoverage(id, MODEL_PRICING);
-      return {
-        id,
-        displayName: model.display_name || null,
-        createdAt: model.created_at || null,
-        family: inferClaudeFamily(id),
-        capabilityCoverage,
-        pricingCoverage,
-      };
-    })
-    .filter((model) => !isCoverageReviewed(model.capabilityCoverage) || !isCoverageReviewed(model.pricingCoverage));
-}
-
-export { classifyRegistryCoverage };
-
-function isCoverageReviewed(coverage) {
-  return coverage.status === 'reviewed_exact' || coverage.status === 'reviewed_dated';
-}
-
-function isCreatedAfterReview(createdAt, reviewedAt) {
-  if (!createdAt || !reviewedAt) return false;
-  const created = new Date(createdAt);
-  if (Number.isNaN(created.getTime())) return false;
-  return created.toISOString().slice(0, 10) > reviewedAt;
-}
-
-function inferClaudeFamily(modelId) {
-  for (const family of ['opus', 'sonnet', 'haiku', 'fable', 'mythos']) {
-    if (modelId.includes(`-${family}-`)) return family;
-  }
-  return 'unknown';
-}
+export { findUnreviewedLiveClaudeModels, classifyRegistryCoverage };
