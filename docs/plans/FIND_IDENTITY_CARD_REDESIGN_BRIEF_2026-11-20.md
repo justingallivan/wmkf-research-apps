@@ -248,6 +248,29 @@ free text; the system is called AkoyaGO everywhere on the card; no
      import) is not known [ASSUMED unknown], so an older contact address is
      corroboration of age, not proof the person typed it. Owner decision
      pending on whether to add it as a route.
+7. **Validate the applicant's listed details against AkoyaGO** (owner request,
+   2026-11-20). Each mismatch below puts the card in *Check email*, highlights
+   the cell in Compare details, and requires the evidence link:
+   - the applicant's listed institution vs the applicant's email domain (for
+     example "Stanford" with an `@harvard.edu` address); this is the
+     "domain doesn't fit the institution" case of owner decision 5;
+   - the applicant's listed institution vs the AkoyaGO reviewer record's
+     institution (the person may have moved and the record is stale);
+   - the applicant's email vs a same-name AkoyaGO contact with a different
+     address.
+
+   Reuse existing parts rather than raw string comparison: institution name
+   to domain through OpenAlex and email-domain relatedness
+   (`buildInstitutionDomainEvidence`, `emailDomainRelatedToAny` in
+   `lib/services/contact-enrichment/domain-evidence.js`), and the stage-2
+   institution comparison for affiliated institutions. These are flags, never
+   blocks: affiliated institutes (Broad, HHMI, hospital or medical-school
+   domains), personal addresses and recent moves are legitimate.
+
+   When step 1 finds an existing reviewer record by email, it does not
+   overwrite that record's institution with the applicant's [REPORTED by the
+   owner 2026-11-20; not yet confirmed with Connor or in data], so the
+   record-vs-applicant comparison can catch stale records.
 
 ### 8. Open decisions
 None. The three questions raised with this brief were settled as owner
