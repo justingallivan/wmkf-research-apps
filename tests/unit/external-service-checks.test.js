@@ -29,7 +29,7 @@ test.each(['<html>sign in</html>','not a valid provider page'])('invalid public 
 });
 test('SerpAPI allowlist drops echoed credentials and personal account fields',async()=>{
   process.env.SERP_API_KEY='test-secret-never-retain';
-  fetch.mockResolvedValue(reply({api_key:'test-secret-never-retain',account_email:'private@example.org',account_id:'private-id',plan_name:'Starter',plan_monthly_price:25,searches_per_month:100,this_month_usage:92,total_searches_left:8,plan_renewal_date:'2026-12-20'}));
+  fetch.mockResolvedValue(reply({api_key:'test-secret-never-retain',account_email:'private@example.org',account_id:'private-id',plan_name:'Starter',plan_monthly_price:25,searches_per_month:100,this_month_usage:92,plan_searches_left:8,extra_credits:0,total_searches_left:8,plan_renewal_date:'2026-12-20'}));
   const result=await collectSource(sourcesFor('serpapi')[0],undefined,undefined,now);
   expect(result.result.status).toBe('baseline');expect(result.result.attention).toBe(true);
   for(const secret of ['test-secret-never-retain','private@example.org','private-id'])expect(JSON.stringify(result)).not.toContain(secret);
@@ -72,11 +72,11 @@ test('cooldown reuse makes no provider calls',async()=>{
 });
 test('SerpAPI usage changes preserve the plan baseline until allowance becomes low',async()=>{
   process.env.SERP_API_KEY='test-key';const source=sourcesFor('serpapi')[0];
-  const account={plan_name:'Starter',plan_monthly_price:25,searches_per_month:100,this_month_usage:20,total_searches_left:80,plan_renewal_date:null};
+  const account={plan_name:'Starter',plan_monthly_price:25,searches_per_month:100,this_month_usage:20,plan_searches_left:80,extra_credits:0,total_searches_left:80,plan_renewal_date:null};
   fetch.mockResolvedValue(reply(account));const first=await collectSource(source,undefined,undefined,now);
-  fetch.mockResolvedValue(reply({...account,this_month_usage:30,total_searches_left:70}));
+  fetch.mockResolvedValue(reply({...account,this_month_usage:30,plan_searches_left:70,extra_credits:0,total_searches_left:70}));
   expect((await collectSource(source,first.baseline,undefined,now)).result).toMatchObject({status:'unchanged',attention:false});
-  fetch.mockResolvedValue(reply({...account,this_month_usage:91,total_searches_left:9}));
+  fetch.mockResolvedValue(reply({...account,this_month_usage:91,plan_searches_left:9,extra_credits:0,total_searches_left:9}));
   expect((await collectSource(source,first.baseline,undefined,now)).result).toMatchObject({status:'unchanged',attention:true});
   fetch.mockResolvedValue(reply({...account,plan_monthly_price:30}));
   expect((await collectSource(source,first.baseline,undefined,now)).result.status).toBe('changed');
@@ -139,9 +139,9 @@ test('a review saved during the previous check cannot acknowledge its unseen fin
   const checked=await checkForUpdates('assemblyai',42);expect(checked.sources[0].status).toBe('changed');
 });
 test('routine SerpAPI renewal and recovered allowance do not change the plan fingerprint',async()=>{
-  process.env.SERP_API_KEY='test-key';const account={plan_name:'Starter',plan_monthly_price:25,searches_per_month:100,this_month_usage:95,total_searches_left:5,plan_renewal_date:'2026-11-22'};
+  process.env.SERP_API_KEY='test-key';const account={plan_name:'Starter',plan_monthly_price:25,searches_per_month:100,this_month_usage:95,plan_searches_left:5,extra_credits:0,total_searches_left:5,plan_renewal_date:'2026-11-22'};
   fetch.mockResolvedValue(reply(account));const first=await collectSource(sourcesFor('serpapi')[0],undefined,undefined,now);
-  fetch.mockResolvedValue(reply({...account,this_month_usage:0,total_searches_left:100,plan_renewal_date:'2026-12-22'}));
+  fetch.mockResolvedValue(reply({...account,this_month_usage:0,plan_searches_left:100,extra_credits:0,total_searches_left:100,plan_renewal_date:'2026-12-22'}));
   expect((await collectSource(sourcesFor('serpapi')[0],first.baseline,undefined,now)).result).toMatchObject({status:'unchanged',attention:false});
 });
 test('blended billing percentage movement does not create another finding',async()=>{
@@ -149,4 +149,28 @@ test('blended billing percentage movement does not create another finding',async
   const first=await collectSource(sourcesFor('anthropic')[2],undefined,undefined,now);
   getCostReport.mockResolvedValue(bucket([cost('1210')]));
   expect((await collectSource(sourcesFor('anthropic')[2],first.baseline,undefined,now)).result).toMatchObject({status:'unchanged',attention:true});
+});
+
+test('SerpAPI separates monthly balance from extra credits without flagging balance movement as plan drift',async()=>{
+  process.env.SERP_API_KEY='test-key';
+  const account={plan_name:'Developer',plan_monthly_price:75,searches_per_month:5000,this_month_usage:3,plan_searches_left:4997,extra_credits:10000,total_searches_left:14997};
+  const source=sourcesFor('serpapi')[0];
+  fetch.mockResolvedValue(reply(account));
+  const first=await collectSource(source,undefined,undefined,now);
+  expect(first.result.lines).toContain('Monthly searches: 5000; used: 3; monthly remaining: 4997.');
+  expect(first.result.lines).toContain('Extra credits: 10000; total remaining: 14997.');
+  fetch.mockResolvedValue(reply({...account,plan_searches_left:0,this_month_usage:5000,extra_credits:1000,total_searches_left:1000}));
+  expect((await collectSource(source,first.baseline,undefined,now)).result).toMatchObject({status:'unchanged',attention:false});
+  fetch.mockResolvedValue(reply({...account,plan_searches_left:0,this_month_usage:5000,extra_credits:500,total_searches_left:500}));
+  expect((await collectSource(source,first.baseline,undefined,now)).result).toMatchObject({status:'unchanged',attention:true});
+});
+test.each(['plan_searches_left','extra_credits'])('invalid or absent %s cannot replace a successful balance',async field=>{
+  process.env.SERP_API_KEY='test-key';
+  const source=sourcesFor('serpapi')[0];
+  const baseline={fingerprint:'prior',lines:['prior balance'],observedAt:now};
+  for(const value of [undefined,null,-1,'123']){
+    fetch.mockResolvedValue(reply({plan_name:'Developer',plan_monthly_price:75,searches_per_month:5000,this_month_usage:3,plan_searches_left:4997,extra_credits:10000,total_searches_left:14997,[field]:value}));
+    const result=await collectSource(source,baseline,undefined,now);
+    expect(result.result.status).toBe('unavailable');expect(result.baseline).toBe(baseline);
+  }
 });
