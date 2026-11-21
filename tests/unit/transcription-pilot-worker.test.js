@@ -140,12 +140,14 @@ describe('transcription worker submission safety', () => {
     expect(store.releaseTranscriptionLease).toHaveBeenCalledWith(expect.objectContaining({ expectedVersion: 8, expectedStatuses: ['queued'] }));
   });
 
-  it('reuses a reference discovered after inspection and never uploads again', async () => {
+  it.each(['universal-3-5-pro', 'assemblyai-stt-3-7'])('preserves persisted model %s when reusing an upload reference', async (model) => {
+    store.getLeasedTranscriptionJob.mockResolvedValue({ ...queued, version: 3, requested_model: model, provider_submission_started_at: new Date() });
     store.claimNextDueTranscriptionJob.mockReset().mockResolvedValue(null);
-    store.getLeasedTranscriptionJob.mockResolvedValueOnce({ ...queued, version: 2, provider_upload_ref_ciphertext: 'late-saved-ref' });
+    store.getLeasedTranscriptionJob.mockResolvedValueOnce({ ...queued, version: 2, requested_model: model, provider_upload_ref_ciphertext: 'late-saved-ref' });
     await drainTranscriptionPilot({ maxJobs: 1 });
     expect(runtime.inspectOwnerInput).toHaveBeenCalled();
     expect(runtime.providerReference).toHaveBeenCalledWith('late-saved-ref');
+    expect(submitAssemblyAITranscription).toHaveBeenCalledWith(expect.objectContaining({ model }));
     expect(uploadAssemblyAIAudio).not.toHaveBeenCalled();
     expect(submitAssemblyAITranscription).toHaveBeenCalledTimes(1);
   });

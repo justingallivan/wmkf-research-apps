@@ -32,16 +32,16 @@ describe('AssemblyAI transcription provider boundary', () => {
     }));
   });
 
-  it('submits the fixed model, diarization, and attempt HMAC without arbitrary options', async () => {
-    safeFetch.mockResolvedValueOnce(jsonResponse({ id: 'provider_123', speech_model_used: 'universal-3-5-pro' }));
+  it.each([['universal-3-5-pro', {}], ['assemblyai-stt-3-7', { disfluencies: false }]])('submits %s with cleaned text and preserves legacy payloads', async (model, options) => {
+    safeFetch.mockResolvedValueOnce(jsonResponse({ id: 'provider_123', speech_model_used: model }));
     await submitAssemblyAITranscription({
       region: 'eu', uploadUrl: 'https://cdn.assemblyai.com/upload/opaque-ref',
-      model: 'universal-3-5-pro', callbackUrl: 'https://app.example/api/webhooks/assemblyai?attempt=attempt', webhookAuth: 'a'.repeat(64),
+      model, callbackUrl: 'https://app.example/api/webhooks/assemblyai?attempt=attempt', webhookAuth: 'a'.repeat(64),
     });
     expect(safeFetch).toHaveBeenCalledWith('https://api.eu.assemblyai.com/v2/transcript', expect.objectContaining({
       method: 'POST', failOnRedirect: true,
       body: JSON.stringify({
-        audio_url: 'https://cdn.assemblyai.com/upload/opaque-ref', speech_models: ['universal-3-5-pro'], speaker_labels: true,
+        audio_url: 'https://cdn.assemblyai.com/upload/opaque-ref', speech_models: [model], speaker_labels: true, ...options,
         webhook_url: 'https://app.example/api/webhooks/assemblyai?attempt=attempt',
         webhook_auth_header_name: 'x-transcription-pilot-auth', webhook_auth_header_value: 'a'.repeat(64),
       }),
