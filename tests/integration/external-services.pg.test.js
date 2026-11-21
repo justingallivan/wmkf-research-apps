@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { Pool } from 'pg';
 import { listServices, listReviews, saveService } from '../../lib/services/external-services/store';
+import handler from '../../pages/api/admin/external-services';
+jest.mock('../../lib/utils/auth',()=>({requireSuperuser:jest.fn(async()=>({profileId:42}))}));
 import seed from '../../lib/services/external-services/seed.json';
 const connectionString=process.env.EXTERNAL_SERVICES_TEST_URL || process.env.TEST_REQUEST_LEDGER_TEST_URL;
 if(connectionString && !['127.0.0.1','localhost','[::1]'].includes(new URL(connectionString).hostname)) throw new Error('Loopback test database required');
@@ -16,6 +18,7 @@ jest.mock('@vercel/postgres',()=>({db:{connect:()=>mockPool.connect()},sql:{quer
     mockPool=new Pool({connectionString,options:`-c search_path=${schema},public`});
     await mockPool.query('CREATE TABLE user_profiles(id INTEGER PRIMARY KEY); INSERT INTO user_profiles VALUES (42)');
     await mockPool.query(fs.readFileSync('lib/db/migrations/106_external_service_reviews.sql','utf8'));
+    await mockPool.query(fs.readFileSync('lib/db/migrations/107_external_service_inventory_followups.sql','utf8'));
   });
   afterAll(async()=>{await mockPool.end();await admin.query(`DROP SCHEMA ${schema} CASCADE`);await admin.end();});
   test('migration seeds match public inventory and preserve first implemented review',async()=>{
@@ -60,6 +63,42 @@ jest.mock('@vercel/postgres',()=>({db:{connect:()=>mockPool.connect()},sql:{quer
     await expect(saveService({...command,reviewId:'-'.repeat(36)},42)).rejects.toMatchObject({status:400});
     await expect(saveService({...command,expectedVersion:2147483648},42)).rejects.toMatchObject({status:400});
     expect(connect).not.toHaveBeenCalled();connect.mockRestore();
+  });
+
+  test.each([null, [], 'body', {id:'assemblyai',data:seed.services[0].data,expectedVersion:1,review:false}, {id:'assemblyai',data:seed.services[0].data,expectedVersion:1,review:'x'}])('malformed request body returns 400: %j',async body=>{
+    const res={setHeader:jest.fn(),status:jest.fn(),json:jest.fn()};res.status.mockReturnValue(res);
+    await handler({method:'PUT',body,query:{}},res);expect(res.status).toHaveBeenCalledWith(400);
+  });
+  test('repeated service ID query parameters return 400',async()=>{
+    const res={setHeader:jest.fn(),status:jest.fn(),json:jest.fn()};res.status.mockReturnValue(res);
+    await handler({method:'GET',query:{id:['assemblyai','openai']}},res);expect(res.status).toHaveBeenCalledWith(400);
+  });
+  test('500-service cap rejects creation without inserting a 501st row',async()=>{
+    const before=Number((await mockPool.query('SELECT count(*) FROM external_services')).rows[0].count);
+    await mockPool.query("INSERT INTO external_services(id,data) SELECT 'cap-service-'||n, $1::jsonb FROM generate_series(1,$2::integer) n",[JSON.stringify(seed.services[0].data),500-before]);
+    try {
+      await expect(saveService({id:'over-cap',data:seed.services[0].data,expectedVersion:0},42)).rejects.toMatchObject({status:400});
+      expect((await mockPool.query('SELECT count(*)::int AS count FROM external_services')).rows[0].count).toBe(500);
+      expect((await mockPool.query("SELECT id FROM external_services WHERE id='over-cap'")).rows).toHaveLength(0);
+    } finally { await mockPool.query("DELETE FROM external_services WHERE id LIKE 'cap-service-%'"); }
+  });
+  test('200-review cap rolls back the companion service edit',async()=>{
+    await saveService({id:'cap-review-service',data:seed.services[0].data,expectedVersion:0},42);
+    const ids=Array.from({length:200},()=>crypto.randomUUID());
+    await mockPool.query("INSERT INTO external_service_reviews(id,service_id,data) SELECT value::uuid,'cap-review-service',$2::jsonb FROM jsonb_array_elements_text($1::jsonb)",[JSON.stringify(ids),JSON.stringify(seed.assemblyAIReview)]);
+    const row=(await listServices()).find(s=>s.id==='cap-review-service');
+    await expect(saveService({id:row.id,data:{...row.data,owner:'Must roll back'},expectedVersion:row.version,review:seed.assemblyAIReview},42)).rejects.toMatchObject({status:400});
+    expect((await listServices()).find(s=>s.id===row.id)).toEqual(row);
+    expect((await mockPool.query('SELECT count(*)::int AS count FROM external_service_reviews WHERE service_id=$1',[row.id])).rows[0].count).toBe(200);
+  });
+  test('inventory follow-up migration is repeatable and preserves operator edits',async()=>{
+    await mockPool.query(`UPDATE external_services SET data=jsonb_set(data,'{notes}','"Operator note"') WHERE id='europe-pmc'`);
+    const before=(await listServices()).find(s=>s.id==='assemblyai');
+    await mockPool.query(fs.readFileSync('lib/db/migrations/107_external_service_inventory_followups.sql','utf8'));
+    expect((await listServices()).find(s=>s.id==='europe-pmc').data.notes).toBe('Operator note');
+    expect((await listServices()).find(s=>s.id==='assemblyai').version).toBe(before.version);
+    const seedReview=(await listReviews('assemblyai')).find(r=>r.id==='438dce63-e462-4e8d-877b-8aefc8f40840');
+    expect(seedReview.data.links.filter(l=>l.href==='https://www.assemblyai.com/benchmarks')).toHaveLength(1);
   });
 
 });

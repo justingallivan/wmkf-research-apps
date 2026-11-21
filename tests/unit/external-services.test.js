@@ -1,5 +1,5 @@
 /** @jest-environment node */
-import { validateService, validateReview, serviceStatus, COST_MODES } from '../../lib/services/external-services/model';
+import { validateService, validateReview, serviceStatus, COST_MODES, reviewToday, nextReviewDate, defaultCadence } from '../../lib/services/external-services/model';
 import seed from '../../lib/services/external-services/seed.json';
 import handler from '../../pages/api/admin/external-services';
 import { requireSuperuser } from '../../lib/utils/auth';
@@ -50,4 +50,30 @@ test('stale edits return conflict and unexpected errors do not expose details',a
   await handler({method:'PUT',body:{}},res);expect(res.status).toHaveBeenCalledWith(409);
   const spy=jest.spyOn(console,'error').mockImplementation(()=>{});listServices.mockRejectedValue(new Error('secret connection URL'));
   await handler({method:'GET',query:{}},res);expect(res.status).toHaveBeenCalledWith(503);expect(JSON.stringify(res.json.mock.calls)).not.toContain('secret connection');spy.mockRestore();
+});
+test('unsupported methods advertise the supported methods without storage access',async()=>{
+  const res=response();await handler({method:'DELETE',query:{}},res);
+  expect(res.status).toHaveBeenCalledWith(405);expect(res.setHeader).toHaveBeenCalledWith('Allow','GET, PUT');
+  expect(listServices).not.toHaveBeenCalled();expect(saveService).not.toHaveBeenCalled();
+});
+
+test('Pacific calendar date is consistent through UTC midnight and DST',()=>{
+  expect(reviewToday(new Date('2026-11-21T02:30:00Z'))).toBe('2026-11-20');
+  expect(reviewToday(new Date('2026-07-21T02:30:00Z'))).toBe('2026-07-20');
+  expect(reviewToday(new Date('2026-11-21T08:00:00Z'))).toBe('2026-11-21');
+  expect(nextReviewDate('2026-03-07',30)).toBe('2026-04-06');
+  expect(nextReviewDate('2026-10-31',30)).toBe('2026-11-30');
+  expect(nextReviewDate('2028-02-28',1)).toBe('2028-02-29');
+});
+test('future-date validation and due status use the Foundation calendar',()=>{
+  jest.useFakeTimers().setSystemTime(new Date('2026-11-21T02:30:00Z'));
+  try {
+    expect(()=>validateReview({...seed.assemblyAIReview,reviewedOn:'2026-11-21'})).toThrow('future');
+    expect(validateReview({...seed.assemblyAIReview,reviewedOn:'2026-11-20'}).reviewedOn).toBe('2026-11-20');
+    expect(serviceStatus({...assembly,lastReviewedOn:'2026-11-19',data:{...assembly.data,nextReviewOn:'2026-11-21'}})).toBe('Current');
+  } finally { jest.useRealTimers(); }
+});
+test('cadence defaults and corporate exclusions also cover newly added provider records',()=>{
+  expect(defaultCadence('AI')).toBe(30);expect(defaultCadence('Hosting & storage')).toBe(90);
+  expect(()=>validateService({...assembly.data,provider:' Microsoft '},'new-corporate-id')).toThrow('corporate-managed');
 });

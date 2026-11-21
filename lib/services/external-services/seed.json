@@ -551,6 +551,52 @@
           }
         ]
       }
+    },
+    {
+      "id": "irs-bmf",
+      "data": {
+        "name": "Exempt Organizations Business Master File",
+        "provider": "IRS",
+        "category": "Research & search",
+        "purpose": "EIN verification against IRS exempt organization reference data",
+        "configuration": "Four regional CSVs; quarterly application refresh and lookup through the IRS BMF service.",
+        "updateMode": "Provider-managed",
+        "costTracking": "No paid plan identified",
+        "owner": "Justin",
+        "cadenceDays": 90,
+        "nextReviewOn": "2026-11-20",
+        "actionNeeded": false,
+        "notes": "Source inventory addition from the Opus review. First service review pending; confirm current terms, limits, and availability.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/lib/services/irs-bmf-service.js"
+          }
+        ]
+      }
+    },
+    {
+      "id": "europe-pmc",
+      "data": {
+        "name": "Scholarly contact evidence",
+        "provider": "Europe PMC",
+        "category": "Research & search",
+        "purpose": "Publication and affiliation evidence for reviewer email discovery",
+        "configuration": "Europe PMC REST search is used by the scholarly-email enrichment tier.",
+        "updateMode": "Provider-managed",
+        "costTracking": "No paid plan identified",
+        "owner": "Justin",
+        "cadenceDays": 90,
+        "nextReviewOn": "2026-11-20",
+        "actionNeeded": false,
+        "notes": "Source inventory addition from the Opus review. First service review pending; confirm current terms, limits, and availability.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/lib/services/contact-enrichment/scholarly-email.js"
+          }
+        ]
+      }
     }
   ],
   "assemblyAIReview": {
@@ -578,6 +624,10 @@
       {
         "label": "Public pricing",
         "href": "https://www.assemblyai.com/pricing"
+      },
+      {
+        "label": "Vendor benchmark comparison",
+        "href": "https://www.assemblyai.com/benchmarks"
       }
     ]
   }

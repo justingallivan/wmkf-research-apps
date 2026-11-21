@@ -8,7 +8,7 @@ const assembly={...seed.services.find(s=>s.id==='assemblyai'),version:1,lastRevi
 const response=(body,status=200)=>({ok:status<400,status,json:async()=>body});
 beforeEach(()=>{
   global.structuredClone=value=>JSON.parse(JSON.stringify(value));
-  Object.defineProperty(global.crypto,'randomUUID',{configurable:true,value:jest.fn(()=> '17f6def6-7b48-4ce0-8197-14219608a6a0')});
+  Object.defineProperty(global.crypto,'randomUUID',{configurable:true,value:jest.fn().mockReturnValueOnce('17f6def6-7b48-4ce0-8197-14219608a6a0').mockReturnValue('217aee48-3637-4c5b-9387-84a371089a27')});
   global.fetch=jest.fn(async url=>response(url.includes('?id=')?{reviews:[{id:'438dce63-e462-4e8d-877b-8aefc8f40840',data:seed.assemblyAIReview}]}:{services:[assembly]}));
 });
 test('shows completed review and records a new review with current service version',async()=>{
@@ -67,4 +67,30 @@ test('cancel after a lost create response reveals the saved row instead of an em
   fireEvent.click(screen.getByRole('button',{name:'Save service'}));await screen.findByRole('alert');fireEvent.click(screen.getByRole('button',{name:'Cancel'}));
   expect(await screen.findByRole('button',{name:'New service · New service'})).toBeInTheDocument();
   expect(global.fetch.mock.calls.filter(([,o])=>o?.method==='PUT')).toHaveLength(1);
+});
+
+test('review date drives next-review suggestion and preserves an explicit next date',async()=>{
+  render(<ExternalServicesSection/>);fireEvent.click(await screen.findByRole('button',{name:'AssemblyAI · Recorded-audio transcription'}));
+  fireEvent.click(screen.getByRole('button',{name:'Record review'}));
+  fireEvent.change(screen.getByLabelText('Review date (Pacific time)'),{target:{value:'2026-10-01'}});
+  expect(screen.getByLabelText('Next review date')).toHaveValue('2026-10-31');
+  fireEvent.change(screen.getByLabelText('Next review date'),{target:{value:'2027-01-01'}});
+  fireEvent.change(screen.getByLabelText('Review date (Pacific time)'),{target:{value:'2026-10-02'}});
+  expect(screen.getByLabelText('Next review date')).toHaveValue('2027-01-01');
+});
+test('new non-AI services default to quarterly and corporate providers exclude costs',async()=>{
+  render(<ExternalServicesSection/>);await screen.findByText(/1 services/);fireEvent.click(screen.getByRole('button',{name:'Add service'}));
+  fireEvent.change(screen.getByLabelText('Category'),{target:{value:'Hosting & storage'}});
+  expect(screen.getByLabelText('Review interval (days)')).toHaveValue(90);
+  fireEvent.change(screen.getByLabelText('Review interval (days)'),{target:{value:'45'}});
+  fireEvent.change(screen.getByLabelText('Category'),{target:{value:'AI'}});
+  expect(screen.getByLabelText('Review interval (days)')).toHaveValue(45);
+  fireEvent.change(screen.getByLabelText('Provider'),{target:{value:'Microsoft'}});
+  expect(screen.getByLabelText('Cost tracking')).toHaveValue('Corporate-managed — excluded');
+  expect(screen.getByLabelText('Cost tracking')).toBeDisabled();
+});
+test('oversized save explains how to recover and retains text',async()=>{
+  render(<ExternalServicesSection/>);fireEvent.click(await screen.findByRole('button',{name:'AssemblyAI · Recorded-audio transcription'}));fireEvent.click(screen.getByRole('button',{name:'Edit service'}));
+  global.fetch.mockResolvedValue(response({},413));fireEvent.click(screen.getByRole('button',{name:'Save service'}));
+  expect(await screen.findByRole('alert')).toHaveTextContent('Shorten the text');expect(screen.getByLabelText('Service name')).toHaveValue(assembly.data.name);
 });
