@@ -572,7 +572,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
 
               {c.identityNote && <p className="text-gray-500">{c.identityNote}</p>}
 
-              <p className="text-gray-500">Source: {provenanceLabel}</p>
+              {!c.isApplicantRecommended && provenanceLabel && <p className="text-gray-500">Source: {provenanceLabel}</p>}
 
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 {identityUnverified ? (

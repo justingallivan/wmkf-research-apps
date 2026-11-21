@@ -123,7 +123,14 @@ legacy free-text values visible, so no existing referral is lost. Until S349
   instruction instead of the old silent no-op. Same silent-no-op family as
   S399 finding 4. Tests:
   `tests/unit/reviewer-find-panel-manual-add-confirm.test.js`.
-- **Warning badges route to their remedy (S403, owner report 2026-08-06):** on
+- **Superseded 2026-11-21 (S693):** the badges and banners below were replaced
+  by one status chip, one match line and a single action row computed by
+  `getCandidateCardStatus` in
+  `shared/components/reviewers/reviewer-search-logic.js`; evidence moved into a
+  Compare details disclosure. The handler rule still holds: the three derived
+  remedies stay the single source, and an action renders only when its handler
+  exists. Tests: `tests/unit/reviewer-candidate-card-status.test.js`.
+- **Warning badges route to their remedy (S403, owner report 2026-08-06; historical):** on
   `CandidateCard`, "⚠ Email needs confirmation" / "⚠ Research only" /
   "⛔ Address conflict must be resolved", the "⚠ Address verification
   required" / "⛔ Address conflict" pill, "⚠ Verified email required", and
