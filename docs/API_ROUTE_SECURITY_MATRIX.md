@@ -114,6 +114,7 @@ There are no open findings from the initial matrix pass as of this update. New f
 
 | Route | Methods | Intended Class | Current Guard | Data Scope | Persistence | Risk | Notes |
 |---|---|---|---|---|---|---|---|
+| `/api/admin/external-services` | GET, PUT | Superuser | `requireSuperuser`; server-derived `gate.profileId` attribution | Organization-wide private operational service register and dated reviews | Reads/writes `external_services` and `external_service_reviews` (PG) | Medium | [VERIFIED via branch source 2026-11-20; migrations 106–107 not deployed.] Private no-store; 512 KB request cap; validated bounded fields and HTTPS reference links; 500 services / 200 reviews per service. Service-version conflict returns 409; combined service/review save is transactional. Records decisions only: no provider calls or automatic changes. |
 | `/api/admin/expertise-roster` | GET, POST, PATCH | Superuser | `requireSuperuser`; `withDalContext`; writes require matching authenticated profile and mapped Dataverse User | Org-wide roster and bounded Contact/enabled User lookups; strict DTO/GUID validation | Dataverse Expertise Profiles plus Postgres numeric identity/binding; default Postgres mode is informational read only | High | [VERIFIED via branch source 2026-11-19; not deployed here.] Stable create key; ETag updates; impersonation required with no fallback. No Expertise Finder grant required; no hard delete, Contact writes, automation or retirement. |
 
 

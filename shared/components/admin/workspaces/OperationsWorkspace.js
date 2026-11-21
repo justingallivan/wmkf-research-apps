@@ -1,3 +1,4 @@
+import ExternalServicesSection from '../ExternalServicesSection';
 import SystemAlertsSection from '../SystemAlertsSection';
 import OperationalEventsSection from '../OperationalEventsSection';
 import MaintenanceSection from '../MaintenanceSection';
@@ -21,6 +22,8 @@ const ALERT_RECIPIENT_DATAVERSE_FIELDS = [
 
 export function OperationsWorkspace({ view }) {
   switch (view) {
+    case 'external-services':
+      return <ExternalServicesSection />;
     case 'incidents':
       return (
         <div className="space-y-6">

@@ -49,6 +49,11 @@ If you're touching a service or utility, read its header before this catalog. If
   Finder/Workbench orchestration service. It now delegates provider calls through
   `llm-client.js`; do not treat it as dead code.
 
+### External service register
+
+- **`external-services/model.js`** — Browser-safe service/review validation, closed choices, HTTPS reference-link rules, and due/action status projection.
+- **`external-services/store.js`** — Private Postgres inventory and review persistence; callers require superuser authorization. Service-version guard and transaction cover combined saves; bounded to 500 services and 200 reviews per service. No provider calls. See [the Atlas contract](atlas/postgres-external-services.md).
+
 ### Dynamics / Dataverse
 
 - **`dynamics-service.js`** — Dynamics 365 / Dataverse client (OAuth, OData, Dataverse Search, email activities, `updateIfEmpty`, `logAiRun`). Impersonation contract documented in `docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md`.

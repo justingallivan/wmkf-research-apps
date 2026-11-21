@@ -23,6 +23,7 @@ export const ADMIN_WORKSPACES = Object.freeze([
       { key: 'incidents', label: 'Incidents' },
       { key: 'jobs', label: 'Jobs & retention' },
       { key: 'credentials', label: 'Credentials' },
+      { key: 'external-services', label: 'External services' },
       { key: 'notifications', label: 'Notifications' },
       { key: 'feedback', label: 'Feedback & quality' },
       { key: 'dynamics-safeguards', label: 'Dynamics safeguards' },

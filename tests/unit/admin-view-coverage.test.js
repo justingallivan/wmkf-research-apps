@@ -29,6 +29,7 @@ const jsonResponse = (status, body) => ({
 });
 
 const MINIMAL_BODIES = {
+  '/api/admin/external-services': { services: [] },
   '/api/cycle-calendar': { canEdit: false, savingAvailable: true, defaultCycleCode: null, cycles: [] },
   '/api/landing-cycle': { landingCycleCode: null, automatic: null, storedValue: null, status: 'automatic', setBy: null, setAt: null, revision: null, canEdit: false, cycles: [] },
   '/api/admin/maintenance': { jobs: [] },
@@ -37,6 +38,7 @@ const MINIMAL_BODIES = {
 };
 
 const EXPECTED_FETCHES = {
+  'operations:external-services': ['/api/admin/external-services'],
   'overview:summary': [
     '/api/admin/alerts',
     '/api/admin/maintenance',
@@ -119,6 +121,7 @@ const EXPECTED_FETCHES = {
 };
 
 const EXPECTED_HEADINGS = {
+  'operations:external-services': ['External services'],
   'overview:summary': [
     'Common destinations',
     'Needs attention',

@@ -1,0 +1,634 @@
+{
+  "services": [
+    {
+      "id": "anthropic",
+      "data": {
+        "name": "Claude API",
+        "provider": "Anthropic",
+        "category": "AI",
+        "purpose": "Shared prompt execution and document analysis",
+        "configuration": "Model routing varies by app; inspect Admin \u2192 AI \u2192 Models and the model resolver.",
+        "updateMode": "Pinned by us",
+        "costTracking": "Review costs",
+        "owner": "Justin",
+        "cadenceDays": 30,
+        "nextReviewOn": "2026-11-20",
+        "actionNeeded": false,
+        "notes": "Inventory baseline from repository source, 2026-11-20. First service review pending; account plan, effective configuration, and current usage need confirmation.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/lib/services/llm-client.js"
+          }
+        ]
+      }
+    },
+    {
+      "id": "openai",
+      "data": {
+        "name": "OpenAI API",
+        "provider": "OpenAI",
+        "category": "AI",
+        "purpose": "GPT-backed document and multi-model workflows",
+        "configuration": "Per-app model routing; review active assignments and overrides.",
+        "updateMode": "Pinned by us",
+        "costTracking": "Review costs",
+        "owner": "Justin",
+        "cadenceDays": 30,
+        "nextReviewOn": "2026-11-20",
+        "actionNeeded": false,
+        "notes": "Inventory baseline from repository source, 2026-11-20. First service review pending; account plan, effective configuration, and current usage need confirmation.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/lib/services/openai-client.js"
+          }
+        ]
+      }
+    },
+    {
+      "id": "google-ai",
+      "data": {
+        "name": "Gemini API",
+        "provider": "Google",
+        "category": "AI",
+        "purpose": "Optional multi-model analysis provider",
+        "configuration": "Supported in the multi-model client; production use and selected models require confirmation.",
+        "updateMode": "Pinned by us",
+        "costTracking": "Review costs",
+        "owner": "Justin",
+        "cadenceDays": 30,
+        "nextReviewOn": "2026-11-20",
+        "actionNeeded": false,
+        "notes": "Inventory baseline from repository source, 2026-11-20. First service review pending; account plan, effective configuration, and current usage need confirmation.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/lib/services/multi-llm-service.js"
+          }
+        ]
+      }
+    },
+    {
+      "id": "perplexity",
+      "data": {
+        "name": "Perplexity API",
+        "provider": "Perplexity",
+        "category": "AI",
+        "purpose": "Optional multi-model analysis provider",
+        "configuration": "Supported in the multi-model client; production use and selected models require confirmation.",
+        "updateMode": "Pinned by us",
+        "costTracking": "Review costs",
+        "owner": "Justin",
+        "cadenceDays": 30,
+        "nextReviewOn": "2026-11-20",
+        "actionNeeded": false,
+        "notes": "Inventory baseline from repository source, 2026-11-20. First service review pending; account plan, effective configuration, and current usage need confirmation.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/lib/services/multi-llm-service.js"
+          }
+        ]
+      }
+    },
+    {
+      "id": "assemblyai",
+      "data": {
+        "name": "Recorded-audio transcription",
+        "provider": "AssemblyAI",
+        "category": "AI",
+        "purpose": "Meeting Tracker transcription with speaker diarization",
+        "configuration": "assemblyai-stt-3-7; speaker labels enabled; disfluencies false. Existing jobs retain their saved model.",
+        "updateMode": "Pinned by us",
+        "costTracking": "Review costs",
+        "owner": "Justin",
+        "cadenceDays": 30,
+        "nextReviewOn": "2026-12-20",
+        "actionNeeded": false,
+        "notes": "Review completed 2026-11-20. Public price baseline: $0.21/audio hour plus $0.02 diarization. No private account billing figures stored in the seed. Live quality observation remains pending the next natural transcription.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/lib/services/transcription-pilot/provider.js"
+          }
+        ]
+      }
+    },
+    {
+      "id": "cloudmersive",
+      "data": {
+        "name": "Virus scanning",
+        "provider": "Cloudmersive",
+        "category": "Security",
+        "purpose": "Advanced virus scanning for uploaded files",
+        "configuration": "Advanced file scanning API; account plan and quota require review.",
+        "updateMode": "Provider-managed",
+        "costTracking": "Review costs",
+        "owner": "Justin",
+        "cadenceDays": 90,
+        "nextReviewOn": "2026-11-20",
+        "actionNeeded": false,
+        "notes": "Inventory baseline from repository source, 2026-11-20. First service review pending; account plan, effective configuration, and current usage need confirmation.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/lib/services/cloudmersive-scan.js"
+          }
+        ]
+      }
+    },
+    {
+      "id": "serpapi",
+      "data": {
+        "name": "Search API",
+        "provider": "SerpAPI",
+        "category": "Research & search",
+        "purpose": "Reviewer contact lookup and integrity news searches",
+        "configuration": "Search API; current subscription and quota require review.",
+        "updateMode": "Provider-managed",
+        "costTracking": "Review costs",
+        "owner": "Justin",
+        "cadenceDays": 90,
+        "nextReviewOn": "2026-11-20",
+        "actionNeeded": false,
+        "notes": "Inventory baseline from repository source, 2026-11-20. First service review pending; account plan, effective configuration, and current usage need confirmation.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/lib/services/serp-contact-service.js"
+          }
+        ]
+      }
+    },
+    {
+      "id": "vercel-hosting",
+      "data": {
+        "name": "Hosting & Functions",
+        "provider": "Vercel",
+        "category": "Hosting & storage",
+        "purpose": "Application hosting, compute, and cron jobs",
+        "configuration": "Managed service; plan, quotas, and usage to be confirmed in the first review.",
+        "updateMode": "Mixed",
+        "costTracking": "Review costs",
+        "owner": "Justin",
+        "cadenceDays": 90,
+        "nextReviewOn": "2026-11-20",
+        "actionNeeded": false,
+        "notes": "Inventory baseline from repository source, 2026-11-20. First service review pending; account plan, effective configuration, and current usage need confirmation.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/vercel.json"
+          }
+        ]
+      }
+    },
+    {
+      "id": "vercel-blob",
+      "data": {
+        "name": "Blob storage",
+        "provider": "Vercel",
+        "category": "Hosting & storage",
+        "purpose": "Temporary and private application file stores",
+        "configuration": "Managed service; plan, quotas, and usage to be confirmed in the first review.",
+        "updateMode": "Mixed",
+        "costTracking": "Review costs",
+        "owner": "Justin",
+        "cadenceDays": 90,
+        "nextReviewOn": "2026-11-20",
+        "actionNeeded": false,
+        "notes": "Inventory baseline from repository source, 2026-11-20. First service review pending; account plan, effective configuration, and current usage need confirmation.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/docs/CREDENTIALS_RUNBOOK.md"
+          }
+        ]
+      }
+    },
+    {
+      "id": "vercel-workflow",
+      "data": {
+        "name": "Workflow",
+        "provider": "Vercel",
+        "category": "Hosting & storage",
+        "purpose": "Durable background workflow execution",
+        "configuration": "Managed service; plan, quotas, and usage to be confirmed in the first review.",
+        "updateMode": "Mixed",
+        "costTracking": "Review costs",
+        "owner": "Justin",
+        "cadenceDays": 90,
+        "nextReviewOn": "2026-11-20",
+        "actionNeeded": false,
+        "notes": "Inventory baseline from repository source, 2026-11-20. First service review pending; account plan, effective configuration, and current usage need confirmation.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/lib/services/transcription-pilot/workflow.js"
+          }
+        ]
+      }
+    },
+    {
+      "id": "vercel-sandbox",
+      "data": {
+        "name": "Sandbox",
+        "provider": "Vercel",
+        "category": "Hosting & storage",
+        "purpose": "Media processing with FFmpeg",
+        "configuration": "Managed service; plan, quotas, and usage to be confirmed in the first review.",
+        "updateMode": "Mixed",
+        "costTracking": "Review costs",
+        "owner": "Justin",
+        "cadenceDays": 90,
+        "nextReviewOn": "2026-11-20",
+        "actionNeeded": false,
+        "notes": "Inventory baseline from repository source, 2026-11-20. First service review pending; account plan, effective configuration, and current usage need confirmation.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/lib/services/meeting-tracker-recordings/presentation-video-sandbox.js"
+          }
+        ]
+      }
+    },
+    {
+      "id": "neon",
+      "data": {
+        "name": "PostgreSQL",
+        "provider": "Neon",
+        "category": "Hosting & storage",
+        "purpose": "Operational application data",
+        "configuration": "Managed Postgres; review compute/storage plan, branches, and restore history.",
+        "updateMode": "Provider-managed",
+        "costTracking": "Review costs",
+        "owner": "Justin",
+        "cadenceDays": 90,
+        "nextReviewOn": "2026-11-20",
+        "actionNeeded": false,
+        "notes": "Inventory baseline from repository source, 2026-11-20. First service review pending; account plan, effective configuration, and current usage need confirmation.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/docs/atlas/postgres-infra-tables.md"
+          }
+        ]
+      }
+    },
+    {
+      "id": "microsoft",
+      "data": {
+        "name": "Microsoft services",
+        "provider": "Microsoft",
+        "category": "Corporate",
+        "purpose": "Dataverse, SharePoint, Entra ID, Graph, and organizational email",
+        "configuration": "Corporate-managed service. Check API/SDK compatibility and deprecations; automatic integration compatibility is not assumed.",
+        "updateMode": "Mixed",
+        "costTracking": "Corporate-managed \u2014 excluded",
+        "owner": "Justin",
+        "cadenceDays": 90,
+        "nextReviewOn": "2026-11-20",
+        "actionNeeded": false,
+        "notes": "Inventory baseline from repository source, 2026-11-20. First service review pending; account plan, effective configuration, and current usage need confirmation.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/docs/CREDENTIALS_RUNBOOK.md"
+          }
+        ]
+      }
+    },
+    {
+      "id": "github",
+      "data": {
+        "name": "GitHub services",
+        "provider": "GitHub",
+        "category": "Corporate",
+        "purpose": "Source hosting, pull requests, and CI",
+        "configuration": "Corporate-managed service. Check API/SDK compatibility and deprecations; automatic integration compatibility is not assumed.",
+        "updateMode": "Mixed",
+        "costTracking": "Corporate-managed \u2014 excluded",
+        "owner": "Justin",
+        "cadenceDays": 90,
+        "nextReviewOn": "2026-11-20",
+        "actionNeeded": false,
+        "notes": "Inventory baseline from repository source, 2026-11-20. First service review pending; account plan, effective configuration, and current usage need confirmation.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/.github/workflows/test.yml"
+          }
+        ]
+      }
+    },
+    {
+      "id": "zoom",
+      "data": {
+        "name": "Zoom services",
+        "provider": "Zoom",
+        "category": "Corporate",
+        "purpose": "Meeting recordings and transcript imports",
+        "configuration": "Corporate-managed service. Check API/SDK compatibility and deprecations; automatic integration compatibility is not assumed.",
+        "updateMode": "Mixed",
+        "costTracking": "Corporate-managed \u2014 excluded",
+        "owner": "Justin",
+        "cadenceDays": 90,
+        "nextReviewOn": "2026-11-20",
+        "actionNeeded": false,
+        "notes": "Inventory baseline from repository source, 2026-11-20. First service review pending; account plan, effective configuration, and current usage need confirmation.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/lib/services/meeting-tracker-recordings/zoom-client.js"
+          }
+        ]
+      }
+    },
+    {
+      "id": "openalex",
+      "data": {
+        "name": "Research graph",
+        "provider": "OpenAlex",
+        "category": "Research & search",
+        "purpose": "Author, publication, and institution discovery",
+        "configuration": "Repository integration identified; confirm live usage, API limits, and terms.",
+        "updateMode": "Provider-managed",
+        "costTracking": "No paid plan identified",
+        "owner": "Justin",
+        "cadenceDays": 90,
+        "nextReviewOn": "2026-11-20",
+        "actionNeeded": false,
+        "notes": "Inventory baseline from repository source, 2026-11-20. First service review pending; account plan, effective configuration, and current usage need confirmation.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/lib/services/openalex-service.js"
+          }
+        ]
+      }
+    },
+    {
+      "id": "pubmed",
+      "data": {
+        "name": "PubMed",
+        "provider": "NCBI",
+        "category": "Research & search",
+        "purpose": "Biomedical literature discovery",
+        "configuration": "Repository integration identified; confirm live usage, API limits, and terms.",
+        "updateMode": "Provider-managed",
+        "costTracking": "No paid plan identified",
+        "owner": "Justin",
+        "cadenceDays": 90,
+        "nextReviewOn": "2026-11-20",
+        "actionNeeded": false,
+        "notes": "Inventory baseline from repository source, 2026-11-20. First service review pending; account plan, effective configuration, and current usage need confirmation.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/lib/services/pubmed-service.js"
+          }
+        ]
+      }
+    },
+    {
+      "id": "orcid",
+      "data": {
+        "name": "Researcher identity",
+        "provider": "ORCID",
+        "category": "Research & search",
+        "purpose": "Researcher identity and employment corroboration",
+        "configuration": "Repository integration identified; confirm live usage, API limits, and terms.",
+        "updateMode": "Provider-managed",
+        "costTracking": "No paid plan identified",
+        "owner": "Justin",
+        "cadenceDays": 90,
+        "nextReviewOn": "2026-11-20",
+        "actionNeeded": false,
+        "notes": "Inventory baseline from repository source, 2026-11-20. First service review pending; account plan, effective configuration, and current usage need confirmation.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/lib/services/orcid-service.js"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ror",
+      "data": {
+        "name": "Institution registry",
+        "provider": "ROR",
+        "category": "Research & search",
+        "purpose": "Institution identity matching",
+        "configuration": "Repository integration identified; confirm live usage, API limits, and terms.",
+        "updateMode": "Provider-managed",
+        "costTracking": "No paid plan identified",
+        "owner": "Justin",
+        "cadenceDays": 90,
+        "nextReviewOn": "2026-11-20",
+        "actionNeeded": false,
+        "notes": "Inventory baseline from repository source, 2026-11-20. First service review pending; account plan, effective configuration, and current usage need confirmation.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/lib/services/ror-institution-candidate-adapter.js"
+          }
+        ]
+      }
+    },
+    {
+      "id": "arxiv",
+      "data": {
+        "name": "Preprints",
+        "provider": "arXiv",
+        "category": "Research & search",
+        "purpose": "Preprint discovery",
+        "configuration": "Repository integration identified; confirm live usage, API limits, and terms.",
+        "updateMode": "Provider-managed",
+        "costTracking": "No paid plan identified",
+        "owner": "Justin",
+        "cadenceDays": 90,
+        "nextReviewOn": "2026-11-20",
+        "actionNeeded": false,
+        "notes": "Inventory baseline from repository source, 2026-11-20. First service review pending; account plan, effective configuration, and current usage need confirmation.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/lib/services/arxiv-service.js"
+          }
+        ]
+      }
+    },
+    {
+      "id": "biorxiv",
+      "data": {
+        "name": "Preprints",
+        "provider": "bioRxiv",
+        "category": "Research & search",
+        "purpose": "Life-science preprint discovery",
+        "configuration": "Repository integration identified; confirm live usage, API limits, and terms.",
+        "updateMode": "Provider-managed",
+        "costTracking": "No paid plan identified",
+        "owner": "Justin",
+        "cadenceDays": 90,
+        "nextReviewOn": "2026-11-20",
+        "actionNeeded": false,
+        "notes": "Inventory baseline from repository source, 2026-11-20. First service review pending; account plan, effective configuration, and current usage need confirmation.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/lib/services/biorxiv-service.js"
+          }
+        ]
+      }
+    },
+    {
+      "id": "chemrxiv",
+      "data": {
+        "name": "Preprints",
+        "provider": "ChemRxiv",
+        "category": "Research & search",
+        "purpose": "Chemistry preprint discovery",
+        "configuration": "Repository integration identified; confirm live usage, API limits, and terms.",
+        "updateMode": "Provider-managed",
+        "costTracking": "No paid plan identified",
+        "owner": "Justin",
+        "cadenceDays": 90,
+        "nextReviewOn": "2026-11-20",
+        "actionNeeded": false,
+        "notes": "Inventory baseline from repository source, 2026-11-20. First service review pending; account plan, effective configuration, and current usage need confirmation.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/lib/services/chemrxiv-service.js"
+          }
+        ]
+      }
+    },
+    {
+      "id": "retraction-watch",
+      "data": {
+        "name": "Retraction dataset",
+        "provider": "Crossref / Retraction Watch",
+        "category": "Research & search",
+        "purpose": "Retraction evidence for integrity screening",
+        "configuration": "Scheduled dataset refresh; review source availability and terms.",
+        "updateMode": "Provider-managed",
+        "costTracking": "No paid plan identified",
+        "owner": "Justin",
+        "cadenceDays": 90,
+        "nextReviewOn": "2026-11-20",
+        "actionNeeded": false,
+        "notes": "Inventory baseline from repository source, 2026-11-20. First service review pending; account plan, effective configuration, and current usage need confirmation.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/lib/services/retraction-dataset.js"
+          }
+        ]
+      }
+    },
+    {
+      "id": "bill",
+      "data": {
+        "name": "Honorarium payments",
+        "provider": "BILL",
+        "category": "Payments",
+        "purpose": "Reviewer vendor onboarding and honorarium integration",
+        "configuration": "Account terms and enabled payment workflows require review.",
+        "updateMode": "Mixed",
+        "costTracking": "Review costs",
+        "owner": "Justin",
+        "cadenceDays": 90,
+        "nextReviewOn": "2026-11-20",
+        "actionNeeded": false,
+        "notes": "Inventory baseline from repository source, 2026-11-20. First service review pending; account plan, effective configuration, and current usage need confirmation.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/lib/bill/index.js"
+          }
+        ]
+      }
+    },
+    {
+      "id": "irs-bmf",
+      "data": {
+        "name": "Exempt Organizations Business Master File",
+        "provider": "IRS",
+        "category": "Research & search",
+        "purpose": "EIN verification against IRS exempt organization reference data",
+        "configuration": "Four regional CSVs; quarterly application refresh and lookup through the IRS BMF service.",
+        "updateMode": "Provider-managed",
+        "costTracking": "No paid plan identified",
+        "owner": "Justin",
+        "cadenceDays": 90,
+        "nextReviewOn": "2026-11-20",
+        "actionNeeded": false,
+        "notes": "Source inventory addition from the Opus review. First service review pending; confirm current terms, limits, and availability.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/lib/services/irs-bmf-service.js"
+          }
+        ]
+      }
+    },
+    {
+      "id": "europe-pmc",
+      "data": {
+        "name": "Scholarly contact evidence",
+        "provider": "Europe PMC",
+        "category": "Research & search",
+        "purpose": "Publication and affiliation evidence for reviewer email discovery",
+        "configuration": "Europe PMC REST search is used by the scholarly-email enrichment tier.",
+        "updateMode": "Provider-managed",
+        "costTracking": "No paid plan identified",
+        "owner": "Justin",
+        "cadenceDays": 90,
+        "nextReviewOn": "2026-11-20",
+        "actionNeeded": false,
+        "notes": "Source inventory addition from the Opus review. First service review pending; confirm current terms, limits, and availability.",
+        "links": [
+          {
+            "label": "Integration source",
+            "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/lib/services/contact-enrichment/scholarly-email.js"
+          }
+        ]
+      }
+    }
+  ],
+  "assemblyAIReview": {
+    "reviewedOn": "2026-11-20",
+    "trigger": "AssemblyAI product announcement and owner-requested service review.",
+    "changes": "STT-3.7 is available for recordings. Adopted for new jobs at the same published base price: $0.21/audio hour plus $0.02 diarization. The newsletter Sync API discount applies to a different API.",
+    "evidence": "Vendor-reported benchmarks: with the new diarization system, Universal-3.5 \u2192 STT-3.7 cpWER 26.8% \u2192 23.5%, DER 10.5% \u2192 9.4%. Clean-English WER slightly worsens (5.0% \u2192 5.2%). No independent head-to-head or local reprocessing evaluation established.",
+    "decision": "Change",
+    "rationale": "Expected improvement in speaker attribution at unchanged published unit cost. Explicit disfluencies:false retains cleaned text.",
+    "status": "Implemented",
+    "followUp": "PR #667 merged and production deployment verified 2026-11-20. Existing jobs retain their saved model; completed recordings were not reprocessed. Observe quality, returned model, and billed rate on the next naturally requested transcription.",
+    "links": [
+      {
+        "label": "Completed review",
+        "href": "https://github.com/justingallivan/wmkf-research-apps/blob/main/docs/audits/assemblyai-service-review-2026-11-20.md"
+      },
+      {
+        "label": "Implementation PR #667",
+        "href": "https://github.com/justingallivan/wmkf-research-apps/pull/667"
+      },
+      {
+        "label": "Vendor benchmark research",
+        "href": "https://www.assemblyai.com/blog/assemblyai-stt-3-7-research"
+      },
+      {
+        "label": "Public pricing",
+        "href": "https://www.assemblyai.com/pricing"
+      },
+      {
+        "label": "Vendor benchmark comparison",
+        "href": "https://www.assemblyai.com/benchmarks"
+      }
+    ]
+  }
+}
