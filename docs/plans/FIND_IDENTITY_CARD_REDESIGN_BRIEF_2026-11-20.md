@@ -40,7 +40,9 @@ Decided, not built:
      domain that doesn't fit the institution or doesn't accept mail, or
      publications that point to a different institution and field.
    - The invite dialog's per-recipient acknowledgement before sending is
-     unchanged in every case.
+     unchanged in every case. (Corrected 2026-11-20: today a staff
+     confirmation already removes that acknowledgement; see "Facts" and open
+     decision A.)
 6. **Confirm step is a small dialog** showing name, institution, the exact
    email and where it came from. The one-click level skips it.
 7. **Remove the "Applicant-referred reviewers" list** from the Find tab. The
@@ -64,15 +66,17 @@ action when the evidence is clean.
 - **The applicant's email and affiliation are on the suggestion row.** Step 1
   copies them to `wmkf_revieweremail` / `wmkf_revieweraffiliation` on
   `wmkf_appreviewersuggestion` [REPORTED by Connor, recorded in
-  `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md` §3]. Whether the adapter's row read
-  (`lib/dataverse/adapters/reviewer-suggestion.js:1839`, `FIELD_SELECT` built
-  from the field registry at `:59`) includes these columns is not checked
-  [ASSUMED]. The Find-tab applicant list projects only the person lookup and
+  `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md` §3]. The adapter's row read
+  already selects them (`FIELD_SELECT` at
+  `lib/dataverse/adapters/reviewer-suggestion.js:59` is built from the registry,
+  which lists both at `lib/dataverse/core/entity-registry.js:182,191`)
+  [VERIFIED]. The Find-tab applicant list projects only the person lookup and
   its formatted name [VERIFIED via
   `lib/services/workbench/applicant-reviewers-service.js:169,178-196`].
-  Staff contact edits write the same columns
-  (`reviewer-suggestion.js:2257-2265`), so they hold the applicant's values
-  only until staff edit the contact.
+  The reviewer's own accept/decline contact edits write the same columns
+  (`applyStage2aResponse`, `reviewer-suggestion.js:2240-2265`), so they hold
+  the applicant's values only until the reviewer responds; that does not
+  affect unengaged Find rows.
 - **The AkoyaGO reviewer record is found by that same email.** Step 1 matches
   or creates `wmkf_potentialreviewer` on `wmkf_emailaddress` [REPORTED by
   Connor, recorded in the flow map §3]. So for an applicant row the stored
@@ -86,10 +90,19 @@ action when the evidence is clean.
   means "the applicant listed this address". Promotion reads the saved
   receipt's type [VERIFIED via
   `lib/services/workbench/promote-applicant-reviewer-service.js:271-339`].
-- **Send-time check stays.** A staff-attested address is `quick_check`, never
-  `ready`, so the invite dialog still asks for a per-recipient acknowledgement
-  (`docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md` §1). This brief
-  does not change that.
+- **Corrected 2026-11-20: a staff confirmation already skips the send-time
+  check.** A `staff_verified` source with a valid exact-address bundle is
+  `ready` (`lib/utils/reviewer-invite.js:197-206`), and the send step asks for
+  the per-recipient acknowledgement only on `quick_check`
+  (`lib/services/review-manager/send-emails-service.js:855`) [VERIFIED].
+  Promotion writes that source from the confirm receipt
+  (`promote-applicant-reviewer-service.js:330-345`). This is the exact-address
+  attestation model the lifecycle doc records as implemented in S391; its §1
+  "Today" text describes the earlier S387 behaviour [STALE/CONFLICT in
+  `docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md` §1]. So owner
+  decision 5's line "the send-time acknowledgement is unchanged" is wrong as
+  written: under today's model, the checkbox level would also make the address
+  `ready`. See open decision A.
 
 ## Brief
 
@@ -297,6 +310,83 @@ free text; the system is called AkoyaGO everywhere on the card; no
      with both. For D26 both came from the applicant, so this says nothing
      about J27, where the record keeps its own institution.
 
-### 8. Open decisions
-None. The questions raised with this brief were settled as owner decisions
-5–9 on 2026-11-20.
+### 8. Contract review (2026-11-20, Session 693)
+
+`/contract-reconcile` Mode A trace of §7 and owner decisions 3, 5, 8, 9.
+Verdict: **needs rework for the server items; the design-only and
+projection items can proceed.** Required changes, in order:
+
+1. **Open decision A (below)** before any server work.
+2. **The server decides the evidence level.** Today the browser picks the
+   evidence type and the route accepts any member of the set
+   (`pages/api/workbench/reviewer-address-trust.js:69-80`;
+   `lib/utils/reviewer-address-trust.js:89-92`). Corroboration types ("older
+   contact", "lookup found the same address", "accepted before") must be
+   written only by the server after re-deriving the fact, and URL-less types
+   must be refused when a "something off" flag is set. Otherwise the levels
+   are a client-only exemption from the evidence gate.
+3. **Keep the lookup source through confirm.** `confirm_identity` overwrites
+   `contactEnrichment.email`/`emailSource` with the submitted email and
+   `manual` (`lib/services/reviewer-roster-store.js:337-353`;
+   `lib/services/workbench/reviewer-roster-service.js:557-572`), which erases
+   the evidence a server check would read. Compute the level before that
+   write, or from the person record, and compare the exact final email.
+4. **Decision 8 specifics.** `createdon` is in neither the contacts select nor
+   the suggestion select (`lib/dataverse/core/entity-registry.js`); choose the
+   reference time (suggestion `createdon` or roster `first_seen_at`); require
+   a name match on the single contact (`findByEmailCandidates` checks email
+   only, `lib/dataverse/adapters/contact.js:161-185`).
+5. **DNS MX semantics.** Server only, bounded timeout, per-domain cache; no
+   record → "something off"; timeout or server failure → "check
+   unavailable", which goes to the evidence-link level, never to "plausible".
+   Account for the A-record-only implicit-MX case.
+6. **Institution-name cleanup and a role-mailbox detector** at the new call
+   site, not inside `strongInstitutionDisplayMatch` (it also gates
+   enrichment's anchored domains, `domain-evidence.js:134-143`). Neither
+   helper exists today.
+7. **Reason codes alongside `reasoning`, not instead.** `reasoning` also
+   carries the positive "why suggested" text for search rows and is persisted
+   to Dataverse `wmkf_matchreason` (`save-candidates-service.js:1028-1032`,
+   `manual-reviewer-service.js:364`) and exported. Add a closed code field to
+   the roster allowlist with a card fallback for rows that lack it.
+8. **Combined action as client orchestration of the existing verify and
+   promote routes for one candidate** (not the multi-row `saveSelected`).
+   Partial failure (confirmed but not added) must show as a failure. Branch 2
+   must cover `confirm_identity` plus the five `wmkf_selected` writers:
+   `upsert` (save-candidates), `ensureStaffManualCandidate` (manual add),
+   `selectIfUnengaged` (applicant and Factory promotion), `restore`
+   (my-candidates) and `applyStage2aResponse` (reviewer accept).
+9. **Removing the applicant list must keep what only it renders**
+   (`shared/components/reviewers/search/ApplicantReviewerStatus.js:41-176`):
+   the Factory promote button, the enrichment re-run with progress and
+   errors, the ingest and read-failure retries, the "applicant listed nobody"
+   empty state, and rows that have no card yet.
+10. **Institution comparison:** the identical-string short-circuit is small;
+    "different institution and field" needs a field signal that nothing feeds
+    to `institution-affiliation-stage2.js` today.
+11. **Search-found rows** confirm through save-candidates, not promotion; the
+    three levels apply only to applicant rows.
+
+Build order:
+- **Independent now:** card anatomy and wording mapped from current
+  `reasoning` and `institutionPresentation.kind`; projecting the applicant
+  columns in `applicant-reviewers-service.js`; the identical-string
+  short-circuit; moving the applicant warnings, re-run and Factory button to
+  the top of Find before removing the list.
+- **Next:** the closed reason-code field.
+- **After decision A and a Codex plan review:** the evidence-type contract,
+  the server-computed level (contact age, MX, domain fit), the combined
+  action, then Branch 2 enforcement across every entry point.
+- No Postgres migration (JSONB). Atlas pages
+  `postgres-reviewer-find-roster.md` and `dataverse-wmkf-potentialreviewers.md`
+  change; `check:dataverse-access-layer` for the select changes.
+
+### 9. Open decisions
+**A. What should a staff confirmation mean at send time?** Today a confirmed
+address becomes `ready`, so the invite skips the per-recipient check (S391
+exact-address model). Options: keep that for every level (the checkbox
+level then removes both the evidence link and the send-time check), or make
+the checkbox level `quick_check` so the send-time check returns for those
+reviewers only.
+
+Owner decisions 5–9 settled the brief's earlier questions on 2026-11-20.
