@@ -81,7 +81,20 @@ export function CandidateCard({ candidate, applicantListed = null, checked, onTo
 
   const c = candidate;
   const status = getCandidateCardStatus(c);
-  const institutionPresentation = activeInstitutionStage2Presentation(c);
+  const activePresentation = activeInstitutionStage2Presentation(c);
+  // Saved rows enriched before the identical-text short-circuit still carry a
+  // note comparing one institution with itself; it says nothing, so hide it.
+  const sameInstitutionText = (left, right) => {
+    const norm = (value) => (typeof value === 'string'
+      ? value.normalize('NFKC').toLowerCase().replace(/[.,;:\s…]+$/u, '').replace(/\s+/gu, ' ').trim()
+      : '');
+    return Boolean(norm(left)) && norm(left) === norm(right);
+  };
+  const institutionPresentation = activePresentation
+    && activePresentation.kind !== 'current_conflict'
+    && sameInstitutionText(activePresentation.evidenceInstitution, activePresentation.recordedInstitution)
+    ? null
+    : activePresentation;
   const reasonPresentation = getCandidateReasonPresentation(c);
   const provenanceLabel = provenanceLabelForCandidate(c);
   const pubs = Array.isArray(c.publications) ? c.publications : [];

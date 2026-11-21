@@ -471,7 +471,14 @@ export function getCandidateCardStatus(candidate) {
         primary: 'confirm_identity',
       };
     }
-    if (getCandidateReasonPresentation(c)?.kind === 'identity_review') {
+    // An unresolved identity is thin evidence, not contrary evidence: the
+    // server's generic "Could not confirm…" text must not read as "someone
+    // else". Only explicit different-person wording, with papers to check,
+    // earns the Check identity sentence.
+    const reason = getCandidateReasonPresentation(c);
+    const saysDifferentPerson = reason?.kind === 'identity_review'
+      && /different (?:people|person)|may be a different person|identity (?:conflict|mismatch)|ambiguous (?:identity|name)/i.test(reason.text || '');
+    if (decision.reason !== 'identity_not_resolved' && saysDifferentPerson && pubs > 0) {
       return {
         key: 'check_identity',
         label: 'Check identity',

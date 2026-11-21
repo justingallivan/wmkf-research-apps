@@ -238,3 +238,45 @@ test('staff notification suppresses compatible pairs and reports historical pair
   });
   expect(historical.presentation.detail).toMatch(/not a confirmed current mismatch/i);
 });
+
+describe('identical affiliation text', () => {
+  const LONG = 'The Laboratory of Signaling and Gene Expression, Cecil H. and Ida Green Center for Reproductive Biology Sciences, University of Texas Southwestern Medical Center, Dallas, TX 75390';
+  const throwingResolver = { resolve: jest.fn(async () => { throw new Error('resolver must not be called'); }) };
+
+  test('is compatible without a provider lookup and shows no card note, even under a legacy hold', async () => {
+    const evaluator = createInstitutionStage2Evaluator({ assertionResolver: throwingResolver });
+    const { assessment, presentation } = await evaluator.evaluate({
+      evidenceAssertion: assertion(LONG),
+      recordedAssertion: assertion(`  ${LONG.toUpperCase()}. `, { sourceType: 'staff_record' }),
+      consumer: 'candidate_card',
+      independentIdentity: identity(),
+      legacyHold: true,
+    });
+    expect(throwingResolver.resolve).not.toHaveBeenCalled();
+    expect(assessment).toMatchObject({ relationship: 'same', evidenceContext: 'compatible', basis: 'identical_text' });
+    expect(presentation).toMatchObject({ visible: false, kind: 'compatible', heading: null, detail: null, legacyHold: true });
+  });
+
+  test('suppresses the staff notification', async () => {
+    const evaluator = createInstitutionStage2Evaluator({ assertionResolver: throwingResolver });
+    const { presentation } = await evaluator.evaluate({
+      evidenceAssertion: assertion(LONG),
+      recordedAssertion: assertion(LONG, { sourceType: 'staff_record' }),
+      consumer: 'staff_notification',
+      independentIdentity: identity(),
+    });
+    expect(presentation).toMatchObject({ notify: false, kind: 'compatible' });
+  });
+
+  test('different text still goes to the resolver', async () => {
+    const resolver = { resolve: jest.fn(async (a) => ({ ...a, segments: [] })) };
+    const evaluator = createInstitutionStage2Evaluator({ assertionResolver: resolver });
+    await evaluator.evaluate({
+      evidenceAssertion: assertion(LONG),
+      recordedAssertion: assertion('UT Southwestern Medical Center', { sourceType: 'staff_record' }),
+      consumer: 'candidate_card',
+      independentIdentity: identity(),
+    });
+    expect(resolver.resolve).toHaveBeenCalledTimes(2);
+  });
+});

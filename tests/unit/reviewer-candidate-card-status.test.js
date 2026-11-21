@@ -35,6 +35,8 @@ const CASES = [
   ['unrecorded address conflict', { ...READY, conflictRecordUnavailable: true }, { key: 'check_unavailable', primary: 'retry_conflict_check' }],
   ['identity plus pending address conflict', { ...UNRESOLVED, email: 'a@example.edu', emailSource: 'pubmed', addressConflictPending: true }, { key: 'check_identity', primary: 'review_and_confirm' }],
   ['unresolved identity', UNRESOLVED, { key: 'confirm_identity', primary: 'confirm_identity', matchIncludes: 'Check the 1 paper' }],
+  ['unresolved identity with the server\'s generic text and no papers', { ...UNRESOLVED, publications: [], reasoning: 'Could not confirm this is the right person because the identity resolver did not establish a probable match. Confirm or correct the identity before selecting this reviewer.' }, { key: 'confirm_identity', matchIncludes: 'No publications found under this name' }],
+  ['unresolved identity with the server\'s generic text and papers', { ...UNRESOLVED, reasoning: 'Could not confirm this is the right person because the identity resolver did not establish a probable match.' }, { key: 'confirm_identity', matchIncludes: 'Check the 1 paper' }],
   ['ORCID and email split', { ...READY, pdIdentityConfirmed: false, serverIdentityReviewReason: 'orcid_email_split' }, { key: 'check_identity', primary: 'confirm_identity' }],
   ['manual contact change is thin, not contradictory', { ...READY, pdIdentityConfirmed: false, serverIdentityReviewReason: 'manual_contact_changed' }, { key: 'confirm_identity' }],
   ['missing email', { ...READY, email: null, emailSource: null }, { key: 'check_email', matchIncludes: 'No email address found' }],
@@ -192,5 +194,37 @@ describe('Applicant listed column', () => {
       />,
     );
     expect(screen.getByTestId('candidate-compare-details')).not.toHaveAttribute('open');
+  });
+});
+
+describe('saved institution note comparing a value with itself', () => {
+  // eslint-disable-next-line global-require
+  const { render, screen, cleanup } = require('@testing-library/react');
+  // eslint-disable-next-line global-require
+  const { CandidateCard } = require('../../shared/components/reviewers/ReviewerSearchSection');
+  afterEach(() => { cleanup(); delete process.env.NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION; });
+  const presentation = (evidence, recorded) => ({
+    version: 'institution-stage2-presentation/v1',
+    visible: true,
+    kind: 'unresolved',
+    tone: 'neutral',
+    heading: 'Institution comparison unresolved',
+    detail: `The available evidence could not establish whether ${evidence} and ${recorded} are compatible.`,
+    evidenceInstitution: evidence,
+    recordedInstitution: recorded,
+    remedies: [],
+  });
+
+  test('is hidden when both sides are the same text', () => {
+    process.env.NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION = 'on';
+    const lab = 'The Laboratory of Signaling, University of Texas Southwestern Medical Center, Dallas…';
+    render(<CandidateCard candidate={{ ...READY, institutionPresentation: presentation(lab, lab) }} checked={false} onToggle={() => {}} />);
+    expect(screen.queryByTestId('institution-stage2-presentation')).not.toBeInTheDocument();
+  });
+
+  test('is still shown when the two sides differ', () => {
+    process.env.NEXT_PUBLIC_INSTITUTION_STAGE2_PRESENTATION = 'on';
+    render(<CandidateCard candidate={{ ...READY, institutionPresentation: presentation('Old University', 'New University') }} checked={false} onToggle={() => {}} />);
+    expect(screen.getByTestId('institution-stage2-presentation')).toBeInTheDocument();
   });
 });
