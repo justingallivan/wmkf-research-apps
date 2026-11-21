@@ -25,6 +25,7 @@ import {
   pruneApplicantKnownReviewer,
 } from '../../../lib/utils/applicant-known-reviewer';
 import {
+  activeInstitutionStage2Presentation,
   INSTITUTION_STAGE2_PRESENTATION_VERSION,
   isInstitutionStage2PresentationEnabled,
 } from '../../utils/institution-stage2-presentation';
@@ -275,6 +276,296 @@ export function getCandidateReasonPresentation(candidate) {
         ? 'identity_review'
         : 'suggestion');
   return { kind, text, ...CANDIDATE_REASON_PRESENTATION[kind] };
+}
+
+const RECORD_EMAIL_CONFLICT_REASONS = new Set([
+  'email_conflict',
+  'contact_linked_elsewhere',
+  'ambiguous_email_owner',
+  'inactive_email_owner',
+]);
+
+// Closed identity-reason → plain sentence map for the card's match line.
+// `check` reasons mean the evidence points at someone else; the rest mean the
+// evidence is merely thin. Unknown reasons fall back to the generic sentence.
+const IDENTITY_REASON_MATCH = Object.freeze({
+  orcid_email_split: { check: true, text: 'The ORCID and the email on file belong to different AkoyaGO records' },
+  ambiguous_or_name_mismatch: { check: true, text: 'More than one AkoyaGO record could match, or the name on the record differs' },
+  identity_conflict: { check: true, text: 'AkoyaGO records disagree about who this is' },
+  contact_linked_elsewhere: { check: true, text: 'This email is linked to a different AkoyaGO contact' },
+  contact_claim_mismatch: { check: true, text: "The contact details don't match the AkoyaGO record" },
+  provisional_orcid_match: { check: false, text: 'Matched to an AkoyaGO record by ORCID only' },
+  manual_contact_changed: { check: false, text: 'The contact details were changed by hand after the identity check' },
+});
+
+function coauthorPaperCount(candidate) {
+  const list = Array.isArray(candidate?.coauthorships) ? candidate.coauthorships : [];
+  return list.reduce((sum, entry) => sum + (Number(entry?.paperCount) || 0), 0);
+}
+
+function coauthorSentence(candidate, prefix) {
+  const list = Array.isArray(candidate?.coauthorships) ? candidate.coauthorships : [];
+  const total = coauthorPaperCount(candidate);
+  const first = list.find((entry) => entry?.proposalAuthor)?.proposalAuthor;
+  const papers = `${total} paper${total === 1 ? '' : 's'}`;
+  return first
+    ? `${prefix} ${papers} with ${first}${list.length > 1 ? ` and ${list.length - 1} other proposal author${list.length === 2 ? '' : 's'}` : ''}`
+    : `${prefix} ${papers} with the proposal authors`;
+}
+
+/**
+ * The one status a Find-tab candidate card shows (Status-Once Rule).
+ *
+ * Presentation only: built from the existing promotion decision, email
+ * readiness, COI fields and institution presentation, so it can never make a
+ * row more selectable than those helpers already do. Precedence runs from
+ * blocking conflicts to readiness; the final fallback is never Ready.
+ *
+ * `primary` names the action the card should emphasise. The card renders it
+ * only when the matching handler was supplied, so a status never offers a
+ * dead-end button.
+ *
+ * @returns {{
+ *   key: string, label: string, tone: 'green'|'amber'|'red'|'gray',
+ *   match: { tone: 'ok'|'warn'|'bad'|'neutral', text: string },
+ *   primary: null|'add_to_invite'|'confirm_identity'|'review_and_confirm'|'review_email_choice'|'verify_address'|'retry_record_check'|'retry_conflict_check'|'retry_institution',
+ * }}
+ */
+export function getCandidateCardStatus(candidate) {
+  const c = candidate || {};
+  const decision = getCandidatePromotionDecision(c);
+  const readiness = getCandidateEmailReadiness(c);
+  const known = c.applicantKnownReviewer || null;
+  const manualEmail = Array.isArray(c.manualContactFields) && c.manualContactFields.includes('email');
+  const email = manualEmail
+    ? (c.email || c.contactEnrichment?.email || null)
+    : (known?.email || c.email || c.contactEnrichment?.email || null);
+  const emailAction = email ? readiness?.action : 'missing';
+  const presentation = activeInstitutionStage2Presentation(c);
+  const pubs = Array.isArray(c.publications) ? c.publications.length : 0;
+
+  const institutionCOI = !!c.hasInstitutionCOI;
+  const flaggedInstitutionCOI = institutionCOI && c.institutionCOIDetails?.dropDecision === 'flagged';
+  const coauthorStrength = c.coauthorCOIStrength || (c.hasCoauthorCOI ? 'likely' : null);
+
+  if ((institutionCOI && !flaggedInstitutionCOI) || coauthorStrength === 'likely') {
+    const institution = c.institutionCOIDetails?.reviewerInstitution;
+    return {
+      key: 'conflict',
+      label: 'Conflict',
+      tone: 'red',
+      match: {
+        tone: 'bad',
+        text: institutionCOI && !flaggedInstitutionCOI
+          ? `Same institution as the PI${institution ? ` (${institution})` : ''}`
+          : coauthorSentence(c, 'Coauthored'),
+      },
+      primary: null,
+    };
+  }
+
+  if (decision?.decision === 'needs_record_repair') {
+    if (RECORD_EMAIL_CONFLICT_REASONS.has(decision.reason)) {
+      return {
+        key: 'email_conflict',
+        label: 'Email conflict',
+        tone: 'red',
+        match: { tone: 'bad', text: "This email is on another reviewer's record in AkoyaGO" },
+        primary: 'retry_record_check',
+      };
+    }
+    return {
+      key: 'fix_record',
+      label: 'Fix record',
+      tone: 'amber',
+      match: {
+        tone: 'warn',
+        text: decision.reason === 'person_inactive'
+          ? 'The AkoyaGO reviewer record is inactive'
+          : 'The AkoyaGO reviewer record needs repair',
+      },
+      primary: 'retry_record_check',
+    };
+  }
+
+  if (known && known.status && known.status !== 'known') {
+    return {
+      key: 'fix_record',
+      label: 'Fix record',
+      tone: 'amber',
+      match: { tone: 'warn', text: "The linked AkoyaGO reviewer record couldn't be loaded" },
+      primary: null,
+    };
+  }
+
+  if (c.conflictRecordUnavailable === true || c.contactEnrichment?.conflictRecordUnavailable === true) {
+    return {
+      key: 'check_unavailable',
+      label: 'Check unavailable',
+      tone: 'gray',
+      match: { tone: 'neutral', text: "We couldn't record the email conflict safely" },
+      primary: 'retry_conflict_check',
+    };
+  }
+
+  if (decision?.decision === 'needs_identity_confirmation') {
+    if (c.addressConflictPending === true) {
+      return {
+        key: 'check_identity',
+        label: 'Check identity',
+        tone: 'amber',
+        match: { tone: 'warn', text: 'The institution and email found differ from the AkoyaGO record' },
+        primary: 'review_and_confirm',
+      };
+    }
+    if (presentation?.kind === 'provider_failure') {
+      return {
+        key: 'check_unavailable',
+        label: 'Check unavailable',
+        tone: 'gray',
+        match: { tone: 'neutral', text: "We couldn't compare this reviewer's institutions" },
+        primary: 'retry_institution',
+      };
+    }
+    if (presentation?.kind === 'current_conflict' && presentation.detail) {
+      return {
+        key: 'check_identity',
+        label: 'Check identity',
+        tone: 'amber',
+        match: { tone: 'warn', text: presentation.detail },
+        primary: 'confirm_identity',
+      };
+    }
+    if (!presentation && c.institutionMismatch && c.suggestedInstitution) {
+      const found = typeof c.affiliation === 'string' ? c.affiliation.split(',')[0].trim() : '';
+      return {
+        key: 'check_identity',
+        label: 'Check identity',
+        tone: 'amber',
+        match: {
+          tone: 'warn',
+          text: found
+            ? `${c.isApplicantRecommended ? 'The applicant listed' : 'The suggestion listed'} ${c.suggestedInstitution}, but linked evidence shows ${found}`
+            : `${c.isApplicantRecommended ? 'The applicant listed' : 'The suggestion listed'} ${c.suggestedInstitution}, but the publications found couldn't be matched to it`,
+        },
+        primary: 'confirm_identity',
+      };
+    }
+    const mapped = IDENTITY_REASON_MATCH[decision.reason];
+    if (mapped) {
+      return {
+        key: mapped.check ? 'check_identity' : 'confirm_identity',
+        label: mapped.check ? 'Check identity' : 'Confirm identity',
+        tone: 'amber',
+        match: { tone: mapped.check ? 'warn' : 'neutral', text: mapped.text },
+        primary: 'confirm_identity',
+      };
+    }
+    if (getCandidateReasonPresentation(c)?.kind === 'identity_review') {
+      return {
+        key: 'check_identity',
+        label: 'Check identity',
+        tone: 'amber',
+        match: { tone: 'warn', text: 'Publications under this name may belong to someone else' },
+        primary: 'confirm_identity',
+      };
+    }
+    return {
+      key: 'confirm_identity',
+      label: 'Confirm identity',
+      tone: 'amber',
+      match: {
+        tone: 'neutral',
+        text: decision.reason === 'identity_not_resolved'
+          ? (pubs > 0
+            ? `We couldn't tell which researcher this is. Check the ${pubs} paper${pubs === 1 ? '' : 's'} found under this name`
+            : 'No publications found under this name')
+          : 'Confirm this is the right person before adding them',
+      },
+      primary: 'confirm_identity',
+    };
+  }
+
+  if (decision?.decision === 'missing_email' || emailAction === 'missing') {
+    return {
+      key: 'check_email',
+      label: 'Check email',
+      tone: 'amber',
+      match: { tone: 'warn', text: 'No email address found' },
+      primary: 'confirm_identity',
+    };
+  }
+  if (c.addressConflictPending === true) {
+    return {
+      key: 'check_email',
+      label: 'Check email',
+      tone: 'amber',
+      match: { tone: 'warn', text: 'The stored and newly found emails differ' },
+      primary: 'review_email_choice',
+    };
+  }
+  if (emailAction === 'blocked') {
+    return {
+      key: 'email_conflict',
+      label: 'Email conflict',
+      tone: 'red',
+      match: { tone: 'bad', text: 'This email conflicts with another reviewer record' },
+      primary: null,
+    };
+  }
+  if (emailAction === 'research_only' || emailAction === 'quick_check') {
+    return {
+      key: 'check_email',
+      label: 'Check email',
+      tone: 'amber',
+      match: { tone: 'warn', text: `${email} hasn't been confirmed yet` },
+      primary: 'verify_address',
+    };
+  }
+
+  if (emailAction === 'ready' && decision?.decision === 'ready') {
+    if (flaggedInstitutionCOI || coauthorStrength === 'possible') {
+      return {
+        key: 'possible_conflict',
+        label: 'Possible conflict',
+        tone: 'amber',
+        match: {
+          tone: 'warn',
+          text: coauthorStrength === 'possible'
+            ? `${coauthorSentence(c, 'Possible coauthor overlap:')}; may be a large collaboration`
+            : 'A low-confidence institution match with the PI; current evidence disagrees',
+        },
+        primary: 'add_to_invite',
+      };
+    }
+    const emailSource = manualEmail
+      ? (c.emailSource || c.contactEnrichment?.emailSource || null)
+      : (known?.emailSource || c.emailSource || c.contactEnrichment?.emailSource || null);
+    const staffChose = readiness?.reason === STAFF_ADDRESS_CHOICE_REASON;
+    const staffVerified = emailSource === 'staff_verified'
+      || known?.addressTrustVerified === true
+      || c.addressTrustReceipt?.personConfirmed === true;
+    return {
+      key: 'ready',
+      label: 'Ready',
+      tone: 'green',
+      match: {
+        tone: 'ok',
+        text: staffChose
+          ? `Chosen by staff after comparing addresses: ${email}`
+          : (staffVerified ? `Confirmed by staff: ${email}` : `Confirmed: ${email}`),
+      },
+      primary: 'add_to_invite',
+    };
+  }
+
+  return {
+    key: 'needs_review',
+    label: 'Needs review',
+    tone: 'gray',
+    match: { tone: 'neutral', text: 'Check the details before adding this reviewer' },
+    primary: null,
+  };
 }
 
 /**

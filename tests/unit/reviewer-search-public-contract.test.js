@@ -60,7 +60,7 @@ test('renders populated identity evidence and routes the explicit remedy to the 
     />,
   );
 
-  await user.click(screen.getByRole('button', { name: 'Show supporting evidence' }));
+  await user.click(screen.getByText('Compare details'));
 
   expect(screen.getAllByText(/Example University/).length).toBeGreaterThanOrEqual(2);
   expect(screen.getByText(/Example Medical Center/)).toBeInTheDocument();
@@ -92,7 +92,7 @@ test('keeps unknown linked-record status visible and exposes repair and retry on
     />,
   );
 
-  expect(screen.getByText(/the person record could not be loaded/i)).toBeInTheDocument();
+  expect(screen.getByText(/AkoyaGO reviewer record couldn't be loaded/i)).toBeInTheDocument();
   const repair = screen.getByRole('button', { name: 'Create repair request for Pat Example' });
   const retry = screen.getByRole('button', { name: 'Retry conflict check for Pat Example' });
   await user.click(repair);
@@ -118,7 +118,7 @@ test('read-only or missing remedy handlers never render dead repair actions', ()
       onRetryAddressCheck={jest.fn()}
     />,
   );
-  expect(screen.getByText(/the person record could not be loaded/i)).toBeInTheDocument();
+  expect(screen.getByText(/AkoyaGO reviewer record couldn't be loaded/i)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /Create repair request/ })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /Retry conflict check/ })).not.toBeInTheDocument();
 
@@ -129,7 +129,7 @@ test('read-only or missing remedy handlers never render dead repair actions', ()
       canManage
     />,
   );
-  expect(screen.getByText(/the person record could not be loaded/i)).toBeInTheDocument();
+  expect(screen.getByText(/AkoyaGO reviewer record couldn't be loaded/i)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /Create repair request/ })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /Retry conflict check/ })).not.toBeInTheDocument();
 });

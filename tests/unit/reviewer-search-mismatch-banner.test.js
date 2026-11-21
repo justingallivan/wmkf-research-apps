@@ -96,7 +96,7 @@ test('Stage 2 historical copy replaces the legacy mismatch accusation without ch
 
   expect(screen.getByText(/Earlier affiliation:/)).toBeInTheDocument();
   expect(screen.getByText(/No institution correction is required/)).toBeInTheDocument();
-  expect(screen.queryByText(/Institution needs review:/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/The applicant listed University of California San Diego/)).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: /not a fit: Dr Historical Move/i })).toBeInTheDocument();
 });
 
@@ -125,8 +125,9 @@ test('Stage 2 provider failure exposes the existing retry-enrichment action', as
   await screen.findByText('Dr Retry Institution');
 
   expect(screen.getByText(/Institution comparison unavailable:/)).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /retry enrichment/i })).toBeInTheDocument();
-  expect(screen.queryByText(/Institution needs review:/)).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /Retry institution check for Dr Retry Institution/ })).toBeInTheDocument();
+  expect(screen.getByTestId('candidate-status-chip')).toHaveTextContent('Check unavailable');
+  expect(screen.queryByText(/The applicant listed University of California San Diego/)).not.toBeInTheDocument();
 });
 
 test('turning Stage 2 off restores the legacy banner even when cached presentation data exists', async () => {
@@ -149,7 +150,7 @@ test('turning Stage 2 off restores the legacy banner even when cached presentati
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob-a" proposalKey="proposal-a" />);
   await screen.findByText('Dr Applicant Referred');
 
-  expect(screen.getByText(/Institution needs review:/)).toBeInTheDocument();
+  expect(screen.getByText(/The applicant listed University of California San Diego/)).toBeInTheDocument();
   expect(screen.queryByText(/Earlier affiliation:/)).not.toBeInTheDocument();
 });
 
@@ -174,7 +175,7 @@ test('an invisible Stage 2 fallback preserves the legacy banner when the flag is
   render(<ReviewerSearchSection requestId={REQ} blobUrl="blob-a" proposalKey="proposal-a" />);
   await screen.findByText('Dr Applicant Referred');
 
-  expect(screen.getByText(/Institution needs review:/)).toBeInTheDocument();
+  expect(screen.getByText(/The applicant listed University of California San Diego/)).toBeInTheDocument();
   expect(screen.queryByTestId('institution-stage2-presentation')).not.toBeInTheDocument();
 });
 
@@ -185,10 +186,10 @@ test('applicant-referred mismatch banner attributes the applicant and never fabr
   const attribution = await screen.findByText(/The applicant listed/);
   expect(attribution).toBeInTheDocument();
   expect(screen.queryByText(/a different institution/)).not.toBeInTheDocument();
-  expect(screen.getByText(/retrieved publications could not be reconciled with it/)).toBeInTheDocument();
-  expect(screen.getByText(/Identity concern:/).parentElement).toHaveTextContent('Could not confirm this is the right person');
-  expect(screen.queryByText(/Why this reviewer was suggested:/)).not.toBeInTheDocument();
-  expect(screen.getByText(/retry enrichment after the linked reviewer record is repaired/i)).toBeInTheDocument();
+  expect(screen.getByText(/the publications found couldn't be matched to it/)).toBeInTheDocument();
+  // Server free text is never rendered on the card, positive or negative.
+  expect(screen.queryByText(/Could not confirm this is the right person/)).not.toBeInTheDocument();
+  expect(screen.getByText(/repair the linked AkoyaGO record and retry/i)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /confirm identity for Dr Applicant Referred/i })).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: /not a fit: Dr Applicant Referred/i })).toBeInTheDocument();
 });
@@ -203,5 +204,5 @@ test('non-applicant mismatch uses source-neutral attribution and names the evide
   // review, MEDIUM).
   expect(screen.getByText(/linked evidence shows/)).toBeInTheDocument();
   expect(screen.queryByText(/PubMed shows/)).not.toBeInTheDocument();
-  expect(screen.getByText('Northwestern University Feinberg School of Medicine')).toBeInTheDocument();
+  expect(screen.getByText(/linked evidence shows Northwestern University Feinberg School of Medicine/)).toBeInTheDocument();
 });

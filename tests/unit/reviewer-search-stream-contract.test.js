@@ -438,7 +438,7 @@ test('malformed post-write GET clears uncertain cards and exposes a working rost
 
   fireEvent.click(screen.getByRole('button', { name: 'Retry reviewer state' }));
   expect(await screen.findByText('Recovered From GET')).toBeInTheDocument();
-  expect(screen.getByText('GET authority')).toBeInTheDocument();
+  expect(screen.getByText('GET authority', { selector: 'p' })).toBeInTheDocument();
   expect(postCount).toBe(1);
   expect(calls.filter(({ target, options }) => target === '/api/workbench/reviewer-roster' && options.method === 'POST')).toHaveLength(1);
 });

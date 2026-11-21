@@ -13,6 +13,8 @@ import { projectInstitutionStage2Presentation } from '../../lib/services/institu
 jest.mock('../../shared/components/Layout', () => ({
   __esModule: true,
   default: ({ children }) => <main>{children}</main>,
+  // eslint-disable-next-line no-unused-vars
+  Button: ({ children, variant, size, loading, ...props }) => <button {...props}>{children}</button>,
   PageHeader: ({ title, subtitle }) => (
     <header>
       <h1>{title}</h1>
@@ -140,13 +142,14 @@ test('renders all Stage II cases behind reviewer access and keeps actions local'
     INSTITUTION_STAGE2_SMOKE_CASES.length,
   );
   expect(screen.getByText(/This is not a confirmed mismatch/)).toBeInTheDocument();
-  expect(screen.queryByText(/Institution needs review:/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/(The applicant|The suggestion) listed/)).not.toBeInTheDocument();
 
   let clickedActions = 0;
   for (const testCase of INSTITUTION_STAGE2_SMOKE_CASES) {
     const caseRegion = screen.getByTestId(`stage2-case-${testCase.key}`);
-    const notice = within(caseRegion).getByTestId('institution-stage2-presentation');
-    const buttons = within(notice).queryAllByRole('button');
+    // Stage II remedies render in the card's single action row.
+    expect(within(caseRegion).getByTestId('institution-stage2-presentation')).toBeInTheDocument();
+    const buttons = within(caseRegion).queryAllByRole('button');
     expect(buttons).toHaveLength(testCase.actions.length);
     for (const button of buttons) {
       await user.click(button);
@@ -164,7 +167,7 @@ test('the exact off path suppresses every Stage II notice', () => {
   render(<InstitutionStage2SmokeGuard />);
 
   expect(screen.queryByTestId('institution-stage2-presentation')).not.toBeInTheDocument();
-  expect(screen.getAllByText(/Institution needs review:/)).toHaveLength(
+  expect(screen.getAllByText(/(The applicant|The suggestion) listed/)).toHaveLength(
     INSTITUTION_STAGE2_SMOKE_CASES.length,
   );
 });

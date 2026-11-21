@@ -479,7 +479,7 @@ test('labels restored generated rows and removes only the scoped previous result
 
   expect(await screen.findByText(/Found in an earlier search/)).toBeInTheDocument();
   expect(screen.getByText(/1 candidate below was restored from an earlier search/i)).toBeInTheDocument();
-  expect(screen.getByText('Applicant recommended')).toBeInTheDocument();
+  expect(screen.getByText(/Recommended by the applicant/)).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: 'Remove previous results' }));
 

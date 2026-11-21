@@ -576,7 +576,7 @@ test('plain website edits are durably acknowledged by the request roster before 
     target: { value: website },
   });
   const localEmailEdit = 'REINERS@ARIZONA.EDU';
-  fireEvent.change(screen.getByText('Email').parentElement.querySelector('input'), {
+  fireEvent.change(screen.getAllByText('Email').map((el) => el.parentElement.querySelector('input')).find(Boolean), {
     target: { value: localEmailEdit },
   });
   fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
@@ -971,7 +971,7 @@ test.each([1, 0])('expired verification with roster recorded=%i is acknowledged 
   if (recordedCount === 1) {
     expect(await screen.findByText(/Contact verification was refreshed for 1 reviewer/i)).toBeInTheDocument();
     expect(screen.queryByLabelText(`Select ${expired.name}`)).not.toBeInTheDocument();
-    expect(screen.getByText(/The available evidence for fresh@example.edu is limited/)).toBeInTheDocument();
+    expect(screen.getByText("fresh@example.edu hasn't been confirmed yet")).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /verify address/i })).toBeInTheDocument();
   } else {
     expect(await screen.findByText(/No candidates were saved: Expired Verification Reviewer: Refreshed verification could not be written to the active roster\./i)).toBeInTheDocument();

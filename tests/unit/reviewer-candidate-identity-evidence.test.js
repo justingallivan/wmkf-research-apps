@@ -103,21 +103,19 @@ function renderUnresolved(overrides = {}) {
   );
 }
 
-const TOGGLE = /Show supporting evidence/;
+const TOGGLE = 'Compare details';
+const openCompare = (user) => user.click(screen.getByText(TOGGLE));
 
 describe('CandidateCard identity evidence disclosure', () => {
-  test('offers the evidence collapsed, and only for an unresolved identity', () => {
+  test('offers the evidence collapsed, with one identity status', () => {
     renderUnresolved();
 
-    const toggle = screen.getByRole('button', { name: TOGGLE });
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getByText(/Identity confirmation required/)).toBeInTheDocument();
-    // Collapsed: the evidence itself is absent from the DOM, not merely hidden.
-    expect(screen.queryByText(/Quantitative MS of histone marks/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Address on file/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('candidate-compare-details')).not.toHaveAttribute('open');
+    expect(screen.getByTestId('candidate-status-chip')).toHaveTextContent('Confirm identity');
+    expect(screen.getByTestId('candidate-match-line')).toHaveTextContent("We couldn't tell which researcher this is");
   });
 
-  test('does not offer the disclosure on a resolved candidate', () => {
+  test('does not label a resolved candidate\'s details as unconfirmed', () => {
     render(
       <CandidateCard
         candidate={{ ...unresolvedCandidate, identityStatus: 'confirmed' }}
@@ -126,16 +124,17 @@ describe('CandidateCard identity evidence disclosure', () => {
       />
     );
 
-    expect(screen.queryByRole('button', { name: TOGGLE })).not.toBeInTheDocument();
+    expect(screen.queryByText(/None of this is confirmed/)).not.toBeInTheDocument();
   });
 
   test('expanding shows every evidence field staff need to judge the person', async () => {
     const user = userEvent.setup();
     renderUnresolved();
 
-    await user.click(screen.getByRole('button', { name: TOGGLE }));
+    await openCompare(user);
 
-    expect(screen.getByRole('button', { name: /Hide supporting evidence/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('candidate-compare-details')).toHaveAttribute('open');
+    expect(screen.getByText(/None of this is confirmed/)).toBeInTheDocument();
 
     // Affiliation + its provenance label.
     expect(screen.getByText(/Department of Biochemistry, Example University/)).toBeInTheDocument();
@@ -144,21 +143,21 @@ describe('CandidateCard identity evidence disclosure', () => {
     // Dataverse evidence states what the match does and does not prove. It is keyed on
     // the email that came from the same retrieval, so it must not read as independent
     // identity confirmation.
-    expect(screen.getByText(/already on an existing person record/)).toBeInTheDocument();
+    expect(screen.getByText(/already on an AkoyaGO person record/)).toBeInTheDocument();
     expect(screen.getByText(/does not confirm this is the person the proposal named/)).toBeInTheDocument();
     expect(screen.queryByText(/matched an existing person record by exact/)).not.toBeInTheDocument();
-    const institutionRow = screen.getByText(/may include co-affiliations or history/).parentElement;
+    const institutionRow = screen.getByText(/Institutions on that AkoyaGO record/);
     expect(institutionRow).toHaveTextContent('Example University (primary affiliation)');
     expect(institutionRow).toHaveTextContent('Other Institute (organization)');
 
     // Address, shown with its source.
     expect(screen.getByText('namesake@example.edu')).toBeInTheDocument();
-    expect(screen.getByText(/from pubmed, 2024/)).toBeInTheDocument();
+    expect(screen.getByText(/PubMed, 2024/)).toBeInTheDocument();
 
     // Publications, including the retrieved-vs-counted gap.
     expect(screen.getByText(/showing 2 of 6/)).toBeInTheDocument();
     expect(screen.getByText(/Quantitative MS of histone marks/)).toHaveTextContent('2024');
-    expect(screen.getByRole('link', { name: '[link]' })).toHaveAttribute('href', 'https://example.org/work/1');
+    expect(screen.getByRole('link', { name: 'link' })).toHaveAttribute('href', 'https://example.org/work/1');
 
     // Scholar is a NAME SEARCH, never a stored profile URL.
     const scholar = screen.getByRole('link', { name: /Search Google Scholar for this name/ });
@@ -169,7 +168,7 @@ describe('CandidateCard identity evidence disclosure', () => {
     const user = userEvent.setup();
     renderUnresolved({ googleScholarUrl: 'https://scholar.google.com/citations?user=NAMESAKE123' });
 
-    await user.click(screen.getByRole('button', { name: TOGGLE }));
+    await openCompare(user);
 
     const scholar = screen.getByRole('link', { name: /Search Google Scholar for this name/ });
     expect(scholar.getAttribute('href')).not.toContain('NAMESAKE123');
@@ -178,9 +177,9 @@ describe('CandidateCard identity evidence disclosure', () => {
 
   test('does not restore the verified contact treatment', async () => {
     const user = userEvent.setup();
-    renderUnresolved();
+    renderUnresolved({ hIndex: 42, totalCitations: 900 });
 
-    await user.click(screen.getByRole('button', { name: TOGGLE }));
+    await openCompare(user);
 
     // No mailto chip, no readiness verdict, no "known in Dataverse" ✓ claim.
     expect(screen.queryByRole('link', { name: 'namesake@example.edu' })).not.toBeInTheDocument();
@@ -188,8 +187,10 @@ describe('CandidateCard identity evidence disclosure', () => {
     expect(screen.queryByText('Email needs confirmation')).not.toBeInTheDocument();
     expect(screen.queryByText(/Existing person record matched by exact/)).not.toBeInTheDocument();
     // The gate itself is untouched.
-    expect(screen.getByText(/Identity confirmation required/)).toBeInTheDocument();
+    expect(screen.getByTestId('candidate-status-chip')).toHaveTextContent('Confirm identity');
     expect(screen.getByRole('button', { name: 'Confirm identity for Benjamin Namesake' })).toBeInTheDocument();
+    // Namesake safety: no metrics for an unresolved identity.
+    expect(screen.queryByText(/h-index/)).not.toBeInTheDocument();
   });
 
   test('points the staffer at the papers as the check the panel cannot make', async () => {
@@ -201,9 +202,9 @@ describe('CandidateCard identity evidence disclosure', () => {
     const user = userEvent.setup();
     renderUnresolved();
 
-    await user.click(screen.getByRole('button', { name: TOGGLE }));
+    await openCompare(user);
 
-    expect(screen.getByText(/do these match what the proposal is about/)).toBeInTheDocument();
+    expect(screen.getByText(/Do these match what the proposal is about/)).toBeInTheDocument();
     // Every retrieved paper is listed, not a sample.
     expect(screen.getByText(/Quantitative MS of histone marks/)).toBeInTheDocument();
     expect(screen.getByText(/Synthetic readers benchmarked/)).toBeInTheDocument();
@@ -219,9 +220,10 @@ describe('CandidateCard identity evidence disclosure', () => {
       contactEnrichment: {},
     });
 
-    await user.click(screen.getByRole('button', { name: TOGGLE }));
+    await openCompare(user);
 
-    expect(screen.getAllByText('none retrieved')).toHaveLength(3);
+    expect(screen.getAllByText('None found')).toHaveLength(2);
+    expect(screen.getByText('Publication count unavailable.')).toBeInTheDocument();
     expect(screen.queryByText(/showing/)).not.toBeInTheDocument();
   });
 });

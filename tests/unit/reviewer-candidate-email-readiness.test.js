@@ -40,15 +40,12 @@ describe('CandidateCard email readiness', () => {
       },
     });
 
-    expect(screen.getByRole('link', { name: 'ready@example.edu' })).toHaveAttribute(
-      'title',
-      'Email (from scholarly_multi, 2025)'
-    );
-    expect(screen.getByText('Identity: verified')).toBeInTheDocument();
-    expect(screen.getByText(/Evidence includes high-confidence email/)).toBeInTheDocument();
-    expect(screen.getByText('Email evidence:').parentElement).toHaveTextContent('Address source: multiple recent papers');
-    expect(screen.getByText('Email evidence:').parentElement).toHaveTextContent('2 recent works');
-    expect(screen.getByText('Email evidence:').parentElement).toHaveTextContent('2025');
+    expect(screen.getByRole('link', { name: 'Email ready@example.edu' })).toHaveAttribute('href', 'mailto:ready@example.edu');
+    expect(screen.getByTestId('candidate-status-chip')).toHaveTextContent('Ready');
+    expect(screen.getByTestId('candidate-match-line')).toHaveTextContent('Confirmed: ready@example.edu');
+    expect(screen.getByText(/multiple recent papers, 2025/)).toBeInTheDocument();
+    expect(screen.getByText('Email evidence:').parentElement).toHaveTextContent('listed on a paper from 2025');
+    expect(screen.getByRole('link', { name: '2025' })).toHaveAttribute('href', 'https://example.org/work/1');
   });
 
   test('explains an institution-page ownership decision after roster reload', () => {
@@ -66,14 +63,13 @@ describe('CandidateCard email readiness', () => {
       },
     });
 
-    expect(screen.getByText(/Evidence includes high-confidence email/)).toBeInTheDocument();
+    expect(screen.getByTestId('candidate-status-chip')).toHaveTextContent('Ready');
     expect(screen.getByRole('link', { name: 'official profile' })).toHaveAttribute(
       'href',
       'https://engineering.tamu.edu/electrical/profiles/phemmer.html',
     );
-    expect(screen.getByText(/initials \+ surname mailbox match/)).toHaveTextContent(
-      '1 other page address not selected',
-    );
+    expect(screen.getByText('Email evidence:').parentElement).toHaveTextContent(/initials \+ surname mailbox match/);
+    expect(screen.getByText('Email evidence:').parentElement).toHaveTextContent('1 other page address not selected');
   });
 
   test('surfaces manual and unknown provenance as needing confirmation', () => {
@@ -82,9 +78,9 @@ describe('CandidateCard email readiness', () => {
       emailSource: 'manual',
     });
 
-    expect(screen.getByText('Identity: address needs confirmation')).toBeInTheDocument();
-    expect(screen.getByText(/The available evidence for manual@example.edu is limited/)).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'manual@example.edu' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('candidate-status-chip')).toHaveTextContent('Check email');
+    expect(screen.getByTestId('candidate-match-line')).toHaveTextContent("manual@example.edu hasn't been confirmed yet");
+    expect(screen.queryByRole('link', { name: /manual@example.edu/ })).not.toBeInTheDocument();
   });
 
   test('lets a current address-trust receipt override stale enrichment readiness', () => {
@@ -103,19 +99,16 @@ describe('CandidateCard email readiness', () => {
       },
     });
 
-    expect(screen.getByText('Identity: verified')).toBeInTheDocument();
-    expect(screen.getByText(/verified@example.edu was verified by staff against recorded evidence/)).toBeInTheDocument();
-    expect(screen.getByText('Email evidence:').parentElement).toHaveTextContent(
-      'Staff verified this exact person and address for promotion'
-    );
-    expect(screen.queryByText('Identity: address needs confirmation')).not.toBeInTheDocument();
+    expect(screen.getByTestId('candidate-status-chip')).toHaveTextContent('Ready');
+    expect(screen.getByTestId('candidate-match-line')).toHaveTextContent('Confirmed by staff: verified@example.edu');
+    expect(screen.queryByText(/hasn't been confirmed yet/)).not.toBeInTheDocument();
   });
 
   test('surfaces missing contact instead of implying enrichment succeeded', () => {
     renderCandidate({ email: null, contactEnrichment: {} });
 
-    expect(screen.getByText('Identity: verified email required')).toBeInTheDocument();
-    expect(screen.getByText(/No verified email address is available/)).toBeInTheDocument();
+    expect(screen.getByTestId('candidate-status-chip')).toHaveTextContent('Check email');
+    expect(screen.getByTestId('candidate-match-line')).toHaveTextContent('No email address found');
   });
 
   test('keeps search-derived addresses visibly quarantined as research-only', () => {
@@ -124,9 +117,10 @@ describe('CandidateCard email readiness', () => {
       emailSource: 'serp_search',
     });
 
-    expect(screen.getByText('Identity: address not verified')).toBeInTheDocument();
-    expect(screen.getByText(/lead@example.edu was found through Google search/)).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'lead@example.edu' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('candidate-status-chip')).toHaveTextContent('Check email');
+    expect(screen.getByTestId('candidate-match-line')).toHaveTextContent("lead@example.edu hasn't been confirmed yet");
+    expect(screen.getByText(/Google search/, { selector: 'span' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /lead@example.edu/ })).not.toBeInTheDocument();
   });
 
   test('does not surface contact readiness for an unresolved proposal-named identity', () => {
@@ -143,10 +137,9 @@ describe('CandidateCard email readiness', () => {
       },
     });
 
-    expect(screen.queryByText(/Evidence includes high-confidence email/)).not.toBeInTheDocument();
-    expect(screen.queryByText('Identity: address needs confirmation')).not.toBeInTheDocument();
-    expect(screen.queryByText('Identity: verified email required')).not.toBeInTheDocument();
-    expect(screen.getByText(/Identity confirmation required/)).toBeInTheDocument();
+    expect(screen.getByTestId('candidate-status-chip')).toHaveTextContent('Confirm identity');
+    expect(screen.queryByText(/Confirmed:/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /namesake@example.edu/ })).not.toBeInTheDocument();
   });
 });
 
@@ -170,10 +163,10 @@ describe('CandidateCard affiliation and Dataverse evidence', () => {
       },
     });
 
-    expect(screen.getByText('Existing reviewer record linked.')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'linked@example.edu' })).not.toBeInTheDocument();
-    expect(screen.getByText('Identity: address needs confirmation')).toBeInTheDocument();
-    expect(screen.queryByText(/Existing person record matched by exact/)).not.toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'AkoyaGO record' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /linked@example.edu/ })).not.toBeInTheDocument();
+    expect(screen.getByTestId('candidate-status-chip')).toHaveTextContent('Check email');
+    expect(screen.queryByText(/AkoyaGO person record matches/)).not.toBeInTheDocument();
   });
 
   test('shows the Sarah Shackleton linked-record case as one actionable address issue', async () => {
@@ -206,23 +199,19 @@ describe('CandidateCard affiliation and Dataverse evidence', () => {
       />,
     );
 
-    expect(screen.getByText('Existing reviewer record linked.')).toBeInTheDocument();
-    expect(screen.getAllByText('Identity: address not verified')).toHaveLength(1);
-    expect(screen.getByText(/found through Claude web search/)).toBeInTheDocument();
-    expect(screen.queryByText(/research_only/)).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'sarah.shackleton@whoi.edu' })).not.toBeInTheDocument();
-    expect(container.querySelectorAll('.bg-emerald-50')).toHaveLength(0);
+    expect(screen.getByRole('columnheader', { name: 'AkoyaGO record' })).toBeInTheDocument();
+    expect(screen.getAllByTestId('candidate-status-chip')).toHaveLength(1);
+    expect(screen.getByTestId('candidate-status-chip')).toHaveTextContent('Check email');
+    expect(screen.getByText(/Claude web search/, { selector: 'span' })).toBeInTheDocument();
+    expect(container).not.toHaveTextContent(/research_only/);
+    expect(screen.queryByRole('link', { name: /sarah.shackleton@whoi.edu/ })).not.toBeInTheDocument();
+    expect(container.querySelectorAll('.bg-green-50')).toHaveLength(0);
+    // One remedy: Verify address is the primary and is not repeated.
+    expect(screen.getAllByRole('button', { name: /Verify address/ })).toHaveLength(1);
 
     await user.click(screen.getByRole('button', { name: 'Verify address for Sarah Shackleton' }));
     expect(onEdit).toHaveBeenCalledTimes(1);
-
-    await user.click(screen.getByText('Details'));
-    expect(screen.getByText('Email evidence:').parentElement).toHaveTextContent(
-      'Search lead lacks address-specific first-party evidence',
-    );
-    expect(screen.getByText('Dataverse record:').parentElement).toHaveTextContent(
-      'Existing reviewer record linked to this applicant recommendation',
-    );
+    expect(screen.queryByText(/Search lead lacks address-specific/)).not.toBeInTheDocument();
   });
 
   test('turns a staff-verified linked record into a single verified identity state', () => {
@@ -242,9 +231,10 @@ describe('CandidateCard affiliation and Dataverse evidence', () => {
       },
     });
 
-    expect(screen.getByText('Identity: verified')).toBeInTheDocument();
-    expect(screen.getByText(/verified by staff against recorded evidence and is linked to an existing reviewer record/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'verified-linked@example.edu' })).toBeInTheDocument();
+    expect(screen.getAllByTestId('candidate-status-chip')).toHaveLength(1);
+    expect(screen.getByTestId('candidate-status-chip')).toHaveTextContent('Ready');
+    expect(screen.getByTestId('candidate-match-line')).toHaveTextContent('Confirmed by staff: verified-linked@example.edu');
+    expect(screen.getByRole('link', { name: 'Email verified-linked@example.edu' })).toBeInTheDocument();
   });
 
   test('labels publication and OpenAlex evidence without claiming both are current', () => {
@@ -279,12 +269,10 @@ describe('CandidateCard affiliation and Dataverse evidence', () => {
       },
     });
 
-    expect(screen.getByText(/Existing person record matched by exact email/)).toBeInTheDocument();
-    expect(screen.getByText('Dataverse institutions:').parentElement).toHaveTextContent(
-      'may include co-affiliations or history',
-    );
-    expect(screen.getByText('Dataverse institutions:').parentElement).toHaveTextContent('Stanford University');
-    expect(screen.getByText('Dataverse institutions:').parentElement).toHaveTextContent('Northwestern University');
+    expect(screen.getByText(/An AkoyaGO person record matches this reviewer's email exactly/)).toBeInTheDocument();
+    const recordCell = screen.getByText('May include joint appointments or history.').closest('td');
+    expect(recordCell).toHaveTextContent('Stanford University (organization)');
+    expect(recordCell).toHaveTextContent('Northwestern University (primary affiliation)');
   });
 
   test('surfaces review-required exact-key reconciliation without making a known claim', () => {
@@ -299,7 +287,8 @@ describe('CandidateCard affiliation and Dataverse evidence', () => {
       },
     });
 
-    expect(screen.getByText('Dataverse identity needs review')).toBeInTheDocument();
-    expect(screen.queryByText(/Existing person record matched by exact/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('akoyago-review-required')).toBeInTheDocument();
+    expect(screen.getByTestId('candidate-compare-details')).toHaveAttribute('open');
+    expect(screen.queryByText(/AkoyaGO person record matches this reviewer/)).not.toBeInTheDocument();
   });
 });

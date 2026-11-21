@@ -54,7 +54,9 @@ test('address confirmation is shown once as status plus an executable remedy', a
   const user = userEvent.setup();
   const { onEdit } = renderCard();
 
-  expect(screen.getAllByText('Identity: address needs confirmation')).toHaveLength(1);
+  expect(screen.getAllByTestId('candidate-status-chip')).toHaveLength(1);
+  expect(screen.getByTestId('candidate-status-chip')).toHaveTextContent('Check email');
+  expect(screen.getAllByRole('button', { name: /Verify address/ })).toHaveLength(1);
   expect(screen.queryByRole('button', { name: /Email needs confirmation/ })).toBeNull();
   await user.click(screen.getByRole('button', { name: 'Verify address for Alexander Green' }));
 
@@ -166,13 +168,14 @@ test('existing AkoyaGO request context is not hidden by a separate repair warnin
 
   expect(screen.getByText(/Previously listed as a potential reviewer on #1002278/)).toBeInTheDocument();
   expect(screen.getByText(/Additional request history may be available/)).toBeInTheDocument();
-  expect(screen.getByText(/Existing linked reviewer record needs repair/)).toBeInTheDocument();
+  expect(screen.getByTestId('candidate-status-chip')).toHaveTextContent('Fix record');
+  expect(screen.getByTestId('candidate-match-line')).toHaveTextContent('The AkoyaGO reviewer record is inactive');
 });
 
 test('read-only (canManage=false) leaves the warning as inert text — no dead action offered', () => {
   renderCard({}, { canManage: false });
 
-  expect(screen.getByText(/Identity: address needs confirmation/)).toBeInTheDocument();
+  expect(screen.getByTestId('candidate-status-chip')).toHaveTextContent('Check email');
   expect(screen.queryByRole('button', { name: /Verify address/ })).toBeNull();
 });
 
@@ -187,7 +190,7 @@ test('does not render a dead address remedy when only the inactive conflict hand
     />,
   );
 
-  expect(screen.getByText(/Identity: address needs confirmation/)).toBeInTheDocument();
+  expect(screen.getByTestId('candidate-status-chip')).toHaveTextContent('Check email');
   expect(screen.queryByRole('button', { name: /Verify address/ })).toBeNull();
 });
 
@@ -197,13 +200,14 @@ test('an unrecorded address conflict leaves the badge inert (repair path owns it
   expect(screen.queryByRole('button', { name: /Address conflict/ })).toBeNull();
 });
 
-test('"Dataverse identity needs review" banner opens the confirm-identity remedy', async () => {
+test('a partly matching AkoyaGO record offers the confirm-identity remedy', async () => {
   const user = userEvent.setup();
   const { onConfirmIdentity } = renderCard({
     contactEnrichment: { dataverseContactEvidence: { status: 'review_required' } },
   });
 
-  await user.click(screen.getByRole('button', { name: /Dataverse identity needs review/ }));
+  expect(screen.getByTestId('akoyago-review-required')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Confirm identity for Alexander Green' }));
   expect(onConfirmIdentity).toHaveBeenCalledTimes(1);
 });
 
@@ -228,8 +232,9 @@ test('"Existing linked reviewer record needs repair" exposes the AkoyaGO retry r
 test('ready identity evidence is summarized once and is not an action', () => {
   renderCard({ emailSource: 'orcid' });
 
-  expect(screen.getByText(/Evidence includes high-confidence email/)).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: /high-confidence email/ })).toBeNull();
+  expect(screen.getByTestId('candidate-status-chip')).toHaveTextContent('Ready');
+  expect(screen.getByTestId('candidate-match-line')).toHaveTextContent('Confirmed: aagreen@bu.edu');
+  expect(screen.queryByRole('button', { name: /Confirmed/ })).toBeNull();
 });
 
 test('a trusted address does not render green while the person still needs confirmation', () => {
@@ -239,9 +244,9 @@ test('a trusted address does not render green while the person still needs confi
     pdIdentityConfirmed: false,
   });
 
-  expect(screen.getByText('Identity: confirmation required')).toBeInTheDocument();
-  expect(screen.queryByText('Identity: verified')).not.toBeInTheDocument();
-  expect(container.querySelectorAll('.bg-emerald-50')).toHaveLength(0);
+  expect(screen.getByTestId('candidate-status-chip')).toHaveTextContent('Confirm identity');
+  expect(screen.getByTestId('candidate-match-line')).toHaveTextContent('changed by hand');
+  expect(container.querySelectorAll('.bg-green-50')).toHaveLength(0);
 });
 
 test('a thin zero-match sample renders as one qualified expertise status with a direct Invite action', async () => {
@@ -271,10 +276,9 @@ test('a thin zero-match sample renders as one qualified expertise status with a 
     />,
   );
 
-  expect(screen.getByText(/0 of 3 retrieved papers matched the stated expertise/)).toBeInTheDocument();
-  expect(screen.getByText(/not this person's full publication record/)).toBeInTheDocument();
-  expect(screen.getByText(/Why this reviewer was suggested:/).parentElement).toHaveTextContent('His work addresses the proposal risk.');
-  expect(screen.getByText(/Evidence includes high-confidence email \+ ORCID/)).toBeInTheDocument();
+  expect(screen.getByText(/None of the 3 retrieved papers matched the stated expertise/)).toHaveTextContent('not the full publication record');
+  expect(screen.getByText('His work addresses the proposal risk.')).toBeInTheDocument();
+  expect(screen.getByTestId('candidate-status-chip')).toHaveTextContent('Ready');
   expect(screen.queryByText(/0%|Low match|Expertise mismatch|Claude claimed/)).not.toBeInTheDocument();
   expect(container.firstChild).toHaveClass('bg-white');
 
