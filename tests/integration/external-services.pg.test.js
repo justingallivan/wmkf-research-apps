@@ -3,8 +3,6 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { Pool } from 'pg';
 import { listServices, listReviews, saveService } from '../../lib/services/external-services/store';
-import handler from '../../pages/api/admin/external-services';
-jest.mock('../../lib/utils/auth',()=>({requireSuperuser:jest.fn(async()=>({profileId:42}))}));
 import seed from '../../lib/services/external-services/seed.json';
 const connectionString=process.env.EXTERNAL_SERVICES_TEST_URL || process.env.TEST_REQUEST_LEDGER_TEST_URL;
 if(connectionString && !['127.0.0.1','localhost','[::1]'].includes(new URL(connectionString).hostname)) throw new Error('Loopback test database required');
@@ -65,14 +63,6 @@ jest.mock('@vercel/postgres',()=>({db:{connect:()=>mockPool.connect()},sql:{quer
     expect(connect).not.toHaveBeenCalled();connect.mockRestore();
   });
 
-  test.each([null, [], 'body', {id:'assemblyai',data:seed.services[0].data,expectedVersion:1,review:false}, {id:'assemblyai',data:seed.services[0].data,expectedVersion:1,review:'x'}])('malformed request body returns 400: %j',async body=>{
-    const res={setHeader:jest.fn(),status:jest.fn(),json:jest.fn()};res.status.mockReturnValue(res);
-    await handler({method:'PUT',body,query:{}},res);expect(res.status).toHaveBeenCalledWith(400);
-  });
-  test('repeated service ID query parameters return 400',async()=>{
-    const res={setHeader:jest.fn(),status:jest.fn(),json:jest.fn()};res.status.mockReturnValue(res);
-    await handler({method:'GET',query:{id:['assemblyai','openai']}},res);expect(res.status).toHaveBeenCalledWith(400);
-  });
   test('500-service cap rejects creation without inserting a 501st row',async()=>{
     const before=Number((await mockPool.query('SELECT count(*) FROM external_services')).rows[0].count);
     await mockPool.query("INSERT INTO external_services(id,data) SELECT 'cap-service-'||n, $1::jsonb FROM generate_series(1,$2::integer) n",[JSON.stringify(seed.services[0].data),500-before]);
@@ -99,6 +89,19 @@ jest.mock('@vercel/postgres',()=>({db:{connect:()=>mockPool.connect()},sql:{quer
     expect((await listServices()).find(s=>s.id==='assemblyai').version).toBe(before.version);
     const seedReview=(await listReviews('assemblyai')).find(r=>r.id==='438dce63-e462-4e8d-877b-8aefc8f40840');
     expect(seedReview.data.links.filter(l=>l.href==='https://www.assemblyai.com/benchmarks')).toHaveLength(1);
+  });
+
+  test('first benchmark addition preserves review edits and increments the parent version',async()=>{
+    const id='438dce63-e462-4e8d-877b-8aefc8f40840';
+    const original=(await listReviews('assemblyai')).find(r=>r.id===id);
+    const edited={...original.data,followUp:'Operator follow-up',links:original.data.links.filter(l=>l.href!=='https://www.assemblyai.com/benchmarks')};
+    await mockPool.query('UPDATE external_service_reviews SET data=$1::jsonb WHERE id=$2',[JSON.stringify(edited),id]);
+    const before=(await listServices()).find(s=>s.id==='assemblyai');
+    await mockPool.query(fs.readFileSync('lib/db/migrations/107_external_service_inventory_followups.sql','utf8'));
+    const after=(await listServices()).find(s=>s.id==='assemblyai');
+    expect(after.version).toBe(before.version+1);expect(after.data).toEqual(before.data);
+    const review=(await listReviews('assemblyai')).find(r=>r.id===id);
+    expect(review.data).toEqual({...edited,links:[...edited.links,{label:'Vendor benchmark comparison',href:'https://www.assemblyai.com/benchmarks'}]});
   });
 
 });

@@ -13,7 +13,7 @@ function Field({ label, value, onChange, options, multiline, type = 'text', requ
   return <label className="block text-sm font-medium text-gray-700">{label}
     {options ? <select className={`${inputClass} mt-1`} value={value} onChange={e => onChange(e.target.value)} disabled={disabled}>{options.map(option => <option key={option}>{option}</option>)}</select>
       : multiline ? <textarea className={`${inputClass} mt-1`} rows={3} value={value} onChange={e => onChange(e.target.value)} required={required} maxLength={maxLength} />
-        : <input className={`${inputClass} mt-1`} type={type} value={value} onChange={e => onChange(e.target.value)} required={required} maxLength={maxLength} />}
+        : <input className={`${inputClass} mt-1`} type={type} value={value} onChange={e => onChange(e.target.value)} required={required} maxLength={maxLength} max={type === 'date' ? '9999-12-31' : undefined} />}
   </label>;
 }
 function LinkEditor({ links, onChange }) {
@@ -97,7 +97,7 @@ export default function ExternalServicesSection() {
     const id = current?.id || newServiceId.current;
     setSaving(true); setError('');
     try {
-      await requestJson(API, { method: 'PUT', body: { id, data: draft, expectedVersion: current?.version || 0, ...(review ? { review, reviewId } : {}) }, fallbackMessage: 'Could not save the service.' });
+      await requestJson(API, { method: 'PUT', body: { id, data: { ...draft, costTracking: isCorporateService(selected, draft.provider) ? COST_MODES[1] : draft.costTracking }, expectedVersion: current?.version || 0, ...(review ? { review, reviewId } : {}) }, fallbackMessage: 'Could not save the service.' });
       if (generation.current !== token) return;
       saveFailed.current = false;
       closeEditor(); setSelected(id); setNotice('Saved.'); setReload(v => v + 1);
@@ -117,14 +117,18 @@ export default function ExternalServicesSection() {
     setDraft(previous => {
       const next = { ...previous, [key]: value };
       if (editor === 'new' && key === 'category' && Number(previous.cadenceDays) === defaultCadence(previous.category)) next.cadenceDays = defaultCadence(value);
-      if (key === 'provider' && isCorporateService(selected, value)) next.costTracking = COST_MODES[1];
       return next;
     });
   };
   const setReviewField = (key, value) => {
     setReview(previous => ({ ...previous, [key]: value }));
     if (key === 'reviewedOn' && value && !reviewId && !nextDateEdited.current) {
-      setDraft(previous => ({ ...previous, nextReviewOn: nextReviewDate(value, previous.cadenceDays) }));
+      // Date inputs can emit an incomplete or five-digit year while typing.
+      // Keep that input for validation without throwing during React render.
+      try {
+        const suggested = nextReviewDate(value, draft.cadenceDays);
+        setDraft(previous => ({ ...previous, nextReviewOn: suggested }));
+      } catch { /* Preserve the existing suggestion until the date is valid. */ }
     }
   };
 
@@ -152,7 +156,7 @@ export default function ExternalServicesSection() {
             <Field label="Category" options={CATEGORIES} value={draft.category} onChange={v => setField('category', v)} />
             <Field label="Used for" multiline value={draft.purpose} onChange={v => setField('purpose', v)} maxLength={2000} />
             <Field label="Current model, API, or plan" multiline value={draft.configuration} onChange={v => setField('configuration', v)} maxLength={2000} />
-            <div className="grid gap-4 sm:grid-cols-2"><Field label="Update behavior" options={UPDATE_MODES} value={draft.updateMode} onChange={v => setField('updateMode', v)} /><Field label="Cost tracking" options={COST_MODES} disabled={isCorporateService(selected, draft.provider)} value={draft.costTracking} onChange={v => setField('costTracking', v)} /></div>
+            <div className="grid gap-4 sm:grid-cols-2"><Field label="Update behavior" options={UPDATE_MODES} value={draft.updateMode} onChange={v => setField('updateMode', v)} /><Field label="Cost tracking" options={COST_MODES} disabled={isCorporateService(selected, draft.provider)} value={isCorporateService(selected, draft.provider) ? COST_MODES[1] : draft.costTracking} onChange={v => setField('costTracking', v)} /></div>
             <div className="grid gap-4 sm:grid-cols-2"><Field label="Owner" value={draft.owner} onChange={v => setField('owner', v)} maxLength={120} /><Field label="Review interval (days)" type="number" value={draft.cadenceDays} onChange={v => setField('cadenceDays', v)} /></div>
             <Field label="Private account notes" multiline required={false} value={draft.notes} onChange={v => setField('notes', v)} />
             <LinkEditor links={draft.links} onChange={v => setField('links', v)} />

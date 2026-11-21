@@ -94,3 +94,23 @@ test('oversized save explains how to recover and retains text',async()=>{
   global.fetch.mockResolvedValue(response({},413));fireEvent.click(screen.getByRole('button',{name:'Save service'}));
   expect(await screen.findByRole('alert')).toHaveTextContent('Shorten the text');expect(screen.getByLabelText('Service name')).toHaveValue(assembly.data.name);
 });
+test('unusual review years do not crash or discard the review draft',async()=>{
+  render(<ExternalServicesSection/>);fireEvent.click(await screen.findByRole('button',{name:'AssemblyAI · Recorded-audio transcription'}));fireEvent.click(screen.getByRole('button',{name:'Record review'}));
+  fireEvent.change(screen.getByLabelText('What prompted this review?'),{target:{value:'Keep this draft'}});
+  const prior=screen.getByLabelText('Next review date').value;
+  fireEvent.change(screen.getByLabelText('Review date (Pacific time)'),{target:{value:'20266-10-01'}});
+  expect(screen.getByLabelText('What prompted this review?')).toHaveValue('Keep this draft');
+  expect(screen.getByLabelText('Next review date')).toHaveValue(prior);
+  fireEvent.change(screen.getByLabelText('Review date (Pacific time)'),{target:{value:'9999-12-31'}});
+  expect(screen.getByLabelText('Next review date')).toHaveValue(prior);
+});
+test('typing through a corporate name does not exclude the completed non-corporate provider',async()=>{
+  render(<ExternalServicesSection/>);await screen.findByText(/1 services/);fireEvent.click(screen.getByRole('button',{name:'Add service'}));
+  for(const name of ['Zoom','ZoomInfo'])fireEvent.change(screen.getByLabelText('Provider'),{target:{value:name}});
+  expect(screen.getByLabelText('Cost tracking')).toHaveValue('Review costs');expect(screen.getByLabelText('Cost tracking')).not.toBeDisabled();
+  for(const label of ['Service name','Used for','Current model, API, or plan'])fireEvent.change(screen.getByLabelText(label),{target:{value:'Example'}});
+  fireEvent.click(screen.getByRole('button',{name:'Save service'}));
+  await waitFor(()=>expect(global.fetch.mock.calls.some(([,o])=>o?.method==='PUT')).toBe(true));
+  const body=JSON.parse(global.fetch.mock.calls.find(([,o])=>o?.method==='PUT')[1].body);
+  expect(body.data).toMatchObject({provider:'ZoomInfo',costTracking:'Review costs'});
+});
