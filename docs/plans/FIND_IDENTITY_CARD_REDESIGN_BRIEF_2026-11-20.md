@@ -381,12 +381,70 @@ Build order:
   `postgres-reviewer-find-roster.md` and `dataverse-wmkf-potentialreviewers.md`
   change; `check:dataverse-access-layer` for the select changes.
 
+### 8a. Codex plan review (2026-11-20, Session 693)
+
+Adversarial review of this brief against `fe3f8c6ea` (read-only). Verdict:
+**needs attention; do not implement the server plan as written.** It
+confirmed §8's client-evidence and overwrite findings and added:
+
+1. **High: the domain helper treats different domains as the same.**
+   `normalizeDomain` strips hyphens (`lib/services/contact-enrichment/domain-evidence.js:43-47`,
+   used by `domainRelated` at `:54-59`), so `stan-ford.edu` matches
+   `stanford.edu` [VERIFIED by reading; Codex reproduced it]. The trust
+   decision needs a strict hostname comparison (exact domain or a justified
+   subdomain, hyphens kept); keep the Scholar-specific normalisation out of it.
+2. **High: computing evidence "before confirm" does not survive the combined
+   flow.** The client commits `confirm_identity` before address verification
+   (`useReviewerContactActions.js:343-368`), and that write replaces the
+   lookup email, source and affiliation and clears `applicantContactMismatch`
+   (`reviewer-roster-store.js:337-361`). Corroboration and contradiction
+   evidence must be stored server-side, bound to request, candidate, person,
+   exact address and source version, before any destructive update; consumed
+   with stale-version checks; with defined retry behaviour; and applied the
+   same way on both verification paths (`candidateKey` and `suggestionId`) and
+   in promotion.
+3. **High: exclusion enforcement must come first, and the writer list is
+   incomplete.** `selectIfUnengaged` checks engagement and the ETag, not the
+   JSON exclusions (`reviewer-suggestion.js:1258-1284`). Merge rebinding
+   (`reviewer-merge.js:437-440` → `repointToPotentialReviewer`,
+   `reviewer-suggestion.js:529-538`) changes a suggestion's person without a
+   selection write, so a selected row could become an excluded person
+   [VERIFIED by reading]. Branch 2 becomes a release prerequisite for the
+   combined action and must cover merge rebinding, Reconsider, verification
+   writes and invitation sending, and recheck exclusions before send.
+4. **Medium: contact age is not address age.** `findByEmailCandidates` reads
+   the contact's current `emailaddress1` (`contact.js:161-184`), which can be
+   updated, so an old contact edited to the applicant's address after intake
+   would qualify. Use the suggestion's creation time, not roster
+   `first_seen_at`, and either prove the address predates it or accept the
+   weaker guarantee explicitly (open decision B).
+5. **Medium: an acceptance is not proof of the address.**
+   `applyStage2aResponse` writes the reviewer's submitted email to
+   `wmkf_revieweremail` in the same update that marks acceptance
+   (`reviewer-suggestion.js:2254-2291`). The qualifying event must
+   distinguish the address the invitation went to from one the reviewer
+   typed while accepting; legacy rows without that evidence get no credit.
+6. **Build order:** presentation-only anatomy and wording, the applicant-column
+   projection, moving the existing controls, and closed reason codes can ship
+   on their own. The identical-string institution shortcut must stay
+   presentation-only (stage 2 grants no identity or selection authority,
+   `institution-affiliation-stage2.js:3-7`).
+
 ### 9. Open decisions
 **A. What should a staff confirmation mean at send time?** Today a confirmed
 address becomes `ready`, so the invite skips the per-recipient check (S391
 exact-address model). Options: keep that for every level (the checkbox
 level then removes both the evidence link and the send-time check), or make
 the checkbox level `quick_check` so the send-time check returns for those
-reviewers only.
+reviewers only. **Codex recommends `quick_check` for checkbox-only
+confirmations**: a fitting domain that accepts mail does not show that this
+exact mailbox reaches this person. That distinction would have to be carried
+through the trust bundle, promotion, the card and sending.
+
+**B. Is "an older AkoyaGO contact has this address" good enough for one
+click?** Owner decision 8 said yes, but contact age does not show the
+address is old (finding 4 above). Options: accept that weaker guarantee
+explicitly; require proof the address itself predates the suggestion (no
+address history is read today); or demote this route to the checkbox level.
 
 Owner decisions 5–9 settled the brief's earlier questions on 2026-11-20.
