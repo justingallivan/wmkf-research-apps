@@ -44,7 +44,9 @@ request, `akoya_request.wmkf_excludedreviewers` (Memo). Today:
   write `wmkf_appexcludedreviewer` or `wmkf_potentialreviewers` rows. The form
   collects only name and institution, with no email, so flow-created records would
   risk duplicates; he leaves any promotion to the app. Phase C below therefore does
-  not apply to J27 as written [REPORTED by Connor 2026-11-20].
+  not apply to J27 as written [REPORTED by Connor 2026-11-20]. Since 2026-11-20 the
+  field holds JSON, `{"schema":"wmkf-excludedreviewers/1","source":"applicant","reviewers":[{"firstName","lastName","info","reason"}]}` [VERIFIED 2026-11-20 via owner-approved read-only Production read of test request 1003526 after Connor's end-to-end rerun]; `info` is optional free text, not a clean
+  institution.
 - To use the text as a search soft-block, the Find tab has Claude Haiku parse
   names out of it on **every mount** where the text is substantive — an
   uncached, deterministic LLM call

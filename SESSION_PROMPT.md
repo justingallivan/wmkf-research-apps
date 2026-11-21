@@ -89,11 +89,17 @@ flow names); no request or applicant rows were read.
    only in search, not on manual add, save or promotion (map section 9, item 6).
 3. **Low-priority questions for Connor:** whether `wmkf_ai_methodologies` comes from
    `intake.keywords` or another prompt, whether `akoya_submissionaccepted` is always
-   manual, and whether the parenthesized part of an excluded-reviewer line is always
-   the institution (map section 10, items 6–8). Answered 2026-11-20: the compliance
-   summary is written only for non-compliant submissions; the request's
-   `wmkf_potentialreviewer1`–`5` lookups are deprecated; excluded reviewers stay free
-   text, with no flow-created records.
+   manual (map section 10, items 6–7). Answered 2026-11-20: the compliance summary
+   is written only for non-compliant submissions; the request's
+   `wmkf_potentialreviewer1`–`5` lookups are deprecated (final); excluded reviewers
+   are now JSON (`wmkf-excludedreviewers/1`), with no flow-created records; a rerun
+   updates the five suggestion rows in place (map section 10, items 8–9).
+3a. **Next build (branch, `/contract-reconcile` first):** the Find tab reads existing
+   Recommended suggestion rows instead of the lookups; parse the JSON exclusions
+   directly (Haiku stays for older free text; treat blank, `{}` and an empty list as
+   none); check exclusion names on manual add, save and promotion. Test request
+   1003526 is the fixture: five Recommended rows, three JSON exclusions, empty
+   lookups.
 4. **`cycle-dossier.entry` cache read:** re-run
    `scripts/probe-ai-run-cache-reads.js --prompt cycle-dossier.entry` after the next
    dossier batch. This is a Production read and needs the owner's OK.

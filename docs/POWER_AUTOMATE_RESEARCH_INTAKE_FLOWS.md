@@ -136,7 +136,7 @@ library).
 | Field | Content |
 |---|---|
 | `wmkf_abstract` | Text. Applicant abstract, cleaned in place (PDF line breaks removed). |
-| `wmkf_excludedreviewers` | Text. One excluded reviewer per line: `{first} {last} ({info}) — {reason}`. `" ({info})"` is omitted when blank. |
+| `wmkf_excludedreviewers` | JSON text (since 2026-11-20; earlier: one reviewer per line, `{first} {last} ({info}) — {reason}`). Shape `{"schema":"wmkf-excludedreviewers/1","source":"applicant","reviewers":[{"firstName","lastName","info","reason"}]}` [VERIFIED 2026-11-20 via owner-approved read-only Production read of test request 1003526 after Connor's end-to-end rerun]. `firstName`, `lastName` and `reason` are required on the form; `info` is optional free text that may hold the institution. Empty JSON when no one is excluded (the field is optional on the form). |
 | `wmkf_projectleader` | Lookup → `contact`. The PI's contact. |
 | `wmkf_type` | = Program |
 | `wmkf_grantprogram` | = Research |
@@ -395,9 +395,10 @@ Checked against our source on 2026-11-20 unless labeled.
      Connor will build it, triggered at `wmkf_phaseistatus` = Recommended (owner,
      2026-11-20); staff decide its contents; the portal serves it unchanged
      (section 10 question 4).
-6. **Excluded reviewers stay free text, in a fixed format.** Step 1 writes one
-   reviewer per line (`{first} {last} ({info}) — {reason}`) to
-   `wmkf_excludedreviewers`. Connor confirms the format is deterministic and will
+6. **Excluded reviewers are JSON on the request.** Since 2026-11-20 step 1 writes
+   `wmkf_excludedreviewers` as `{"schema":"wmkf-excludedreviewers/1","source":"applicant","reviewers":[{"firstName","lastName","info","reason"}]}` [VERIFIED 2026-11-20 via owner-approved read-only Production read of test request 1003526 after Connor's end-to-end rerun]; before that it wrote one reviewer per
+   line (`{first} {last} ({info}) — {reason}`). Staff read the JSON directly
+   in Dynamics; no readable copy (owner, 2026-11-20). Connor confirms the format is deterministic and will
    not write `wmkf_potentialreviewers` or `wmkf_appexcludedreviewer` rows for
    excluded reviewers: the form collects only name and institution, no email, so
    flow-created records would risk duplicates. He leaves any promotion to the app
@@ -488,7 +489,12 @@ acceptance half of question 7 the same day `[REPORTED by Connor 2026-11-20]`.
    **Compliance summary answered 2026-11-20:** not retired; written only when the
    submission does not follow the instructions. Acceptance not answered.
 8. **Excluded reviewers — answered 2026-11-20.** Connor keeps them in
-   `wmkf_excludedreviewers` in the deterministic one-per-line format and will not
-   create reviewer records for them (no email is collected, so records would risk
-   duplicates). Whether the parenthesized part is always the institution was not
-   answered.
+   `wmkf_excludedreviewers`, now as JSON (section 3), and will not create reviewer
+   records for them (no email is collected, so records would risk duplicates).
+   `info` is optional free text that may hold the institution, not a clean
+   institution field. Empty JSON when none.
+9. **Rerun behavior — answered 2026-11-20 by data.** Connor's end-to-end rerun of
+   1003526 updated the same five suggestion rows in place (no duplicates; sources
+   still `"applicant"`) and set disposition Recommended on all five; the request's
+   reviewer lookups stayed empty [VERIFIED 2026-11-20 via owner-approved read-only Production read of test request 1003526 after Connor's end-to-end rerun]. Suggested reviewers are required on the
+   form; excluded reviewers are optional (Connor via owner, 2026-11-20).
