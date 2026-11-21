@@ -99,7 +99,7 @@ describe('transcription pilot private Blob runtime', () => {
     expect(order.map(entry => entry[0])).toEqual(['reserve', 'mint']);
     expect(order[0][1]).toEqual(expect.objectContaining({ jobId: job.id, ownerProfileId: 42, validUntil: expect.any(Date) }));
     expect(order[1][1]).toEqual(expect.objectContaining({ pathname: job.input_cleanup_pathname, validUntil: order[0][1].validUntil.getTime() }));
-    expect(store.createTranscriptionJob).toHaveBeenCalledWith(expect.objectContaining({ requestedModel: 'universal-3-5-pro' }));
+    expect(store.createTranscriptionJob).toHaveBeenCalledWith(expect.objectContaining({ requestedModel: 'assemblyai-stt-3-7' }));
     expect(result.upload.token).toBe('client-capability');
   });
 
@@ -241,6 +241,7 @@ describe('Meeting Tracker Zoom transcript upload and start', () => {
     const result = await createMeetingTranscriptionUpload({ ownerProfileId: 42, requestId, siteVisitActivityId,
       body: body({ zoomTranscript: { contentType: 'text/vtt', bytes: 1234 } }) });
     const input = store.createMeetingTranscriptionJob.mock.calls[0][0];
+    expect(input.requestedModel).toBe('assemblyai-stt-3-7');
     expect(input.zoomTranscriptCleanupPathname).toBe(`transcription-pilot/42/${input.id}/input/zoom-transcript.vtt`);
     expect(input.optionsSnapshot).toEqual({ zoomTranscript: { bytes: 1234 } });
     expect(generateClientTokenFromReadWriteToken).toHaveBeenCalledTimes(2);
