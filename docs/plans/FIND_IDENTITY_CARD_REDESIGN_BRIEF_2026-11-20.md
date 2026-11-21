@@ -221,6 +221,16 @@ free text; the system is called AkoyaGO everywhere on the card; no
      would land at the checkbox level. Whether a lookup that finds the stored
      address always records it in `contactEnrichment.email` is not checked
      [ASSUMED], so 13% may be an undercount.
+   - **Past acceptances add nothing for this population yet** [VERIFIED
+     2026-11-20 via an owner-approved, read-only, counts-only Production
+     Dataverse query of `wmkf_appreviewersuggestion` rows with
+     `wmkf_accepted eq true` for the same 61 linked reviewers]. Only 4 accepted
+     rows exist for them. None is on another request before the roster row was
+     first seen with the same address (1 earlier acceptance carries a
+     different or blank address; 2 acceptances came later or on the same
+     request). Acceptances on these rows are app-era records, so earlier
+     reviewing history kept elsewhere in AkoyaGO is not covered [ASSUMED].
+     Combined result for the 62: 8 one click, 51 checkbox, 3 evidence link.
 
 ### 8. Open decisions
 None. The three questions raised with this brief were settled as owner
