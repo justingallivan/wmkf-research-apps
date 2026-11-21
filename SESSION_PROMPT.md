@@ -97,7 +97,9 @@ flow names); no request or applicant rows were read.
 3a. **Next build (branch, `/contract-reconcile` first):** the Find tab reads existing
    Recommended suggestion rows instead of the lookups; parse the JSON exclusions
    directly (Haiku stays for older free text; treat blank, `{}` and an empty list as
-   none); check exclusion names on manual add, save and promotion. Test request
+   none); hard-block exact exclusion-name matches on manual add, save and promotion,
+   server-side, JSON exclusions only (owner decisions 2026-11-20; contract review
+   done in Session 692). Test request
    1003526 is the fixture: five Recommended rows, three JSON exclusions, empty
    lookups.
 4. **`cycle-dossier.entry` cache read:** re-run
