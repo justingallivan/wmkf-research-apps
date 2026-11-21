@@ -23,9 +23,29 @@ Decided, not built:
    the applicant gave matches the linked AkoyaGO record's stored email,
    confirming needs no evidence link; the evidence is recorded as that stored
    address. An evidence link is required only for uncertain addresses (a role
-   or lab mailbox, a domain mismatch, or no address found). See open decision 1.
-4. **Process for decision 3:** `/contract-reconcile` and a Codex plan review
-   before any server change.
+   or lab mailbox, a domain mismatch, or no address found). Refined by
+   decision 5.
+4. **Process for decisions 3 and 5:** `/contract-reconcile` and a Codex plan
+   review before any server change.
+5. **Three evidence levels for applicant-recommended reviewers** (refines
+   decision 3, after the owner learned that step 1 finds the AkoyaGO record by
+   the applicant's email, so the stored and applicant emails match almost by
+   construction):
+   - **Confirmed elsewhere → one click, no dialog.** The applicant's exact
+     address also appears on the person's ORCID, an institution page, their
+     papers (the existing `ready` sources), or a past invitation they accepted.
+   - **Plausible → dialog with one checkbox, no evidence link.** Not found
+     elsewhere, but the domain fits the listed institution and accepts mail.
+   - **Something is off → evidence link required.** A role or lab mailbox, a
+     domain that doesn't fit the institution or doesn't accept mail, or
+     publications that point to a different institution and field.
+   - The invite dialog's per-recipient acknowledgement before sending is
+     unchanged in every case.
+6. **Confirm step is a small dialog** showing name, institution, the exact
+   email and where it came from. The one-click level skips it.
+7. **Remove the "Applicant-referred reviewers" list** from the Find tab. The
+   cards carry the applicant's listed details; a suggested-reviewer row that
+   fails to load shows a warning at the top of the Find tab.
 
 Earlier owner targets carried into this brief (SESSION_PROMPT, Session 693
 item 1): one plain question per card; the match result as one line; one pair
@@ -107,8 +127,8 @@ reasoning, no record IDs, no pointer to another section.
 
 ### 4. Scope and boundaries
 - In scope: the candidate card in every Find-tab section, its Confirm dialog,
-  and the applicant-referred list near the bottom of the tab (proposed for
-  removal, open decision 3).
+  and the applicant-referred list near the bottom of the tab (removed by
+  owner decision 7).
 - Untouched: namesake safety (contact details and metrics stay hidden until
   identity is confirmed; the Scholar link stays a name search), the send-time
   acknowledgement, the admin identity comparison panel, search controls and
@@ -144,11 +164,12 @@ free text; the system is called AkoyaGO everywhere on the card; no
 "enrichment", "gate", "resolver" or "Dataverse".
 
 ### 6. Interaction
-- **Confirm and add to Invite** opens a short confirm step showing the name,
-  institution and the exact email, with one checkbox: *This is the person the
-  applicant meant, and this address reaches them.* No evidence link when the
-  address is not in doubt (owner decision 3). Saving confirms identity and
-  adds the reviewer to Invite in one action.
+- **Confirm and add to Invite** follows owner decision 5. When the address is
+  confirmed elsewhere it adds the reviewer directly. When it is only plausible
+  it opens a small dialog showing the name, institution, the exact email and
+  its source, with one checkbox: *This is the person the applicant meant, and
+  this address reaches them.* Either way, one action confirms identity and
+  adds the reviewer to Invite.
 - **Review and confirm** and **Confirm email** open the same step with the
   comparison visible and an evidence link or note required.
 - *Not a fit* stays recoverable through Reconsider.
@@ -172,16 +193,20 @@ free text; the system is called AkoyaGO everywhere on the card; no
    confirmation and promotion. Branch 2 (exclusion enforcement) must cover it.
 5. **Applicant columns.** The Find tab must read the row's applicant-listed
    email and affiliation to fill the *Applicant listed* column.
+6. **Automatic pre-validation for decision 5.**
+   - Compare the applicant's exact address with addresses the existing lookups
+     already find (`READY_EMAIL_SOURCES` in `lib/utils/reviewer-invite.js:82`).
+   - Treat a past accepted invitation at that address as confirmation
+     (acceptance evidence is collected but not written back; see
+     `docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md` §5.4).
+   - Add a domain-fits-institution check and a does-the-domain-accept-mail
+     (DNS MX) check. Neither exists today [VERIFIED via a repo grep for MX and
+     DNS imports in `lib/`, `pages/`, `shared/` and `scripts/`; only `lib/utils/safe-fetch.js` uses DNS, to resolve hosts].
+   - Not chosen: mailbox probing or an outside verification service
+     (unreliable at universities, and sends reviewer emails to a third party).
+   - How often the existing lookups actually find an applicant's address is
+     unknown [ASSUMED unknown]; the five 1003526 test reviewers showed none.
 
-### 8. Open decisions for the owner
-1. **The email-match condition is almost always true.** Because step 1 finds
-   the AkoyaGO record by the applicant's email, "applicant email matches the
-   stored email" holds for nearly every applicant row. Decision 3 therefore
-   means: applicant-recommended reviewers confirm without an evidence link
-   unless the address is a role or lab mailbox or its domain doesn't match the
-   listed institution. Confirm that is intended, or narrow it (for example,
-   also require the publications not to point elsewhere).
-2. **Confirm step:** a small dialog (proposed) or an inline checkbox on the
-   card.
-3. **Applicant-referred list:** remove it once the cards show the applicant's
-   listed details (proposed), or keep it.
+### 8. Open decisions
+None. The three questions raised with this brief were settled as owner
+decisions 5–7 on 2026-11-20.
