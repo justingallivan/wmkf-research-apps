@@ -225,6 +225,12 @@
         ],
         "createdAt": "2026-09-19T05:06:10.802Z",
         "reason": "Preserve the five pre-existing secondary-note sizes from ReviewerSearchSection at cc119614 during the authorized behavior-and-appearance-preserving extraction; not a new global typography step."
+      },
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "createdAt": "2026-11-21T04:01:57.351Z",
+        "reason": "DESIGN.md Typography declares Inter as the suite's display, body and label font"
       }
     ]
   }
