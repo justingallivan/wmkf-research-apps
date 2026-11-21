@@ -47,4 +47,19 @@ jest.mock('@vercel/postgres',()=>({db:{connect:()=>mockPool.connect()},sql:{quer
     const result=await mockPool.query('SELECT updated_by,data FROM external_service_reviews WHERE id=$1',[review.id]);
     expect(result.rows[0]).toMatchObject({updated_by:42,data:{followUp:'Observed on next natural run'}});
   });
+  test('rejects another service’s review and rolls back the attempted service change',async()=>{
+    const row=(await listServices()).find(s=>s.id==='openai');
+    const review=(await listReviews('assemblyai'))[0];
+    await expect(saveService({id:row.id,data:{...row.data,owner:'Wrong service'},expectedVersion:row.version,review:review.data,reviewId:review.id},42)).rejects.toMatchObject({status:404});
+    expect((await listServices()).find(s=>s.id===row.id)).toEqual(row);
+    expect((await listReviews('assemblyai')).find(r=>r.id===review.id).data).toEqual(review.data);
+  });
+  test('malformed UUID and out-of-range version reject before connecting',async()=>{
+    const connect=jest.spyOn(mockPool,'connect');
+    const command={id:'assemblyai',data:seed.services.find(s=>s.id==='assemblyai').data,expectedVersion:1,review:seed.assemblyAIReview};
+    await expect(saveService({...command,reviewId:'-'.repeat(36)},42)).rejects.toMatchObject({status:400});
+    await expect(saveService({...command,expectedVersion:2147483648},42)).rejects.toMatchObject({status:400});
+    expect(connect).not.toHaveBeenCalled();connect.mockRestore();
+  });
+
 });

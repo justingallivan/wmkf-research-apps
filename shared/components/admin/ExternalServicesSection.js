@@ -46,6 +46,7 @@ export default function ExternalServicesSection() {
   const [reload, setReload] = useState(0);
   const generation = useRef(0);
   const newServiceId = useRef(null);
+  const saveFailed = useRef(false);
   useAdminUnsavedChangesGuard(!!editor);
 
   useEffect(() => {
@@ -79,7 +80,14 @@ export default function ExternalServicesSection() {
     setReviewId(existingReview?.id || null); setEditor(kind); setError(''); setNotice('');
     if (kind === 'review' && !existingReview) setDraft({ ...current.data, nextReviewOn: new Date(Date.now() + current.data.cadenceDays * 86400000).toISOString().slice(0, 10) });
   }
-  function closeEditor() { setEditor(null); setDraft(null); setReview(null); setReviewId(null); setError(''); }
+  function closeEditor() {
+    setEditor(null); setDraft(null); setReview(null); setReviewId(null); setError('');
+    // A failed response does not prove the transaction failed. Re-read before
+    // another edit or creation so committed results and current versions appear.
+    if (saveFailed.current) {
+      saveFailed.current = false; setLoading(true); setReload(v => v + 1);
+    }
+  }
   function back() { if (editor && !window.confirm('Discard unsaved service changes?')) return; closeEditor(); setSelected(null); setNotice(''); }
   async function save(event) {
     event.preventDefault(); if (saving) return;
@@ -89,9 +97,16 @@ export default function ExternalServicesSection() {
     try {
       await requestJson(API, { method: 'PUT', body: { id, data: draft, expectedVersion: current?.version || 0, ...(review ? { review, reviewId } : {}) }, fallbackMessage: 'Could not save the service.' });
       if (generation.current !== token) return;
+      saveFailed.current = false;
       closeEditor(); setSelected(id); setNotice('Saved.'); setReload(v => v + 1);
     } catch (err) {
-      if (generation.current === token) setError(err.status === 409 ? 'This record changed since you opened it. Copy any unsaved notes, cancel, then reload before trying again.' : (err.message || 'Could not save. Please retry.'));
+      if (generation.current === token) {
+        saveFailed.current = true;
+        setError(err.status === 409
+          ? 'This record changed or may already have been saved. Copy any unsaved notes, then Cancel to reload saved records before trying again.'
+          : err.status === 400 ? err.message
+            : 'We could not confirm the save. Copy any unsaved notes, then Cancel to reload saved records and check whether it succeeded.');
+      }
     } finally { if (generation.current === token) setSaving(false); }
   }
   const setField = (key, value) => setDraft(v => ({ ...v, [key]: value }));
@@ -99,7 +114,7 @@ export default function ExternalServicesSection() {
 
   return <section aria-labelledby="external-services-title" className="space-y-5">
     <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 id="external-services-title" className="text-xl font-semibold text-gray-900">External services</h2><p className="mt-1 text-sm text-gray-600">Review what we use, what changed, and what needs a decision.</p></div>
-      {!selected && !editor && <Button onClick={() => openEditor('new')}>Add service</Button>}
+      {!selected && !editor && <Button disabled={loading} onClick={() => openEditor('new')}>Add service</Button>}
     </div>
     {notice && <p role="status" className="text-sm text-green-700">{notice}</p>}
     {error && <div role="alert" className="text-sm text-red-700">{error} {!editor && <Button variant="link" onClick={() => setReload(v => v + 1)}>Retry</Button>}</div>}

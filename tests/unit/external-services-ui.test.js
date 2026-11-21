@@ -42,3 +42,29 @@ test('failed save preserves the draft and never displays success',async()=>{
   expect(await screen.findByRole('alert')).toHaveTextContent('Copy any unsaved notes');
   expect(screen.getByLabelText('Owner')).toHaveValue('New owner');expect(screen.queryByText('Saved.')).not.toBeInTheDocument();
 });
+test('cancel after a conflict reloads the service version before the next edit',async()=>{
+  let row=assembly;
+  global.fetch.mockImplementation(async(url,options)=>{
+    if(options?.method==='PUT'){row={...assembly,version:2,data:{...assembly.data,owner:'Saved by another editor'}};return response({error:'stale'},409);}
+    return response(url.includes('?id=')?{reviews:[]}:{services:[row]});
+  });
+  render(<ExternalServicesSection/>);fireEvent.click(await screen.findByRole('button',{name:'AssemblyAI · Recorded-audio transcription'}));
+  fireEvent.click(screen.getByRole('button',{name:'Edit service'}));fireEvent.click(screen.getByRole('button',{name:'Save service'}));
+  await screen.findByRole('alert');fireEvent.click(screen.getByRole('button',{name:'Cancel'}));
+  await screen.findByText(/Owner: Saved by another editor/);
+  fireEvent.click(screen.getByRole('button',{name:'Edit service'}));fireEvent.click(screen.getByRole('button',{name:'Save service'}));
+  await waitFor(()=>expect(global.fetch.mock.calls.filter(([,o])=>o?.method==='PUT')).toHaveLength(2));
+  expect(JSON.parse(global.fetch.mock.calls.filter(([,o])=>o?.method==='PUT')[1][1].body).expectedVersion).toBe(2);
+});
+test('cancel after a lost create response reveals the saved row instead of an empty list',async()=>{
+  let saved=null;
+  global.fetch.mockImplementation(async(url,options)=>{
+    if(options?.method==='PUT'){const body=JSON.parse(options.body);saved={id:body.id,data:body.data,version:1,lastReviewedOn:null};throw new Error('reply lost');}
+    return response({services:saved?[saved]:[]});
+  });
+  render(<ExternalServicesSection/>);await screen.findByText(/0 services/);fireEvent.click(screen.getByRole('button',{name:'Add service'}));
+  for(const label of ['Service name','Provider','Used for','Current model, API, or plan'])fireEvent.change(screen.getByLabelText(label),{target:{value:'New service'}});
+  fireEvent.click(screen.getByRole('button',{name:'Save service'}));await screen.findByRole('alert');fireEvent.click(screen.getByRole('button',{name:'Cancel'}));
+  expect(await screen.findByRole('button',{name:'New service · New service'})).toBeInTheDocument();
+  expect(global.fetch.mock.calls.filter(([,o])=>o?.method==='PUT')).toHaveLength(1);
+});
