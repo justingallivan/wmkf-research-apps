@@ -223,6 +223,7 @@ export default function ReviewerSearchSection({
           progress={progress}
         />
         <SearchResults
+          applicantRecommendations={recommended}
           rosterNote={rosterNote}
           displayCandidates={displayCandidates}
           rosterExcluded={rosterExcluded}

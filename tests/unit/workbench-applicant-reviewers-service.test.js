@@ -51,7 +51,7 @@ jest.mock('../../lib/services/model-override-loader', () => ({
   loadModelOverrides: (...a) => loadModelOverrides(...a),
 }));
 
-import { ingestApplicantReviewers } from '../../lib/services/workbench/applicant-reviewers-service';
+import { applicantListedFromSuggestionRow, ingestApplicantReviewers } from '../../lib/services/workbench/applicant-reviewers-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 
 const REQ = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
@@ -348,5 +348,57 @@ describe('existing applicant-recommended rows (J27 intake: slots empty)', () => 
     expect(body.knownLookupFailed).toEqual([
       { slot: null, potentialReviewerId: null, suggestionId: 'row-1', code: 'person_unavailable' },
     ]);
+  });
+});
+
+describe('applicant-listed details (display only)', () => {
+  afterEach(() => { findApplicantRecommendedByRequest.mockReset(); findApplicantRecommendedByRequest.mockResolvedValue([]); });
+  const P3 = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+  const listedRow = (over = {}) => ({
+    wmkf_appreviewersuggestionid: 'row-1',
+    _wmkf_potentialreviewer_value: P3,
+    _wmkf_potentialreviewer_value_formatted: 'Dr. Three',
+    wmkf_selected: false,
+    wmkf_applicantdisposition: 100000000,
+    wmkf_revieweremail: '  three@stanford.edu ',
+    wmkf_revieweraffiliation: 'Stanford University',
+    wmkf_notes: 'Staff note that must not be shown as the applicant\'s field',
+    ...over,
+  });
+
+  test('attaches the applicant-typed email and institution to a row-only recommendation', async () => {
+    findApplicantRecommendedByRequest.mockResolvedValue([listedRow()]);
+    const body = await ingestApplicantReviewers(args);
+    expect(body.recommended[0].applicantListed).toEqual({ email: 'three@stanford.edu', institution: 'Stanford University' });
+    expect(JSON.stringify(body.recommended[0].applicantListed)).not.toContain('Staff note');
+  });
+
+  test('attaches to a slot-materialized recommendation through its suggestion id', async () => {
+    getById.mockResolvedValue(baseRequest({ _wmkf_potentialreviewer1_value: P1 }));
+    ensureApplicantRecommended.mockResolvedValue({ id: 'slot-row', created: false, skippedExcluded: false });
+    findApplicantRecommendedByRequest.mockResolvedValue([
+      listedRow({ wmkf_appreviewersuggestionid: 'slot-row', _wmkf_potentialreviewer_value: P1 }),
+    ]);
+    const body = await ingestApplicantReviewers(args);
+    expect(body.recommended).toHaveLength(1);
+    expect(body.recommended[0]).toMatchObject({ slot: 1, suggestionId: 'slot-row' });
+    expect(body.recommended[0].applicantListed).toEqual({ email: 'three@stanford.edu', institution: 'Stanford University' });
+  });
+
+  test.each([
+    ['accepted', { wmkf_accepted: true }],
+    ['declined', { wmkf_declined: true }],
+    ['responded', { wmkf_responsereceivedat: '2026-11-01T00:00:00Z' }],
+    ['review received', { wmkf_reviewreceivedat: '2026-11-02T00:00:00Z' }],
+  ])('omits values once the reviewer has %s (they may be the reviewer\'s own edits)', async (_label, over) => {
+    findApplicantRecommendedByRequest.mockResolvedValue([listedRow(over)]);
+    const body = await ingestApplicantReviewers(args);
+    expect(body.recommended[0]?.applicantListed).toBeUndefined();
+  });
+
+  test('omits the field entirely when the row carries neither value', () => {
+    expect(applicantListedFromSuggestionRow(listedRow({ wmkf_revieweremail: ' ', wmkf_revieweraffiliation: null }))).toBeNull();
+    expect(applicantListedFromSuggestionRow(listedRow({ wmkf_revieweremail: null }))).toEqual({ email: null, institution: 'Stanford University' });
+    expect(applicantListedFromSuggestionRow(null)).toBeNull();
   });
 });

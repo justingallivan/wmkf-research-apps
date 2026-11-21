@@ -68,7 +68,7 @@ function PaperList({ pubs }) {
 // view never decides selectability. `readOnly` renders without the Select
 // checkbox; `onExclude` adds Not a fit; `onPromote` adds Reconsider (the
 // collapsed Excluded section).
-export function CandidateCard({ candidate, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onAddToInvite, addingToInvite = false, onUseLead, onEdit, onConfirmIdentity, onRequestRepair, onReviewAddressConflict, onRetryAddressCheck, onRetryInstitution, canManage = true, repairAttention = false, repairRequest = null, repairRequestsUnavailable = false, onRetryRepairStatus }) {
+export function CandidateCard({ candidate, applicantListed = null, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onAddToInvite, addingToInvite = false, onUseLead, onEdit, onConfirmIdentity, onRequestRepair, onReviewAddressConflict, onRetryAddressCheck, onRetryInstitution, canManage = true, repairAttention = false, repairRequest = null, repairRequestsUnavailable = false, onRetryRepairStatus }) {
   const cardRef = useRef(null);
   const baseId = useId();
   const selectId = `${baseId}-select`;
@@ -269,13 +269,28 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
   const foundInstitution = c.affiliation || null;
   const foundEmail = manualEmail ? (c.email || null) : (enr.email || c.email || null);
   const showRecordColumn = Boolean(recordInstitution || recordEmail);
-  const institutionDiffers = showRecordColumn && !sameValue(recordInstitution, foundInstitution);
-  const emailDiffers = showRecordColumn && !sameValue(recordEmail, foundEmail);
+  // What the applicant typed on the form (joined by suggestion id). Display
+  // only: it never changes the status, the action or the evidence rule.
+  const listedInstitution = typeof applicantListed?.institution === 'string' ? applicantListed.institution : null;
+  const listedEmail = typeof applicantListed?.email === 'string' ? applicantListed.email : null;
+  const showApplicantColumn = Boolean(listedInstitution || listedEmail);
+  // Only exact email differences are highlighted. Institution names are free
+  // text in different formats ("Department of X, University Y, City"), so a
+  // raw string difference is not evidence of a mismatch.
+  const shownEmails = [
+    showApplicantColumn ? listedEmail : null,
+    showRecordColumn ? recordEmail : null,
+    foundEmail,
+  ].filter(Boolean).map((value) => value.trim().toLowerCase());
+  const emailDiffers = new Set(shownEmails).size > 1;
   const hasFitWarning = Boolean(c.expertiseMismatch || c.aiFlaggedNotRelevant || c.lowPublicationCount
     || (typeof c.verificationConfidence === 'number' && c.verificationConfidence < 0.65));
+  // Auto-open ignores the applicant's values: they arrive after the cards
+  // mount, and a late open would shift the page under the director.
+  const recordFoundEmailDiffers = Boolean(showRecordColumn && recordEmail && foundEmail
+    && recordEmail.trim().toLowerCase() !== foundEmail.trim().toLowerCase());
   const compareDefaultOpen = status.key === 'check_identity'
-    || institutionDiffers
-    || emailDiffers
+    || recordFoundEmailDiffers
     || hasFitWarning
     || dataverseEvidence?.status === 'review_required';
   // Follows the computed default (enrichment can change it after mount) until
@@ -412,6 +427,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                 <thead>
                   <tr className="text-gray-500">
                     <th scope="col" className="w-28 py-1.5 pr-2 font-medium"><span className="sr-only">Detail</span></th>
+                    {showApplicantColumn && <th scope="col" className="py-1.5 pr-2 font-medium">Applicant listed</th>}
                     {showRecordColumn && <th scope="col" className="py-1.5 pr-2 font-medium">AkoyaGO record</th>}
                     <th scope="col" className="py-1.5 pr-2 font-medium">{identityUnverified ? 'Found for this name' : 'Found by search'}</th>
                   </tr>
@@ -419,8 +435,9 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                 <tbody>
                   <tr className="border-t border-gray-200 align-top">
                     <th scope="row" className="py-1.5 pr-2 font-medium text-gray-500">Institution</th>
+                    {showApplicantColumn && <td className="py-1.5 pr-2">{listedInstitution}</td>}
                     {showRecordColumn && (
-                      <td className={`py-1.5 pr-2 ${institutionDiffers ? 'bg-amber-50 font-medium text-amber-800' : ''}`}>
+                      <td className="py-1.5 pr-2">
                         {recordInstitutionEntries.length > 0
                           ? recordInstitutionEntries.map((entry, index) => (
                             <span key={`${entry.source || 'record'}:${entry.value}`}>
@@ -434,7 +451,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                         )}
                       </td>
                     )}
-                    <td className={`py-1.5 pr-2 ${institutionDiffers ? 'bg-amber-50 font-medium text-amber-800' : ''}`}>
+                    <td className="py-1.5 pr-2">
                       {foundInstitution || <span className="text-gray-500">None found</span>}
                       {foundInstitution && affiliationEvidenceLabel(c.affiliationSource || enr.affiliationSource) && (
                         <span className="font-normal text-gray-500"> · {affiliationEvidenceLabel(c.affiliationSource || enr.affiliationSource)}</span>
@@ -443,15 +460,20 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                   </tr>
                   <tr className="border-t border-gray-200 align-top">
                     <th scope="row" className="py-1.5 pr-2 font-medium text-gray-500">Email</th>
+                    {showApplicantColumn && (
+                      <td className={`break-all py-1.5 pr-2 ${emailDiffers && listedEmail ? 'bg-amber-50 font-medium text-amber-800' : ''}`} data-testid="applicant-listed-email">
+                        {listedEmail}
+                      </td>
+                    )}
                     {showRecordColumn && (
-                      <td className={`break-all py-1.5 pr-2 ${emailDiffers ? 'bg-amber-50 font-medium text-amber-800' : ''}`}>
+                      <td className={`break-all py-1.5 pr-2 ${emailDiffers && recordEmail ? 'bg-amber-50 font-medium text-amber-800' : ''}`}>
                         {recordEmail ? <span>{recordEmail}</span> : <span className="text-gray-500">None on record</span>}
                         {recordEmail && emailSource && sameValue(recordEmail, email) && (
                           <span className="font-normal text-gray-500"> · {emailSourceDisplayLabel(emailSource)}</span>
                         )}
                       </td>
                     )}
-                    <td className={`break-all py-1.5 pr-2 ${emailDiffers ? 'bg-amber-50 font-medium text-amber-800' : ''}`}>
+                    <td className={`break-all py-1.5 pr-2 ${emailDiffers && foundEmail ? 'bg-amber-50 font-medium text-amber-800' : ''}`}>
                       {foundEmail ? <span>{foundEmail}</span> : <span className="text-gray-500">None found</span>}
                       {foundEmail && emailSource && sameValue(foundEmail, email) && !(recordEmail && sameValue(recordEmail, email)) && (
                         <span className="font-normal text-gray-500"> · {emailSourceDisplayLabel(emailSource)}{enr.emailYear ? `, ${enr.emailYear}` : ''}</span>
@@ -461,6 +483,7 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
                   {expertiseTerms.length > 0 && (
                     <tr className="border-t border-gray-200 align-top">
                       <th scope="row" className="py-1.5 pr-2 font-medium text-gray-500">Field</th>
+                      {showApplicantColumn && <td className="py-1.5 pr-2" />}
                       {showRecordColumn && <td className="py-1.5 pr-2 text-gray-500">Not recorded</td>}
                       <td className="py-1.5 pr-2">{expertiseTerms.join(', ')}</td>
                     </tr>

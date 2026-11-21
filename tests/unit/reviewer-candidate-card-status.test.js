@@ -78,7 +78,8 @@ describe('getCandidateCardStatus', () => {
 
 describe('CandidateCard status rendering', () => {
   // eslint-disable-next-line global-require
-  const { render, screen } = require('@testing-library/react');
+  const { render, screen, cleanup } = require('@testing-library/react');
+  afterEach(cleanup);
   // eslint-disable-next-line global-require
   const { CandidateCard } = require('../../shared/components/reviewers/ReviewerSearchSection');
 
@@ -117,5 +118,79 @@ describe('CandidateCard status rendering', () => {
     expect(screen.getByText('Named in the proposal')).toBeInTheDocument();
     rerender(<CandidateCard candidate={{ ...READY, sources: ['staff_manual'] }} checked={false} onToggle={() => {}} />);
     expect(screen.getByText('Added by staff')).toBeInTheDocument();
+  });
+});
+
+describe('Applicant listed column', () => {
+  // eslint-disable-next-line global-require
+  const { render, screen, within, cleanup } = require('@testing-library/react');
+  afterEach(cleanup);
+  // eslint-disable-next-line global-require
+  const { CandidateCard } = require('../../shared/components/reviewers/ReviewerSearchSection');
+  const APPLICANT = {
+    ...READY,
+    email: 'okafor@harvard.edu',
+    affiliation: 'Harvard University',
+    isApplicantRecommended: true,
+    suggestionId: 'row-1',
+    applicantKnownReviewer: {
+      status: 'known',
+      affiliation: 'Harvard University',
+      email: 'okafor@harvard.edu',
+      emailSource: 'orcid',
+      emailReadiness: { level: 'high', action: 'ready', reason: 'x' },
+    },
+  };
+
+  test('is absent when the applicant row carried no listed details', () => {
+    render(<CandidateCard candidate={APPLICANT} applicantListed={null} checked={false} onToggle={() => {}} />);
+    expect(screen.queryByRole('columnheader', { name: 'Applicant listed' })).not.toBeInTheDocument();
+  });
+
+  test('shows what the applicant typed and highlights only an exact email difference', () => {
+    render(
+      <CandidateCard
+        candidate={APPLICANT}
+        applicantListed={{ institution: 'Department of Chemistry, Stanford University, Stanford CA', email: 'mokafor@stanford.edu' }}
+        checked={false}
+        onToggle={() => {}}
+      />,
+    );
+    expect(screen.getByRole('columnheader', { name: 'Applicant listed' })).toBeInTheDocument();
+    expect(screen.getByText('Department of Chemistry, Stanford University, Stanford CA')).toBeInTheDocument();
+    const listedEmail = screen.getByTestId('applicant-listed-email');
+    expect(listedEmail).toHaveTextContent('mokafor@stanford.edu');
+    expect(listedEmail).toHaveClass('bg-amber-50');
+    // Institution text in a different format is never highlighted.
+    expect(screen.getByText('Department of Chemistry, Stanford University, Stanford CA').closest('td')).not.toHaveClass('bg-amber-50');
+    // Plain text, never a mail link.
+    expect(within(listedEmail).queryByRole('link')).not.toBeInTheDocument();
+    // Display only: the status is unchanged by the applicant's values.
+    expect(screen.getByTestId('candidate-status-chip')).toHaveTextContent('Ready');
+  });
+
+  test('a matching email is not highlighted and does not open the disclosure', () => {
+    render(
+      <CandidateCard
+        candidate={APPLICANT}
+        applicantListed={{ institution: 'Harvard', email: 'OKAFOR@harvard.edu' }}
+        checked={false}
+        onToggle={() => {}}
+      />,
+    );
+    expect(screen.getByTestId('applicant-listed-email')).not.toHaveClass('bg-amber-50');
+    expect(screen.getByTestId('candidate-compare-details')).not.toHaveAttribute('open');
+  });
+
+  test('an applicant email difference alone does not auto-open Compare details', () => {
+    render(
+      <CandidateCard
+        candidate={APPLICANT}
+        applicantListed={{ institution: null, email: 'other@stanford.edu' }}
+        checked={false}
+        onToggle={() => {}}
+      />,
+    );
+    expect(screen.getByTestId('candidate-compare-details')).not.toHaveAttribute('open');
   });
 });

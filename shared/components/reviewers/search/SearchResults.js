@@ -20,6 +20,7 @@ const BLOCKED_REFERRAL_REASON = {
 // The durable roster and this-run results are a markup-only view. Selection,
 // save, remediation and roster commands remain owned by useReviewerSearchController and the operation hooks.
 export default function SearchResults({
+  applicantRecommendations = [],
   rosterNote,
   displayCandidates,
   rosterExcluded,
@@ -74,6 +75,17 @@ export default function SearchResults({
   runSearch,
   progress,
 }) {
+  // The applicant's own listed details, joined to cards by suggestion id only
+  // (never by name). Display only; absent for rows without them.
+  const applicantListedBySuggestion = new Map(
+    (Array.isArray(applicantRecommendations) ? applicantRecommendations : [])
+      .filter((entry) => entry?.suggestionId && entry.applicantListed)
+      .map((entry) => [entry.suggestionId, entry.applicantListed]),
+  );
+  const applicantListedFor = (candidate) => (candidate?.suggestionId
+    ? applicantListedBySuggestion.get(candidate.suggestionId) || null
+    : null);
+
   return (
     <>
       {(rosterNote || displayCandidates.length > 0 || rosterExcluded.length > 0 || rosterIneligible.length > 0 || rosterBlocked.length > 0 || phase === 'results' || phase === 'done') && (
@@ -179,6 +191,7 @@ export default function SearchResults({
                               return <CandidateCard
                                 key={candKey(c)}
                                 candidate={c}
+                                applicantListed={applicantListedFor(c)}
                                 previousResult={previousSearchKeys.has(candKey(c))}
                                 checked={selected.has(candKey(c))}
                                 onToggle={() => toggle(candKey(c))}
@@ -198,6 +211,7 @@ export default function SearchResults({
                             return <CandidateCard
                               key={candKey(c)}
                               candidate={c}
+                              applicantListed={applicantListedFor(c)}
                               previousResult={previousSearchKeys.has(candKey(c))}
                               readOnly
                               onExclude={excludeCandidate}
@@ -274,7 +288,7 @@ export default function SearchResults({
                   </summary>
                   <div className="space-y-2 mt-2">
                     {rosterExcluded.map((c) => (
-                      <CandidateCard key={`exc-${candKey(c)}`} candidate={c} readOnly onPromote={promoteCandidate} />
+                      <CandidateCard key={`exc-${candKey(c)}`} candidate={c} applicantListed={applicantListedFor(c)} readOnly onPromote={promoteCandidate} />
                     ))}
                   </div>
                 </details>
@@ -311,7 +325,7 @@ export default function SearchResults({
                   </summary>
                   <div className="space-y-2 mt-2">
                     {rosterBlocked.map((candidate) => (
-                      <CandidateCard key={`blocked-${candKey(candidate)}`} candidate={candidate} readOnly />
+                      <CandidateCard key={`blocked-${candKey(candidate)}`} candidate={candidate} applicantListed={applicantListedFor(candidate)} readOnly />
                     ))}
                   </div>
                 </details>
@@ -334,6 +348,7 @@ export default function SearchResults({
                       return <CandidateCard
                         key={`unv-${candKey(c)}`}
                         candidate={c}
+                        applicantListed={applicantListedFor(c)}
                         readOnly
                         onExclude={excludeUnverifiedCandidate}
                         onConfirmIdentity={canRescue ? openIdentityConfirmation : undefined}
