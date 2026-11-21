@@ -46,6 +46,13 @@ Decided, not built:
 7. **Remove the "Applicant-referred reviewers" list** from the Find tab. The
    cards carry the applicant's listed details; a suggested-reviewer row that
    fails to load shows a warning at the top of the Find tab.
+8. **An older AkoyaGO contact counts as confirmation.** When exactly one active
+   AkoyaGO contact has the applicant's exact address, and that contact existed
+   before the suggestion, the address is *confirmed elsewhere* (one click).
+   A contact created after the suggestion does not count. Evidence in §7
+   item 6.
+9. **Validate the applicant's listed details against AkoyaGO** (§7 item 7);
+   mismatches are flags that require the evidence link, never blocks.
 
 Earlier owner targets carried into this brief (SESSION_PROMPT, Session 693
 item 1): one plain question per card; the match result as one line; one pair
@@ -246,8 +253,8 @@ free text; the system is called AkoyaGO everywhere on the card; no
      most 12 of them older; the exact overlap was not computed). Who entered
      each contact's address (the person in GOApply, staff, or an earlier
      import) is not known [ASSUMED unknown], so an older contact address is
-     corroboration of age, not proof the person typed it. Owner decision
-     pending on whether to add it as a route.
+     corroboration of age, not proof the person typed it. The owner chose to
+     count it (owner decision 8).
 7. **Validate the applicant's listed details against AkoyaGO** (owner request,
    2026-11-20). Each mismatch below puts the card in *Check email*, highlights
    the cell in Compare details, and requires the evidence link:
@@ -272,6 +279,24 @@ free text; the system is called AkoyaGO everywhere on the card; no
    owner 2026-11-20; not yet confirmed with Connor or in data], so the
    record-vs-applicant comparison can catch stale records.
 
+   **D26 measurement** [VERIFIED 2026-11-20 via an owner-approved, read-only,
+   counts-only query of the same 62 roster rows; only institution names were
+   sent to the public OpenAlex API, using the existing
+   `strongInstitutionDisplayMatch` and `domainRelated` helpers]. The listed
+   institution was the candidate's affiliation, else the AkoyaGO record's
+   (both applicant-originated for D26 [ASSUMED]):
+   - 22 email domains fit the institution and 2 do not (about 8% of the 24
+     that could be compared);
+   - 4 are personal addresses (gmail and similar);
+   - 33 institutions could not be resolved to a domain, because long
+     department strings ("Department of X, University Y, City") fail the
+     strong-match rule. The build must clean institution names first or this
+     check rarely fires;
+   - 1 had no institution.
+   - Listed vs AkoyaGO record institution: 0 contradictions among the 20 rows
+     with both. For D26 both came from the applicant, so this says nothing
+     about J27, where the record keeps its own institution.
+
 ### 8. Open decisions
-None. The three questions raised with this brief were settled as owner
-decisions 5–7 on 2026-11-20.
+None. The questions raised with this brief were settled as owner decisions
+5–9 on 2026-11-20.
