@@ -204,8 +204,23 @@ free text; the system is called AkoyaGO everywhere on the card; no
      DNS imports in `lib/`, `pages/`, `shared/` and `scripts/`; only `lib/utils/safe-fetch.js` uses DNS, to resolve hosts].
    - Not chosen: mailbox probing or an outside verification service
      (unreliable at universities, and sends reviewer emails to a third party).
-   - How often the existing lookups actually find an applicant's address is
-     unknown [ASSUMED unknown]; the five 1003526 test reviewers showed none.
+   - **How often the existing lookups find the applicant's address**
+     [VERIFIED 2026-11-20 via an owner-approved, read-only, counts-only query
+     of `reviewer_find_roster` (Postgres host from `.env.local`)]. Population:
+     applicant-suggested rows saved in the current data format
+     (`applicantEnrichmentCacheVersion` 4): 62 reviewers on 14 requests, first
+     seen June–August 2026, all with a stored AkoyaGO address. Of the 62:
+     - 8 (13%): a ready-tier source found the **same** address (one click);
+     - 11: the same address from a weaker source (10 of them `manual`, which
+       is staff-entered rather than an independent lookup);
+     - 3: a **different** address (1 ready-tier, 2 weaker);
+     - 40 (65%): no address found.
+
+     Older-format rows (155 on other cache versions or none) lack the fields
+     and were excluded. So without past acceptances, most applicant reviewers
+     would land at the checkbox level. Whether a lookup that finds the stored
+     address always records it in `contactEnrichment.email` is not checked
+     [ASSUMED], so 13% may be an undercount.
 
 ### 8. Open decisions
 None. The three questions raised with this brief were settled as owner
