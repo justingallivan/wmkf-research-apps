@@ -249,7 +249,12 @@ free text; the system is called AkoyaGO everywhere on the card; no
      - 11: the same address from a weaker source (10 of them `manual`, which
        is staff-entered rather than an independent lookup);
      - 3: a **different** address (1 ready-tier, 2 weaker);
-     - 40 (65%): no address found.
+     - 40 (65%): no address found. **Confounded (2026-11-21):** the server
+       blanks contact data for unresolved identities
+       (`enrich-recommended-service.js:1248-1300`), and 34 of 43 unresolved
+       rows have no found email, so most of these are hidden, not missed. The
+       one-click share is a floor until identity resolution improves; see
+       `docs/plans/APPLICANT_REVIEWER_IDENTITY_W2_PLAN_2026-11-21.md`.
 
      Older-format rows (155 on other cache versions or none) lack the fields
      and were excluded. So without past acceptances, most applicant reviewers
