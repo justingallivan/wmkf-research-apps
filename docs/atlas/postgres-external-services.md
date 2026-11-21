@@ -1,6 +1,6 @@
 # Postgres: external service register
 
-[VERIFIED 2026-11-21 via PR #668, Vercel inspection, and production Postgres readback] Admin → Operations → External services is deployed in production. Migrations 106–107 were applied through the canonical existing-database runner; readback confirmed 26 services, one AssemblyAI review, and no pending migrations. See [release evidence](../audits/SERVICE_TRACKER_RELEASE_2026-11-21.md).
+[VERIFIED 2026-11-21 via PRs #668–669, Vercel inspection, and production Postgres readback] Admin → Operations → External services is deployed in production. Migrations 106–108 were applied through the canonical existing-database runner; readback confirmed 26 services, one AssemblyAI review, and no pending migrations. See [register release evidence](../audits/SERVICE_TRACKER_RELEASE_2026-11-21.md) and [manual-check release evidence](../audits/SERVICE_UPDATE_CHECKS_RELEASE_2026-11-21.md).
 
 ## Authority and schema
 
@@ -13,7 +13,7 @@
 
 | Hop | Contract |
 |---|---|
-| Entry | `pages/api/admin/external-services.js`: GET, PUT, and branch-built POST require `requireSuperuser`; actor attribution comes from the authenticated profile, not the request body. Responses are private/no-store; request body limit is 512 KB. |
+| Entry | `pages/api/admin/external-services.js`: GET, PUT, and POST require `requireSuperuser`; actor attribution comes from the authenticated profile, not the request body. Responses are private/no-store; request body limit is 512 KB. |
 | Validation | `lib/services/external-services/model.js`: bounded service/review fields, closed choices, Pacific-time calendar dates, at most 12 credential-free HTTPS reference links per record. Microsoft, GitHub, and Zoom retain corporate-managed excluded cost policy by seed ID and normalized provider name. |
 | Writes | `lib/services/external-services/store.js`: create at expected version zero; existing saves update only the supplied current service version, incrementing it. A service and optional new/edited review commit in one transaction. Missing review or stale service version rolls back the entire save. Review updates are scoped by service ID. |
 | Bounds | At most 500 services and 200 reviews per service through the store. Service creation takes a table lock before checking capacity; saves serialize on the service version. Service overflow fails explicitly; review history reads at most 200 rows. |
@@ -32,9 +32,9 @@ Verified locally: the canonical upgrade runner applied migration 107 to an isola
 
 Production deployment and schema/count readback are verified on 2026-11-21. An anonymous production API request redirects to sign-in with no-store headers. Authenticated superuser access and a hosted save/reload smoke remain unverified because the available browser was signed out. The AssemblyAI review preserves its source evidence and quality-observation limitations; no recordings were reprocessed for this release.
 
-## Manual update checks — branch-built, not deployed
+## Manual update checks — deployed
 
-[VERIFIED via source and isolated PostgreSQL tests 2026-11-21] `codex/service-update-checks` adds `POST {action: "check", id}` to the same superuser route, restricted to `assemblyai`, `anthropic`, and `serpapi`. Migration `108_external_service_checks.sql` adds one latest JSONB snapshot per supported service, bounded to three rows and 256 KiB per snapshot (application write cap 200,000 bytes). The manifest includes 108; it has not been applied to production.
+[VERIFIED via PR #669, Ready production deployment, and production schema readback 2026-11-21] The manual action adds `POST {action: "check", id}` to the same superuser route, restricted to `assemblyai`, `anthropic`, and `serpapi`. Migration `108_external_service_checks.sql` adds one latest JSONB snapshot per supported service, bounded to three rows and 256 KiB per snapshot (application write cap 200,000 bytes). Migration 108 was applied through the canonical runner at 22:25:28 UTC, before preview and production deployment. Readback confirmed the six-column checks table and unchanged 26-service/one-review inventory.
 
 `check-store.js` claims an atomic 90-second lease; concurrent requests receive 409, checks completed within one minute reuse the stored result, and an expired writer cannot replace a newer result. Interrupted checks can be retried; known completion failures expire their token-fenced lease immediately when the database is reachable. `checks.js` collects independent sources and saves a fenced snapshot. Per-source success baselines survive source failures; unavailable is never interpreted as unchanged. Detected changes remain pending across repeat checks until a new or edited human review is saved after the check completed; the next check observes that review revision and clears the pending comparison. Editing service metadata alone or saving a review during a running check does not acknowledge that check’s findings. Failed sources with pending changes retain visibly dated evidence and can still seed a review draft. GET history returns the latest check, allowing recovery after a lost POST response. Missing check storage returns an explicit setup-needed state while preserving existing review history. These writes do not modify the service version, review dates, or human reviews.
 
@@ -42,4 +42,4 @@ Production deployment and schema/count readback are verified on 2026-11-21. An a
 
 The Admin panel renders plain-text evidence, timestamps, source links, changes, and unavailable sources. The first successful read establishes a baseline; source changes are evidence for a human decision, not a pricing recommendation or benchmark. Excerpts are bounded and may not show every changed passage. “Start review from findings” creates an unsaved Proposed/Investigate draft; rationale and an explicit save are still required. Changing selection invalidates late results. Corporate-managed services remain outside this initial check allowlist.
 
-Live authenticated provider/account checks and hosted save/reload for this addition remain unverified. Publication requires migration 108 through the canonical runner before the new runtime is promoted.
+Live authenticated provider/account checks and hosted save/reload for this addition remain unverified. Migration 108 and the production runtime are deployed; see the release receipt above.
