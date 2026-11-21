@@ -231,6 +231,23 @@ free text; the system is called AkoyaGO everywhere on the card; no
      request). Acceptances on these rows are app-era records, so earlier
      reviewing history kept elsewhere in AkoyaGO is not covered [ASSUMED].
      Combined result for the 62: 8 one click, 51 checkbox, 3 evidence link.
+   - **AkoyaGO contacts are a better second route** [VERIFIED 2026-11-20 via
+     owner-requested, read-only, counts-only Production queries using
+     `lib/dataverse/adapters/contact.js` `findByEmailCandidates` and
+     `searchByName`]. Of the 62:
+     - 16 have exactly one active contact whose `emailaddress1` is the stored
+       address. 12 of those contacts were created before the roster row was
+       first seen (8 more than a year before), and 4 after;
+     - 2 have no email match but a same-name contact with a different address;
+     - 44 have no contact found.
+
+     If an exact, older contact address counted as confirmation, one click
+     would rise from 8 to roughly 18–20 of 62 (14 contact-only matches, at
+     most 12 of them older; the exact overlap was not computed). Who entered
+     each contact's address (the person in GOApply, staff, or an earlier
+     import) is not known [ASSUMED unknown], so an older contact address is
+     corroboration of age, not proof the person typed it. Owner decision
+     pending on whether to add it as a route.
 
 ### 8. Open decisions
 None. The three questions raised with this brief were settled as owner
