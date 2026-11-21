@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Find Identity Card — Workbench Mockup</title>
+  <style>
+    :root {
+      --ink: #111827;
+      --text: #374151;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --border-strong: #d1d5db;
+      --canvas: #f9fafb;
+      --surface: #ffffff;
+      --blue: #1d4ed8;
+      --green: #15803d;
+      --green-soft: #f0fdf4;
+      --green-line: #bbf7d0;
+      --amber: #b45309;
+      --amber-soft: #fffbeb;
+      --amber-line: #fde68a;
+      --red: #b91c1c;
+      --red-soft: #fef2f2;
+      --red-line: #fecaca;
+      --gray-soft: #f3f4f6;
+      --radius-card: 0.75rem;
+      --radius-control: 0.5rem;
+      --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --overlay: 0 20px 25px -5px rgb(0 0 0 / 0.10), 0 8px 10px -6px rgb(0 0 0 / 0.10);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--canvas); color: var(--text);
+      font: 14px/1.5 Inter, ui-sans-serif, system-ui, sans-serif;
+    }
+    main { max-width: 80rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
+    .note { max-width: 56rem; color: var(--muted); margin: 0 0 1.5rem; }
+    h1 { font-size: 1.5rem; font-weight: 600; color: var(--ink); margin: 0 0 .25rem; }
+    h2.section {
+      font-size: .875rem; font-weight: 600; color: var(--ink);
+      margin: 2rem 0 .75rem; display: flex; gap: .5rem; align-items: baseline;
+    }
+    h2.section span { color: var(--muted); font-weight: 400; }
+    .state-tag {
+      font-size: .75rem; color: var(--muted); margin: 1.25rem 0 .375rem;
+      text-transform: none; letter-spacing: 0;
+    }
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-card); box-shadow: var(--shadow);
+      padding: 1.25rem 1.5rem; max-width: 56rem;
+    }
+    .head { display: flex; gap: 1rem; align-items: flex-start; }
+    .who { flex: 1; min-width: 0; }
+    .who h3 { font-size: 1rem; font-weight: 600; color: var(--ink); margin: 0; }
+    .who .inst { color: var(--muted); }
+    .who .source { font-size: .8125rem; color: var(--text); margin-top: .125rem; }
+    .who .source b { font-weight: 600; }
+    .chip {
+      flex: none; font-size: .75rem; font-weight: 600; padding: .125rem .625rem;
+      border-radius: 999px; border: 1px solid; white-space: nowrap;
+    }
+    .chip.green { color: var(--green); background: var(--green-soft); border-color: var(--green-line); }
+    .chip.amber { color: var(--amber); background: var(--amber-soft); border-color: var(--amber-line); }
+    .chip.red { color: var(--red); background: var(--red-soft); border-color: var(--red-line); }
+    .chip.gray { color: var(--text); background: var(--gray-soft); border-color: var(--border); }
+    .chip.mod { font-weight: 500; color: var(--muted); background: var(--gray-soft); border-color: var(--border); margin-left: .375rem; }
+    .match { margin: .75rem 0 0; color: var(--ink); }
+    .match.warn { color: var(--amber); font-weight: 500; }
+    .match.bad { color: var(--red); font-weight: 500; }
+    .match .glyph { display: inline-block; width: 1.1em; }
+    details { margin-top: .625rem; }
+    summary {
+      cursor: pointer; color: var(--blue); font-size: .8125rem; width: max-content;
+      text-decoration: underline; text-underline-offset: 2px;
+    }
+    table.cmp {
+      width: 100%; border-collapse: collapse; margin-top: .625rem; font-size: .8125rem;
+    }
+    table.cmp th, table.cmp td {
+      text-align: left; padding: .375rem .5rem; border-top: 1px solid var(--border);
+      vertical-align: top;
+    }
+    table.cmp thead th { color: var(--muted); font-weight: 500; border-top: 0; }
+    table.cmp tbody th { color: var(--muted); font-weight: 500; width: 7rem; }
+    td.diff { background: var(--amber-soft); color: var(--amber); font-weight: 500; }
+    .papers { margin: .5rem 0 0; padding-left: 1.1rem; font-size: .8125rem; }
+    .papers li { margin: .125rem 0; }
+    .prompt { font-size: .8125rem; color: var(--text); margin-top: .5rem; }
+    .block {
+      margin-top: .75rem; padding: .5rem .75rem; border-radius: var(--radius-control);
+      font-size: .8125rem; border: 1px solid;
+    }
+    .block.red { background: var(--red-soft); border-color: var(--red-line); color: var(--red); }
+    .block.amber { background: var(--amber-soft); border-color: var(--amber-line); color: var(--amber); }
+    .actions { display: flex; gap: 1rem; align-items: center; margin-top: 1rem; }
+    .btn {
+      font: inherit; font-weight: 600; border-radius: var(--radius-control);
+      padding: .5rem 1rem; border: 1px solid transparent; cursor: pointer;
+    }
+    .btn.primary { background: var(--ink); color: #fff; }
+    .btn.outline { background: #fff; color: var(--text); border-color: var(--border-strong); }
+    .link {
+      font: inherit; background: none; border: 0; padding: 0; cursor: pointer;
+      color: var(--text); text-decoration: underline; text-underline-offset: 2px;
+    }
+    .muted { color: var(--muted); }
+    .collapsed {
+      max-width: 56rem; background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-card); padding: .625rem 1.5rem;
+      display: flex; gap: 1rem; align-items: center;
+    }
+    .collapsed .name { color: var(--ink); font-weight: 600; }
+    .collapsed .why { flex: 1; color: var(--muted); }
+    /* dialog */
+    .dialog-wrap {
+      max-width: 56rem; background: rgb(17 24 39 / .35); border-radius: var(--radius-card);
+      padding: 2rem; display: flex; justify-content: center;
+    }
+    .dialog {
+      background: #fff; border-radius: 1rem; box-shadow: var(--overlay);
+      width: 100%; max-width: 30rem; padding: 1.5rem;
+    }
+    .dialog h3 { margin: 0 0 1rem; font-size: 1.125rem; color: var(--ink); font-weight: 600; }
+    .dialog dl { display: grid; grid-template-columns: 6rem 1fr; gap: .375rem .75rem; margin: 0 0 1rem; }
+    .dialog dt { color: var(--muted); }
+    .dialog dd { margin: 0; color: var(--ink); }
+    .check { display: flex; gap: .5rem; align-items: flex-start; margin: 1rem 0; }
+    .check input { margin-top: .25rem; }
+    .field label { display: block; font-weight: 500; color: var(--text); margin-bottom: .25rem; }
+    .field input {
+      width: 100%; font: inherit; padding: .5rem 1rem; border: 1px solid var(--border-strong);
+      border-radius: var(--radius-control);
+    }
+    .dialog .actions { justify-content: flex-end; }
+    .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(26rem, 1fr)); gap: 1.5rem; max-width: 80rem; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Find tab: identity card mock-up</h1>
+  <p class="note">
+    Design brief: <code>docs/plans/FIND_IDENTITY_CARD_REDESIGN_BRIEF_2026-11-20.md</code>.
+    All people, institutions and emails are fictitious. One status chip, one match line,
+    details folded unless something differs, one action row. Grey captions above each card
+    name the state; they are not part of the design.
+  </p>
+
+  <h2 class="section">Ready to add to Invite <span>1</span></h2>
+
+  <p class="state-tag">Ready</p>
+  <article class="card">
+    <div class="head">
+      <div class="who">
+        <h3>Maria Okafor</h3>
+        <div class="inst">Northlake University</div>
+        <div class="source"><b>Recommended by the applicant</b></div>
+      </div>
+      <span class="chip green">Ready</span>
+    </div>
+    <p class="match"><span class="glyph" aria-hidden="true">✓</span>Confirmed: m.okafor@northlake.edu</p>
+    <details><summary>Compare details</summary></details>
+    <div class="actions">
+      <button class="btn primary">Add to Invite</button>
+      <button class="link">Not a fit</button>
+    </div>
+  </article>
+
+  <h2 class="section">Needs a decision <span>5</span></h2>
+
+  <p class="state-tag">Confirm identity: applicant-recommended, evidence agrees (comparison closed)</p>
+  <article class="card">
+    <div class="head">
+      <div class="who">
+        <h3>Daniel Reyes</h3>
+        <div class="inst">Western Coast Medical School</div>
+        <div class="source"><b>Recommended by the applicant</b> · cryo-EM of membrane proteins</div>
+      </div>
+      <span class="chip amber">Confirm identity</span>
+    </div>
+    <p class="match"><span class="glyph" aria-hidden="true">✓</span>Publications match Western Coast Medical School, structural biology</p>
+    <details>
+      <summary>Compare details</summary>
+    </details>
+    <div class="actions">
+      <button class="btn primary">Confirm and add to Invite</button>
+      <button class="link">Not a fit</button>
+    </div>
+  </article>
+
+  <p class="state-tag">Check identity: publications point to someone else (comparison opens itself)</p>
+  <article class="card">
+    <div class="head">
+      <div class="who">
+        <h3>Helen Brandt</h3>
+        <div class="inst">Eastfield University</div>
+        <div class="source"><b>Recommended by the applicant</b> · chromatin and DNA repair</div>
+      </div>
+      <span class="chip amber">Check identity</span>
+    </div>
+    <p class="match warn"><span class="glyph" aria-hidden="true">⚠</span>Publications under this name are from Southmoor University, Department of Psychology</p>
+    <details open>
+      <summary>Compare details</summary>
+      <table class="cmp">
+        <thead><tr><th></th><th>Applicant listed</th><th>AkoyaGO record</th><th>Publications</th></tr></thead>
+        <tbody>
+          <tr><th>Institution</th><td>Eastfield University</td><td>Eastfield University</td><td class="diff">Southmoor University</td></tr>
+          <tr><th>Email</th><td>hbrandt@eastfield.edu</td><td>hbrandt@eastfield.edu</td><td class="muted">none found</td></tr>
+          <tr><th>Field</th><td>Chromatin, DNA repair</td><td class="muted">not recorded</td><td class="diff">Cognitive psychology</td></tr>
+        </tbody>
+      </table>
+      <ol class="papers">
+        <li>Attention and working memory in older adults (2023)</li>
+        <li>Visual search under time pressure (2021)</li>
+      </ol>
+      <p class="prompt">Do these papers match what the proposal is about? If not, they likely belong to someone else with this name.</p>
+    </details>
+    <div class="actions">
+      <button class="btn primary">Review and confirm</button>
+      <button class="link">Not a fit</button>
+    </div>
+  </article>
+
+  <p class="state-tag">Check email: found by search, lab mailbox</p>
+  <article class="card">
+    <div class="head">
+      <div class="who">
+        <h3>Samuel Itoh <span class="chip mod">Emeritus / retired</span></h3>
+        <div class="inst">Harbor Institute of Technology</div>
+        <div class="source"><b>Found by literature search</b> · RNA-guided nucleases</div>
+      </div>
+      <span class="chip amber">Check email</span>
+    </div>
+    <p class="match warn"><span class="glyph" aria-hidden="true">⚠</span>itoh-lab@harbor.edu looks like a lab mailbox</p>
+    <details><summary>Compare details</summary></details>
+    <div class="actions">
+      <button class="btn primary">Confirm email</button>
+      <button class="link">Not a fit</button>
+    </div>
+  </article>
+
+  <p class="state-tag">Fix record: the linked AkoyaGO record is inactive</p>
+  <article class="card">
+    <div class="head">
+      <div class="who">
+        <h3>Priya Natarajan</h3>
+        <div class="inst">Lakeside University</div>
+        <div class="source"><b>Recommended by the applicant</b></div>
+      </div>
+      <span class="chip amber">Fix record</span>
+    </div>
+    <p class="match">This reviewer's AkoyaGO record is inactive. Reactivate or merge it in AkoyaGO, then check again.</p>
+    <div class="actions">
+      <button class="btn outline">Check again</button>
+      <button class="link">Request repair</button>
+      <button class="link">Not a fit</button>
+    </div>
+  </article>
+
+  <p class="state-tag">Conflict: same institution as the PI</p>
+  <article class="card">
+    <div class="head">
+      <div class="who">
+        <h3>George Lindqvist</h3>
+        <div class="inst">Test Organization 1</div>
+        <div class="source"><b>Found by literature search</b></div>
+      </div>
+      <span class="chip red">Conflict</span>
+    </div>
+    <div class="block red">Same institution as the PI (Test Organization 1). This reviewer can't be invited for this proposal.</div>
+    <div class="actions">
+      <button class="link">Not a fit</button>
+    </div>
+  </article>
+
+  <h2 class="section">Can't be added <span>1</span></h2>
+  <div class="collapsed">
+    <span class="name">Ruth Calder</span>
+    <span class="why">The applicant asked that this person not review.</span>
+    <span class="chip gray">Excluded by applicant</span>
+  </div>
+
+  <h2 class="section">Confirm step</h2>
+  <div class="pair">
+    <div>
+      <p class="state-tag">After "Confirm and add to Invite": address not in doubt, no evidence link</p>
+      <div class="dialog-wrap">
+        <div class="dialog" role="dialog" aria-labelledby="d1">
+          <h3 id="d1">Add Daniel Reyes to Invite</h3>
+          <dl>
+            <dt>Institution</dt><dd>Western Coast Medical School</dd>
+            <dt>Email</dt><dd>d.reyes@wcms.edu</dd>
+            <dt>Source</dt><dd>Listed by the applicant; matches the AkoyaGO record</dd>
+          </dl>
+          <label class="check"><input type="checkbox" /> <span>This is the person the applicant meant, and this address reaches them.</span></label>
+          <div class="actions">
+            <button class="link">Cancel</button>
+            <button class="btn primary">Confirm and add</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <p class="state-tag">After "Review and confirm" or "Confirm email": evidence required</p>
+      <div class="dialog-wrap">
+        <div class="dialog" role="dialog" aria-labelledby="d2">
+          <h3 id="d2">Confirm Samuel Itoh</h3>
+          <dl>
+            <dt>Institution</dt><dd>Harbor Institute of Technology</dd>
+            <dt>Email</dt><dd>itoh-lab@harbor.edu <span class="muted">(lab mailbox)</span></dd>
+          </dl>
+          <div class="field">
+            <label for="ev">Where you checked this address</label>
+            <input id="ev" placeholder="Link to a lab page, paper, or institution directory" />
+          </div>
+          <label class="check"><input type="checkbox" /> <span>This is the right person, and this address reaches them.</span></label>
+          <div class="actions">
+            <button class="link">Cancel</button>
+            <button class="btn primary">Confirm and add</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+</body>
+</html>
