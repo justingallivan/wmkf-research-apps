@@ -51,6 +51,10 @@ If you're touching a service or utility, read its header before this catalog. If
 
 ### External service register
 
+- **`external-services/checks.js`** — Manual superuser update-check orchestration; independent source outcomes, retained success baselines, fenced latest snapshot, no human-review writes.
+- **`external-services/check-store.js`** — Three-service allowlist, atomic 90-second lease, one-minute completed-result reuse, bounded latest JSONB snapshot; migration 108 is branch-built, not deployed.
+- **`external-services/check-sources.js`** — Fixed-destination, bounded AssemblyAI public references, Anthropic metadata/billing/local coverage, and explicitly projected SerpAPI account observations. No inference, provider writes, raw credential/account response retention, or alerts.
+- **`pricing-checks.js`** — Pure live Claude registry and billing comparisons shared by manual service checks and existing pricing crons; no persistence or notification effects.
 - **`external-services/model.js`** — Browser-safe service/review validation, closed choices, HTTPS reference-link rules, and due/action status projection.
 - **`external-services/store.js`** — Private Postgres inventory and review persistence; callers require superuser authorization. Service-version guard and transaction cover combined saves; bounded to 500 services and 200 reviews per service. No provider calls. See [the Atlas contract](atlas/postgres-external-services.md).
 

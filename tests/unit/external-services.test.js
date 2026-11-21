@@ -1,4 +1,6 @@
 /** @jest-environment node */
+jest.mock('../../lib/services/external-services/check-store',()=>({readCheck:jest.fn()}));
+jest.mock('../../lib/services/external-services/checks',()=>({checkForUpdates:jest.fn()}));
 import { validateService, validateReview, serviceStatus, COST_MODES, reviewToday, nextReviewDate, defaultCadence } from '../../lib/services/external-services/model';
 import seed from '../../lib/services/external-services/seed.json';
 import handler from '../../pages/api/admin/external-services';
@@ -53,7 +55,7 @@ test('stale edits return conflict and unexpected errors do not expose details',a
 });
 test('unsupported methods advertise the supported methods without storage access',async()=>{
   const res=response();await handler({method:'DELETE',query:{}},res);
-  expect(res.status).toHaveBeenCalledWith(405);expect(res.setHeader).toHaveBeenCalledWith('Allow','GET, PUT');
+  expect(res.status).toHaveBeenCalledWith(405);expect(res.setHeader).toHaveBeenCalledWith('Allow','GET, PUT, POST');
   expect(listServices).not.toHaveBeenCalled();expect(saveService).not.toHaveBeenCalled();
 });
 
