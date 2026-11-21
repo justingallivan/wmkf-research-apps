@@ -403,8 +403,10 @@ Checked against our source on 2026-11-20 unless labeled.
    excluded reviewers: the form collects only name and institution, no email, so
    flow-created records would risk duplicates. He leaves any promotion to the app
    [REPORTED by Connor 2026-11-20; section 10 question 8]. Our parser
-   (`lib/services/reviewer-exclusion-parser.js`) was built for heterogeneous D26
-   prose and uses an LLM; J27 text could be parsed deterministically. Search blocks
+   (`lib/services/reviewer-exclusion-parser.js`) reads the JSON deterministically
+   (`parseStructuredExclusions`, no LLM; an unknown schema or invalid entry shows the
+   parse warning) and keeps the LLM path for older free text. That reading feeds the
+   display and the client search soft-block only. Search blocks
    excluded names by exact normalized name (`filterExcluded`,
    `shared/components/reviewers/reviewer-search-logic.js:661`), which needs no
    email. That is the only enforcement of the text exclusions: the names go to the
@@ -418,11 +420,7 @@ Checked against our source on 2026-11-20 unless labeled.
    `"applicant"` (appending to an existing row's sources) and
    `wmkf_applicantdisposition` = Recommended [REPORTED by Connor 2026-11-20; not yet
    seen on a J27 row]. Step 1 does not fill the request's
-   `wmkf_potentialreviewer1`–`5` lookups [VERIFIED 2026-11-20 via owner-approved read-only Production read of test request 1003526 (created 2026-11-17): five suggestion rows with `wmkf_sources` = `"applicant"`, blank disposition (created before Connor's change), `wmkf_selected` = false; all five request lookups empty]. **Gap (traced in code 2026-11-20;
-   the data condition is confirmed on 1003526, the UI was not opened):** the Find tab's applicant list comes only from the slots (`lib/services/workbench/applicant-reviewers-service.js:111-139`), and verification (`findApplicantRecommendedByRequest`, called only from `lib/services/workbench/enrich-recommended-service.js:511`) starts only when that list is non-empty (`shared/components/reviewers/search/useApplicantReviewerEnrichment.js:107-119`). So on a J27 request the Find tab says the applicant listed no
-   reviewers, and the PubMed check and conflict flags never run for Connor's rows.
-   Fix not chosen: Connor refills the lookups, or the app lists existing Recommended
-   rows (a runtime change on shared-writer rows: branch and `/contract-reconcile`). The app also writes this
+   `wmkf_potentialreviewer1`–`5` lookups [VERIFIED 2026-11-20 via owner-approved read-only Production read of test request 1003526 (created 2026-11-17): five suggestion rows with `wmkf_sources` = `"applicant"`, blank disposition (created before Connor's change), `wmkf_selected` = false; all five request lookups empty]. **App behavior:** the Find tab lists these rows read-only after materializing any legacy slots (`lib/services/workbench/applicant-reviewers-service.js`, `findApplicantRecommendedByRequest`), so they reach verification and promotion; a failed row read or a row with no linked person shows a retry warning instead of the "applicant did not list any" empty state. Promotion stamps the request's cycle code on a row that has none, in the selection PATCH (`selectIfUnengaged`), and refuses untouched if the cycle cannot be read. (Gap found 2026-11-20 on 1003526: the list was slot-only; the fix is on branch `claude/j27-applicant-reviewers-from-rows` until it merges.) The app also writes this
    table through `lib/services/reviewer-engagement/`, so the two writers share
    rows.
 8. **The ready flag is a deliberate manual gate.** For 2027+ cycles the Workbench
@@ -479,9 +477,9 @@ acceptance half of question 7 the same day `[REPORTED by Connor 2026-11-20]`.
    already done. Step 1 sets Recommended (`100000000`) on the five
    applicant-suggested rows for every request from now on; earlier test requests
    have a blank disposition. Connor also says step 1 does not fill the request's
-   `wmkf_potentialreviewer1`–`5` lookups, which are deprecated. **That breaks the
-   Find tab for J27** (section 9 item 7): the applicant list and its verification
-   are driven only by those lookups. Owner decision needed on the fix.
+   `wmkf_potentialreviewer1`–`5` lookups, which are deprecated. The deprecation is
+   final (Connor, 2026-11-20), so the app lists the Recommended rows directly
+   (section 9 item 7).
 6. Is `wmkf_ai_methodologies` written by `intake.keywords` or a separate prompt?
    Asked again 2026-11-20; not answered.
 7. Low priority: confirm `akoya_submissionaccepted` is always manual (superseding

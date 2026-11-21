@@ -488,7 +488,7 @@ describe('happy path (progress ordering + full card payload)', () => {
     await handler(post(baseBody()), res2);
     expect(setMatchReason).toHaveBeenCalledWith(
       SUG,
-      'Recommended by applicant (legacy reviewer slot). [Institution COI: Same institution as proposal PI]',
+      'Recommended by applicant. [Institution COI: Same institution as proposal PI]',
       { actingUserSystemId: 'u-1' },
     );
     expect(res2.events().pop().data.recommended[0].hasInstitutionCOI).toBe(true);

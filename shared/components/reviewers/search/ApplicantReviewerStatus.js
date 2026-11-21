@@ -20,7 +20,8 @@ export default function ApplicantReviewerStatus({
   recommended,
   recommendedFailed,
   slotsPopulated,
-  knownLookupFailed,
+  applicantRowsReadFailed = false,
+  knownLookupFailed = [],
   blobUrl,
   recCount,
   recProgress,
@@ -44,9 +45,11 @@ export default function ApplicantReviewerStatus({
         </div>
       ) : ingestLoading ? (
         <p className="text-sm text-gray-500">Materializing the applicant's recommended reviewers…</p>
-      ) : (recommended.length === 0 && recommendedFailed.length === 0 && slotsPopulated === 0) ? (
+      ) : (recommended.length === 0 && recommendedFailed.length === 0 && knownLookupFailed.length === 0
+          && slotsPopulated === 0 && !applicantRowsReadFailed) ? (
         <p className="text-sm text-gray-600">The applicant did not list any recommended reviewers for this request.</p>
-      ) : (recommended.length === 0 && recommendedFailed.length === 0 && slotsPopulated === null) ? (
+      ) : (recommended.length === 0 && recommendedFailed.length === 0 && knownLookupFailed.length === 0
+          && (slotsPopulated === null || applicantRowsReadFailed)) ? (
         <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
           Couldn't confirm the applicant's recommended reviewers.{' '}
           <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry</button>
@@ -61,6 +64,12 @@ export default function ApplicantReviewerStatus({
                 <> ({recommendedFailed.map((f) => f.name).filter(Boolean).join(', ')})</>
               )}
               . They are <span className="font-medium">not</span> saved as candidates.{' '}
+              <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry</button>
+            </div>
+          )}
+          {applicantRowsReadFailed && (
+            <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
+              Some applicant-recommended reviewers could not be loaded.{' '}
               <button type="button" onClick={onRetryIngestion} className="underline font-medium">Retry</button>
             </div>
           )}

@@ -35,6 +35,7 @@
  *   - recommendedFailed      : applicant-recommended rows that failed to ingest (warning in the bottom card)
  *   - knownLookupFailed      : materialized rows whose exact linked person could not be safely hydrated
  *   - slotsPopulated        : how many wmkf_potentialreviewer slots the applicant filled (null = unknown)
+ *   - applicantRowsReadFailed : the existing applicant-recommended rows could not be read (show retry, not empty)
  *   - ingestLoading / ingestError / onRetryIngestion : applicant-reviewer ingestion state + retry (from ReviewerFindPanel)
  *   - onSaved               : optional callback after a successful save
  *
@@ -68,6 +69,7 @@ export default function ReviewerSearchSection({
   recommendedFailed = [],
   knownLookupFailed = [],
   slotsPopulated = null,
+  applicantRowsReadFailed = false,
   ingestLoading = false,
   ingestError = null,
   onRetryIngestion,
@@ -304,6 +306,7 @@ export default function ReviewerSearchSection({
         recommended={recommended}
         recommendedFailed={recommendedFailed}
         slotsPopulated={slotsPopulated}
+        applicantRowsReadFailed={applicantRowsReadFailed}
         knownLookupFailed={knownLookupFailed}
         blobUrl={blobUrl}
         recCount={recCount}

@@ -70,6 +70,13 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
 }));
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
   queryAllRequests: jest.fn(async () => ({ records: [], capped: false })),
+  // Applicant promotion resolves the request's linked cycle before any write.
+  getById: jest.fn(async () => ({ akoya_requestid: 'req', wmkf_GrantCycle: null })),
+}));
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle.js', () => ({
+  ...jest.requireActual('../../lib/dataverse/adapters/operations-grant-cycle.js'),
+  linkedCycleExpand: () => 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  linkedCycleCode: (row) => row?.wmkf_GrantCycle?.wmkf_cyclecode ?? null,
 }));
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   finalizeCandidatePromotion: jest.fn(async (_requestId, candidate, anchors) => ({

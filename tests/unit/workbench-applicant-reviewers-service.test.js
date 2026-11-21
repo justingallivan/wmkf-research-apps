@@ -24,8 +24,10 @@ jest.mock('../../lib/dataverse/adapters/operations-grant-cycle.js', () => ({
 }));
 
 const ensureApplicantRecommended = jest.fn();
+const findApplicantRecommendedByRequest = jest.fn(async () => []);
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   ensureApplicantRecommended: (...a) => ensureApplicantRecommended(...a),
+  findApplicantRecommendedByRequest: (...a) => findApplicantRecommendedByRequest(...a),
 }));
 
 const extractExcludedReviewers = jest.fn();
@@ -234,7 +236,7 @@ test('passes acting user + request-derived label/cycle/programArea to the adapte
     suggestionLabel: 'Engineered gene circuits — Dr. One',
     grantCycleCode: 'J26',
     programArea: 'Science',
-    matchReason: 'Recommended by applicant (legacy reviewer slot).',
+    matchReason: 'Recommended by applicant.',
   }, { actingUserSystemId: 'u-1', allowInactiveOrdinary: true });
   expect(getById).toHaveBeenCalledWith(REQ, expect.objectContaining({
     expand: 'wmkf_GrantCycle($select=wmkf_cyclecode)',
@@ -263,4 +265,88 @@ test('Factory display hint is emitted on the recommendation only after scoped hy
   expect(result.recommended[0]).toMatchObject({ factoryTestReviewer: true });
   expect(loadApplicantKnownReviewerContext).toHaveBeenCalledWith(P1, REQ);
   expect(result.recommended[0].applicantKnownReviewer.factoryTestReviewer).toBeUndefined();
+});
+
+describe('existing applicant-recommended rows (J27 intake: slots empty)', () => {
+  afterEach(() => { findApplicantRecommendedByRequest.mockReset(); findApplicantRecommendedByRequest.mockResolvedValue([]); });
+  const P3 = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+  const row = (over = {}) => ({
+    wmkf_appreviewersuggestionid: 'row-1',
+    _wmkf_potentialreviewer_value: P3,
+    _wmkf_potentialreviewer_value_formatted: 'Dr. Three',
+    wmkf_selected: false,
+    wmkf_applicantdisposition: 100000000,
+    ...over,
+  });
+
+  test('lists row-only recommendations read-only, with no repair write', async () => {
+    findApplicantRecommendedByRequest.mockResolvedValue([row()]);
+    const body = await ingestApplicantReviewers(args);
+    expect(findApplicantRecommendedByRequest).toHaveBeenCalledWith(REQ);
+    expect(ensureApplicantRecommended).not.toHaveBeenCalled();
+    expect(body.recommended).toHaveLength(1);
+    expect(body.recommended[0]).toMatchObject({
+      slot: null,
+      potentialReviewerId: P3,
+      name: 'Dr. Three',
+      suggestionId: 'row-1',
+      created: false,
+      skippedExcluded: false,
+      handled: false,
+    });
+    expect(body.recommended[0].applicantKnownReviewer).toMatchObject({ status: 'known' });
+    expect(body.slotsPopulated).toBe(0);
+    expect(body.recommendedComplete).toBe(true);
+    expect(body.applicantRowsReadFailed).toBe(false);
+  });
+
+  test('does not duplicate a person already emitted from a slot', async () => {
+    getById.mockResolvedValue(baseRequest({
+      _wmkf_potentialreviewer1_value: P1,
+      _wmkf_potentialreviewer1_value_formatted: 'Dr. One',
+    }));
+    findApplicantRecommendedByRequest.mockResolvedValue([
+      row({ wmkf_appreviewersuggestionid: 'sug-1', _wmkf_potentialreviewer_value: P1 }),
+      row(),
+    ]);
+    const body = await ingestApplicantReviewers(args);
+    expect(body.recommended.map((r) => r.potentialReviewerId)).toEqual([P1, P3]);
+    expect(body.recommended.map((r) => r.slot)).toEqual([1, null]);
+  });
+
+  test('a slot whose ensure write failed is recovered from its persisted row', async () => {
+    getById.mockResolvedValue(baseRequest({
+      _wmkf_potentialreviewer1_value: P1,
+      _wmkf_potentialreviewer1_value_formatted: 'Dr. One',
+    }));
+    ensureApplicantRecommended.mockRejectedValueOnce(new Error('PATCH 412'));
+    findApplicantRecommendedByRequest.mockResolvedValue([
+      row({ wmkf_appreviewersuggestionid: 'sug-p1', _wmkf_potentialreviewer_value: P1 }),
+    ]);
+    const body = await ingestApplicantReviewers(args);
+    expect(body.recommended).toHaveLength(1);
+    expect(body.recommended[0]).toMatchObject({ potentialReviewerId: P1, suggestionId: 'sug-p1', slot: null });
+    expect(body.recommendedFailed).toBeUndefined();
+    expect(body.recommendedComplete).toBe(true);
+    expect(body.errors).toEqual([expect.objectContaining({ potentialReviewerId: P1, error: 'PATCH 412' })]);
+  });
+
+  test('a failed row read is reported, never an empty list', async () => {
+    findApplicantRecommendedByRequest.mockRejectedValue(new Error('Dataverse 503'));
+    const body = await ingestApplicantReviewers(args);
+    expect(body.recommended).toEqual([]);
+    expect(body.applicantRowsReadFailed).toBe(true);
+    expect(body.recommendedComplete).toBe(false);
+    expect(body.errors).toEqual([{ stage: 'applicant-rows', error: 'Dataverse 503' }]);
+  });
+
+  test('a row with no linked person is reported as a lookup failure', async () => {
+    findApplicantRecommendedByRequest.mockResolvedValue([row({ _wmkf_potentialreviewer_value: null })]);
+    const body = await ingestApplicantReviewers(args);
+    expect(body.recommended).toEqual([]);
+    expect(body.knownLookupComplete).toBe(false);
+    expect(body.knownLookupFailed).toEqual([
+      { slot: null, potentialReviewerId: null, suggestionId: 'row-1', code: 'person_unavailable' },
+    ]);
+  });
 });
