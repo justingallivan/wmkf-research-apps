@@ -1,7 +1,9 @@
 # Applicant reviewer identity — W2 works-first resolver plan
 
 Status: **plan for owner decision; nothing changed.** Written 2026-11-21
-(Session 693) after the owner asked why every applicant reviewer on test
+(Session 693), then corrected the same day after an independent Codex
+assessment (verbatim output kept in the session scratchpad; findings folded
+in below). Written after the owner asked why every applicant reviewer on test
 request 1003526 showed "No publications found". Separate workstream from the
 card redesign (`FIND_IDENTITY_CARD_REDESIGN_BRIEF_2026-11-20.md`).
 
@@ -27,8 +29,9 @@ ORCID search finds, even with "Yale University" or "Anna Marie Pyle"
 through ORCID with UCSF.
 
 **Scope correction.** This is not only applicant reviewers. The OpenAlex
-matching inside the shared verification step runs only for non-biomedical
-proposals (`discovery/verification.js:62-66,87-113`). On biomedical
+matching inside the shared verification step runs only for clearly
+non-biomedical proposals or when PubMed is explicitly off
+(`discovery/verification.js:61-66,87-113`). On biomedical
 proposals, every Track A suggestion, including the AI's own search
 suggestions, depends on the same ORCID or Scholar route. Track B literature
 finds have their own works-first step (`discovery/track-b-identity.js`).
@@ -60,19 +63,29 @@ evaluation: legacy 13 correct / 2 wrong-person / 12 miss; combined 22 correct
 basis"). The credentials runbook says not to set `combined` in a deployed
 environment without an owner-approved cutover.
 
-Production has a value set for the variable (stored as a hidden secret), and
-the shadow comparison table `reviewer_identity_shadow_log` has **no rows at
-all** [VERIFIED 2026-11-21, read-only count]. So shadow mode has never
-recorded a comparison; Production most likely runs `legacy` [ASSUMED; the
-hidden value was not read].
+Production has a value set for the variable (stored as a Secret, which
+Vercel cannot reveal after saving; owner reports it was changed 2026-08-08),
+and the comparison table `reviewer_identity_shadow_log` currently holds **no
+rows** [VERIFIED 2026-11-21, read-only count]. That does **not** show the
+mode: rows older than the 90-day retention are deleted
+(`maintenance-service.js:64`), inserts can be skipped by the logger's circuit
+breaker (`reviewer-identity-shadow-log.js:64`), and shadow logs only on the
+non-biomedical verifier path. Production's current mode is **unknown**.
 
 Enrichment already calls `ReviewerIdentityRuntime.evaluateExistingResult`
-(`tiers.js:501`), which in `combined` mode applies W2 to applicant rows with
-no further code change.
+(`tiers.js:501`). In `combined` mode it applies W2 there; in `shadow` mode it
+returns the legacy result **without running or logging any comparison**
+(`reviewer-identity-runtime.js:591-610`, pinned by
+`tests/unit/reviewer-identity-runtime.test.js:900`). So setting `shadow`
+measures nothing for biomedical applicant reviewers; it only covers
+non-biomedical ones, which pass through the shared verifier first
+(`enrich-recommended-service.js:722`).
 
-**Local test, the five 1003526 reviewers, `combined` mode** (public OpenAlex
-and ROR only; database URLs removed, shadow writes disabled) [VERIFIED
-2026-11-21]:
+**Local seam test, the five 1003526 reviewers, `combined` mode** (public
+OpenAlex and ROR only; database URLs removed, shadow writes disabled)
+[VERIFIED 2026-11-21]. This fed a synthetic "legacy unresolved" input to the
+seam; it is **not** a replay of the full applicant path, whose real legacy
+inputs and later institution checks can give different outcomes:
 
 | Reviewer, institution used | Result |
 |---|---|
@@ -88,30 +101,53 @@ institution needs a look before cutover.
 
 ## What `combined` also turns on
 
-- **W4.1 evidence persistence.** Combined results thread typed anchors into
-  `wmkf_identityverifiedanchorsjson` on the reviewer record. Built, never run
-  in Production (`REVIEWER_IDENTITY_CONTACT_PLAN.md` W4). A cutover is also
-  the first Production write of that field.
-- **Every caller of the runtime seam,** not only applicant rows: Track A
-  non-biomedical verification and every enrichment run.
+- **Conditional identity writes.** W2 rescues produce typed anchors that
+  applicant enrichment can write to `wmkf_identityverifiedanchorsjson` when
+  its guards allow (`reviewer-works-first-authoritative.js:43`,
+  `enrich-recommended-service.js:1179`, `lib/dataverse/adapters/researcher.js:227`).
+  Switching the mode back does not undo those writes. Whether any W2 write
+  has happened before is unknown.
+- **Every execution reaching the seam:** the non-biomedical verifier and
+  enrichment runs. PubMed verification and Track B are unchanged; cached
+  rows skip enrichment. Combined can demote as well as rescue.
+- **Profile-propagation gap.** Enrichment copies W2's identity and ORCID but
+  not its selected OpenAlex profile, so later institution reconciliation
+  never sees it (`tiers.js:477,501`; `enrich-recommended-service.js:112`).
+  Ailong Ke's Yale-vs-Cornell case may go unexamined. This is an
+  integration gap, not proof of a wrong match.
+- **Independent institution hold.** `identityNeedsReview = !identityConfirmed
+  || institutionContradicted` (`enrich-recommended-service.js:891-998`); a
+  probable identity alone does not clear the 13 contradiction rows.
+- **Stale caches.** Saved unresolved results stay valid caches regardless of
+  mode (`reviewer-search-logic.js:989`), so any change needs a deliberate
+  re-enrichment.
 - More OpenAlex calls per reviewer (about 3 seconds each in the local test).
 
-## Options
+## Options (corrected)
 
-1. **Shadow first (recommended first step).** Set the variable to `shadow` in
-   Production. Nothing a director sees changes; each enrichment run logs a
-   decision-only comparison (no names). After a week of real use, read the
-   log: how many legacy abstains W2 would rescue, and any W2 bind that
-   disagrees with the listed institution.
-2. **Combined everywhere.** The owner-gated cutover the existing plan already
-   describes. Largest effect, widest blast radius, first W4.1 writes.
-3. **Combined for applicant rows only.** Pass a combined-mode override from
-   `enrich-recommended-service.js` only. Narrow, but it is new code on the
-   identity path and needs `/contract-reconcile` and a Codex plan review.
+1. **Confirm Production's effective mode** from existing evidence
+   (`resolverMode` in institution-resolver metrics logs, or a non-biomedical
+   admin identity comparison), or a small reviewed diagnostic that returns
+   only the normalized mode and deployment id.
+2. **Add comparison coverage to the enrichment seam** (code change): in
+   `shadow`, run W2 there too, log the comparison, keep the exact legacy
+   result, and write nothing. Directors see no change.
+3. **Test the complete applicant path** with real stored inputs, institution
+   reconciliation and the final card, persistence stubbed. Close the
+   profile-propagation gap.
+4. **Applicant-only combined pilot.** Needs explicit plumbing (the public
+   enrichment method takes no mode override, `reviewer-identity-runtime.js:631`),
+   a manual check of every new bind, regression checks on existing probable
+   matches, and cache refresh.
+5. **Global combined cutover** only with representative coverage, benchmark
+   regression checks and an explicit decision.
 
-Recommendation: option 1 now, then option 3 or 2 on the measured result.
-Target: raise the share of applicant rows reaching `probable` from 15 of 58
-(26%) with zero wrong-person binds in a manual check of every new bind.
+Recommendation (Codex, adopted): steps 1–3 before any switch; do not cut
+over globally on the five-reviewer seam test. Target for the pilot: raise
+the share of applicant rows reaching `probable` above the prior-format
+cohort baseline of 15 of 58, with zero wrong-person binds in a manual check.
+Individual urgent reviewers can still be confirmed by staff through the
+existing evidence-backed confirmation.
 
 ## Consequence for the card brief
 
