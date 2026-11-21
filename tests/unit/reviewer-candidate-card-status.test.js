@@ -1,7 +1,6 @@
 import {
   getCandidateCardStatus,
-  getCandidateEmailReadiness,
-  getCandidatePromotionDecision,
+  isCandidateSelectable,
 } from '../../shared/components/reviewers/reviewer-search-logic';
 
 // One status per Find-tab card (DESIGN.md Status-Once Rule). The helper is
@@ -41,6 +40,7 @@ const CASES = [
   ['missing email', { ...READY, email: null, emailSource: null }, { key: 'check_email', matchIncludes: 'No email address found' }],
   ['pending stored/found address conflict', { ...READY, addressConflictPending: true }, { key: 'check_email', primary: 'review_email_choice' }],
   ['search-only address', { ...READY, emailSource: 'serp_search' }, { key: 'check_email', primary: 'verify_address', matchIncludes: "hasn't been confirmed yet" }],
+  ['deceased beats ready', { ...READY, eligibilityStatus: 'deceased' }, { key: 'not_eligible', primary: null }],
   ['single-paper address', { ...READY, emailSource: 'pubmed' }, { key: 'check_email', primary: 'verify_address' }],
 ];
 
@@ -56,11 +56,10 @@ describe('getCandidateCardStatus', () => {
     expect(status.match.text.length).toBeGreaterThan(0);
   });
 
-  test.each(CASES)('never calls %s Ready unless the selection helpers agree', (_name, candidate) => {
+  test.each(CASES)('never calls %s Ready unless the row is selectable', (_name, candidate) => {
     const status = getCandidateCardStatus(candidate);
     if (status.key === 'ready' || status.primary === 'add_to_invite') {
-      expect(getCandidatePromotionDecision(candidate)?.decision).toBe('ready');
-      expect(getCandidateEmailReadiness(candidate)?.action).toBe('ready');
+      expect(isCandidateSelectable(candidate)).toBe(true);
     }
   });
 
@@ -74,5 +73,49 @@ describe('getCandidateCardStatus', () => {
     for (const [, candidate] of CASES) {
       expect(getCandidateCardStatus(candidate).match.text).not.toMatch(/Dataverse|enrichment|gate|resolver|research_only|quick_check/i);
     }
+  });
+});
+
+describe('CandidateCard status rendering', () => {
+  // eslint-disable-next-line global-require
+  const { render, screen } = require('@testing-library/react');
+  // eslint-disable-next-line global-require
+  const { CandidateCard } = require('../../shared/components/reviewers/ReviewerSearchSection');
+
+  test('a selectable coauthor-conflict row keeps Add to Invite as a non-primary action', () => {
+    const onAddToInvite = jest.fn();
+    render(
+      <CandidateCard
+        candidate={{ ...READY, hasCoauthorCOI: true, coauthorCOIStrength: 'likely', coauthorships: [{ proposalAuthor: 'Dr PI', paperCount: 4 }] }}
+        checked={false}
+        onToggle={() => {}}
+        onAddToInvite={onAddToInvite}
+      />,
+    );
+    expect(screen.getByTestId('candidate-status-chip')).toHaveTextContent('Conflict');
+    screen.getByRole('button', { name: 'Add Maria Okafor to Invite' }).click();
+    expect(onAddToInvite).toHaveBeenCalledTimes(1);
+  });
+
+  test('Compare details opens when a re-render turns a card into Check identity', () => {
+    const { rerender } = render(<CandidateCard candidate={READY} checked={false} onToggle={() => {}} />);
+    expect(screen.getByTestId('candidate-compare-details')).not.toHaveAttribute('open');
+    rerender(
+      <CandidateCard
+        candidate={{ ...READY, pdIdentityConfirmed: false, serverIdentityReviewReason: 'orcid_email_split' }}
+        checked={false}
+        onToggle={() => {}}
+        onConfirmIdentity={() => {}}
+      />,
+    );
+    expect(screen.getByTestId('candidate-status-chip')).toHaveTextContent('Check identity');
+    expect(screen.getByTestId('candidate-compare-details')).toHaveAttribute('open');
+  });
+
+  test('source line follows provenance', () => {
+    const { rerender } = render(<CandidateCard candidate={{ ...READY, provenance: { kind: 'proposal_named', sources: ['proposal'], seedRole: 'query_seed', groundingWorkIds: [] } }} checked={false} onToggle={() => {}} />);
+    expect(screen.getByText('Named in the proposal')).toBeInTheDocument();
+    rerender(<CandidateCard candidate={{ ...READY, sources: ['staff_manual'] }} checked={false} onToggle={() => {}} />);
+    expect(screen.getByText('Added by staff')).toBeInTheDocument();
   });
 });

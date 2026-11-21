@@ -364,6 +364,16 @@ export function getCandidateCardStatus(candidate) {
     };
   }
 
+  if ((c.eligibilityStatus || c.contactEnrichment?.eligibilityStatus) === 'deceased') {
+    return {
+      key: 'not_eligible',
+      label: 'Not eligible',
+      tone: 'gray',
+      match: { tone: 'neutral', text: 'An official institutional source reports this person has died' },
+      primary: null,
+    };
+  }
+
   if (decision?.decision === 'needs_record_repair') {
     if (RECORD_EMAIL_CONFLICT_REASONS.has(decision.reason)) {
       return {

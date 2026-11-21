@@ -13,7 +13,7 @@ import {
 } from '../reviewer-search-logic';
 import { buildScholarSearchUrl, isRealScholarProfileUrl } from '../../../../lib/utils/scholar-url';
 import { buildGoogleSearchUrl } from '../../../../lib/utils/google-search-url';
-import { provenanceLabelForCandidate } from '../../../../lib/utils/reviewer-provenance';
+import { buildReviewerProvenance, provenanceLabelForCandidate } from '../../../../lib/utils/reviewer-provenance';
 import { activeInstitutionStage2Presentation } from '../../../utils/institution-stage2-presentation';
 import { priorRequestCardSummary } from '../../../utils/reviewer-prior-request-context';
 import {
@@ -206,6 +206,9 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
   const pushSecondary = (key, action) => {
     if (action && key !== primaryKey && !secondary.some((item) => item.key === key)) secondary.push({ key, ...action });
   };
+  // The save path annotates, but does not reject, a coauthor conflict, so a
+  // selectable row keeps its Add to Invite action, just not as the primary.
+  if (status.key === 'conflict') pushSecondary('add_to_invite', ACTIONS.add_to_invite);
   if (needsIdentityConfirmation && !needsCombinedReview) pushSecondary('confirm_identity', ACTIONS.confirm_identity);
   if (needsCombinedReview) pushSecondary('review_and_confirm', ACTIONS.review_and_confirm);
   // A partly matching AkoyaGO record is resolved through the identity dialog.
@@ -233,11 +236,24 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
   const headerInstitution = identityUnverified
     ? (knownReviewer?.affiliation || c.suggestedInstitution || null)
     : (c.affiliation || knownReviewer?.affiliation || null);
-  const sourceLine = c.isApplicantRecommended
+  const provenance = buildReviewerProvenance(c);
+  const provenanceSources = [
+    ...(Array.isArray(provenance?.sources) ? provenance.sources : []),
+    ...(Array.isArray(c.sources) ? c.sources : []),
+  ];
+  const sourceLine = c.isApplicantRecommended || provenance?.kind === 'applicant_suggested'
     ? 'Recommended by the applicant'
-    : (/^Externally-Referred/.test(provenanceLabel || '')
-      ? provenanceLabel.replace(/^Externally-Referred(?: · )?/, 'Referred').replace(/^Referred(?=\S)/, 'Referred by ')
-      : 'Found by literature search');
+    : provenance?.kind === 'referred'
+      ? (provenance.referredBy ? `Referred by ${provenance.referredBy}` : 'Referred by a reviewer')
+      : provenanceSources.includes('staff_manual')
+        ? 'Added by staff'
+        : provenance?.kind === 'proposal_named'
+          ? 'Named in the proposal'
+          : provenance?.kind === 'cited_reference'
+            ? 'Cited in the proposal'
+            : (provenance?.kind === 'literature_retrieved' || provenance?.kind === 'grounded_seed')
+              ? 'Found by literature search'
+              : 'Found by search';
 
   // Compare details: AkoyaGO record vs what the search found. The applicant's
   // own listed details join as a third column once the roster projects them.
@@ -255,11 +271,17 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
   const showRecordColumn = Boolean(recordInstitution || recordEmail);
   const institutionDiffers = showRecordColumn && !sameValue(recordInstitution, foundInstitution);
   const emailDiffers = showRecordColumn && !sameValue(recordEmail, foundEmail);
+  const hasFitWarning = Boolean(c.expertiseMismatch || c.aiFlaggedNotRelevant || c.lowPublicationCount
+    || (typeof c.verificationConfidence === 'number' && c.verificationConfidence < 0.65));
   const compareDefaultOpen = status.key === 'check_identity'
     || institutionDiffers
     || emailDiffers
+    || hasFitWarning
     || dataverseEvidence?.status === 'review_required';
-  const [compareOpen, setCompareOpen] = useState(compareDefaultOpen);
+  // Follows the computed default (enrichment can change it after mount) until
+  // the director opens or closes the disclosure themselves.
+  const [compareToggled, setCompareToggled] = useState(null);
+  const compareOpen = compareToggled === null ? compareDefaultOpen : compareToggled;
 
   // Blocking line: only an issue the status chip does not already name.
   const statusNamesCOI = status.key === 'conflict' || status.key === 'possible_conflict';
@@ -370,7 +392,10 @@ export function CandidateCard({ candidate, checked, onToggle, readOnly = false, 
           <details
             className="mt-2.5"
             open={compareOpen}
-            onToggle={(event) => setCompareOpen(event.currentTarget.open)}
+            onToggle={(event) => {
+              const nextOpen = event.currentTarget.open;
+              if (nextOpen !== compareOpen) setCompareToggled(nextOpen);
+            }}
             data-testid="candidate-compare-details"
           >
             <summary className="w-max cursor-pointer text-[13px] font-medium text-blue-700 underline underline-offset-2 hover:text-blue-900">

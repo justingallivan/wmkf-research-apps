@@ -281,6 +281,8 @@ test('a thin zero-match sample renders as one qualified expertise status with a 
   expect(screen.getByTestId('candidate-status-chip')).toHaveTextContent('Ready');
   expect(screen.queryByText(/0%|Low match|Expertise mismatch|Claude claimed/)).not.toBeInTheDocument();
   expect(container.firstChild).toHaveClass('bg-white');
+  // A fit warning must be visible on a Ready card, not folded away.
+  expect(screen.getByTestId('candidate-compare-details')).toHaveAttribute('open');
 
   await user.click(screen.getByRole('button', { name: 'Add Peter Reiners to Invite' }));
   expect(onAddToInvite).toHaveBeenCalledTimes(1);
