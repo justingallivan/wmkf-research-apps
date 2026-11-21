@@ -10,6 +10,14 @@
  * (instead of failing the promote) when the email collides with another record.
  */
 
+const getRequestById = jest.fn(async () => ({ akoya_requestid: 'req', wmkf_GrantCycle: { wmkf_cyclecode: 'J27' } }));
+jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
+  getById: (...a) => getRequestById(...a),
+}));
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle.js', () => ({
+  linkedCycleExpand: () => 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  linkedCycleCode: (row) => row?.wmkf_GrantCycle?.wmkf_cyclecode ?? null,
+}));
 jest.mock('../../lib/utils/auth', () => ({
   requireAppAccess: jest.fn(async () => ({ session: { user: { dynamicsSystemuserId: 'sys-1' } } })),
 }));

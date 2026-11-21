@@ -464,6 +464,9 @@ export default function ReviewerFindPanel({
   // absent (older response / fetch error). Lets us tell a genuine "applicant
   // listed none" from "ingestion failed so the list looks empty."
   const slotsPopulated = typeof data?.slotsPopulated === 'number' ? data.slotsPopulated : null;
+  // The existing applicant-recommended rows could not be read: never show the
+  // "applicant listed none" empty state on that basis.
+  const applicantRowsReadFailed = data?.applicantRowsReadFailed === true;
   const excludedRaw = data?.excludedRaw || null;
   const excludedParseFailed = data?.excludedParseFailed || false;
 
@@ -800,6 +803,7 @@ export default function ReviewerFindPanel({
         recommendedFailed={recommendedFailed}
         knownLookupFailed={knownLookupFailed}
         slotsPopulated={slotsPopulated}
+        applicantRowsReadFailed={applicantRowsReadFailed}
         ingestLoading={ingest.loading}
         ingestError={ingest.error}
         onRetryIngestion={runIngestion}

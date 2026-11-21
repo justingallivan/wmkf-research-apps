@@ -526,6 +526,31 @@ describe('selectIfUnengaged compare-and-set', () => {
     );
   });
 
+  test('stamps the cycle code in the same ETag PATCH only when the fresh row has none', async () => {
+    const fresh = {
+      ...NEVER_INVITED, wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      wmkf_selected: false, wmkf_invited: false, wmkf_accepted: false, wmkf_declined: false,
+      _etag: 'W/"52"',
+    };
+    DynamicsService.getRecord.mockResolvedValueOnce({ ...fresh, wmkf_grantcyclecode: null });
+    await selectIfUnengaged(SUGGESTION_ID, { actingUserSystemId: 'SYS-1', grantCycleCode: 'J27' });
+    expect(DynamicsService.updateRecord).toHaveBeenLastCalledWith(
+      'wmkf_appreviewersuggestions',
+      SUGGESTION_ID,
+      { wmkf_selected: true, wmkf_grantcyclecode: 'J27' },
+      { actingUserSystemId: 'SYS-1', ifMatch: 'W/"52"' },
+    );
+
+    DynamicsService.getRecord.mockResolvedValueOnce({ ...fresh, wmkf_grantcyclecode: 'D26' });
+    await selectIfUnengaged(SUGGESTION_ID, { actingUserSystemId: 'SYS-1', grantCycleCode: 'J27' });
+    expect(DynamicsService.updateRecord).toHaveBeenLastCalledWith(
+      'wmkf_appreviewersuggestions',
+      SUGGESTION_ID,
+      { wmkf_selected: true },
+      { actingUserSystemId: 'SYS-1', ifMatch: 'W/"52"' },
+    );
+  });
+
   test('refuses an already-declined row before any PATCH', async () => {
     DynamicsService.getRecord.mockResolvedValue({
       ...NEVER_INVITED, wmkf_appreviewersuggestionid: SUGGESTION_ID,

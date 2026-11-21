@@ -11,6 +11,14 @@
 const findById = jest.fn();
 const updateLifecycle = jest.fn(async () => {});
 const selectIfUnengaged = jest.fn(async () => ({}));
+const getRequestById = jest.fn(async () => ({ akoya_requestid: 'req', wmkf_GrantCycle: { wmkf_cyclecode: 'J27' } }));
+jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
+  getById: (...a) => getRequestById(...a),
+}));
+jest.mock('../../lib/dataverse/adapters/operations-grant-cycle.js', () => ({
+  linkedCycleExpand: () => 'wmkf_GrantCycle($select=wmkf_cyclecode)',
+  linkedCycleCode: (row) => row?.wmkf_GrantCycle?.wmkf_cyclecode ?? null,
+}));
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   APPLICANT_DISPOSITION_MAP: { recommended: 100000000, excluded: 100000001 },
   findById: (...a) => findById(...a),
@@ -235,7 +243,7 @@ test('typed 404 is NOT eaten by the applicant-excluded regex translation (P1m no
 
 test('plain promote: canonical email verified, selected flipped, roster finalized', async () => {
   const body = await promoteApplicantReviewer(args());
-  expect(selectIfUnengaged).toHaveBeenCalledWith(SUG, { actingUserSystemId: 'u-1' });
+  expect(selectIfUnengaged).toHaveBeenCalledWith(SUG, { actingUserSystemId: 'u-1', grantCycleCode: 'J27' });
   expect(body).toEqual({
     success: true,
     suggestionId: SUG,
@@ -785,7 +793,7 @@ test('server-recorded staff confirmation permits promotion of an identity-review
   });
   const body = await promoteApplicantReviewer(args());
   expect(body.success).toBe(true);
-  expect(selectIfUnengaged).toHaveBeenCalledWith(SUG, { actingUserSystemId: 'u-1' });
+  expect(selectIfUnengaged).toHaveBeenCalledWith(SUG, { actingUserSystemId: 'u-1', grantCycleCode: 'J27' });
 });
 
 test('manual email collision withholds promotion and returns a merge-required conflict', async () => {
@@ -945,7 +953,7 @@ test.each([null, {
   reviewerInstitutionPhase2Enabled.mockReturnValue(true);
   const result = await promoteApplicantReviewer(args());
   expect(result).toMatchObject({ success: true, suggestionId: SUG, savedFields: [], partialSuccess: false });
-  expect(selectIfUnengaged).toHaveBeenCalledWith(SUG, { actingUserSystemId: 'u-1' });
+  expect(selectIfUnengaged).toHaveBeenCalledWith(SUG, { actingUserSystemId: 'u-1', grantCycleCode: 'J27' });
   expect(finalizeCandidatePromotion).toHaveBeenCalledWith(REQ, expect.objectContaining({
     candidateKey: `suggestion:${SUG}`,
   }), expect.objectContaining({ suggestionId: SUG, potentialReviewerId: PERSON }));
@@ -1060,4 +1068,24 @@ test('unengaged saved Factory suggestion retains the incumbent server re-promoti
   expect((await promoteApplicantReviewer(args())).success).toBe(true);
   expect(selectIfUnengaged).toHaveBeenCalledTimes(1);
   expect(recordInstitutionMeasurement).not.toHaveBeenCalled();
+});
+
+test('a failed request-cycle read refuses promotion before any write, and a retry succeeds', async () => {
+  getRequestById.mockRejectedValueOnce(new Error('Dataverse 503'));
+  const error = await promoteApplicantReviewer(args()).catch((caught) => caught);
+  expect(error).toBeInstanceOf(ServiceHttpError);
+  expect(error.httpStatus).toBe(503);
+  expect(error.body).toMatchObject({ code: 'request_cycle_unavailable' });
+  expect(selectIfUnengaged).not.toHaveBeenCalled();
+  expect(update).not.toHaveBeenCalled();
+
+  const body = await promoteApplicantReviewer(args());
+  expect(body.success).toBe(true);
+  expect(selectIfUnengaged).toHaveBeenCalledWith(SUG, { actingUserSystemId: 'u-1', grantCycleCode: 'J27' });
+});
+
+test('a request with no linked cycle promotes without a cycle fill', async () => {
+  getRequestById.mockResolvedValueOnce({ akoya_requestid: REQ, wmkf_GrantCycle: null });
+  await promoteApplicantReviewer(args());
+  expect(selectIfUnengaged).toHaveBeenCalledWith(SUG, { actingUserSystemId: 'u-1', grantCycleCode: null });
 });

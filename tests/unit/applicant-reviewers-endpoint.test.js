@@ -42,8 +42,10 @@ jest.mock('../../lib/services/dynamics-service', () => ({
 // No slots populated, so ensureApplicantRecommended is never invoked by default; mock the
 // module anyway so its dataverse-adapter transitive deps don't load.
 const ensureApplicantRecommended = jest.fn(async () => ({ id: 'sug-1', created: true, skippedExcluded: false }));
+const findApplicantRecommendedByRequest = jest.fn(async () => []);
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   ensureApplicantRecommended: (...a) => ensureApplicantRecommended(...a),
+  findApplicantRecommendedByRequest: (...a) => findApplicantRecommendedByRequest(...a),
 }));
 
 
@@ -199,6 +201,7 @@ describe('happy-path envelope (full pin)', () => {
       slotsPopulated: 1,
       recommendedFailed: undefined,
       recommendedComplete: true,
+      applicantRowsReadFailed: false,
       knownLookupComplete: true,
       knownLookupFailed: undefined,
       excluded: [{ name: 'Mya Breitbart', affiliation: null }],
