@@ -36,6 +36,8 @@ Decided, not built:
      papers (the existing `ready` sources), or a past invitation they accepted.
    - **Plausible → dialog with one checkbox, no evidence link.** Not found
      elsewhere, but the domain fits the listed institution and accepts mail.
+     Per decision 10, a checkbox-only confirmation keeps the send-time
+     per-recipient check.
    - **Something is off → evidence link required.** A role or lab mailbox, a
      domain that doesn't fit the institution or doesn't accept mail, or
      publications that point to a different institution and field.
@@ -48,13 +50,26 @@ Decided, not built:
 7. **Remove the "Applicant-referred reviewers" list** from the Find tab. The
    cards carry the applicant's listed details; a suggested-reviewer row that
    fails to load shows a warning at the top of the Find tab.
-8. **An older AkoyaGO contact counts as confirmation.** When exactly one active
-   AkoyaGO contact has the applicant's exact address, and that contact existed
-   before the suggestion, the address is *confirmed elsewhere* (one click).
-   A contact created after the suggestion does not count. Evidence in §7
-   item 6.
+8. **An older AkoyaGO contact is shown, at the checkbox level.** (Revised by
+   decision 11 on 2026-11-21; originally it counted as one-click
+   confirmation.) When exactly one active AkoyaGO contact has the
+   applicant's exact address and that contact existed before the suggestion,
+   the card says so (for example "this email has been on file in AkoyaGO
+   since 2019") but the director still confirms with the checkbox. Evidence
+   in §7 item 6.
 9. **Validate the applicant's listed details against AkoyaGO** (§7 item 7);
    mismatches are flags that require the evidence link, never blocks.
+10. **A checkbox-only confirmation keeps the send-time check** (2026-11-21,
+    open decision A). Confirmations at the one-click level (a `ready` source
+    found the same address) or with an evidence link stay `ready`, as today.
+    A confirmation made with only the checkbox records the address as
+    `quick_check`, so the invite dialog asks for the per-recipient
+    acknowledgement for that reviewer. The distinction has to travel through
+    the trust bundle, promotion, the card and sending (§8a).
+11. **Contact age is not address age, so the older-contact route moves to
+    the checkbox level** (2026-11-21, open decision B). One click comes only
+    from independent lookups (ORCID, institution page, multiple papers).
+    The older contact is still displayed as supporting context.
 
 Earlier owner targets carried into this brief (SESSION_PROMPT, Session 693
 item 1): one plain question per card; the match result as one line; one pair
@@ -266,8 +281,11 @@ free text; the system is called AkoyaGO everywhere on the card; no
      most 12 of them older; the exact overlap was not computed). Who entered
      each contact's address (the person in GOApply, staff, or an earlier
      import) is not known [ASSUMED unknown], so an older contact address is
-     corroboration of age, not proof the person typed it. The owner chose to
-     count it (owner decision 8).
+     corroboration of age, not proof the person typed it. The owner first
+     chose to count it (owner decision 8), then, after the Codex review showed
+     contact age is not address age, moved it to the checkbox level as
+     displayed context (owner decision 11). One click therefore stays at the
+     8 of 62 found by independent lookups.
 7. **Validate the applicant's listed details against AkoyaGO** (owner request,
    2026-11-20). Each mismatch below puts the card in *Check email*, highlights
    the cell in Compare details, and requires the evidence link:
@@ -331,7 +349,7 @@ projection items can proceed.** Required changes, in order:
    `lib/services/workbench/reviewer-roster-service.js:557-572`), which erases
    the evidence a server check would read. Compute the level before that
    write, or from the person record, and compare the exact final email.
-4. **Decision 8 specifics.** `createdon` is in neither the contacts select nor
+4. **Decision 8 specifics** (now display-only context, decision 11). `createdon` is in neither the contacts select nor
    the suggestion select (`lib/dataverse/core/entity-registry.js`); choose the
    reference time (suggestion `createdon` or roster `first_seen_at`); require
    a name match on the single contact (`findByEmailCandidates` checks email
@@ -431,20 +449,9 @@ confirmed §8's client-evidence and overwrite findings and added:
    `institution-affiliation-stage2.js:3-7`).
 
 ### 9. Open decisions
-**A. What should a staff confirmation mean at send time?** Today a confirmed
-address becomes `ready`, so the invite skips the per-recipient check (S391
-exact-address model). Options: keep that for every level (the checkbox
-level then removes both the evidence link and the send-time check), or make
-the checkbox level `quick_check` so the send-time check returns for those
-reviewers only. **Codex recommends `quick_check` for checkbox-only
-confirmations**: a fitting domain that accepts mail does not show that this
-exact mailbox reaches this person. That distinction would have to be carried
-through the trust bundle, promotion, the card and sending.
-
-**B. Is "an older AkoyaGO contact has this address" good enough for one
-click?** Owner decision 8 said yes, but contact age does not show the
-address is old (finding 4 above). Options: accept that weaker guarantee
-explicitly; require proof the address itself predates the suggestion (no
-address history is read today); or demote this route to the checkbox level.
+None. Decisions A (send-time meaning of a checkbox-only confirmation) and B
+(older AkoyaGO contact as one-click evidence) were settled on 2026-11-21 as
+owner decisions 10 and 11, following the Codex recommendation in §8a.
 
 Owner decisions 5–9 settled the brief's earlier questions on 2026-11-20.
+Decisions 10–11 settled A and B on 2026-11-21.
