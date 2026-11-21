@@ -1,6 +1,6 @@
 # Postgres: external service register
 
-[VERIFIED 2026-11-20 via branch source] The Admin → Operations → External services view records service inventory and dated decisions in private operational Postgres tables. Migrations 106–107 are branch-built; application deployment and database application are not established by this source review. The production read-only preflight found the register tables absent; isolated local database validation is recorded below.
+[VERIFIED 2026-11-21 via PR #668, Vercel inspection, and production Postgres readback] Admin → Operations → External services is deployed in production. Migrations 106–107 were applied through the canonical existing-database runner; readback confirmed 26 services, one AssemblyAI review, and no pending migrations. See [release evidence](../audits/SERVICE_TRACKER_RELEASE_2026-11-21.md).
 
 ## Authority and schema
 
@@ -30,4 +30,4 @@ The feature records proposed, approved, or implemented decisions. It makes no pr
 
 Verified locally: the canonical upgrade runner applied migration 107 to an isolated database already at 106; a separate fresh-database bootstrap also replayed both migrations. Both read back 26 services and one review. The 78 scoped tests cover seed parity, atomic saves, stale retries, rollback, cross-service ownership, both capacity limits, malformed requests, Pacific dates/DST, editable cadence defaults, ambiguous responses, and stable creation IDs. The production build and type check passed. Desktop and narrow-width captures used mocked API data; they are not hosted authorization or live-save proof. Operations now has eight navigation entries; the scoped UI review accepted the scrollable extension despite the design guide’s seven-tab preference.
 
-This page documents the source route, validator, store, migration, and Admin consumer. Production migration application, populated row counts, hosted authorization, and a save/reload smoke remain unverified. The AssemblyAI seed review preserves its source evidence and limitations; its Implemented label does not establish that this register has shipped.
+Production deployment and schema/count readback are verified on 2026-11-21. An anonymous production API request redirects to sign-in with no-store headers. Authenticated superuser access and a hosted save/reload smoke remain unverified because the available browser was signed out. The AssemblyAI review preserves its source evidence and quality-observation limitations; no recordings were reprocessed for this release.
