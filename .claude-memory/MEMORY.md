@@ -29,7 +29,7 @@
 - Action affordances / UI gating: feedback-ui-gates-must-mirror-server-guards.md; feedback-match-existing-ui-patterns.md; ordered workflows as one guided action: feedback-ordered-workflows-as-one-action.md
 - Tunables / cycle-scoped settings / cycle literals / per-cycle allowlists / PD campaign settings vs central defaults: feedback-mutable-parameters-not-in-code.md; feedback-minimize-per-cycle-configuration.md; feedback-centralize-over-pd-specific-settings.md
 - Test venue (default: Production test requests, not sandbox) / Factory safety vs fidelity / sandbox Request creates (GoVerify bypass) and derived status: feedback-factory-safe-not-full-fidelity.md; feedback-question-the-rehearsal-venue.md; project-sandbox-request-status-business-rules.md
-- Tone / user context: feedback-no-performative-contrition.md; feedback-user-facing-error-copy-voice.md; item codes in owner/colleague text: feedback-no-item-codes-in-owner-facing-text.md
+- Tone / user context: feedback-no-performative-contrition.md; feedback-user-facing-error-copy-voice.md; item codes in owner/colleague text: feedback-no-item-codes-in-owner-facing-text.md; decision questions anchored in a named example: feedback-anchor-decisions-in-a-named-example.md
 - Legacy labels / interim trims on surfaces with a decided target: feedback-skip-legacy-fixes-that-the-target-state-removes.md
 - Search / schema language: feedback-grep-general-codebase-terms.md; feedback-human-legibility-schema-principle.md; feedback-staff-ui-never-shows-internal-ids.md; feedback-staff-ui-desktop-first.md
 
