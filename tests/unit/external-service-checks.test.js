@@ -1,11 +1,11 @@
 /** @jest-environment node */
 import { boundedFetch, collectSource, sourcesFor } from '../../lib/services/external-services/check-sources';
 import { checkForUpdates } from '../../lib/services/external-services/checks';
-import { claimCheck, finishCheck } from '../../lib/services/external-services/check-store';
+import { claimCheck, finishCheck, interruptCheck } from '../../lib/services/external-services/check-store';
 import { getCostReport, getMessagesUsageReport } from '../../lib/services/anthropic-admin';
 import { sql } from '@vercel/postgres';
-jest.mock('@vercel/postgres',()=>({sql:{query:jest.fn()}}));
-jest.mock('../../lib/services/external-services/check-store',()=>({claimCheck:jest.fn(),finishCheck:jest.fn(async(id,token,snapshot)=>snapshot)}));
+jest.mock('@vercel/postgres',()=>{const query=jest.fn();return {sql:{query},db:{connect:jest.fn(async()=>({query,release:jest.fn()}))}};});
+jest.mock('../../lib/services/external-services/check-store',()=>({claimCheck:jest.fn(),interruptCheck:jest.fn().mockResolvedValue(undefined),finishCheck:jest.fn(async(id,token,snapshot)=>snapshot)}));
 jest.mock('../../lib/services/anthropic-admin',()=>({getCostReport:jest.fn(),getMessagesUsageReport:jest.fn()}));
 const now='2026-11-21T20:00:00.000Z';
 const reply=(value,status=200)=>({ok:status===200,status,body:new ReadableStream({start(c){c.enqueue(Buffer.from(typeof value==='string'?value:JSON.stringify(value)));c.close();}})});
@@ -69,4 +69,58 @@ test('partial failures persist independent successes without completing human re
 });
 test('cooldown reuse makes no provider calls',async()=>{
   claimCheck.mockResolvedValue({cached:{checkedAt:now,sources:[]}});expect(await checkForUpdates('serpapi',42)).toEqual({checkedAt:now,sources:[]});expect(fetch).not.toHaveBeenCalled();expect(finishCheck).not.toHaveBeenCalled();
+});
+test('SerpAPI usage changes preserve the plan baseline until allowance becomes low',async()=>{
+  process.env.SERP_API_KEY='test-key';const source=sourcesFor('serpapi')[0];
+  const account={plan_name:'Starter',plan_monthly_price:25,searches_per_month:100,this_month_usage:20,total_searches_left:80,plan_renewal_date:null};
+  fetch.mockResolvedValue(reply(account));const first=await collectSource(source,undefined,undefined,now);
+  fetch.mockResolvedValue(reply({...account,this_month_usage:30,total_searches_left:70}));
+  expect((await collectSource(source,first.baseline,undefined,now)).result).toMatchObject({status:'unchanged',attention:false});
+  fetch.mockResolvedValue(reply({...account,this_month_usage:91,total_searches_left:9}));
+  expect((await collectSource(source,first.baseline,undefined,now)).result).toMatchObject({status:'changed',attention:true});
+  fetch.mockResolvedValue(reply({...account,plan_monthly_price:30}));
+  expect((await collectSource(source,first.baseline,undefined,now)).result.status).toBe('changed');
+});
+test('incomplete local pricing census cannot replace a complete prior baseline',async()=>{
+  const source=sourcesFor('anthropic')[1];
+  sql.query.mockResolvedValue({rows:[{model:'unknown-example',count:3}]});
+  const first=await collectSource(source,undefined,undefined,now);
+  expect(first.result).toMatchObject({status:'baseline',attention:true});
+  sql.query.mockResolvedValue({rows:Array.from({length:101},(_,i)=>({model:`unknown-${i}`,count:1}))});
+  const next=await collectSource(source,first.baseline,undefined,now);
+  expect(next.result.status).toBe('unavailable');expect(next.baseline).toEqual(first.baseline);
+});
+
+test('changed evidence remains pending on repeated checks until a recorded review',async()=>{
+  const source=sourcesFor('assemblyai')[0];
+  const page=price=>'# AssemblyAI Pricing\n'+'Official pricing notes. '.repeat(6)+`\nPre-recorded audio $${price}/hr`;
+  fetch.mockResolvedValue(reply(page('0.21')));const first=await collectSource(source,undefined,undefined,now);
+  fetch.mockImplementation(async()=>reply(page('0.20')));const changed=await collectSource(source,first.baseline,undefined,now);
+  fetch.mockImplementation(async()=>reply(page('0.20')));const repeated=await collectSource(source,changed.baseline,undefined,now);
+  expect(repeated.result).toMatchObject({status:'changed',attention:true});expect(repeated.result.previousLines.join()).toContain('0.21');
+  claimCheck.mockResolvedValue({token:'lease',reviewRevision:'review-2',previous:{reviewRevision:'review-1',baselines:{pricing:repeated.baseline}},service:{version:3,data:{configuration:'current'}}});
+  const checked=await checkForUpdates('assemblyai',42);expect(checked.sources[0].status).toBe('unchanged');expect(checked.baselines.pricing.pending).toBe(false);
+});
+test('known completion failure interrupts only the claimed attempt',async()=>{
+  claimCheck.mockResolvedValue({token:'lease',previous:{},service:{version:3,data:{configuration:'current'}}});
+  fetch.mockRejectedValue(new Error('offline'));finishCheck.mockRejectedValueOnce(new Error('storage unavailable'));
+  await expect(checkForUpdates('assemblyai',42)).rejects.toThrow('storage unavailable');expect(interruptCheck).toHaveBeenCalledWith('assemblyai','lease');
+});
+const cohort={model:'claude-sonnet-5',service_tier:'standard',context_window:'0-200k',inference_geo:'global',workspace_id:null};
+const bucket=results=>[{starting_at:'2026-11-01T00:00:00Z',ending_at:'2026-11-02T00:00:00Z',results}];
+const cost=amount=>({...cohort,token_type:'output_tokens',amount,currency:'USD',cost_type:'tokens'});
+const usage={...cohort,uncached_input_tokens:0,output_tokens:1000000,cache_read_input_tokens:0,cache_creation:{ephemeral_5m_input_tokens:0,ephemeral_1h_input_tokens:0}};
+test('billing fingerprints ignore date shifts but preserve known drift with skipped rows',async()=>{
+  process.env.ANTHROPIC_ADMIN_API_KEY='test-admin';getMessagesUsageReport.mockResolvedValue(bucket([usage]));
+  getCostReport.mockResolvedValue(bucket([cost('1000')]));
+  jest.useFakeTimers().setSystemTime(new Date('2026-11-21T20:00:00Z'));
+  try {
+    const source=sourcesFor('anthropic')[2];const first=await collectSource(source,undefined,undefined,now);
+    expect(first.result).toMatchObject({status:'baseline',attention:false});
+    jest.setSystemTime(new Date('2026-11-22T20:00:00Z'));
+    expect((await collectSource(source,first.baseline,undefined,now)).result.status).toBe('unchanged');
+    getCostReport.mockResolvedValue(bucket([cost('1200'),{...cost('1000'),service_tier:'batch'}]));
+    const drift=await collectSource(source,first.baseline,undefined,now);
+    expect(drift.result).toMatchObject({status:'changed',attention:true});expect(drift.result.lines.join()).toContain('1 unsupported or unmatched');expect(drift.result.lines.join()).toContain('20.0%');
+  } finally {jest.useRealTimers();}
 });

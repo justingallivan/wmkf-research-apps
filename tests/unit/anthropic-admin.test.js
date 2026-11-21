@@ -32,3 +32,9 @@ it.each([{ data: [], has_more: undefined }, { data: [{}], has_more: false }])('r
   global.fetch.mockResolvedValue(response(body));
   await expect(getCostReport(window)).rejects.toThrow('Invalid Anthropic report response');
 });
+
+it('passes the manual signal and bounded transport through without using global fetch',async()=>{
+  const signal=new AbortController().signal;const fetchImpl=jest.fn().mockResolvedValue(response({data:[],has_more:false}));
+  await getCostReport({...window,signal,fetchImpl});expect(global.fetch).not.toHaveBeenCalled();
+  expect(fetchImpl).toHaveBeenCalledWith(expect.any(String),expect.objectContaining({signal}));
+});

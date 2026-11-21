@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { Pool } from 'pg';
 import { listServices, listReviews, saveService } from '../../lib/services/external-services/store';
-import { claimCheck, finishCheck, readCheck } from '../../lib/services/external-services/check-store';
+import { claimCheck, finishCheck, readCheck, interruptCheck } from '../../lib/services/external-services/check-store';
 import seed from '../../lib/services/external-services/seed.json';
 const connectionString=process.env.EXTERNAL_SERVICES_TEST_URL || process.env.TEST_REQUEST_LEDGER_TEST_URL;
 if(connectionString && !['127.0.0.1','localhost','[::1]'].includes(new URL(connectionString).hostname)) throw new Error('Loopback test database required');
@@ -123,6 +123,29 @@ jest.mock('@vercel/postgres',()=>({db:{connect:()=>mockPool.connect()},sql:{quer
   });
   test.each(['microsoft','openai','service-custom',null,['assemblyai']])('unsupported manual-check target rejects before SQL: %j',async id=>{
     const query=jest.spyOn(mockPool,'query');await expect(claimCheck(id,42)).rejects.toMatchObject({status:400});expect(query).not.toHaveBeenCalled();query.mockRestore();
+  });
+
+  test('missing check storage preserves an explicit setup state',async()=>{
+    await mockPool.query('ALTER TABLE external_service_checks RENAME TO check_storage_test_hidden');
+    try { expect(await readCheck('assemblyai')).toEqual({setupRequired:true});expect((await listReviews('assemblyai')).length).toBeGreaterThan(0); }
+    finally {await mockPool.query('ALTER TABLE check_storage_test_hidden RENAME TO external_service_checks');}
+  });
+  test('failed and expired attempts cannot finish or interrupt their replacement',async()=>{
+    const first=await claimCheck('serpapi',42);
+    await expect(finishCheck('serpapi',first.token,{large:'x'.repeat(200001)})).rejects.toMatchObject({status:503});
+    await interruptCheck('serpapi',first.token);expect((await readCheck('serpapi')).interrupted).toBe(true);
+    await expect(finishCheck('serpapi',first.token,{})).rejects.toMatchObject({status:409});
+    const next=await claimCheck('serpapi',42);await interruptCheck('serpapi',first.token);
+    expect((await readCheck('serpapi')).running).toBe(true);
+    await finishCheck('serpapi',next.token,{checkedAt:new Date().toISOString()});
+  });
+  test('human review revision changes only on a saved review, not a service edit',async()=>{
+    const first=await claimCheck('anthropic',42);await interruptCheck('anthropic',first.token);
+    const row=(await listServices()).find(s=>s.id==='anthropic');
+    await saveService({id:row.id,data:{...row.data,owner:'Updated owner'},expectedVersion:row.version},42);
+    const second=await claimCheck('anthropic',42);expect(second.reviewRevision).toBe(first.reviewRevision);await interruptCheck('anthropic',second.token);
+    await saveService({id:row.id,data:row.data,expectedVersion:row.version+1,review:seed.assemblyAIReview},42);
+    const third=await claimCheck('anthropic',42);expect(third.reviewRevision).not.toBe(second.reviewRevision);await interruptCheck('anthropic',third.token);
   });
 
 });

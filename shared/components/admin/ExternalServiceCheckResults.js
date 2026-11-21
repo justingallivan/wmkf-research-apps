@@ -1,9 +1,10 @@
 /** Plain-text evidence only. A source check never counts as a completed human review. */
 import { Button } from '../Layout';
-const labels = { baseline:'First check — baseline saved',changed:'Source changed',unchanged:'No change detected',unavailable:'Could not check' };
+const labels = { baseline:'First check — baseline saved',changed:'Changed — review needed',unchanged:'No change detected',unavailable:'Could not check' };
 export default function ExternalServiceCheckResults({ check, serviceVersion, onReview }) {
   if (!check) return <p className="text-sm text-gray-600">No update check yet. A check gathers evidence; it does not complete a review.</p>;
   return <div className="space-y-4">
+    {check.setupRequired && <p role="alert" className="text-sm text-amber-800">Update checks are not set up yet. An administrator must apply the check-storage migration. Existing reviews remain available.</p>}
     {check.running && <p role="status" className="text-sm">A check is running. Reload results shortly.</p>}
     {check.interrupted && <p role="alert" className="text-sm text-amber-800">The previous check did not finish. Run another check; any earlier results below are retained.</p>}
     {check.checkedAt && <p className="text-sm text-gray-600">Last check: {new Date(check.checkedAt).toLocaleString('en-US',{timeZone:'America/Los_Angeles'})} Pacific. Checks do not change review dates or provider settings.</p>}
