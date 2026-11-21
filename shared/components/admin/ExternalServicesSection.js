@@ -132,7 +132,7 @@ export default function ExternalServicesSection() {
     openEditor('review');
     const sources = updateCheck.sources || [];
     setReview(previous=>({...previous, trigger:'Manual service update check',decision:'Investigate',
-      changes:sources.map(s=>`${s.label}: ${s.status}. ${s.summary}\n${(s.lines||[]).join('\n')}`).join('\n\n').slice(0,6000),
+      changes:sources.map(s=>`${s.label}: ${s.status}. ${s.summary}\n${(s.lines||[]).join('\n')}${s.retainedObservedAt ? `\nRetained from ${s.retainedObservedAt}; not a fresh observation.` : ''}`).join('\n\n').slice(0,6000),
       evidence:`Checked ${updateCheck.checkedAt}. Provider statements and account observations; not independently benchmarked. ${sources.filter(s=>s.status==='unavailable').map(s=>`${s.label} could not be checked.`).join(' ')}`,
       links:sources.map(s=>({label:s.label,href:s.url}))}));
   }
@@ -200,7 +200,7 @@ export default function ExternalServicesSection() {
           <References links={current.data.links} />
         </div>
         {['assemblyai','anthropic','serpapi'].includes(selected) && <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-lg font-semibold">Update checks</h3><Button disabled={checking || reviewLoading} onClick={checkUpdates}>{checking ? 'Checking…' : 'Check for updates'}</Button></div>
+          <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-lg font-semibold">Update checks</h3><Button disabled={checking || reviewLoading || updateCheck?.setupRequired} onClick={checkUpdates}>{checking ? 'Checking…' : 'Check for updates'}</Button></div>
           <p className="text-sm text-gray-600">Manual only. Reads official references or account metrics; no AI generation, purchases, or automatic changes. Checks within one minute reuse the saved result.</p>
           {checkError && <p role="alert" className="text-sm text-red-700">{checkError}</p>}
           <Button variant="link" disabled={checking} onClick={()=>setReload(v=>v+1)}>Reload check results</Button>

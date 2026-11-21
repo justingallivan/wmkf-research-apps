@@ -148,4 +148,14 @@ jest.mock('@vercel/postgres',()=>({db:{connect:()=>mockPool.connect()},sql:{quer
     const third=await claimCheck('anthropic',42);expect(third.reviewRevision).not.toBe(second.reviewRevision);await interruptCheck('anthropic',third.token);
   });
 
+  test('review acknowledgement must follow the completed check in database time',async()=>{
+    const row=(await listServices()).find(s=>s.id==='serpapi');
+    await saveService({id:row.id,data:row.data,expectedVersion:row.version,review:seed.assemblyAIReview},42);
+    await mockPool.query("UPDATE external_service_reviews SET updated_at=now()-interval '120 seconds' WHERE service_id='serpapi'");
+    await mockPool.query("UPDATE external_service_checks SET checked_at=now()-interval '61 seconds' WHERE service_id='serpapi'");
+    const during=await claimCheck('serpapi',42);expect(during.reviewAfterCheck).toBe(false);await interruptCheck('serpapi',during.token);
+    await mockPool.query("UPDATE external_service_reviews SET updated_at=now() WHERE service_id='serpapi'");
+    const after=await claimCheck('serpapi',42);expect(after.reviewAfterCheck).toBe(true);await interruptCheck('serpapi',after.token);
+  });
+
 });

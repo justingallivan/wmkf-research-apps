@@ -77,7 +77,7 @@ test('SerpAPI usage changes preserve the plan baseline until allowance becomes l
   fetch.mockResolvedValue(reply({...account,this_month_usage:30,total_searches_left:70}));
   expect((await collectSource(source,first.baseline,undefined,now)).result).toMatchObject({status:'unchanged',attention:false});
   fetch.mockResolvedValue(reply({...account,this_month_usage:91,total_searches_left:9}));
-  expect((await collectSource(source,first.baseline,undefined,now)).result).toMatchObject({status:'changed',attention:true});
+  expect((await collectSource(source,first.baseline,undefined,now)).result).toMatchObject({status:'unchanged',attention:true});
   fetch.mockResolvedValue(reply({...account,plan_monthly_price:30}));
   expect((await collectSource(source,first.baseline,undefined,now)).result.status).toBe('changed');
 });
@@ -98,7 +98,7 @@ test('changed evidence remains pending on repeated checks until a recorded revie
   fetch.mockImplementation(async()=>reply(page('0.20')));const changed=await collectSource(source,first.baseline,undefined,now);
   fetch.mockImplementation(async()=>reply(page('0.20')));const repeated=await collectSource(source,changed.baseline,undefined,now);
   expect(repeated.result).toMatchObject({status:'changed',attention:true});expect(repeated.result.previousLines.join()).toContain('0.21');
-  claimCheck.mockResolvedValue({token:'lease',reviewRevision:'review-2',previous:{reviewRevision:'review-1',baselines:{pricing:repeated.baseline}},service:{version:3,data:{configuration:'current'}}});
+  claimCheck.mockResolvedValue({token:'lease',reviewAfterCheck:true,reviewRevision:'review-2',previous:{reviewRevision:'review-1',baselines:{pricing:repeated.baseline}},service:{version:3,data:{configuration:'current'}}});
   const checked=await checkForUpdates('assemblyai',42);expect(checked.sources[0].status).toBe('unchanged');expect(checked.baselines.pricing.pending).toBe(false);
 });
 test('known completion failure interrupts only the claimed attempt',async()=>{
@@ -123,4 +123,30 @@ test('billing fingerprints ignore date shifts but preserve known drift with skip
     const drift=await collectSource(source,first.baseline,undefined,now);
     expect(drift.result).toMatchObject({status:'changed',attention:true});expect(drift.result.lines.join()).toContain('1 unsupported or unmatched');expect(drift.result.lines.join()).toContain('20.0%');
   } finally {jest.useRealTimers();}
+});
+
+test('a pending change remains visible and reviewable when its source fails',async()=>{
+  const baseline={fingerprint:'changed',lines:['Current changed rate'],observedAt:now,pending:true,changeFrom:{lines:['Old rate'],observedAt:'2026-11-20T00:00:00Z'}};
+  fetch.mockRejectedValue(new Error('offline'));
+  const failed=await collectSource(sourcesFor('assemblyai')[0],baseline,undefined,now);
+  expect(failed.result).toMatchObject({status:'unavailable',pending:true,attention:true,lines:['Current changed rate'],previousLines:['Old rate'],retainedObservedAt:now,summary:expect.stringContaining('still unreviewed')});expect(failed.baseline).toBe(baseline);
+});
+test('a review saved during the previous check cannot acknowledge its unseen findings',async()=>{
+  const page='# AssemblyAI Pricing\n'+'Official pricing notes. '.repeat(6)+'\nPre-recorded $0.20/hr';
+  fetch.mockImplementation(async()=>reply(page));
+  const baseline=(await collectSource(sourcesFor('assemblyai')[0],undefined,undefined,now)).baseline;
+  claimCheck.mockResolvedValue({token:'lease',reviewRevision:'new-review',reviewAfterCheck:false,previous:{reviewRevision:'old-review',baselines:{pricing:{...baseline,pending:true,changeFrom:{lines:['Prior rate'],observedAt:now}}}},service:{version:3,data:{configuration:'current'}}});
+  const checked=await checkForUpdates('assemblyai',42);expect(checked.sources[0].status).toBe('changed');
+});
+test('routine SerpAPI renewal and recovered allowance do not change the plan fingerprint',async()=>{
+  process.env.SERP_API_KEY='test-key';const account={plan_name:'Starter',plan_monthly_price:25,searches_per_month:100,this_month_usage:95,total_searches_left:5,plan_renewal_date:'2026-11-22'};
+  fetch.mockResolvedValue(reply(account));const first=await collectSource(sourcesFor('serpapi')[0],undefined,undefined,now);
+  fetch.mockResolvedValue(reply({...account,this_month_usage:0,total_searches_left:100,plan_renewal_date:'2026-12-22'}));
+  expect((await collectSource(sourcesFor('serpapi')[0],first.baseline,undefined,now)).result).toMatchObject({status:'unchanged',attention:false});
+});
+test('blended billing percentage movement does not create another finding',async()=>{
+  process.env.ANTHROPIC_ADMIN_API_KEY='test-admin';getMessagesUsageReport.mockResolvedValue(bucket([usage]));getCostReport.mockResolvedValue(bucket([cost('1200')]));
+  const first=await collectSource(sourcesFor('anthropic')[2],undefined,undefined,now);
+  getCostReport.mockResolvedValue(bucket([cost('1210')]));
+  expect((await collectSource(sourcesFor('anthropic')[2],first.baseline,undefined,now)).result).toMatchObject({status:'unchanged',attention:true});
 });

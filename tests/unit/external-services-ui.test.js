@@ -161,3 +161,13 @@ test('late check response cannot overwrite a different service selection',async(
   expect(screen.queryByText('Recorded audio rate changed')).not.toBeInTheDocument();
   expect(screen.queryByRole('button',{name:'Check for updates'})).not.toBeInTheDocument();
 });
+
+test('an unavailable source with a retained change still offers an evidence draft',async()=>{
+  const check={...checked,sources:[{...checked.sources[0],status:'unavailable',pending:true,attention:true,retainedObservedAt:checked.checkedAt,summary:'Prior change still unreviewed.'}]};
+  global.fetch.mockImplementation(async url=>response(url.includes('?id=')?{reviews:[],check}:{services:[assembly]}));
+  render(<ExternalServicesSection/>);fireEvent.click(await screen.findByRole('button',{name:'AssemblyAI · Recorded-audio transcription'}));
+  fireEvent.click(await screen.findByRole('button',{name:'Start review from findings'}));
+  expect(screen.getByLabelText('What changed / findings').value).toContain('Recorded audio rate changed');
+  expect(screen.getByLabelText('What changed / findings').value).toContain('not a fresh observation');
+  expect(global.fetch.mock.calls.some(([,o])=>o?.method==='PUT')).toBe(false);
+});
