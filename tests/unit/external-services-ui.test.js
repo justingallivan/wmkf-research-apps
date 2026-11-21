@@ -171,3 +171,26 @@ test('an unavailable source with a retained change still offers an evidence draf
   expect(screen.getByLabelText('What changed / findings').value).toContain('not a fresh observation');
   expect(global.fetch.mock.calls.some(([,o])=>o?.method==='PUT')).toBe(false);
 });
+test('saved Markdown evidence is readable, expandable and carried into an unsaved review', async () => {
+  const lines = ['| **Recordings** | `assemblyai-stt-3-7` | $0.15/hr | [Guide](https://www.assemblyai.com/docs) |', '**Retirement:** February 1, 2027', 'Remaining searches: 123', '<img src=x onerror=alert(1)>'];
+  const check = {...checked, sources: [{...checked.sources[0], status: 'baseline', attention: false, lines, previousLines: ['**Earlier price:** $0.30/hr']}]};
+  global.fetch.mockImplementation(async url => response(url.includes('?id=') ? {reviews: [], check} : {services: [assembly]}));
+  const {container} = render(<ExternalServicesSection/>);
+  fireEvent.click(await screen.findByRole('button', {name:'AssemblyAI · Recorded-audio transcription'}));
+  expect(await screen.findByText('Recordings · assemblyai-stt-3-7 · $0.15/hr · Guide')).toBeVisible();
+  expect(screen.getByText('Retirement: February 1, 2027')).toBeVisible();
+  const extra = screen.getByText('Show 1 more excerpt').closest('details');
+  expect(extra).not.toHaveAttribute('open');
+  fireEvent.click(screen.getByText('Show 1 more excerpt'));
+  expect(extra).toHaveAttribute('open');
+  expect(screen.getByText('<img src=x onerror=alert(1)>')).toBeVisible();
+  expect(container.querySelector('img')).toBeNull();
+  expect(screen.getByRole('link', {name:'Open source'})).toHaveAttribute('href', check.sources[0].url);
+  fireEvent.click(screen.getByRole('button', {name:'Start review from findings'}));
+  const draft = screen.getByLabelText('What changed / findings').value;
+  expect(draft).toContain('Recordings · assemblyai-stt-3-7 · $0.15/hr · Guide');
+  expect(draft).toContain('<img src=x onerror=alert(1)>');
+  expect(draft).not.toContain('**');
+  expect(check.sources[0].lines).toEqual(lines);
+  expect(global.fetch.mock.calls.some(([,options]) => options?.method === 'PUT')).toBe(false);
+});

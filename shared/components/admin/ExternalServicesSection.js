@@ -4,7 +4,7 @@ import { requestJson } from '../../utils/api-request';
 import useAdminUnsavedChangesGuard from './useAdminUnsavedChangesGuard';
 import { CATEGORIES, COST_MODES, UPDATE_MODES, DECISIONS, REVIEW_STATES, isCorporateService, serviceStatus, reviewToday, nextReviewDate, defaultCadence } from '../../../lib/services/external-services/model';
 
-import ExternalServiceCheckResults from './ExternalServiceCheckResults';
+import ExternalServiceCheckResults, { readableEvidence } from './ExternalServiceCheckResults';
 
 const API = '/api/admin/external-services';
 const inputClass = 'w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-500';
@@ -132,7 +132,7 @@ export default function ExternalServicesSection() {
     openEditor('review');
     const sources = updateCheck.sources || [];
     setReview(previous=>({...previous, trigger:'Manual service update check',decision:'Investigate',
-      changes:sources.map(s=>`${s.label}: ${s.status}. ${s.summary}\n${(s.lines||[]).join('\n')}${s.retainedObservedAt ? `\nRetained from ${s.retainedObservedAt}; not a fresh observation.` : ''}`).join('\n\n').slice(0,6000),
+      changes:sources.map(s=>`${s.label}: ${s.status}. ${s.summary}\n${(s.lines||[]).map(readableEvidence).join('\n')}${s.retainedObservedAt ? `\nRetained from ${s.retainedObservedAt}; not a fresh observation.` : ''}`).join('\n\n').slice(0,6000),
       evidence:`Checked ${updateCheck.checkedAt}. Provider statements and account observations; not independently benchmarked. ${sources.filter(s=>s.status==='unavailable').map(s=>`${s.label} could not be checked.`).join(' ')}`,
       links:sources.map(s=>({label:s.label,href:s.url}))}));
   }
