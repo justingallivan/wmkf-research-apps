@@ -216,3 +216,35 @@ test('OpenAI exposes the manual action and drafts independent source results wit
   expect(screen.getByLabelText('Evidence and limitations').value).toContain('Official OpenAI retirement notices could not be checked');
   expect(global.fetch.mock.calls.some(([,options])=>options?.method==='PUT')).toBe(false);
 });
+
+test('Vercel hosting exposes manual partial checks and leaves other Vercel products outside the allowlist',async()=>{
+  const hosting={...seed.services.find(s=>s.id==='vercel-hosting'),version:1};
+  const blob={...seed.services.find(s=>s.id==='vercel-blob'),version:1};
+  const check={checkedAt:'2026-11-22T00:00:00Z',serviceVersion:1,sources:[
+    {key:'pricing',label:'Public Vercel Pro pricing and allowances',status:'baseline',lines:['$20/month platform fee'],url:'https://vercel.com/docs/plans/pro-plan.md'},
+    {key:'usage',label:'Vercel team usage — recent seven days',status:'unavailable',summary:'Account usage needs setup.',lines:[],url:'https://vercel.com/changelog/access-billing-usage-cost-data-api'}
+  ]};
+  let saved=null;let resolveReload;
+  global.fetch.mockImplementation(async(url,options)=>{
+    if(options?.method==='POST'){saved={...check,sources:[...check.sources,{key:'usage-snapshot',comparison:'scope',label:'Usage snapshot',status:'unchanged',lines:['Reloaded billing snapshot'],url:'https://vercel.com/changelog/access-billing-usage-cost-data-api'}]};return response({check});}
+    if(url.includes('?id=vercel-hosting')&&saved)return new Promise(resolve=>{resolveReload=()=>resolve(response({reviews:[],check:saved}));});
+    return response(url.includes('?id=')?{reviews:[],check:saved}:{services:[hosting,blob]});
+  });
+  render(<ExternalServicesSection/>);fireEvent.click(await screen.findByRole('button',{name:'Vercel · Hosting & Functions'}));
+  await waitFor(()=>expect(screen.getByRole('button',{name:'Check for updates'})).toBeEnabled());
+  fireEvent.click(screen.getByRole('button',{name:'Check for updates'}));
+  expect(await screen.findByText('Account usage needs setup.')).toBeVisible();
+  expect(JSON.parse(global.fetch.mock.calls.find(([,o])=>o?.method==='POST')[1].body)).toEqual({action:'check',id:'vercel-hosting'});
+  fireEvent.click(screen.getByRole('button',{name:'Reload check results'}));
+  await waitFor(()=>expect(resolveReload).toBeDefined());
+  await require('@testing-library/react').act(async()=>{resolveReload();});
+  expect(await screen.findByText('Reloaded billing snapshot')).toBeVisible();
+  expect(screen.getByText('Usage refreshed — no spend comparison')).toBeVisible();
+  fireEvent.click(screen.getByRole('button',{name:'Start review from findings'}));
+  expect(screen.getByLabelText('Evidence and limitations').value).toContain('Vercel team usage — recent seven days could not be checked');
+  fireEvent.click(screen.getByRole('button',{name:'Cancel'}));fireEvent.click(screen.getByRole('button',{name:'Back to services'}));
+  fireEvent.click(await screen.findByRole('button',{name:'Vercel · Blob storage'}));
+  expect(await screen.findByRole('heading',{name:'Vercel · Blob storage'})).toBeVisible();
+  expect(screen.queryByRole('button',{name:'Check for updates'})).not.toBeInTheDocument();
+  expect(global.fetch.mock.calls.some(([,o])=>o?.method==='PUT')).toBe(false);
+});

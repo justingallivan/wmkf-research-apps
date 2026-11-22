@@ -339,6 +339,26 @@ Automated BILL onboarding is disabled unless `BILL_ENABLED=true`; the current no
 | `CLOUDMERSIVE_API_KEY` | Cloudmersive virus-scan API key. Required when `VIRUS_SCAN_ENABLED=true`. Free tier 800 scans/month. | unset |
 | `HONORARIUM_ONBOARDING_DEFERRED` | Forces reviewer honorarium onboarding to **capture-only**: `ensureHonorariumOnboarding()` captures contact + mailing address then STOPS before minting the honorarium `akoya_request` or calling BILL (`lib/bill/honorarium-onboard-orchestrator.js:54`). Capture-only is *also* implied whenever the discriminator GUIDs (`HONORARIUM_PROGRAM_ID` / `HONORARIUM_GRANTPROGRAM_ID` / `HONORARIUM_TYPE_ID`) are unset — but this flag is the **explicit** lock that still holds if those GUIDs are later configured. **SET to `true` in Production 2026-06-22** as the capture-only lock for the reviewer onboarding-at-accept cycle. **2026-07-01 no-BILL creation plan:** set the three discriminator GUIDs and unset this flag so the portal creates the honorarium request; keep `BILL_ONBOARDING_DEFERRED=true` so no Bill.com payment/onboarding fires. Env-var changes require a deployment/restart built after the update because the discriminator module reads them at load time. To go live on Bill.com later, keep the GUIDs configured and separately unset `BILL_ONBOARDING_DEFERRED` after BILL credentials and option-set values are ready. **GO-LIVE 2026-07-02:** the three discriminator GUIDs were set in **Production**, this flag was **removed from Production** (kept `true` on **Preview**, which also has no GUIDs, so preview stays capture-only), `BILL_ONBOARDING_DEFERRED=true` retained, and prod was redeployed (`dpl_CqnqfG6mp3U9FkLuvzWsuzmnUfc1`) so the module constants took effect — no-BILL honorarium creation is live. | **Production: unset 2026-07-02 (live)**; Preview: `true` (capture-only) |
 
+### Optional — Manual Vercel service checks
+
+Branch implementation, not provisioned or deployed (2026-11-21). The public Pro-plan
+and Node.js reference checks need no credential. The optional team-wide FOCUS usage
+collector in `lib/services/external-services/check-sources.js` requires:
+
+| Variable | Purpose | Setup |
+|---|---|---|
+| `VERCEL_SERVICE_CHECK_TOKEN` | Dedicated server-only Vercel token for GET `/v1/billing/charges` | Configure securely as a Secret only in approved environments; never paste into chat, notes, or commits. Select the intended team and minimum available permissions. A team-scoped token is not necessarily read-only; this collector itself only issues GET. Do not copy a developer CLI/OAuth session or reuse `VERCEL_API_TOKEN` (which enables separate log-analysis behavior). |
+| `VERCEL_SERVICE_CHECK_TEAM_ID` | Explicit non-secret `team_…` billing target | Configure with the credential after verifying the target. No personal-account or ambient-team fallback. |
+
+Missing configuration produces a visible setup-needed source result while public
+checks continue. A rejected credential remains unavailable, not zero usage. Runtime
+configuration requires a new deployment. Track the token's actual expiry under
+`secret_expiration:vercel_service_check_token`; rotate through Vercel, update the
+secret, redeploy, verify the manual check, then revoke the outgoing token. No token
+was created, copied, or configured by this implementation. Usage is team-wide FOCUS
+effective cost, not the CLI's gross-cost view, invoice total, credit balance, or
+remaining quota. Migration 110 must precede deployment of the Vercel action.
+
 ### Optional — Notifications & Spend Alerts
 
 | Variable | Purpose |
@@ -651,6 +671,7 @@ Canonical list lives in `lib/utils/tracked-secrets.js` — both `pages/api/cron/
 | `assemblyai_webhook_secret` | AssemblyAI callback HMAC secret | hmac | No vendor expiry; independently generate and rotate on compromise/offboarding or at least annually. |
 | `transcription_reference_encryption_key` | Transcription provider-reference encryption key | hmac | No vendor expiry; rotation requires decrypt/re-encrypt of retained provider references before replacing the key. |
 | `claude_api_key` | Anthropic Claude API Key | vendor | No vendor expiry, but rotate on compromise or staff offboarding |
+| `vercel_service_check_token` | Vercel service-check API token (optional) | vendor | Record chosen expiry when provisioning; rotate on compromise or expiry. Not provisioned by this build. |
 | `openai_api_key` | OpenAI API Key (Executor provider seam; opt-in) | vendor | No assumed vendor expiry; rotate on compromise or staff offboarding and update every enabled runtime environment |
 | `openalex_api_key` | OpenAlex API Key | vendor | Authenticated request credential; rotate on compromise and update every runtime environment |
 | `cloudmersive_api_key` | Cloudmersive API Key (virus scan; gated by VIRUS_SCAN_ENABLED) | vendor | Pilot uses free tier (800 scans/mo); rotate on compromise |

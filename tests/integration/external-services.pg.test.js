@@ -24,6 +24,9 @@ jest.mock('@vercel/postgres',()=>({db:{connect:()=>mockPool.connect()},sql:{quer
     await expect(mockPool.query("INSERT INTO external_service_checks(service_id) VALUES ('openai')")).rejects.toMatchObject({code:'23514'});
     await mockPool.query(fs.readFileSync('lib/db/migrations/109_openai_service_checks.sql','utf8'));
     expect((await mockPool.query("SELECT snapshot FROM external_service_checks WHERE service_id='assemblyai'")).rows[0].snapshot).toEqual({upgradeProbe:true});
+    await expect(mockPool.query("INSERT INTO external_service_checks(service_id) VALUES ('vercel-hosting')")).rejects.toMatchObject({code:'23514'});
+    await mockPool.query(fs.readFileSync('lib/db/migrations/110_vercel_service_checks.sql','utf8'));
+    expect((await mockPool.query("SELECT snapshot FROM external_service_checks WHERE service_id='assemblyai'")).rows[0].snapshot).toEqual({upgradeProbe:true});
     await mockPool.query("DELETE FROM external_service_checks WHERE service_id='assemblyai'");
   });
   afterAll(async()=>{await mockPool.end();await admin.query(`DROP SCHEMA ${schema} CASCADE`);await admin.end();});
@@ -143,13 +146,13 @@ jest.mock('@vercel/postgres',()=>({db:{connect:()=>mockPool.connect()},sql:{quer
     } finally {await mockPool.query('DROP TABLE api_usage_log');}
   });
 
-  test('OpenAI check persists after allowlist expansion without editing the service',async()=>{
-    const before=(await listServices()).find(s=>s.id==='openai');
-    const claim=await claimCheck('openai',42);
+  test.each(['openai','vercel-hosting'])('%s check persists after allowlist expansion without editing the service',async id=>{
+    const before=(await listServices()).find(s=>s.id===id);
+    const claim=await claimCheck(id,42);
     const snapshot={checkedAt:new Date().toISOString(),sources:[{key:'models',status:'baseline',lines:['Model list checked']}],baselines:{}};
-    await finishCheck('openai',claim.token,snapshot);
-    expect(await readCheck('openai')).toMatchObject(snapshot);
-    expect((await listServices()).find(s=>s.id==='openai')).toEqual(before);
+    await finishCheck(id,claim.token,snapshot);
+    expect(await readCheck(id)).toMatchObject(snapshot);
+    expect((await listServices()).find(s=>s.id===id)).toEqual(before);
     await expect(mockPool.query("INSERT INTO external_service_checks(service_id) VALUES ('microsoft')")).rejects.toMatchObject({code:'23514'});
   });
 

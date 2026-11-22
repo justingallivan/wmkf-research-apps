@@ -51,3 +51,41 @@ The existing superuser POST, lease, independent-source failure handling, bounded
 The local source reads seven days of `api_usage_log` with an explicit OpenAI-family model-prefix filter because the table has no provider field. Executor OpenAI runs appear only when their caller logs usage, so configured models can be missing. It shows logged request counts and missing local pricing (unpriced models first); the fingerprint excludes changing request counts. Zero rows does not establish no OpenAI use. Fine-tuned IDs and unrecognized future model families are excluded. The shared pricing table date is not an independent OpenAI-price verification. The public deprecations Markdown source fingerprints the whole normalized document and shows bounded excerpts; notices are provider-wide and not automatically matched to configured models. All provider text remains inert evidence.
 
 Organization billing and prepaid-credit checks are deliberately excluded per owner direction (individual API-credit account). No new credential, model invocation, automatic schedule, provider settings change, or completed human review is introduced. Migration 109 changes only the service-ID constraint and preserves existing snapshots; fresh installs replay the manifest.
+
+## Vercel hosting extension — branch implementation, not deployed
+
+The `vercel-hosting` inventory row gains the same manual check and unsaved review
+flow. Migration `110_vercel_service_checks.sql` expands the constraint to five
+service IDs, preserving the four existing providers and snapshots; it is not
+applied to production by this build. The runtime/UI allowlists match. Other Vercel
+inventory rows (Blob, Workflow, Sandbox) remain outside the check allowlist.
+
+Three independent collectors read public Pro-plan pricing/allowances, Node.js
+support/retirement guidance, and optional seven-day team usage. Public references
+remove frontmatter, generated related-page navigation, and CLI boilerplate before
+fingerprinting; runtime retirement links are retained separately. Runtime comparison
+uses the current checker process major, not a claim about all deployments, project
+settings, build overrides, or containers. Unsupported majors need attention.
+Public Pro-plan terms do not establish the account's actual plan or remaining quota.
+
+The fixed GET `/v1/billing/charges` uses dedicated server configuration documented
+in `docs/CREDENTIALS_RUNBOOK.md`. It reads bounded JSONL (8 MiB for this endpoint
+only; other HTTP sources retain 1 MiB), at most 12,000 rows and 200 aggregate groups,
+within the existing deadlines. Invalid, empty, truncated, oversized, non-USD or
+unsupported-category data fails the whole usage source and retains the prior
+baseline. Only service/unit/category aggregate quantities, FOCUS effective costs,
+and reported period bounds reach the snapshot; account/project names, IDs, tags,
+and raw records are discarded. The configured team contributes only to the hash.
+Routine quantities, spend and dates are excluded from change fingerprints; unchanged usage reads display “Usage refreshed — no spend comparison.” Signed corrections are retained, and null subscription quantities stay unknown. Reported rows may lag or be incomplete. These
+are all-team/all-product figures, not app-only hosting charges, CLI gross costs,
+invoices, quotas, or an automatic price comparison. No new cron, alert, provider
+write, human-review save, or deployment is introduced.
+
+[VERIFIED via local collector smoke and scoped tests, 2026-11-21] Both live public
+Markdown sources parse successfully; local Node.js 26 is listed as supported.
+The production project's Node.js setting was separately read as 22.x through the
+Vercel CLI; this is not a hosted check of the new implementation. CLI-authorized
+read-only billing discovery confirmed the public FOCUS response shape and the
+need for the larger bounded body. Application credential access remains unverified
+because it is not configured. See the [Vercel implementation review receipt](../audits/VERCEL_SERVICE_CHECKS_REVIEW_2026-11-21.md) for
+release prerequisites and remaining limits.

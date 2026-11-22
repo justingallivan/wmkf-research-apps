@@ -1,5 +1,6 @@
 /** Plain-text evidence only. A source check never counts as a completed human review. */
 import { Button } from '../Layout';
+const scopeLabels = {baseline:'First usage snapshot saved',unchanged:'Usage refreshed — no spend comparison',changed:'Account scope changed — review needed'};
 const labels = { baseline:'First check — baseline saved',changed:'Changed — review needed',unchanged:'No change detected',unavailable:'Could not check' };
 // Display-only normalization: never use this text for fingerprints or saved baselines.
 // React renders the result as text; provider HTML is never interpreted.
@@ -30,7 +31,7 @@ export default function ExternalServiceCheckResults({ check, serviceVersion, onR
     {check.checkedAt && <p className="text-sm text-gray-600">Last check: {new Date(check.checkedAt).toLocaleString('en-US',{timeZone:'America/Los_Angeles'})} Pacific. Checks do not change review dates or provider settings.</p>}
     {check.serviceVersion && check.serviceVersion !== serviceVersion && <p className="text-sm text-amber-800">This service was edited after the check. Compare the findings with the current configuration.</p>}
     {(check.sources || []).map(source=><article key={source.key} className="rounded-lg border border-gray-200 p-4 space-y-2">
-      <div className="flex flex-wrap justify-between gap-2"><h5 className="font-medium text-sm">{source.label}</h5><span className="text-sm">{labels[source.status] || 'Could not check'}{source.attention ? ' · Needs attention' : ''}</span></div>
+      <div className="flex flex-wrap justify-between gap-2"><h5 className="font-medium text-sm">{source.label}</h5><span className="text-sm">{(source.comparison==='scope' && scopeLabels[source.status]) || labels[source.status] || 'Could not check'}{source.attention ? ' · Needs attention' : ''}</span></div>
       <p className="text-sm text-gray-600">{source.summary}</p>
       {source.retainedObservedAt && <p className="text-xs text-amber-800">Retained finding from: {new Date(source.retainedObservedAt).toLocaleString('en-US',{timeZone:'America/Los_Angeles'})} Pacific — still needs review.</p>}
       {source.comparedAt && <p className="text-xs text-gray-500">{source.status==='unavailable'?'Earlier comparison baseline':'Compared with'}: {new Date(source.comparedAt).toLocaleString('en-US',{timeZone:'America/Los_Angeles'})} Pacific</p>}
