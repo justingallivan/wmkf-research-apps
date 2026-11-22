@@ -1,6 +1,6 @@
 # Cloudmersive public pricing and limit checks
 
-Status: branch-built on `codex/cloudmersive-service-check`; not published or deployed. Migration 112 is not applied to production. This feature is public-reference monitoring, not account billing integration.
+Status: branch-built on `codex/cloudmersive-service-check`; not published or deployed. Migration 112 is applied to production via the canonical runner at 2026-11-22T03:52:15Z (one applied, 108 skipped); tracker and constraint readback passed. Runtime deployment remains pending. This feature is public-reference monitoring, not account billing integration.
 
 ## Contract and evidence
 

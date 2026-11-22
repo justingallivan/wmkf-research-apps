@@ -104,7 +104,7 @@ The configuration endpoint is documented, but its billing fields are live-observ
 
 ## Cloudmersive public-reference extension — branch-built, not deployed
 
-[VERIFIED via source and isolated PostgreSQL tests, 2026-11-21] Migration `112_cloudmersive_service_checks.sql` expands the existing constraint to seven supported service IDs by adding `cloudmersive`, matching both application and UI allowlists. Existing snapshots and human reviews are preserved. Production migration and deployment have not occurred.
+[VERIFIED via source and isolated PostgreSQL tests, 2026-11-21] Migration `112_cloudmersive_service_checks.sql` expands the existing constraint to seven supported service IDs by adding `cloudmersive`, matching both application and UI allowlists. Existing snapshots and human reviews are preserved. Migration 112 is applied to production via the canonical runner at 2026-11-22T03:52:15Z (one applied, 108 skipped), with tracker and constraint readback. Runtime deployment remains pending.
 
 `cloudmersive-sources.js` reads only the fixed public small-business pricing page, with no credential or scan request. One bounded HTML read is shared within one check. Two independently validated observations compare default monthly USD plan prices and published monthly call/rate/file-size limits, including compute-limited offerings and full qualifying footnotes. All extracted plans contribute to comparisons; navigation, scripts, form state and signup URLs do not. Missing, ambiguous or unsupported shapes fail visibly and retain prior successful baselines. The existing request, response, lease and snapshot limits apply.
 
