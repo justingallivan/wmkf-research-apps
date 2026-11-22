@@ -248,3 +248,18 @@ test('Vercel hosting exposes manual partial checks and leaves other Vercel produ
   expect(screen.queryByRole('button',{name:'Check for updates'})).not.toBeInTheDocument();
   expect(global.fetch.mock.calls.some(([,o])=>o?.method==='PUT')).toBe(false);
 });
+
+test('Neon manual check posts its ID and reloads persisted Marketplace evidence',async()=>{
+  const neon={...seed.services.find(s=>s.id==='neon'),version:1};let saved=null;
+  const check={checkedAt:'2026-11-22T00:00:00Z',serviceVersion:1,sources:[{key:'usage',label:'Neon Marketplace spending',comparison:'scope',status:'baseline',lines:['Reported spending: $2.50'],url:'https://vercel.com/docs/rest-api/integrations/retrieve-an-integration-configuration'}]};
+  global.fetch.mockImplementation(async(url,options)=>{
+    if(options?.method==='POST'){saved={...check,sources:[{...check.sources[0],lines:['Persisted Neon spending: $2.50']}]};return response({check});}
+    return response(url.includes('?id=')?{reviews:[],check:saved}:{services:[neon]});
+  });
+  render(<ExternalServicesSection/>);fireEvent.click(await screen.findByRole('button',{name:'Neon · PostgreSQL'}));
+  await waitFor(()=>expect(screen.getByRole('button',{name:'Check for updates'})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:'Check for updates'}));
+  expect(await screen.findByText('Reported spending: $2.50')).toBeVisible();
+  expect(JSON.parse(global.fetch.mock.calls.find(([,o])=>o?.method==='POST')[1].body)).toEqual({action:'check',id:'neon'});
+  fireEvent.click(screen.getByRole('button',{name:'Reload check results'}));expect(await screen.findByText('Persisted Neon spending: $2.50')).toBeVisible();
+  expect(screen.getByText('First usage snapshot saved')).toBeVisible();expect(global.fetch.mock.calls.some(([,o])=>o?.method==='PUT')).toBe(false);
+});

@@ -34,7 +34,7 @@ Production deployment and schema/count readback are verified on 2026-11-21. An a
 
 ## Manual update checks — deployed
 
-[VERIFIED via PR #669, Ready production deployment, and production schema readback 2026-11-21] The manual action adds `POST {action: "check", id}` to the same superuser route, originally restricted to `assemblyai`, `anthropic`, and `serpapi`. The OpenAI extension is branch-built, not deployed: migration `109_openai_service_checks.sql` expands the database and application allowlists to include `openai` (four latest rows). [VERIFIED via canonical runner and production readback 2026-11-21 16:14 Pacific] Migration 109 is applied; all three existing snapshots were preserved. OpenAI runtime deployment remains pending. Migration `108_external_service_checks.sql` adds one latest JSONB snapshot per supported service, bounded to three rows and 256 KiB per snapshot (application write cap 200,000 bytes). Migration 108 was applied through the canonical runner at 22:25:28 UTC, before preview and production deployment. Readback confirmed the six-column checks table and unchanged 26-service/one-review inventory.
+[VERIFIED via PR #669, Ready production deployment, and production schema readback 2026-11-21] The manual action adds `POST {action: "check", id}` to the same superuser route, originally restricted to `assemblyai`, `anthropic`, and `serpapi`. The OpenAI extension is included in the deployed runtime: migration `109_openai_service_checks.sql` expands the database and application allowlists to include `openai` (four latest rows). [VERIFIED via canonical runner and production readback 2026-11-21 16:14 Pacific] Migration 109 is applied; all three existing snapshots were preserved. OpenAI is included in the production runtime verified at PR #674; this receipt does not independently re-test its provider calls. Migration `108_external_service_checks.sql` adds one latest JSONB snapshot per supported service, bounded to three rows and 256 KiB per snapshot (application write cap 200,000 bytes). Migration 108 was applied through the canonical runner at 22:25:28 UTC, before preview and production deployment. Readback confirmed the six-column checks table and unchanged 26-service/one-review inventory.
 
 `check-store.js` claims an atomic 90-second lease; concurrent requests receive 409, checks completed within one minute reuse the stored result, and an expired writer cannot replace a newer result. Interrupted checks can be retried; known completion failures expire their token-fenced lease immediately when the database is reachable. `checks.js` collects independent sources and saves a fenced snapshot. Per-source success baselines survive source failures; unavailable is never interpreted as unchanged. Detected changes remain pending across repeat checks until a new or edited human review is saved after the check completed; the next check observes that review revision and clears the pending comparison. Editing service metadata alone or saving a review during a running check does not acknowledge that check’s findings. Failed sources with pending changes retain visibly dated evidence and can still seed a review draft. GET history returns the latest check, allowing recovery after a lost POST response. Missing check storage returns an explicit setup-needed state while preserving existing review history. These writes do not modify the service version, review dates, or human reviews.
 
@@ -42,9 +42,9 @@ Production deployment and schema/count readback are verified on 2026-11-21. An a
 
 The Admin panel renders plain-text evidence, timestamps, source links, changes, and unavailable sources. The first successful read establishes a baseline; source changes are evidence for a human decision, not a pricing recommendation or benchmark. Excerpts are bounded and may not show every changed passage. “Start review from findings” creates an unsaved Proposed/Investigate draft; rationale and an explicit save are still required. Changing selection invalidates late results. Corporate-managed services remain outside this initial check allowlist.
 
-AssemblyAI public-reference checks and persisted result reload are verified through the signed-in production UI; both sources saved their first baseline at 2026-11-21T22:42:43.635Z. Anthropic and SerpAPI account checks and persisted reload passed in signed-in production on 2026-11-21 at 15:06 Pacific. Saving a human review remains unverified. OpenAI runtime is not deployed or live-tested; migration 109 is applied and verified. Migration 108 and the production runtime are deployed; see the release receipt above.
+AssemblyAI public-reference checks and persisted result reload are verified through the signed-in production UI; both sources saved their first baseline at 2026-11-21T22:42:43.635Z. Anthropic and SerpAPI account checks and persisted reload passed in signed-in production on 2026-11-21 at 15:06 Pacific. Saving a human review remains unverified. OpenAI runtime is included in deployed PR #674; migration 109 is applied and verified. Its provider calls were not independently re-tested for the Neon extension. Migration 108 and the production runtime are deployed; see the release receipt above.
 
-## OpenAI manual-check extension — branch implementation
+## OpenAI manual-check extension
 
 The existing superuser POST, lease, independent-source failure handling, bounded snapshot and unsaved review-draft contracts apply. The model-list source uses the server-side `OPENAI_API_KEY` only for GET `/v1/models`, validates the list, and retains public-family IDs only (excluding private fine-tuned IDs and account metadata). It retains at most 500 filtered IDs of at most 100 characters per ID for comparison, including the original pending-change baseline, and displays bounded Added/Removed lists before the model preview. It fingerprints the complete filtered sorted list. Availability is not a recommendation or proof of configured use.
 
@@ -52,12 +52,12 @@ The local source reads seven days of `api_usage_log` with an explicit OpenAI-fam
 
 Organization billing and prepaid-credit checks are deliberately excluded per owner direction (individual API-credit account). No new credential, model invocation, automatic schedule, provider settings change, or completed human review is introduced. Migration 109 changes only the service-ID constraint and preserves existing snapshots; fresh installs replay the manifest.
 
-## Vercel hosting extension — branch implementation, not deployed
+## Vercel hosting extension — deployed
 
 The `vercel-hosting` inventory row gains the same manual check and unsaved review
 flow. Migration `110_vercel_service_checks.sql` expands the constraint to five
-service IDs, preserving the four existing providers and snapshots; it is not
-applied to production by this build. The runtime/UI allowlists match. Other Vercel
+service IDs, preserving the four existing providers and snapshots. It was applied
+through the canonical runner before deployment of PR #673. The runtime/UI allowlists match. Other Vercel
 inventory rows (Blob, Workflow, Sandbox) remain outside the check allowlist.
 
 Three independent collectors read public Pro-plan pricing/allowances, Node.js
@@ -86,6 +86,18 @@ Markdown sources parse successfully; local Node.js 26 is listed as supported.
 The production project's Node.js setting was separately read as 22.x through the
 Vercel CLI; this is not a hosted check of the new implementation. CLI-authorized
 read-only billing discovery confirmed the public FOCUS response shape and the
-need for the larger bounded body. Application credential access remains unverified
-because it is not configured. See the [Vercel implementation review receipt](../audits/VERCEL_SERVICE_CHECKS_REVIEW_2026-11-21.md) for
-release prerequisites and remaining limits.
+need for the larger bounded body. Application credential access was subsequently verified in signed-in Admin on
+2026-11-21 at 18:26 Pacific after replacing the project-scoped token with a
+team-scoped token. All three sources succeeded and persisted across reload.
+PR #674 added sanitized account-read failure diagnostics. The [Vercel implementation review receipt](../audits/VERCEL_SERVICE_CHECKS_REVIEW_2026-11-21.md) records the earlier build-time checks, not the current release state.
+
+
+## Neon Marketplace extension — branch-built, not deployed
+
+[VERIFIED via source, isolated PostgreSQL migration tests and live CLI response-shape probe, 2026-11-21] Migration `111_neon_service_checks.sql` adds `neon` to the service-ID constraint, matching the application and Admin UI allowlists (six possible latest snapshots). Existing snapshots and human reviews are preserved. Production migration and hosted token access are pending.
+
+`neon-sources.js` uses the existing server-side Vercel service-check token and team ID. It discovers exactly one owned Neon Marketplace installation through GET `/v1/integrations/configurations?view=account`, then reads GET `/v1/integrations/configuration/{id}` with the explicit team. Installation identifiers are validated before constructing the fixed-origin URL. No new credential, manually configured installation ID, Neon database access, or provider write is needed. The two HTTP reads share a promise only within one check; the existing response/deadline limits apply. Missing, ambiguous, inactive or mismatched installations fail visibly.
+
+The two independent results are the quoted account plan and provider-reported interim spending for the reported billing period. Plan fingerprints include the installation scope and quoted details. Usage fingerprints include only the installation scope, so ordinary spend movement is not a pricing-change alert. Spending exposes line quantities, rates, amounts, discounts, period and provider timestamp; stale reports require attention. Totals must reconcile, malformed fields fail the source, and a failed source retains its successful baseline while the other source can succeed. Raw resource IDs, account identity, response metadata and credentials are not persisted. All database resources in the installation are included; these are not app-only costs.
+
+The configuration endpoint is documented, but its billing fields are live-observed extensions, not a fully documented stable response contract. Dollar values follow Vercel billing; the response does not supply a currency code. This is not paid invoice history, a forecast, a quota balance, or a complete account bill. Observed Neon Marketplace spending is separate from the hosting check's FOCUS feed. No automatic schedule or human-review save is added. See the [Neon implementation receipt](../audits/NEON_MARKETPLACE_CHECKS_2026-11-21.md) for evidence and release limits.

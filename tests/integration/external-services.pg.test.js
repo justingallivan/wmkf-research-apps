@@ -27,6 +27,9 @@ jest.mock('@vercel/postgres',()=>({db:{connect:()=>mockPool.connect()},sql:{quer
     await expect(mockPool.query("INSERT INTO external_service_checks(service_id) VALUES ('vercel-hosting')")).rejects.toMatchObject({code:'23514'});
     await mockPool.query(fs.readFileSync('lib/db/migrations/110_vercel_service_checks.sql','utf8'));
     expect((await mockPool.query("SELECT snapshot FROM external_service_checks WHERE service_id='assemblyai'")).rows[0].snapshot).toEqual({upgradeProbe:true});
+    await expect(mockPool.query("INSERT INTO external_service_checks(service_id) VALUES ('neon')")).rejects.toMatchObject({code:'23514'});
+    await mockPool.query(fs.readFileSync('lib/db/migrations/111_neon_service_checks.sql','utf8'));
+    expect((await mockPool.query("SELECT snapshot FROM external_service_checks WHERE service_id='assemblyai'")).rows[0].snapshot).toEqual({upgradeProbe:true});
     await mockPool.query("DELETE FROM external_service_checks WHERE service_id='assemblyai'");
   });
   afterAll(async()=>{await mockPool.end();await admin.query(`DROP SCHEMA ${schema} CASCADE`);await admin.end();});
@@ -146,7 +149,7 @@ jest.mock('@vercel/postgres',()=>({db:{connect:()=>mockPool.connect()},sql:{quer
     } finally {await mockPool.query('DROP TABLE api_usage_log');}
   });
 
-  test.each(['openai','vercel-hosting'])('%s check persists after allowlist expansion without editing the service',async id=>{
+  test.each(['openai','vercel-hosting','neon'])('%s check persists after allowlist expansion without editing the service',async id=>{
     const before=(await listServices()).find(s=>s.id===id);
     const claim=await claimCheck(id,42);
     const snapshot={checkedAt:new Date().toISOString(),sources:[{key:'models',status:'baseline',lines:['Model list checked']}],baselines:{}};
