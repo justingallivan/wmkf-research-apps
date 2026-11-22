@@ -296,23 +296,35 @@ of today's code.
 So the holds are mostly last cycle's verdicts, and today's code would still
 hold most of the same-institution cases.
 
-**Caveat and a second defect (found later the same session).** OpenAlex began
-returning 429 (rate limited) during this session's local probing. While that
-lasted, the two pairs that had cleared stopped clearing: every institution
-lookup failed (11 of 11 per run) and the comparison answered "mismatch", not
-"could not compare" [VERIFIED via local probe and resolver counters]. The
-lookup returns "no institution" on a provider error unless built with
-`propagateProviderErrors` (`institution-identity-resolver.js:159-202`), and
-production builds it with the default (`enrich-recommended-service.js:825`).
-So a provider outage can produce a held reviewer with "could not be
-reconciled" wording, contrary to the August rule that provider failure never
-becomes a mismatch. Counts above may include rate-limited lookups; rerun
-once OpenAlex is available before relying on them.
+**Caveat and a second defect (found later the same session).** Keyless
+OpenAlex calls began returning 429 during this session's local probing (the
+keyed account still returned 200). While that lasted, the two pairs that had
+cleared stopped clearing: every institution lookup failed (11 of 11 per run)
+and the comparison answered "mismatch", not "could not compare" [VERIFIED via
+local probe and resolver counters]. The lookup returns "no institution" on a
+provider error unless built with `propagateProviderErrors`
+(`institution-identity-resolver.js:159-202`), and applicant enrichment built
+it with the default. The re-check runs of the 11 stored pairs were keyless,
+so their counts may include failed lookups; rerun them with the key before
+relying on them.
 
-Stage 2 email crash: fixed on branch `worktree-linked-riding-sunset`
-(`150f3ca85`; email addresses are removed before the ROR lookup). The same
-contract also rejects an email in the applicant-listed institution on the W2
-path (`ror-institution-identity-resolver.js`); not fixed.
+**Fixes on branch `worktree-linked-riding-sunset` (not deployed):**
+- *Stage 2 email crash:* email addresses are removed before the ROR lookup
+  ("Strip email addresses from bylines…"). The same contract still rejects an
+  email in the applicant-listed institution on the W2 path
+  (`ror-institution-identity-resolver.js`); not fixed.
+- *Lookup failure read as mismatch:* applicant enrichment now builds its
+  resolver with `propagateProviderErrors`
+  (`createEnrichmentInstitutionCheckers` in `enrich-recommended-service.js`),
+  so a failure is recorded as `comparison_error` ("could not be completed")
+  in the log, the progress message and, when no stage 2 note is shown, the
+  stored reason. The reviewer is still held, and the row is still a valid
+  cache, so a transient failure remains a lasting hold until re-enrichment.
+  With stage 2 on, the card and stored reason come from stage 2 instead.
+- Not changed: the post-acceptance affiliation alert
+  (`alert-reviewer-affiliation-mismatch.js:100`) and the identity resolver's
+  affiliation check (`reviewer-identity-evidence.js:517`) still build the
+  default resolver, so a lookup failure there can still read as a mismatch.
 
 ## Not decided here
 
