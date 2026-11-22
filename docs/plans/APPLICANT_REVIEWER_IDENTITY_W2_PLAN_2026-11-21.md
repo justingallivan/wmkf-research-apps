@@ -213,6 +213,71 @@ server blanks contact data for unresolved identities
 (`enrich-recommended-service.js:1248-1300`). So "8 of 62 one-click" is a
 floor, not a measurement, until identity resolution improves.
 
+## Institution holds: June–August design review and local replay (2026-11-21, Session 694)
+
+**What June–August decided** (sources: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`,
+`docs/plans/REVIEWER_INSTITUTION_AUTO_RESOLUTION_PLAN_2026-09-14.md`,
+`docs/audits/reviewer-institution-phase2-contract-audit-2026-09-14.md`,
+`docs/audits/institution-affiliation-source-recovery-2026-09-14.md`,
+`docs/REVIEWER_AFFILIATION_CONTACT_RECONCILIATION_PLAN.md`):
+- Owner rule (August): institution evidence counts for or against a reviewer
+  only once identity is established without it. Stage 2 therefore changes
+  card wording only (live since 2026-08-19); the older boolean check still
+  decides holds and writes.
+- Extra affiliations: the HHMI/Broad exemption is conflict-of-interest only.
+  On the identity side, stage 2 splits "UCSF; HHMI" but cannot release a hold.
+- Same system: the planned first automatic release covered departments and
+  schools of the same university only, not separately governed hospitals.
+  It was never built.
+- Moves: the card labels where an institution came from (July). Dates are
+  dropped before the comparison, and the dated-currentness rule named as the
+  next step in September was never written.
+- The `REVIEWER_INSTITUTION_PHASE2` switch, when on, adds holds (evidence
+  receipts, extra-affiliation conflict screening) and releases none
+  [VERIFIED via source: `enrich-recommended-service.js:416,861`,
+  `save-candidates-service.js:1120`, `promote-applicant-reviewer-service.js:524`].
+  Off per the docs as of 2026-09-15; not re-checked.
+- W2 is excluded from "identity established without institution evidence":
+  it binds only people with papers at the claimed institution
+  (`reviewer-works-first.js:337-364`; recorded in the September audit). Using
+  W2 to release holds would reverse that September decision.
+
+**Local replay of the 26 held applicant reviewers.** Public PubMed, OpenAlex
+and ROR only; no database or Dataverse access; names and results stay in the
+session scratchpad. Each person's PubMed byline affiliation was compared with
+the listed institution through the production comparison helper and stage 2.
+Caveat: production may have compared a different pair (it also uses ORCID and
+OpenAlex affiliations, and the verifier's first-pass flag stands when no
+comparison runs), and PubMed results today may differ from the original run.
+
+| Group (Claude's reading, not adjudicated) | People |
+|---|---|
+| Same institution, comparison still says mismatch | 14 |
+| Comparison clears this pair, so production held them on a different pair or the earlier flag | 6 |
+| PubMed found a different person with the same name (hold is right) | 3 |
+| Real move or joint appointment | 2 |
+| Listed institution wrong in the record | 1 |
+
+**Why the 14 fail** [VERIFIED via local probes and
+`institution-affiliation-consistency.js:130-161,193-224`]: a byline segment
+that matches the listed institution counts only if every longer stretch of
+the byline after it ("Stanford University, Stanford, CA 94305.") also
+resolves in OpenAlex to the same institution. Addresses and zip codes never
+resolve, so the match is discarded. Institutions OpenAlex has no record for
+("Harvard Medical School", "Tufts University School of Medicine") fail the
+same way. Two identical Stanford chemistry bylines compare as a mismatch.
+This fail-closed rule landed 2026-08-08 (`cad6d2dbd`, `3add5ffd6`) to stop
+"University of California" from matching one campus, and it has not changed
+since; the hold path in `enrich-recommended-service.js` is unchanged since
+2026-08-19 apart from switched-off Phase 2 additions. So this is the August
+design, not a code regression. A change in OpenAlex search behavior since
+August cannot be ruled out from the current evidence.
+
+**Next evidence needed:** the stored hold reason for each of the 26 rows
+(it names the compared pair and whether the hold came from a fresh
+comparison, the earlier flag, or a lookup error). This requires an
+owner-approved read-only Production query.
+
 ## Not decided here
 
 - Whether to change the legacy institution contradiction check (13 rows).
