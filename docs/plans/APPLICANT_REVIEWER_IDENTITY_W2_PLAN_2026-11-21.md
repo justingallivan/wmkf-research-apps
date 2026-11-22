@@ -273,10 +273,28 @@ since; the hold path in `enrich-recommended-service.js` is unchanged since
 design, not a code regression. A change in OpenAlex search behavior since
 August cannot be ruled out from the current evidence.
 
-**Next evidence needed:** the stored hold reason for each of the 26 rows
-(it names the compared pair and whether the hold came from a fresh
-comparison, the earlier flag, or a lookup error). This requires an
-owner-approved read-only Production query.
+**Stored hold reasons** [VERIFIED 2026-11-21 via owner-approved read-only
+query of `reviewer_find_roster`; names kept in the session scratchpad]:
+25 of the 26 rows were last written between 2026-07-21 and 2026-08-20 by
+older code (saved formats 2–4); one was written 2026-11-21. Old-format rows
+are not valid caches (`reviewer-search-logic.js:1017`), so they re-run when
+that request's Find tab is next opened. They are stale verdicts, not output
+of today's code.
+- 13 carry the oldest wording (written 2026-07-21 to 2026-08-02, before the
+  August 8–9 comparison changes); the stored text names no pair.
+- 11 name the compared pair. Re-running those exact pairs through today's
+  code: 2 now clear (both Duke/Stanford department bylines); 9 still fail.
+  Of the 9, Claude reads 7 as the same institution or the same system
+  (department or school bylines, an email or hyphen difference, a
+  cancer-institute byline against its university), one as an extra
+  affiliation listed as the recorded institution, and one as a real move.
+  Stage 2 labels 4 of the 9 "same", and errors on 3 because the
+  byline contains an email address (`ror-institution-candidate-contract.js:41`
+  rejects it); a stage 2 error falls back to the old mismatch wording.
+- 2 carry the stage 2 wording (one compatible, one distinct).
+
+So the holds are mostly last cycle's verdicts, and today's code would still
+hold most of the same-institution cases.
 
 ## Not decided here
 
