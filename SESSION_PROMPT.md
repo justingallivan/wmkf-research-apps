@@ -1,71 +1,41 @@
-# Session 695 Prompt: compare the two workflow reviews, then decide the reviewer-finding direction
+# Session 696 Prompt: choose the next priority
 
-Previous handoff (Session 694 prompt, written at the end of Session 693):
-`git show 0c23e3f3a:SESSION_PROMPT.md`.
+## Session 695 Summary — Codex external-service tracking closeout
 
-## Session 694 Summary — 2026-11-21 (Claude, worktree `.claude/worktrees/linked-riding-sunset`)
+[VERIFIED via migration runner, GitHub checks and signed-in production Admin]
+Cloudmersive public pricing and limit checks shipped in PR #678, merge
+`12b0733f1`. Migration 112 applied before deployment at 2026-11-22T03:52:15Z;
+constraint readback passed. Both public checks saved first baselines at
+2026-11-21 20:03:40 Pacific, and reloading preserved timestamp and evidence.
+Account usage and remaining quota explicitly require manual verification.
+No scans, account API requests or human review saves were made.
 
-### What Was Completed
+- Ordinary Claude Opus OAuth review and follow-up completed; findings addressed.
+- 99 focused tests, build and relevant gates passed; all PR checks passed.
+- `929848f89` records the release in the Atlas and audit. Its production deployment
+  `dpl_GF9B2VeP8oyUqYqYQYx1Hc2yMQqR` reached Ready with production aliases.
+- Runtime entry: `lib/services/external-services/cloudmersive-sources.js`;
+  persistence constraint: `lib/db/migrations/112_cloudmersive_service_checks.sql`.
+- Evidence: `docs/audits/CLOUDMERSIVE_SERVICE_CHECKS_2026-11-21.md` and
+  `docs/atlas/postgres-external-services.md`.
 
-1. **June–August institution and identity work reviewed** (owner request). Findings
-   are recorded in `docs/plans/APPLICANT_REVIEWER_IDENTITY_W2_PLAN_2026-11-21.md`
-   ("Institution holds: June–August design review and local replay").
-   - Owner rule (August): institution evidence counts only once identity is
-     established without it. Stage 2 therefore changes card wording only.
-   - HHMI/Broad is a conflict-of-interest exemption only. The planned automatic
-     release for departments and schools was never built. Moves are handled only
-     in card wording; the dated-currentness rule was never written.
-   - `REVIEWER_INSTITUTION_PHASE2`, when on, adds holds and releases none.
-   - The September audit already excludes W2 from "identity without
-     institution", because W2 binds only at the claimed institution.
-2. **The 26 held applicant reviewers.** A local replay plus an owner-approved,
-   read-only Production query of stored hold reasons.
-   - 25 of 26 were written July 21 – Aug 20 by older code; old-format rows re-run
-     when that request's Find tab is opened.
-   - With the OpenAlex key, today's code clears 3 of the 11 stored pairs; of the
-     8 still held, 1 is a real move and 7 are the same institution or a school,
-     institute, campus or affiliate of it.
-   - The hold rule since 2026-08-08 discards an exact byline match unless the
-     rest of the byline also resolves in OpenAlex; not a code regression.
-3. **Two fixes shipped (PR #675, merge `552f93074`, Production deployment
-   `3PyznosLUf17vko9nomctoRDm8pC` completed).** Codex native review: no
-   actionable findings. Full Jest suite passed.
-   - Stage 2 no longer crashes when a byline contains an email address
-     (`lib/services/ror-affiliation-assertion-resolver.js`).
-   - Applicant enrichment's institution lookup now propagates OpenAlex errors, so
-     a failure is recorded as `comparison_error`, not a mismatch
-     (`createEnrichmentInstitutionCheckers` in `enrich-recommended-service.js`).
-     The reviewer is still held, and the held row is still cached.
-4. **Owner reset the direction.** After a year of added "hold unless proven"
-   rules, about 13% of applicant reviewers reach a one-click state. The owner set
-   a target of fewer than 10% of suggested reviewers needing a human decision,
-   and dispatched two independent models for a holistic workflow review.
-   - Assignment and outputs live in a private, gitignored folder on the owner's
-     machine (real names; not in git):
-     `outputs/reviewer-finding-review-2026-11-21/` in the main checkout:
-     `brief.md`, `case-packet-26-held.md`, `dispatch-prompt.md`, and on
-     completion `report-<model>.md` and `work-<model>/`.
-   - Each report has an executive summary, analysis and design, and a phased
-     plan whose first phase is detailed enough to build. Each model may use up
-     to 1,000 SerpAPI credits, data-provider keys, and its own web search and
-     subagents; no LLM provider keys, no production data, no repo changes.
+**DONE:** Cloudmersive build, migration, release and hosted verification.
+**Owner decision needed:** choose another provider or another task. No additional
+service implementation or scheduled checks are authorized by this handoff.
+Keep checks manual. Microsoft, GitHub and Zoom costs are corporate-managed;
+OpenAI billing integration was deferred by the owner. Cloudmersive account usage
+remains a manual portal check, not inferred from public plan capacities.
 
-### Production Access This Session
-All owner-approved. One read-only Postgres query of `reviewer_find_roster`
-(stored hold reasons for the 26 held applicant rows; results kept in the session
-scratchpad and the private review folder). No Production writes by Claude.
-Local probes used public PubMed, OpenAlex and ROR. Keyless OpenAlex calls hit a
-429 rate limit; the keyed account was unaffected (it returned 200).
+## Concurrent Claude handoff preservation
 
-### Commits
-- `552f93074` (PR #675) — stage 2 email fix, lookup failure as incomplete
-  comparison, and four W2-plan updates.
-- `c80069df8` (PR #677) — interim handoff note pointing to the review folder.
-- This commit — Session 694 handoff and W2-plan deployment status.
+Full Session 694 summary and Session 695 prompt remain retrievable with
+`git show 69a5070cf:SESSION_PROMPT.md`. The worklist below preserves Claude's
+owner decisions and safety constraints; unrelated open claims were not reprobed
+by this Codex closeout. Verify their current status before acting.
 
 ## Next Items
 
-### Verified Open
+### Verify Before Acting — concurrent Claude carryover
 
 1. **Compare the two workflow reviews with the owner** once both
    `report-<model>.md` files exist in the private folder. Produce an
@@ -135,6 +105,7 @@ Local probes used public PubMed, OpenAlex and ROR. Keyless OpenAlex calls hit a
 
 | Stream | Owning reference | Resume boundary |
 |---|---|---|
+| External service tracker (Codex, released) | `docs/audits/CLOUDMERSIVE_SERVICE_CHECKS_2026-11-21.md` | Cloudmersive deployed and verified; next provider requires owner selection |
 | Reviewer-finding workflow review | `outputs/reviewer-finding-review-2026-11-21/` (private) | Two model reviews dispatched; compare when both reports exist |
 | Applicant reviewer identity (W2) | `docs/plans/APPLICANT_REVIEWER_IDENTITY_W2_PLAN_2026-11-21.md` | Shadow live; institution findings recorded; pilot on hold pending the review |
 | Find identity card | `docs/plans/FIND_IDENTITY_CARD_REDESIGN_BRIEF_2026-11-20.md` | Layout and fixes live; follow-ups on hold pending the review |
@@ -143,27 +114,18 @@ Local probes used public PubMed, OpenAlex and ROR. Keyless OpenAlex calls hit a
 | Memory hygiene | `docs/MEMORY_HYGIENE_RUNBOOK.md` §18 | Router about 7.6 KB |
 | Intake/Executor | `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md` | Batch-2 cleanup Nov 23 |
 
-## Key Files Reference
-
-| File | Purpose |
-|---|---|
-| `lib/services/workbench/enrich-recommended-service.js` | Applicant enrichment, institution hold, `createEnrichmentInstitutionCheckers` |
-| `lib/services/institution-affiliation-consistency.js` | Boolean institution comparison and the trailing-text rule |
-| `lib/services/institution-identity-resolver.js` | OpenAlex institution lookup (`propagateProviderErrors`) |
-| `lib/services/ror-affiliation-assertion-resolver.js` | Stage 2 byline segmentation; email removal |
-| `lib/services/institution-affiliation-stage2.js` | Stage 2 card/notification assessment |
-| `lib/services/reviewer-works-first.js` | W2 works-first resolver |
-
-## Testing
-
-```bash
-npx jest --silent tests/unit/enrich-recommended-institution-evidence.test.js tests/unit/ror-affiliation-assertion-resolver.test.js tests/unit/institution-checker-consumer-scope.test.js tests/unit/institution-affiliation-stage2.test.js tests/unit/workbench-enrich-recommended-service.test.js
-```
-
 ## Closeout
 
-**Milestone determination:** no DEVELOPMENT_LOG entry. The two fixes correct
-defects in existing behavior; the workflow review is dispatched, not decided.
+Owner: Codex. Branch: `codex/cloudmersive-release-receipt`; runtime already merged
+in PR #678. Session documentation lands separately on a docs-only stop branch.
+Changed surfaces: Cloudmersive collectors, existing tracker/UI integration,
+constraint migration, tests, Atlas and release audit; this closeout changes only
+SESSION_PROMPT.md and DEVELOPMENT_LOG.md. No runtime edits remain.
+Worktree was clean before closeout; retain it and existing branches, do not delete
+or reset another agent's checkout. Codex releases ownership of the service tracker.
+Next owner/action: Justin chooses the next priority; run `/start` when resuming.
 
-**Other closeout checks:** CLAUDE.md unchanged. Claim-evidence report: 0
-advisory events recorded for this session key, so no observation row.
+Milestone entry added: “Cloudmersive public service checks in Admin”.
+CLAUDE.md and memory unchanged: existing source-of-truth pointers cover the feature.
+Claim-evidence report unavailable (local state could not be read); no observation
+row fabricated. No memory-router growth occurred in this closeout.

@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## November 2026 — Cloudmersive public service checks in Admin (Session 695)
+
+**Milestone:** Admin's manual service tracker now compares Cloudmersive public pricing and qualified plan limits.
+**Sessions:** Codex service-tracking stream, 2026-11-21; owner authorized migration, merge, deployment and hosted verification.
+**Ship state:**
+- PR #678 / `12b0733f1` deployed; migration 112 applied before deployment and constraint readback passed.
+- Signed-in Admin saved both first baselines and preserved them after reload; account usage and remaining quota remain manual verification.
+- Ordinary Claude Opus OAuth reviews completed; 99 focused tests and all release checks passed.
+**Why it matters:** Public price and capacity changes can be reviewed without scans, credentials or unsupported account-balance claims.
+**Pointers:** `docs/audits/CLOUDMERSIVE_SERVICE_CHECKS_2026-11-21.md`; `docs/atlas/postgres-external-services.md`; release receipt `929848f89`.
+
 ## November 2026 — Proposal lists: advisor picks during Scoring, scored-only lists (Session 689)
 
 **Milestone:** Program Directors tick the Chairs and Board members who should see each scored proposal; those ticks set the highlights on each person's list.
