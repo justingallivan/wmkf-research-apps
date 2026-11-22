@@ -1,6 +1,6 @@
 # Neon Marketplace manual check — implementation receipt
 
-Status: branch implementation on `codex/neon-marketplace-check`; not deployed. Migration 111 has not been applied to production. Account identifiers, database names, tokens and private amounts are intentionally omitted.
+Status: branch implementation on `codex/neon-marketplace-check`; not deployed. Migration 111 is applied to production through the canonical runner (one applied, 107 skipped); constraint readback includes Neon. Runtime deployment remains pending. Account identifiers, database names, tokens and private amounts are intentionally omitted.
 
 ## Evidence and API boundary
 
