@@ -9,7 +9,7 @@ jest.mock('../../lib/services/external-services/check-store',()=>({claimCheck:je
 jest.mock('../../lib/services/anthropic-admin',()=>({getCostReport:jest.fn(),getMessagesUsageReport:jest.fn()}));
 const now='2026-11-21T20:00:00.000Z';
 const reply=(value,status=200)=>({ok:status===200,status,body:new ReadableStream({start(c){c.enqueue(Buffer.from(typeof value==='string'?value:JSON.stringify(value)));c.close();}})});
-beforeEach(()=>{jest.clearAllMocks();global.fetch=jest.fn();delete process.env.SERP_API_KEY;delete process.env.CLAUDE_API_KEY;delete process.env.ANTHROPIC_ADMIN_API_KEY;});
+beforeEach(()=>{jest.clearAllMocks();global.fetch=jest.fn();delete process.env.OPENAI_API_KEY;delete process.env.SERP_API_KEY;delete process.env.CLAUDE_API_KEY;delete process.env.ANTHROPIC_ADMIN_API_KEY;});
 test('public sources are fixed, redirect-blocked and compared with successful baseline',async()=>{
   const source=sourcesFor('assemblyai')[0];
   const text='# AssemblyAI Pricing\n'+('Official reference notes. '.repeat(5))+'\nRecorded audio: $0.21/hr; diarization $0.02/hr.';
@@ -173,4 +173,75 @@ test.each(['plan_searches_left','extra_credits'])('invalid or absent %s cannot r
     const result=await collectSource(source,baseline,undefined,now);
     expect(result.result.status).toBe('unavailable');expect(result.baseline).toBe(baseline);
   }
+});
+
+test('OpenAI model availability is fixed-destination, stable across ordering, and excludes private IDs',async()=>{
+  process.env.OPENAI_API_KEY='openai-secret';const source=sourcesFor('openai')[0];
+  const models=['gpt-test','o3','ft:gpt-test:private-org:private-job'];
+  fetch.mockResolvedValue(reply({object:'list',data:models.map(id=>({id,owned_by:'private-owner'}))}));
+  const first=await collectSource(source,undefined,undefined,now);
+  expect(first.result.status).toBe('baseline');
+  expect(fetch).toHaveBeenCalledWith('https://api.openai.com/v1/models',expect.objectContaining({redirect:'error',headers:{Authorization:'Bearer openai-secret'}}));
+  for(const secret of ['private-org','private-owner','private-job','openai-secret'])expect(JSON.stringify(first)).not.toContain(secret);
+  fetch.mockResolvedValue(reply({object:'list',data:models.reverse().map(id=>({id}))}));
+  expect((await collectSource(source,first.baseline,undefined,now)).result.status).toBe('unchanged');
+  fetch.mockResolvedValue(reply({object:'list',data:[{id:'gpt-new'}]}));
+  expect((await collectSource(source,first.baseline,undefined,now)).result).toMatchObject({status:'changed',attention:true});
+});
+test.each([{object:'list',data:[]},{object:'list',data:[null]},{object:'list',data:[{id:'gpt-test'}],has_more:true},'<html>login</html>'])('OpenAI malformed/incomplete model metadata preserves the baseline: %j',async data=>{
+  process.env.OPENAI_API_KEY='secret';const baseline={fingerprint:'old',lines:['old'],observedAt:now};
+  fetch.mockResolvedValue(reply(data));const result=await collectSource(sourcesFor('openai')[0],baseline,undefined,now);
+  expect(result.result.status).toBe('unavailable');expect(result.baseline).toBe(baseline);
+});
+test('OpenAI missing credential makes no request',async()=>{
+  delete process.env.OPENAI_API_KEY;
+  expect((await collectSource(sourcesFor('openai')[0],undefined,undefined,now)).result.status).toBe('unavailable');expect(fetch).not.toHaveBeenCalled();
+});
+test('OpenAI local coverage flags unknown prices without treating request-count changes as drift',async()=>{
+  sql.query.mockResolvedValue({rows:[]});sql.query.mockImplementation(async text=>({rows:text.startsWith('SELECT')?[{model:'gpt-unpriced-test',count:2}]:[]}));
+  const source=sourcesFor('openai')[1];const first=await collectSource(source,undefined,undefined,now);
+  expect(first.result).toMatchObject({status:'baseline',attention:true});expect(first.result.lines.join()).toContain('NO LOCAL RATE');
+  expect(sql.query).toHaveBeenCalledWith(expect.stringContaining("model ~ '^(gpt-"));
+  sql.query.mockImplementation(async text=>({rows:text.startsWith('SELECT')?[{model:'gpt-unpriced-test',count:7}]:[]}));
+  expect((await collectSource(source,first.baseline,undefined,now)).result).toMatchObject({status:'unchanged',attention:true});
+});
+test('OpenAI retirement notices use official Markdown and flag changes outside displayed excerpts',async()=>{
+  const source=sourcesFor('openai')[2];const doc='# Deprecations\n'+('Official policy information. '.repeat(6))+'\n| Jan 1, 2027 | gpt-example | Deprecated | newer model |';
+  fetch.mockResolvedValue(reply(doc));const first=await collectSource(source,undefined,undefined,now);
+  expect(first.result.status).toBe('baseline');expect(first.result.lines.join()).toContain('gpt-example');
+  fetch.mockResolvedValue(reply(doc+'\nOther policy update.'));
+  expect((await collectSource(source,first.baseline,undefined,now)).result.status).toBe('changed');
+});
+test('OpenAI identifies changes beyond the model preview and retains them until review',async()=>{
+  process.env.OPENAI_API_KEY='test';const source=sourcesFor('openai')[0];
+  const ids=Array.from({length:40},(_,i)=>`gpt-a-${String(i).padStart(2,'0')}`);
+  fetch.mockResolvedValue(reply({object:'list',data:[...ids,'gpt-z-old'].map(id=>({id}))}));
+  const first=await collectSource(source,undefined,undefined,now);
+  fetch.mockImplementation(async()=>reply({object:'list',data:[...ids,'gpt-z-new'].map(id=>({id}))}));
+  const next=await collectSource(source,first.baseline,undefined,now);
+  expect(next.result.lines).toContain('Added: gpt-z-new');expect(next.result.lines).toContain('Removed: gpt-z-old');
+  const repeated=await collectSource(source,next.baseline,undefined,now);
+  expect(repeated.result.status).toBe('changed');expect(repeated.result.lines).toContain('Removed: gpt-z-old');expect(repeated.result.lines).toContain('Added: gpt-z-new');
+  const acknowledged=await collectSource(source,{...next.baseline,pending:false,changeFrom:undefined},undefined,now);
+  expect(acknowledged.result.status).toBe('unchanged');expect(acknowledged.result.lines.join()).not.toContain('Removed:');
+});
+test('OpenAI model retention bound rejects oversized lists rather than saving partial metadata',async()=>{
+  process.env.OPENAI_API_KEY='test';fetch.mockResolvedValue(reply({object:'list',data:Array.from({length:501},(_,i)=>({id:`gpt-${i}`}))}));
+  expect((await collectSource(sourcesFor('openai')[0],undefined,undefined,now)).result.status).toBe('unavailable');
+});
+
+test('a reverted OpenAI list explicitly explains the retained pending review',async()=>{
+  process.env.OPENAI_API_KEY='test';const source=sourcesFor('openai')[0];
+  fetch.mockResolvedValue(reply({object:'list',data:[{id:'gpt-original'}]}));
+  const first=await collectSource(source,undefined,undefined,now);
+  fetch.mockResolvedValue(reply({object:'list',data:[{id:'gpt-other'}]}));
+  const next=await collectSource(source,first.baseline,undefined,now);
+  fetch.mockResolvedValue(reply({object:'list',data:[{id:'gpt-original'}]}));
+  const reverted=await collectSource(source,next.baseline,undefined,now);
+  expect(reverted.result.status).toBe('changed');expect(reverted.result.lines[0]).toContain('No net model-list difference');
+});
+test('orchestrator refuses an empty collector set and releases the claim',async()=>{
+  claimCheck.mockResolvedValue({token:'claim',previous:{},service:{version:1,data:{}},reviewAfterCheck:false});
+  await expect(checkForUpdates('unsupported',42)).rejects.toThrow('unsupported_check_source');
+  expect(finishCheck).not.toHaveBeenCalled();expect(interruptCheck).toHaveBeenCalledWith('unsupported','claim');
 });

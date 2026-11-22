@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import { Pool } from 'pg';
 import { listServices, listReviews, saveService } from '../../lib/services/external-services/store';
 import { claimCheck, finishCheck, readCheck, interruptCheck } from '../../lib/services/external-services/check-store';
+import { sourcesFor, collectSource } from '../../lib/services/external-services/check-sources';
 import seed from '../../lib/services/external-services/seed.json';
 const connectionString=process.env.EXTERNAL_SERVICES_TEST_URL || process.env.TEST_REQUEST_LEDGER_TEST_URL;
 if(connectionString && !['127.0.0.1','localhost','[::1]'].includes(new URL(connectionString).hostname)) throw new Error('Loopback test database required');
@@ -19,6 +20,11 @@ jest.mock('@vercel/postgres',()=>({db:{connect:()=>mockPool.connect()},sql:{quer
     await mockPool.query(fs.readFileSync('lib/db/migrations/106_external_service_reviews.sql','utf8'));
     await mockPool.query(fs.readFileSync('lib/db/migrations/107_external_service_inventory_followups.sql','utf8'));
     await mockPool.query(fs.readFileSync('lib/db/migrations/108_external_service_checks.sql','utf8'));
+    await mockPool.query("INSERT INTO external_service_checks(service_id,snapshot) VALUES ('assemblyai','{\"upgradeProbe\":true}')");
+    await expect(mockPool.query("INSERT INTO external_service_checks(service_id) VALUES ('openai')")).rejects.toMatchObject({code:'23514'});
+    await mockPool.query(fs.readFileSync('lib/db/migrations/109_openai_service_checks.sql','utf8'));
+    expect((await mockPool.query("SELECT snapshot FROM external_service_checks WHERE service_id='assemblyai'")).rows[0].snapshot).toEqual({upgradeProbe:true});
+    await mockPool.query("DELETE FROM external_service_checks WHERE service_id='assemblyai'");
   });
   afterAll(async()=>{await mockPool.end();await admin.query(`DROP SCHEMA ${schema} CASCADE`);await admin.end();});
   test('migration seeds match public inventory and preserve first implemented review',async()=>{
@@ -121,8 +127,30 @@ jest.mock('@vercel/postgres',()=>({db:{connect:()=>mockPool.connect()},sql:{quer
     expect((await listServices()).find(s=>s.id==='assemblyai')).toEqual(before);expect(await listReviews('assemblyai')).toEqual(reviews);
     expect((await mockPool.query("SELECT checked_by FROM external_service_checks WHERE service_id='assemblyai'")).rows[0].checked_by).toBe(42);
   });
-  test.each(['microsoft','openai','service-custom',null,['assemblyai']])('unsupported manual-check target rejects before SQL: %j',async id=>{
+  test.each(['microsoft','google','service-custom',null,['assemblyai']])('unsupported manual-check target rejects before SQL: %j',async id=>{
     const query=jest.spyOn(mockPool,'query');await expect(claimCheck(id,42)).rejects.toMatchObject({status:400});expect(query).not.toHaveBeenCalled();query.mockRestore();
+  });
+
+  test('OpenAI coverage SQL reads only matching recent model IDs',async()=>{
+    await mockPool.query('CREATE TABLE api_usage_log(model text, created_at timestamp DEFAULT now())');
+    try {
+      await mockPool.query("INSERT INTO api_usage_log(model) VALUES ('gpt-unpriced-test'),('claude-test'),('ft:gpt-test:private')");
+      await mockPool.query("INSERT INTO api_usage_log(model,created_at) VALUES ('gpt-old-test',now()-interval '8 days')");
+      const checked=await collectSource(sourcesFor('openai')[1],undefined,undefined,new Date().toISOString());
+      expect(checked.result.status).toBe('baseline');
+      expect(checked.result.lines.join()).toContain('gpt-unpriced-test: 1 logged requests; NO LOCAL RATE');
+      for (const excluded of ['claude-test','private','gpt-old-test']) expect(checked.result.lines.join()).not.toContain(excluded);
+    } finally {await mockPool.query('DROP TABLE api_usage_log');}
+  });
+
+  test('OpenAI check persists after allowlist expansion without editing the service',async()=>{
+    const before=(await listServices()).find(s=>s.id==='openai');
+    const claim=await claimCheck('openai',42);
+    const snapshot={checkedAt:new Date().toISOString(),sources:[{key:'models',status:'baseline',lines:['Model list checked']}],baselines:{}};
+    await finishCheck('openai',claim.token,snapshot);
+    expect(await readCheck('openai')).toMatchObject(snapshot);
+    expect((await listServices()).find(s=>s.id==='openai')).toEqual(before);
+    await expect(mockPool.query("INSERT INTO external_service_checks(service_id) VALUES ('microsoft')")).rejects.toMatchObject({code:'23514'});
   });
 
   test('missing check storage preserves an explicit setup state',async()=>{
