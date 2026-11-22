@@ -123,6 +123,53 @@ institution needs a look before cutover.
   re-enrichment.
 - More OpenAlex calls per reviewer (about 3 seconds each in the local test).
 
+## Live shadow check and historical replay (2026-11-21)
+
+**Shadow mode is live.** The owner set `REVIEWER_IDENTITY_RESOLVER_MODE=shadow`
+and the enrichment comparison shipped (`808576ca8`). A Find-tab rerun on
+test request 1003526 wrote 5 comparison rows: 2 works rescues, 2 sent to
+review (multiple ORCID clusters; unresolvable misspelled institution), and 1
+consensus bind [VERIFIED via read-only query of
+`reviewer_identity_shadow_log`]. The test record lists that consensus
+reviewer at the same institution OpenAlex does; the earlier "listed Cornell"
+concern came from a value typed into the local test, not the record.
+
+**Historical replay.** With owner approval, the 153 distinct non-test
+applicant reviewers in the saved Find roster were replayed locally through
+the combined decision (public OpenAlex and ROR only, all telemetry writes
+disabled, a synthetic "legacy unresolved" input). 62 had no institution on
+record and 10 had an email address in the institution field, so 81 were
+usable. Of those 81:
+
+| Current method | New method | People |
+|---|---|---|
+| matched | bind | 8 |
+| matched | review / abstain | 9 (combined keeps these matches; `reviewer-works-first.js:480-512`) |
+| no anchor | **bind (works rescue)** | **21** |
+| no anchor | review / abstain | 21 |
+| institution-held | bind | 14 (still held by the institution gate) |
+| institution-held | review / abstain | 8 |
+
+Matched reviewers would rise from 17 to about 38 of 81. The replay cannot
+detect a case where both methods bind different people (the only demotion
+the combined rule makes), because it fed a synthetic legacy result.
+
+**Owner spot check of the 35 new binds:** every name was the right person
+(owner, 2026-11-21). Five OpenAlex last-known institutions differed from the
+AkoyaGO record; all five were explained (doctoral institution, collaborator's
+institution, campus name, or a recent move). Two AkoyaGO record institutions
+were out of date.
+
+**Consequences for the design.**
+- OpenAlex last-known institution is unreliable as identity evidence. When
+  the selected profile is propagated into institution reconciliation (the
+  gap above), a different last-known institution must not count as a
+  contradiction, or it would block correct matches like these.
+- A stale AkoyaGO institution is worth showing to the director, not
+  evidence of a namesake.
+- Data quality: 62 of 153 saved applicant rows have no institution and 10
+  carry an email in the institution field.
+
 ## Options (corrected)
 
 1. **Confirm Production's effective mode.** Behavioural evidence: the
