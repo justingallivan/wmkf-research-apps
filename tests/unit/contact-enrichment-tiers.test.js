@@ -581,7 +581,8 @@ describe('_finalize — step order (C12) + arg fidelity (C9)', () => {
       expect.objectContaining({
         identity: expect.objectContaining({ status: expect.any(String) }),
       }),
-      expect.objectContaining({ signal: undefined }),
+      // Search candidates never opt in to enrichment shadow comparison.
+      expect.objectContaining({ signal: undefined, allowShadowComparison: false }),
     );
     expect(out.contactEnrichment).toMatchObject({
       orcidId: '0000-0003-2195-6258',
@@ -593,5 +594,26 @@ describe('_finalize — step order (C12) + arg fidelity (C9)', () => {
         }],
       },
     });
+  });
+
+  test('applicant reviewers opt in to enrichment shadow comparison with the run deadline', async () => {
+    jest.spyOn(openAlexMetrics, 'attachOpenAlexMetrics').mockResolvedValue(undefined);
+    jest.spyOn(domainEvidence, 'buildInstitutionDomainEvidence').mockResolvedValue(undefined);
+    jest.spyOn(pageEmail, 'attachEmailFromResolvedPage').mockResolvedValue(undefined);
+    jest.spyOn(ContactEnrichmentService, '_applyAffiliationOverride').mockImplementation(() => {});
+    jest.spyOn(ContactEnrichmentService, 'saveToDatabase').mockResolvedValue(undefined);
+    jest.spyOn(ReviewerIdentityRuntime, 'evaluateExistingResult').mockImplementation(async (_s, legacy) => legacy);
+    const deadlineAt = Date.now() + 120_000;
+    await ContactEnrichmentService.enrichCandidate({
+      name: 'Anna Example',
+      affiliation: 'Example University',
+      isApplicantRecommended: true,
+      publications: [],
+    }, { usePubmed: false, useOrcid: false, deadlineAt });
+    expect(ReviewerIdentityRuntime.evaluateExistingResult).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Anna Example' }),
+      expect.anything(),
+      expect.objectContaining({ allowShadowComparison: true, deadlineAt }),
+    );
   });
 });

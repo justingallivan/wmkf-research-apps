@@ -21,6 +21,7 @@ const {
   configuredResolverMode,
   diagnosePubMedResultsWithRuntimeSeam,
   evaluateCombinedAgainstLegacy,
+  enrichmentShadowTimeoutMs,
   evaluateExistingResultWithRuntimeSeam,
   evaluateSuggestionsWithRuntimeSeam,
   evaluateWithRuntimeSeam,
@@ -897,16 +898,77 @@ describe('reviewer identity runtime seam', () => {
     }));
   });
 
-  test('existing enrichment decisions are pass-through unless combined is explicit', async () => {
+  test('enrichment shadow runs only when the caller opts in, and legacy runs nothing', async () => {
     const legacy = { status: 'unresolved', identity: { status: 'unresolved' } };
     const evaluateWorksFirst = jest.fn();
     await expect(evaluateExistingResultWithRuntimeSeam(
-      suggestion,
-      legacy,
-      {},
-      { mode: RESOLVER_MODE.SHADOW, evaluateWorksFirst },
+      suggestion, legacy, {}, { mode: RESOLVER_MODE.SHADOW, evaluateWorksFirst },
+    )).resolves.toBe(legacy);
+    await expect(evaluateExistingResultWithRuntimeSeam(
+      suggestion, legacy, { allowShadowComparison: true }, { mode: RESOLVER_MODE.LEGACY, evaluateWorksFirst },
     )).resolves.toBe(legacy);
     expect(evaluateWorksFirst).not.toHaveBeenCalled();
+  });
+
+  test('enrichment shadow compares, logs, and returns the exact legacy object', async () => {
+    const legacy = { status: 'unresolved', identity: { status: 'unresolved' }, anchors: [] };
+    const onShadowComparison = jest.fn();
+    const evaluateWorksFirst = jest.fn(async (input, options) => {
+      expect(options).not.toHaveProperty('allowShadowComparison');
+      expect(options).not.toHaveProperty('deadlineAt');
+      return { decision: 'bind', anchor: 'orcid:0000-0003-2195-6258', reason: 'works', evidenceBundle: { orcids: [], anchorDois: [], rors: [], openAlexAuthorIds: ['A100'] } };
+    });
+    const result = await evaluateExistingResultWithRuntimeSeam(
+      suggestion,
+      legacy,
+      { allowShadowComparison: true, deadlineAt: Date.now() + 120_000 },
+      {
+        mode: RESOLVER_MODE.SHADOW,
+        evaluateWorksFirst,
+        createAnchorsMatch: () => async () => false,
+        onShadowComparison,
+        onShadowError: jest.fn(),
+      },
+    );
+    expect(result).toBe(legacy);
+    expect(legacy).toEqual({ status: 'unresolved', identity: { status: 'unresolved' }, anchors: [] });
+    expect(evaluateWorksFirst).toHaveBeenCalledTimes(1);
+    expect(onShadowComparison).toHaveBeenCalledTimes(1);
+  });
+
+  test('enrichment shadow failure still returns the exact legacy object', async () => {
+    const legacy = { status: 'unresolved' };
+    const onShadowError = jest.fn();
+    const result = await evaluateExistingResultWithRuntimeSeam(
+      suggestion,
+      legacy,
+      { allowShadowComparison: true },
+      {
+        mode: RESOLVER_MODE.SHADOW,
+        evaluateWorksFirst: jest.fn(async () => { throw new Error('openalex down'); }),
+        onShadowComparison: jest.fn(),
+        onShadowError,
+      },
+    );
+    expect(result).toBe(legacy);
+    expect(onShadowError).toHaveBeenCalledTimes(1);
+  });
+
+  test('enrichment shadow is skipped when the time budget is nearly spent', async () => {
+    const legacy = { status: 'unresolved' };
+    const evaluateWorksFirst = jest.fn();
+    const now = 1_000_000;
+    await expect(evaluateExistingResultWithRuntimeSeam(
+      suggestion,
+      legacy,
+      { allowShadowComparison: true, deadlineAt: now + 15_000 },
+      { mode: RESOLVER_MODE.SHADOW, evaluateWorksFirst, now: () => now },
+    )).resolves.toBe(legacy);
+    expect(evaluateWorksFirst).not.toHaveBeenCalled();
+    expect(enrichmentShadowTimeoutMs(null, now)).toBe(15_000);
+    expect(enrichmentShadowTimeoutMs(now + 30_000, now)).toBe(10_000);
+    expect(enrichmentShadowTimeoutMs(now + 60_000, now)).toBe(15_000);
+    expect(enrichmentShadowTimeoutMs(now + 20_500, now)).toBe(0);
   });
 
   test('only explicit supported modes are opt-in; unset and unknown configuration are legacy', () => {

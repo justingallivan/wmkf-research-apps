@@ -125,11 +125,17 @@ institution needs a look before cutover.
 
 ## Options (corrected)
 
-1. **Confirm Production's effective mode** from existing evidence
+1. **Confirm Production's effective mode.** Behavioural evidence: the
+   2026-11-21 Production run left Anna Pyle, Rachel Klevit and Ailong Ke
+   unresolved, while `combined` resolves them locally, so Production is not
+   effectively `combined` [inference]. `legacy` and `shadow` look identical
+   to directors; once step 2 deploys, new comparison rows appear only under
+   `shadow`. Otherwise, from existing evidence
    (`resolverMode` in institution-resolver metrics logs, or a non-biomedical
    admin identity comparison), or a small reviewed diagnostic that returns
    only the normalized mode and deployment id.
-2. **Add comparison coverage to the enrichment seam** (code change): in
+2. **[BUILT 2026-11-21 on branch `reviewer-identity-shadow-enrichment`, not
+   deployed]** **Add comparison coverage to the enrichment seam** (code change): in
    `shadow`, run W2 there too, log the comparison, keep the exact legacy
    result, and write nothing. Directors see no change.
 3. **Test the complete applicant path** with real stored inputs, institution
