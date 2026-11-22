@@ -119,6 +119,41 @@ test('slash-joined affiliations abstain instead of resolving as one organization
   expect(adapter.institutionCandidates).not.toHaveBeenCalled();
 });
 
+test('email addresses in a byline are removed before lookup instead of throwing', async () => {
+  const adapter = {
+    institutionCandidates: jest.fn(async (input) => candidateSet(input, [
+      candidate(IDS.child, 'Child University'),
+    ])),
+  };
+  const resolver = createRorAffiliationAssertionResolver({ candidateAdapter: adapter });
+
+  const labelled = await resolver.resolve({
+    rawText: 'Child University. Electronic address: someone@child.example.edu.',
+  });
+  const bare = await resolver.resolve({ rawText: 'Child University someone@child.example.edu' });
+  const explicit = await resolver.resolve({
+    rawText: 'Child University; someone@child.example.edu',
+    segments: [{ rawText: 'Child University' }, { rawText: 'someone@child.example.edu' }],
+  });
+
+  for (const result of [labelled, bare, explicit]) {
+    expect(result.segments).toHaveLength(1);
+    expect(result.segments[0].rawText).not.toContain('@');
+    expect(result.segments[0].resolution.status).toBe('resolved');
+  }
+  for (const [input] of adapter.institutionCandidates.mock.calls) {
+    expect(input.affiliation_string).not.toContain('@');
+  }
+});
+
+test('an affiliation that is only an email address stays unresolved without a lookup', async () => {
+  const adapter = { institutionCandidates: jest.fn() };
+  const resolver = createRorAffiliationAssertionResolver({ candidateAdapter: adapter });
+  const result = await resolver.resolve({ rawText: 'someone@child.example.edu' });
+  expect(result.segments[0].resolution).toMatchObject({ status: 'unresolved', reason: 'empty_affiliation' });
+  expect(adapter.institutionCandidates).not.toHaveBeenCalled();
+});
+
 test('abort propagates instead of being converted to provider failure', async () => {
   const controller = new AbortController();
   controller.abort(new Error('cancelled'));
