@@ -199,7 +199,7 @@ export default function ExternalServicesSection() {
           {current.data.notes && <div><h4 className="text-sm font-semibold">Account and service notes</h4><p className="mt-1 whitespace-pre-wrap break-words text-sm text-gray-700">{current.data.notes}</p></div>}
           <References links={current.data.links} />
         </div>
-        {['assemblyai','anthropic','serpapi'].includes(selected) && <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
+        {['assemblyai','anthropic','serpapi','openai'].includes(selected) && <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-lg font-semibold">Update checks</h3><Button disabled={checking || reviewLoading || updateCheck?.setupRequired} onClick={checkUpdates}>{checking ? 'Checking…' : 'Check for updates'}</Button></div>
           <p className="text-sm text-gray-600">Manual only. Reads official references or account metrics; no AI generation, purchases, or automatic changes. Checks within one minute reuse the saved result.</p>
           {checkError && <p role="alert" className="text-sm text-red-700">{checkError}</p>}

@@ -104,6 +104,7 @@
     "105_proposal_list_advisor_picks.sql",
     "106_external_service_reviews.sql",
     "107_external_service_inventory_followups.sql",
-    "108_external_service_checks.sql"
+    "108_external_service_checks.sql",
+    "109_openai_service_checks.sql"
   ]
 }

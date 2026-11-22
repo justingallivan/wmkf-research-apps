@@ -194,3 +194,25 @@ test('saved Markdown evidence is readable, expandable and carried into an unsave
   expect(check.sources[0].lines).toEqual(lines);
   expect(global.fetch.mock.calls.some(([,options]) => options?.method === 'PUT')).toBe(false);
 });
+test('OpenAI exposes the manual action and drafts independent source results without saving',async()=>{
+  const openai={...seed.services.find(s=>s.id==='openai'),version:1};
+  const check={checkedAt:'2026-11-21T20:00:00Z',serviceVersion:1,sources:[
+    {key:'models',label:'Available OpenAI models',status:'changed',attention:true,lines:['Added: gpt-example','Removed: gpt-old'],url:'https://developers.openai.com/api/docs/models'},
+    {key:'pricing',label:'Recent OpenAI usage and local pricing coverage',status:'baseline',lines:['0 matching model IDs logged'],url:'https://github.com/justingallivan/wmkf-research-apps/blob/main/lib/utils/model-pricing.js'},
+    {key:'deprecations',label:'Official OpenAI retirement notices',status:'unavailable',summary:'Could not check this source.',lines:[],url:'https://developers.openai.com/api/docs/deprecations.md'}
+  ]};
+  global.fetch.mockImplementation(async(url,options)=>response(options?.method==='POST'?{check}:url.includes('?id=')?{reviews:[],check:null}:{services:[openai]}));
+  render(<ExternalServicesSection/>);
+  fireEvent.click(await screen.findByRole('button',{name:'OpenAI · OpenAI API'}));
+  await waitFor(()=>expect(screen.getByRole('button',{name:'Check for updates'})).toBeEnabled());
+  fireEvent.click(screen.getByRole('button',{name:'Check for updates'}));
+  expect(await screen.findByText('Added: gpt-example')).toBeVisible();
+  expect(screen.getByText('Could not check')).toBeVisible();
+  const post=global.fetch.mock.calls.find(([,options])=>options?.method==='POST');
+  expect(JSON.parse(post[1].body)).toEqual({action:'check',id:'openai'});
+  fireEvent.click(screen.getByRole('button',{name:'Start review from findings'}));
+  expect(screen.getByLabelText('What changed / findings').value).toContain('Added: gpt-example');
+  expect(screen.getByLabelText('What changed / findings').value).toContain('Removed: gpt-old');
+  expect(screen.getByLabelText('Evidence and limitations').value).toContain('Official OpenAI retirement notices could not be checked');
+  expect(global.fetch.mock.calls.some(([,options])=>options?.method==='PUT')).toBe(false);
+});
