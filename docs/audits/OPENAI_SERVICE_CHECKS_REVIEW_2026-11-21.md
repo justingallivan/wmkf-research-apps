@@ -1,6 +1,6 @@
 # OpenAI manual service checks — review and release prerequisites
 
-Status: branch implementation; not published or applied to production.
+Status: runtime remains on the unpublished feature branch. Migration 109 is applied and verified in production (2026-11-21 16:14 Pacific).
 
 Owner scope: manual checks for OpenAI model availability, recent local usage/pricing coverage, and official retirement notices. Organization billing and prepaid-credit checks are excluded by owner direction. No inference, provider mutation, automatic schedule, or automatic human review.
 
@@ -24,8 +24,8 @@ Round one requested named change evidence beyond the model-list preview and expl
 - 133 focused tests passed across eight suites, including 23 scratch PostgreSQL integration tests and 16 UI tests.
 - Production build, configured type check, and scoped ESLint passed. Build preceded the final explanatory string/test-only refinement.
 - Migration manifest, Atlas, API-route, documentation-symbol, and documentation-currency gates passed; each available self-test ran sequentially after its gate. Existing unrelated API guard-recognition warnings remain warnings.
-- No hosted OpenAI check or production migration was performed. The official deprecations Markdown was inspected during research, but the application's deployed fetch/credentials remain unverified.
+- No hosted OpenAI check was performed. The production migration was subsequently applied as recorded below. The official deprecations Markdown was inspected during research, but the application's deployed fetch/credentials remain unverified.
 
 ## Before release
 
-Apply `109_openai_service_checks.sql` using the canonical existing-database migration runner before deploying the OpenAI runtime. Then verify signed-in Admin: run OpenAI Check for updates, inspect independent source outcomes and source links, reload the stored result, and confirm no service/review mutation. Missing credentials or changed source formats must remain explicit unavailable results. Code rollback can leave the expanded constraint in place; do not delete saved snapshots.
+Migration `109_openai_service_checks.sql` was applied through `node scripts/apply-migrations.js` at 2026-11-22T00:14:02.618Z (November 21, 16:14 Pacific), following explicit owner authorization. Preflight confirmed the production target and that 109 was the only pending migration. Runner result: 1 applied, 105 skipped. Readback confirmed the four-provider constraint; all three existing snapshot hashes were unchanged, with 26 services and one human review preserved. Runtime has not been published. After deploying, verify signed-in Admin: run OpenAI Check for updates, inspect independent source outcomes and source links, reload the stored result, and confirm no service/review mutation. Missing credentials or changed source formats must remain explicit unavailable results. Code rollback can leave the expanded constraint in place; do not delete saved snapshots.
