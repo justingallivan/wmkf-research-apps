@@ -308,7 +308,8 @@ it with the default. The re-check runs of the 11 stored pairs were keyless,
 so their counts may include failed lookups; rerun them with the key before
 relying on them.
 
-**Fixes on branch `worktree-linked-riding-sunset` (not deployed):**
+**Fixes, live in Production since 2026-11-21 (PR #675, merge `552f93074`;
+Vercel deployment `3PyznosLUf17vko9nomctoRDm8pC` completed):**
 - *Stage 2 email crash:* email addresses are removed before the ROR lookup
   ("Strip email addresses from bylines…"). The same contract still rejects an
   email in the applicant-listed institution on the W2 path
