@@ -71,6 +71,16 @@ jest.mock('../../lib/services/deduplication-service', () => ({
   },
 }));
 
+const keepAlive = jest.fn(async () => {});
+jest.mock('../../lib/utils/keep-alive', () => ({ keepAlive: (...a) => keepAlive(...a) }));
+const runEnrichmentShadowComparisons = jest.fn(async () => ({ attempted: 0, skipped: 0 }));
+jest.mock('../../lib/services/reviewer-identity-runtime', () => {
+  const actual = jest.requireActual('../../lib/services/reviewer-identity-runtime');
+  return {
+    ...actual,
+    ReviewerIdentityRuntime: { runEnrichmentShadowComparisons: (...a) => runEnrichmentShadowComparisons(...a) },
+  };
+});
 const enrichCandidates = jest.fn();
 jest.mock('../../lib/services/contact-enrichment-service', () => ({
   ContactEnrichmentService: { enrichCandidates: (...a) => enrichCandidates(...a) },
@@ -1651,4 +1661,29 @@ test('time-budget abort: resolves with the timeout error variant', async () => {
   expect(events[0].event).toBe('error');
   expect(events[0].data.timeout).toBe(true);
   expect(events[0].data.message).toMatch(/time budget/);
+});
+
+test('hands shadow comparison inputs to the runtime only after the complete event', async () => {
+  // eslint-disable-next-line global-require
+  const { attachIdentityShadowInput } = jest.requireActual('../../lib/services/reviewer-identity-runtime');
+  const order = [];
+  enrichCandidates.mockImplementation(async (candidates) => ({
+    enriched: candidates.map((c) => {
+      const out = { ...c, contactEnrichment: { identity: { status: 'probable' } } };
+      attachIdentityShadowInput(out, { name: c.name }, { status: 'unresolved' });
+      return out;
+    }),
+  }));
+  keepAlive.mockImplementation(async () => { order.push('keepAlive'); });
+  await enrichRecommended(args(), ({ event }) => { if (event === 'complete') order.push('complete'); });
+  expect(order).toEqual(['complete', 'keepAlive']);
+  expect(runEnrichmentShadowComparisons).toHaveBeenCalledWith([
+    { suggestion: { name: 'Dr. Rec One' }, legacyResult: { status: 'unresolved' } },
+  ]);
+});
+
+test('does not schedule shadow work when no enrichment result carries an input', async () => {
+  await enrichRecommended(args(), () => {});
+  expect(keepAlive).not.toHaveBeenCalled();
+  expect(runEnrichmentShadowComparisons).not.toHaveBeenCalled();
 });

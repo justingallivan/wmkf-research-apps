@@ -135,9 +135,12 @@ institution needs a look before cutover.
    admin identity comparison), or a small reviewed diagnostic that returns
    only the normalized mode and deployment id.
 2. **[BUILT 2026-11-21 on branch `reviewer-identity-shadow-enrichment`, not
-   deployed]** **Add comparison coverage to the enrichment seam** (code change): in
-   `shadow`, run W2 there too, log the comparison, keep the exact legacy
-   result, and write nothing. Directors see no change.
+   deployed]** **Add comparison coverage for applicant enrichment** (code
+   change). After a Codex review found that inline comparisons would spend
+   the run's shared time budget, the design runs them after enrichment and
+   the roster save, handed to `keepAlive`: 15 s per reviewer including the
+   log write, 90 s per run, applicant reviewers only, results unchanged,
+   nothing written but the decision-only log. Directors see no change.
 3. **Test the complete applicant path** with real stored inputs, institution
    reconciliation and the final card, persistence stubbed. Close the
    profile-propagation gap.

@@ -581,8 +581,7 @@ describe('_finalize — step order (C12) + arg fidelity (C9)', () => {
       expect.objectContaining({
         identity: expect.objectContaining({ status: expect.any(String) }),
       }),
-      // Search candidates never opt in to enrichment shadow comparison.
-      expect.objectContaining({ signal: undefined, allowShadowComparison: false }),
+      expect.objectContaining({ signal: undefined }),
     );
     expect(out.contactEnrichment).toMatchObject({
       orcidId: '0000-0003-2195-6258',
@@ -596,24 +595,27 @@ describe('_finalize — step order (C12) + arg fidelity (C9)', () => {
     });
   });
 
-  test('applicant reviewers opt in to enrichment shadow comparison with the run deadline', async () => {
+  test('keeps a hidden comparison input for applicant reviewers only', async () => {
     jest.spyOn(openAlexMetrics, 'attachOpenAlexMetrics').mockResolvedValue(undefined);
     jest.spyOn(domainEvidence, 'buildInstitutionDomainEvidence').mockResolvedValue(undefined);
     jest.spyOn(pageEmail, 'attachEmailFromResolvedPage').mockResolvedValue(undefined);
     jest.spyOn(ContactEnrichmentService, '_applyAffiliationOverride').mockImplementation(() => {});
     jest.spyOn(ContactEnrichmentService, 'saveToDatabase').mockResolvedValue(undefined);
     jest.spyOn(ReviewerIdentityRuntime, 'evaluateExistingResult').mockImplementation(async (_s, legacy) => legacy);
-    const deadlineAt = Date.now() + 120_000;
-    await ContactEnrichmentService.enrichCandidate({
-      name: 'Anna Example',
-      affiliation: 'Example University',
-      isApplicantRecommended: true,
-      publications: [],
-    }, { usePubmed: false, useOrcid: false, deadlineAt });
-    expect(ReviewerIdentityRuntime.evaluateExistingResult).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Anna Example' }),
-      expect.anything(),
-      expect.objectContaining({ allowShadowComparison: true, deadlineAt }),
-    );
+    // eslint-disable-next-line global-require
+    const { identityShadowInputOf } = require('../../lib/services/reviewer-identity-runtime');
+    const applicant = await ContactEnrichmentService.enrichCandidate({
+      name: 'Anna Example', affiliation: 'Example University', isApplicantRecommended: true, publications: [],
+    }, { usePubmed: false, useOrcid: false });
+    const searched = await ContactEnrichmentService.enrichCandidate({
+      name: 'Sam Search', affiliation: 'Example University', publications: [],
+    }, { usePubmed: false, useOrcid: false });
+    expect(identityShadowInputOf(applicant)).toMatchObject({
+      suggestion: { name: 'Anna Example', suggestedInstitution: 'Example University' },
+      legacyResult: expect.objectContaining({ status: expect.any(String) }),
+    });
+    expect(identityShadowInputOf(searched)).toBeNull();
+    expect(JSON.stringify(applicant)).not.toContain('legacyResult');
   });
+
 });

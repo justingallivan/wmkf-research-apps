@@ -214,8 +214,9 @@ requires a later owner decision.
 `[COMBINED MODE BUILT; LEGACY DEFAULT; PRODUCTION NOT CUT OVER]`
 
 The evaluated resolver is now shared by the pinned runner and the runtime
-shadow arm. (2026-11-21: `shadow` also compares on the contact-enrichment
-seam for applicant-recommended reviewers, returning the exact legacy result;
+shadow arm. (2026-11-21: `shadow` also compares applicant-recommended
+reviewers in the background after applicant enrichment saves; the
+enrichment seam itself still returns the exact legacy result;
 see `docs/plans/APPLICANT_REVIEWER_IDENTITY_W2_PLAN_2026-11-21.md`.)
 `ReviewerIdentityRuntime` is the sole production call seam for
 non-biomedical/PubMed-off Track-A verification. Unset, `legacy`, and every
