@@ -92,9 +92,9 @@ team-scoped token. All three sources succeeded and persisted across reload.
 PR #674 added sanitized account-read failure diagnostics. The [Vercel implementation review receipt](../audits/VERCEL_SERVICE_CHECKS_REVIEW_2026-11-21.md) records the earlier build-time checks, not the current release state.
 
 
-## Neon Marketplace extension — branch-built, not deployed
+## Neon Marketplace extension — deployed
 
-[VERIFIED via source, isolated PostgreSQL migration tests and live CLI response-shape probe, 2026-11-21] Migration `111_neon_service_checks.sql` adds `neon` to the service-ID constraint, matching the application and Admin UI allowlists (six possible latest snapshots). Existing snapshots and human reviews are preserved. Migration 111 is applied to production through the canonical runner (one applied, 107 skipped), with constraint readback confirming Neon. Runtime deployment and hosted token access remain pending.
+[VERIFIED via source, isolated PostgreSQL migration tests and live CLI response-shape probe, 2026-11-21] Migration `111_neon_service_checks.sql` adds `neon` to the service-ID constraint, matching the application and Admin UI allowlists (six possible latest snapshots). Existing snapshots and human reviews are preserved. Migration 111 is applied to production through the canonical runner (one applied, 107 skipped), with constraint readback confirming Neon. PR #676 is deployed in Ready production deployment `dpl_E6w9H2QbaNpn8CVWrPErWKarpatc`. Signed-in Admin verified both sources through the app token at 18:57 Pacific on 2026-11-21; result reload retained the same timestamp and evidence. No human review was saved.
 
 `neon-sources.js` uses the existing server-side Vercel service-check token and team ID. It discovers exactly one owned Neon Marketplace installation through GET `/v1/integrations/configurations?view=account`, then reads GET `/v1/integrations/configuration/{id}` with the explicit team. Installation identifiers are validated before constructing the fixed-origin URL. No new credential, manually configured installation ID, Neon database access, or provider write is needed. The two HTTP reads share a promise only within one check; the existing response/deadline limits apply. Missing, ambiguous, inactive or mismatched installations fail visibly.
 
