@@ -213,6 +213,119 @@ server blanks contact data for unresolved identities
 (`enrich-recommended-service.js:1248-1300`). So "8 of 62 one-click" is a
 floor, not a measurement, until identity resolution improves.
 
+## Institution holds: June–August design review and local replay (2026-11-21, Session 694)
+
+**What June–August decided** (sources: `docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`,
+`docs/plans/REVIEWER_INSTITUTION_AUTO_RESOLUTION_PLAN_2026-09-14.md`,
+`docs/audits/reviewer-institution-phase2-contract-audit-2026-09-14.md`,
+`docs/audits/institution-affiliation-source-recovery-2026-09-14.md`,
+`docs/REVIEWER_AFFILIATION_CONTACT_RECONCILIATION_PLAN.md`):
+- Owner rule (August): institution evidence counts for or against a reviewer
+  only once identity is established without it. Stage 2 therefore changes
+  card wording only (live since 2026-08-19); the older boolean check still
+  decides holds and writes.
+- Extra affiliations: the HHMI/Broad exemption is conflict-of-interest only.
+  On the identity side, stage 2 splits "UCSF; HHMI" but cannot release a hold.
+- Same system: the planned first automatic release covered departments and
+  schools of the same university only, not separately governed hospitals.
+  It was never built.
+- Moves: the card labels where an institution came from (July). Dates are
+  dropped before the comparison, and the dated-currentness rule named as the
+  next step in September was never written.
+- The `REVIEWER_INSTITUTION_PHASE2` switch, when on, adds holds (evidence
+  receipts, extra-affiliation conflict screening) and releases none
+  [VERIFIED via source: `enrich-recommended-service.js:416,861`,
+  `save-candidates-service.js:1120`, `promote-applicant-reviewer-service.js:524`].
+  Off per the docs as of 2026-09-15; not re-checked.
+- W2 is excluded from "identity established without institution evidence":
+  it binds only people with papers at the claimed institution
+  (`reviewer-works-first.js:337-364`; recorded in the September audit). Using
+  W2 to release holds would reverse that September decision.
+
+**Local replay of the 26 held applicant reviewers.** Public PubMed, OpenAlex
+and ROR only; no database or Dataverse access; names and results stay in the
+session scratchpad. Each person's PubMed byline affiliation was compared with
+the listed institution through the production comparison helper and stage 2.
+Caveat: production may have compared a different pair (it also uses ORCID and
+OpenAlex affiliations, and the verifier's first-pass flag stands when no
+comparison runs), and PubMed results today may differ from the original run.
+
+| Group (Claude's reading, not adjudicated) | People |
+|---|---|
+| Same institution, comparison still says mismatch | 14 |
+| Comparison clears this pair, so production held them on a different pair or the earlier flag | 6 |
+| PubMed found a different person with the same name (hold is right) | 3 |
+| Real move or joint appointment | 2 |
+| Listed institution wrong in the record | 1 |
+
+**Why the 14 fail** [VERIFIED via local probes and
+`institution-affiliation-consistency.js:130-161,193-224`]: a byline segment
+that matches the listed institution counts only if every longer stretch of
+the byline after it ("Stanford University, Stanford, CA 94305.") also
+resolves in OpenAlex to the same institution. Addresses and zip codes never
+resolve, so the match is discarded. Institutions OpenAlex has no record for
+("Harvard Medical School", "Tufts University School of Medicine") fail the
+same way. Two identical Stanford chemistry bylines compare as a mismatch.
+This fail-closed rule landed 2026-08-08 (`cad6d2dbd`, `3add5ffd6`) to stop
+"University of California" from matching one campus, and it has not changed
+since; the hold path in `enrich-recommended-service.js` is unchanged since
+2026-08-19 apart from switched-off Phase 2 additions. So this is the August
+design, not a code regression. A change in OpenAlex search behavior since
+August cannot be ruled out from the current evidence.
+
+**Stored hold reasons** [VERIFIED 2026-11-21 via owner-approved read-only
+query of `reviewer_find_roster`; names kept in the session scratchpad]:
+25 of the 26 rows were last written between 2026-07-21 and 2026-08-20 by
+older code (saved formats 2–4); one was written 2026-11-21. Old-format rows
+are not valid caches (`reviewer-search-logic.js:1017`), so they re-run when
+that request's Find tab is next opened. They are stale verdicts, not output
+of today's code.
+- 13 carry the oldest wording (written 2026-07-21 to 2026-08-02, before the
+  August 8–9 comparison changes); the stored text names no pair.
+- 11 name the compared pair. Re-running those exact pairs through today's
+  code: 2 now clear (both Duke/Stanford department bylines); 9 still fail.
+  Of the 9, Claude reads 7 as the same institution or the same system
+  (department or school bylines, an email or hyphen difference, a
+  cancer-institute byline against its university), one as an extra
+  affiliation listed as the recorded institution, and one as a real move.
+  Stage 2 labels 4 of the 9 "same", and errors on 3 because the
+  byline contains an email address (`ror-institution-candidate-contract.js:41`
+  rejects it); a stage 2 error falls back to the old mismatch wording.
+- 2 carry the stage 2 wording (one compatible, one distinct).
+
+So the holds are mostly last cycle's verdicts, and today's code would still
+hold most of the same-institution cases.
+
+**Caveat and a second defect (found later the same session).** Keyless
+OpenAlex calls began returning 429 during this session's local probing (the
+keyed account still returned 200). While that lasted, the two pairs that had
+cleared stopped clearing: every institution lookup failed (11 of 11 per run)
+and the comparison answered "mismatch", not "could not compare" [VERIFIED via
+local probe and resolver counters]. The lookup returns "no institution" on a
+provider error unless built with `propagateProviderErrors`
+(`institution-identity-resolver.js:159-202`), and applicant enrichment built
+it with the default. The re-check runs of the 11 stored pairs were keyless,
+so their counts may include failed lookups; rerun them with the key before
+relying on them.
+
+**Fixes on branch `worktree-linked-riding-sunset` (not deployed):**
+- *Stage 2 email crash:* email addresses are removed before the ROR lookup
+  ("Strip email addresses from bylines…"). The same contract still rejects an
+  email in the applicant-listed institution on the W2 path
+  (`ror-institution-identity-resolver.js`); not fixed.
+- *Lookup failure read as mismatch:* applicant enrichment now builds its
+  resolver with `propagateProviderErrors`
+  (`createEnrichmentInstitutionCheckers` in `enrich-recommended-service.js`),
+  so a failure is recorded as `comparison_error` ("could not be completed")
+  in the log, the progress message and, when no stage 2 note is shown, the
+  stored reason. The reviewer is still held, and the row is still a valid
+  cache, so a transient failure remains a lasting hold until re-enrichment.
+  With stage 2 on, the card and stored reason come from stage 2 instead.
+- Not changed: the post-acceptance affiliation alert
+  (`alert-reviewer-affiliation-mismatch.js:100`) and the identity resolver's
+  affiliation check (`reviewer-identity-evidence.js:517`) still build the
+  default resolver, so a lookup failure there can still read as a mismatch.
+
 ## Not decided here
 
 - Whether to change the legacy institution contradiction check (13 rows).
