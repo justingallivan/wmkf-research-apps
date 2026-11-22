@@ -72,6 +72,7 @@ jest.mock('../../lib/services/workbench/applicant-known-reviewer-service', () =>
 jest.mock('../../lib/utils/public-blob-fetch', () => ({ fetchPublicBlob: jest.fn() }));
 
 import {
+  createEnrichmentInstitutionCheckers,
   institutionEvidenceConnectsIdentity,
   institutionVerdictReason,
 } from '../../lib/services/workbench/enrich-recommended-service';
@@ -235,6 +236,40 @@ describe('institutionEvidenceConnectsIdentity — S400 captured operands', () =>
     })).rejects.toBe(providerError);
     expect(legacySpy.areConsistent).toHaveBeenCalledTimes(1);
     expect(stagedSpy.areConsistent).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('createEnrichmentInstitutionCheckers — provider failure is not a mismatch', () => {
+  test('an OpenAlex lookup failure propagates instead of comparing as CONTRADICTED', async () => {
+    const providerError = Object.assign(new Error('OpenAlex request failed: 429'), { status: 429 });
+    const openAlexService = {
+      searchInstitutions: jest.fn().mockRejectedValue(providerError),
+      getInstitution: jest.fn(),
+    };
+    const { legacyChecker: legacy, stagedChecker: staged } = createEnrichmentInstitutionCheckers({ openAlexService });
+    await expect(institutionEvidenceConnectsIdentity({
+      evidenceInstitution: CAPTURED.ucsd.evidence,
+      resolvedInstitutions: [CAPTURED.ucsd.listed],
+      finalAffiliation: CAPTURED.ucsd.listed,
+      legacyChecker: legacy,
+      stagedChecker: staged,
+    })).rejects.toBe(providerError);
+    expect(openAlexService.searchInstitutions).toHaveBeenCalled();
+  });
+
+  test('a genuine no-match lookup still compares normally', async () => {
+    const openAlexService = {
+      searchInstitutions: jest.fn().mockResolvedValue([]),
+      getInstitution: jest.fn(),
+    };
+    const { legacyChecker: legacy, stagedChecker: staged } = createEnrichmentInstitutionCheckers({ openAlexService });
+    await expect(institutionEvidenceConnectsIdentity({
+      evidenceInstitution: CAPTURED.zhou.evidence,
+      resolvedInstitutions: ['Texas A&M University'],
+      finalAffiliation: 'Texas A&M University',
+      legacyChecker: legacy,
+      stagedChecker: staged,
+    })).resolves.toBe(false);
   });
 });
 
