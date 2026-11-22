@@ -296,6 +296,24 @@ of today's code.
 So the holds are mostly last cycle's verdicts, and today's code would still
 hold most of the same-institution cases.
 
+**Caveat and a second defect (found later the same session).** OpenAlex began
+returning 429 (rate limited) during this session's local probing. While that
+lasted, the two pairs that had cleared stopped clearing: every institution
+lookup failed (11 of 11 per run) and the comparison answered "mismatch", not
+"could not compare" [VERIFIED via local probe and resolver counters]. The
+lookup returns "no institution" on a provider error unless built with
+`propagateProviderErrors` (`institution-identity-resolver.js:159-202`), and
+production builds it with the default (`enrich-recommended-service.js:825`).
+So a provider outage can produce a held reviewer with "could not be
+reconciled" wording, contrary to the August rule that provider failure never
+becomes a mismatch. Counts above may include rate-limited lookups; rerun
+once OpenAlex is available before relying on them.
+
+Stage 2 email crash: fixed on branch `worktree-linked-riding-sunset`
+(`150f3ca85`; email addresses are removed before the ROR lookup). The same
+contract also rejects an email in the applicant-listed institution on the W2
+path (`ror-institution-identity-resolver.js`); not fixed.
+
 ## Not decided here
 
 - Whether to change the legacy institution contradiction check (13 rows).
