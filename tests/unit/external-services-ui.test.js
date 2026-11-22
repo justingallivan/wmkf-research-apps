@@ -263,3 +263,16 @@ test('Neon manual check posts its ID and reloads persisted Marketplace evidence'
   fireEvent.click(screen.getByRole('button',{name:'Reload check results'}));expect(await screen.findByText('Persisted Neon spending: $2.50')).toBeVisible();
   expect(screen.getByText('First usage snapshot saved')).toBeVisible();expect(global.fetch.mock.calls.some(([,o])=>o?.method==='PUT')).toBe(false);
 });
+
+test('Cloudmersive keeps manual account verification visible before and after public-check failure',async()=>{
+ const service={...seed.services.find(s=>s.id==='cloudmersive'),version:1};
+ const check={checkedAt:'2026-11-22T03:00:00Z',serviceVersion:1,sources:[{key:'pricing',label:'Cloudmersive public plan pricing',status:'unavailable',summary:'Public page unavailable.',lines:[],url:'https://cloudmersive.com/pricing-small-business'},{key:'limits',label:'Cloudmersive public plan limits',status:'baseline',lines:['Public limits only'],url:'https://cloudmersive.com/pricing-small-business'}]};let saved=null;
+ global.fetch.mockImplementation(async(url,options)=>{if(options?.method==='POST'){saved=check;return response({check});}return response(url.includes('?id=')?{reviews:[],check:saved}:{services:[service]});});
+ render(<ExternalServicesSection/>);fireEvent.click(await screen.findByRole('button',{name:'Cloudmersive · Virus scanning'}));
+ expect(await screen.findByText(/Account usage and remaining quota: manual verification required\./)).toBeVisible();
+ expect(screen.getByRole('link',{name:'Open Cloudmersive portal'})).toHaveAttribute('href','https://portal.cloudmersive.com/');
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Check for updates'})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:'Check for updates'}));expect(await screen.findByText('Public page unavailable.')).toBeVisible();
+ expect(JSON.parse(global.fetch.mock.calls.find(([,o])=>o?.method==='POST')[1].body)).toEqual({action:'check',id:'cloudmersive'});
+ fireEvent.click(screen.getByRole('button',{name:'Reload check results'}));expect(await screen.findByText('Public page unavailable.')).toBeVisible();expect(screen.getByText(/Account usage and remaining quota: manual verification required\./)).toBeVisible();
+ fireEvent.click(screen.getByRole('button',{name:'Start review from findings'}));expect(screen.getByLabelText('Evidence and limitations').value).toContain('Public provider references only');expect(screen.getByLabelText('Evidence and limitations').value).not.toContain('account observations');expect(global.fetch.mock.calls.some(([,o])=>o?.method==='PUT')).toBe(false);
+});
