@@ -3,6 +3,21 @@
 Previous handoff (Session 693 prompt, written at the end of Session 692):
 `git show dc6847a16:SESSION_PROMPT.md`.
 
+> **Session 694 interim note (2026-11-21; the full handoff is written at `/stop`).**
+> The owner dispatched two independent models to review the whole
+> reviewer-finding workflow (goal: fewer than 10% of suggested reviewers need a
+> human decision). Their assignment and outputs live in a private, gitignored
+> local folder on the owner's machine (not in git; contains real reviewer names):
+> `outputs/reviewer-finding-review-2026-11-21/` in the main checkout —
+> `brief.md`, `case-packet-26-held.md`, `dispatch-prompt.md`, and on completion
+> `report-<model>.md` plus `work-<model>/` for each model. Next step: compare the
+> two reports with the owner and move the agreed conclusions, without names,
+> into a tracked plan. PR #675 (stage 2 email crash; lookup failure no longer
+> read as a mismatch) is merged and live; the institution-hold findings are in
+> `docs/plans/APPLICANT_REVIEWER_IDENTITY_W2_PLAN_2026-11-21.md`. Items 1–2
+> below were done this session; the 26 holds are mostly stale July–August
+> verdicts, not current output.
+
 ## Session 693 Summary — 2026-11-20/21 (Claude, main checkout)
 
 ### What Was Completed
