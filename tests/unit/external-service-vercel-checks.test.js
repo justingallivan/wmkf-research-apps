@@ -110,3 +110,17 @@ test('an aborted Vercel read fails without replacing the last success',async()=>
   expect(next.result.status).toBe('unavailable');expect(next.baseline).toBe(first.baseline);
   expect(fetch.mock.calls.at(-1)[1].signal.aborted).toBe(true);
 });
+
+test.each([400,404,410,429,500,503])('HTTP %s is actionable without retaining provider body',async status=>{
+  configured();fetch.mockResolvedValue(reply('private-account private-key',status));
+  const result=(await collect('usage')).result;
+  expect(result.summary).toContain(`HTTP ${status}`);
+  expect(JSON.stringify(result)).not.toMatch(/private-account|private-key|test-token/);
+});
+test.each([['TimeoutError','time limit'],['AbortError','interrupted'],['TypeError','network access'],['SyntaxError','malformed']])('classifies %s without exposing error details',async(name,message)=>{
+  configured();const error=name==='TypeError'?new TypeError('private-key'):name==='SyntaxError'?new SyntaxError('private-key'):Object.assign(new Error('private-key'),{name});
+  fetch.mockRejectedValue(error);const result=(await collect('usage')).result;
+  expect(result.summary).toContain(message);expect(JSON.stringify(result)).not.toContain('private-key');
+});
+
+test.each(['null','[]','1'])('non-object JSONL %s is a malformed response, not a network error',async body=>{configured();fetch.mockResolvedValue(reply(body));expect((await collect('usage')).result.summary).toContain('malformed response');});
