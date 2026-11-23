@@ -42,6 +42,11 @@ by this Codex closeout. Verify their current status before acting.
    owner-readable comparison (agreements, disagreements, proposed first phase),
    then move the agreed conclusions, without names, into a tracked plan.
    Evidence: `outputs/reviewer-finding-review-2026-11-21/` (owner's machine).
+   Status 2026-11-23: Claude's report is done
+   (`report-claude-opus-5-5.md`; no Production reads, 44 SerpAPI credits). Its
+   recommendation: one shared resolver bound to the listed institution and the
+   proposal topic, with Phase 1 built in shadow mode. Cutover needs a replay of real
+   rows (one owner-approved read-only query, report §2.8) and 200+ generated decoys.
 2. **Carried from Session 692–693, still open:** Connor's step 3 go-live check
    before early December; Connor's promised builds; low-priority Connor questions;
    the `cycle-dossier.entry` cache-read probe (owner OK); the J27 list search hint
@@ -106,7 +111,7 @@ by this Codex closeout. Verify their current status before acting.
 | Stream | Owning reference | Resume boundary |
 |---|---|---|
 | External service tracker (Codex, released) | `docs/audits/CLOUDMERSIVE_SERVICE_CHECKS_2026-11-21.md` | Cloudmersive deployed and verified; next provider requires owner selection |
-| Reviewer-finding workflow review | `outputs/reviewer-finding-review-2026-11-21/` (private) | Two model reviews dispatched; compare when both reports exist |
+| Reviewer-finding workflow review | `outputs/reviewer-finding-review-2026-11-21/` (private) | Claude report done 2026-11-23; compare when the other report exists |
 | Applicant reviewer identity (W2) | `docs/plans/APPLICANT_REVIEWER_IDENTITY_W2_PLAN_2026-11-21.md` | Shadow live; institution findings recorded; pilot on hold pending the review |
 | Find identity card | `docs/plans/FIND_IDENTITY_CARD_REDESIGN_BRIEF_2026-11-20.md` | Layout and fixes live; follow-ups on hold pending the review |
 | J27 applicant reviewers / exclusions | `docs/POWER_AUTOMATE_RESEARCH_INTAKE_FLOWS.md` §9 | Branch 2 not started |
