@@ -9,7 +9,7 @@
  *
  * POST creates a brand-new prompt and publishes it as v1. Body:
  *   { name, catalog: { title, description?, group?, section?, usedBy?, usage? },
- *     body, systemPrompt?, outputSchema?, model?, maxTokens?, requestId? }
+ *     body, systemPrompt?, variables?, outputSchema?, model?, maxTokens?, requestId? }
  * See createPrompt in lib/services/admin/prompts-publish-service.js.
  *
  * GET also returns the effective prompt group list (`groups`, pinned groups
@@ -35,12 +35,12 @@ export default async function handler(req, res) {
   if (!gate) return;
 
   if (req.method === 'POST') {
-    const { name, catalog, body, systemPrompt, outputSchema, model, maxTokens, requestId } = req.body || {};
+    const { name, catalog, body, systemPrompt, variables, outputSchema, model, maxTokens, requestId } = req.body || {};
     try {
       return await withDalContext('admin-prompts-create', async () => {
         try {
           return res.status(200).json(await createPrompt({
-            name, catalog, body, systemPrompt, outputSchema, model, maxTokens,
+            name, catalog, body, systemPrompt, variables, outputSchema, model, maxTokens,
             requestId: requestId || undefined,
             profileId: gate.profileId,
           }));

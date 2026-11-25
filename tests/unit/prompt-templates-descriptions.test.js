@@ -338,7 +338,39 @@ test('Add prompt: lists placeholders, blocks an existing name, and posts a new p
   const post = global.fetch.mock.calls.find(([url, init]) => url === '/api/admin/prompts' && init?.method === 'POST');
   const sent = JSON.parse(post[1].body);
   expect(sent).toMatchObject({ name: 'grants.budget-check', catalog: { title: 'Budget check', usage: 'unconnected' }, body: 'Check {{budget_text}} for {{program}}.' });
+  expect(sent).not.toHaveProperty('variables');
   expect(sent.requestId).toEqual(expect.any(String));
+});
+
+test('Add prompt: a Variables declaration is validated and posted as written', async () => {
+  serve([prompt('phase-i.summary')]);
+  const listFetch = global.fetch;
+  global.fetch = jest.fn(async (url, init = {}) => {
+    if (url === '/api/admin/prompts' && init.method === 'POST') {
+      return response({ status: 'completed', kind: 'create', targetVersion: 1, newPromptId: 'n' });
+    }
+    return listFetch(url, init);
+  });
+  await renderOpenWorkflows();
+  fireEvent.click(screen.getByRole('button', { name: 'Add prompt' }));
+  const form = screen.getByRole('region', { name: 'Add prompt' });
+  const create = within(form).getByRole('button', { name: 'Create and publish v1' });
+  fireEvent.change(within(form).getByLabelText(/^Name/), { target: { value: 'grants.budget-check' } });
+  fireEvent.change(within(form).getByLabelText(/^Title/), { target: { value: 'Budget check' } });
+  fireEvent.change(within(form).getByLabelText(/^Prompt body/), { target: { value: 'Check {{budget_text}}.' } });
+  expect(create).toBeEnabled();
+
+  fireEvent.change(within(form).getByLabelText(/^Variables/), { target: { value: '{"execution":{}}' } });
+  expect(within(form).getByText('Variables must be blank or a JSON object with a "variables" array.')).toBeInTheDocument();
+  expect(create).toBeDisabled();
+
+  const declared = '{"variables":[{"name":"budget_text","source":{"kind":"override","default":"None"},"required":false}]}';
+  fireEvent.change(within(form).getByLabelText(/^Variables/), { target: { value: declared } });
+  expect(create).toBeEnabled();
+  fireEvent.click(create);
+  await screen.findByText('Prompt created and published as v1.');
+  const post = global.fetch.mock.calls.find(([url, init]) => url === '/api/admin/prompts' && init?.method === 'POST');
+  expect(JSON.parse(post[1].body).variables).toBe(declared);
 });
 
 test('Add prompt: a native structured-output schema requires a compatible concrete model', async () => {
