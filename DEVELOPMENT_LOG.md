@@ -10,6 +10,17 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## November 2026 — Prompt Variables editable in Admin (Session 696)
+
+**Milestone:** Admin Edit & publish and Add prompt now show and edit a prompt's Variables JSON (`wmkf_ai_promptvariables`), which Connor previously could only see in AkoyaGo.
+**Sessions:** Claude, 2026-11-25; owner authorized merge to production and a read-only browser check.
+**Ship state:**
+- PR #680 / `58cf923fa` deployed; docs receipt PR #681 / `4eda6be04`.
+- Edit sends variables only when changed; create (`POST /api/admin/prompts`) now accepts it, and both still declare missing placeholders and keep untrusted-declaration guards.
+- Production check on `intake.personnel` matched AkoyaGo; nothing was published or created.
+**Why it matters:** Prompt authors can review and change variable sources and defaults without leaving Admin.
+**Pointers:** `shared/components/admin/PromptPublishForm.js`; `shared/components/admin/AddPromptForm.js`; `docs/atlas/dataverse-wmkf-ai-run-and-prompt.md`.
+
 ## November 2026 — Cloudmersive public service checks in Admin (Session 695)
 
 **Milestone:** Admin's manual service tracker now compares Cloudmersive public pricing and qualified plan limits.
