@@ -509,10 +509,12 @@ describe('publishPrompt', () => {
     });
 
     it('allows an edit that keeps every untrusted declaration', async () => {
-      await publishPreSite(preSiteVars((vars) => {
+      const edited = preSiteVars((vars) => {
         vars.find((v) => v.name === 'proposal_text').maxChars = 90000;
-      }));
-      expect(aiPrompt.create).toHaveBeenCalled();
+      });
+      await publishPreSite(edited);
+      // The edited declaration is what the new version stores.
+      expect(aiPrompt.create).toHaveBeenCalledWith(expect.objectContaining({ wmkf_ai_promptvariables: edited }));
     });
 
     it('allows a body-only edit (variables carried from the prior row)', async () => {
