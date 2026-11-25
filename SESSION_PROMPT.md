@@ -63,11 +63,7 @@ The full Session 695 handoff is retrievable with
 4. **Executive Summary trial batch-2 cleanup** was scheduled for Nov 23 and is
    now overdue. It is destructive. Steps: `git show dc6847a16:SESSION_PROMPT.md`
    and `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md` ~95–128.
-5. **Merged branches that could be deleted** (confirm first): the Session 695
-   list in `git show 99f9e2443:SESSION_PROMPT.md`, plus this session's
-   squash-merged `claude/session-2026-11-25` and
-   `claude/prompt-variables-live-docs` (local and remote).
-6. **Production identity mode is `shadow`** (owner-set). Do not set `combined`
+5. **Production identity mode is `shadow`** (owner-set). Do not set `combined`
    without an approved cutover.
 
 ### Owner Decision Needed
@@ -87,6 +83,25 @@ The full Session 695 handoff is retrievable with
    identity-confirmation attestation on the owner's behalf.
 3. From Session 692: proposal lists; Connor's roster connection check; do not
    merge the Executor lineage branch; consultant-feedback finalize retry reuse.
+
+### Done After Closeout (2026-11-25, owner-authorized)
+
+1. **Merged-branch cleanup.** Deleted 13 branches whose work is on `main`.
+   Before each delete: tip is an ancestor of `origin/main`, or equals its
+   merged PR's head, or `git cherry` shows the patch already upstream; no
+   worktree had it checked out.
+   - Remote and local: `find-identity-card-layout`,
+     `find-applicant-listed-column`, `find-card-status-fixes`,
+     `find-unresolved-wording`, `reviewer-identity-shadow-enrichment`,
+     `claude/prompt-seed-untrusted-guard` (#664),
+     `claude/consultant-feedback-scan-retry` (#665),
+     `claude/j27-applicant-reviewers-from-rows` (#666),
+     `claude/session-2026-11-25` (#680),
+     `claude/prompt-variables-live-docs` (#681), `claude/session-696-stop` (#682).
+   - Local only: `claude/session-694-stop` (#679),
+     `claude/reviewer-finding-review-prompt` (patch already on `main`).
+   - `worktree-linked-riding-sunset` no longer existed.
+   Other agents' branches and worktrees were not reviewed or touched.
 
 ### Do Not Reopen Without New Decision
 
@@ -127,7 +142,9 @@ npx jest tests/unit/prompt-templates-executor-budgets.test.js tests/unit/prompt-
 Owner: Claude. Session docs branch: `claude/session-696-stop`, based on
 `origin/main` `4eda6be04`; changes only SESSION_PROMPT.md and
 DEVELOPMENT_LOG.md. No runtime edits remain. The Claude worktree
-`WMKF_Apps-claude-2026-11-25` is removed at closeout at the owner's request.
+`WMKF_Apps-claude-2026-11-25` was removed at the owner's request; handoff
+merged as PR #682 (`60278a86b`). Branch cleanup recorded above was a
+follow-up on `claude/handoff-branch-cleanup`.
 Codex's main checkout and other worktrees were not touched.
 CLAUDE.md and memory are unchanged: existing pointers cover the feature.
 Claim-evidence report: no eligible plan or design edit, so no observation row.
