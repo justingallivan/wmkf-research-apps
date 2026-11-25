@@ -18,6 +18,7 @@ const prompt = {
   body: 'body',
   systemPrompt: 'system',
   outputSchema: '',
+  variables: '{"execution":{"mode":"shared-document-task"},"variables":[{"name":"team_roster","source":{"kind":"override"},"required":true}]}',
   model: 'claude-sonnet-5',
   maxTokens: 16384,
 };
@@ -604,6 +605,48 @@ describe('prompt publish (PublishForm, D1 fix)', () => {
     expect(putCall[0]).toBe(`/api/admin/prompts/${encodeURIComponent(prompt.name)}`);
     expect(putCall[1].headers).toEqual({ 'Content-Type': 'application/json' });
     expect(JSON.parse(putCall[1].body)).toMatchObject({ body: 'body edited', systemPrompt: prompt.systemPrompt, model: prompt.model, expectedVersion: prompt.version });
+    // Untouched variables are omitted so the server carries the stored declaration forward.
+    expect(JSON.parse(putCall[1].body)).not.toHaveProperty('variables');
+  });
+
+  test('stored variables render, a variables-only edit publishes them, and Reset restores them', async () => {
+    render(<PromptTemplatesSection />);
+    await screen.findByText('pre-site-visit.proposal-core.generate');
+    fireEvent.click(screen.getByRole('button', { name: 'Edit & publish' }));
+    const publishButton = await screen.findByRole('button', { name: 'Publish v6' });
+    const box = screen.getByDisplayValue(prompt.variables);
+    expect(publishButton).toBeDisabled();
+
+    const edited = prompt.variables.replace('"required":true', '"required":false');
+    fireEvent.change(box, { target: { value: edited } });
+    expect(publishButton).toBeEnabled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
+    expect(screen.getByDisplayValue(prompt.variables)).toBeInTheDocument();
+    expect(publishButton).toBeDisabled();
+
+    fireEvent.change(screen.getByDisplayValue(prompt.variables), { target: { value: edited } });
+    global.fetch.mockImplementation(async (url, options = {}) => {
+      if (options.method === 'PUT') return response({ status: 'completed', newPromptId: 'p-2', targetVersion: 6 });
+      throw new Error(`Unexpected fetch ${url}`);
+    });
+    fireEvent.click(publishButton);
+    expect(await screen.findByText('Published — new version is now current.')).toBeInTheDocument();
+    const putCall = global.fetch.mock.calls.find(([, o]) => o?.method === 'PUT');
+    expect(JSON.parse(putCall[1].body)).toMatchObject({ variables: edited, body: prompt.body });
+  });
+
+  test('variables that are not a JSON object with a variables array block publishing', async () => {
+    await openPublishForm();
+    const publishButton = screen.getByRole('button', { name: 'Publish v6' });
+    expect(publishButton).toBeEnabled();
+    fireEvent.change(screen.getByDisplayValue(prompt.variables), { target: { value: '{"execution":{}}' } });
+    expect(screen.getByText('Variables must be blank or a JSON object with a "variables" array.')).toBeInTheDocument();
+    expect(publishButton).toBeDisabled();
+    fireEvent.change(screen.getByDisplayValue('{"execution":{}}'), { target: { value: 'not json' } });
+    expect(publishButton).toBeDisabled();
+    fireEvent.change(screen.getByDisplayValue('not json'), { target: { value: '' } });
+    expect(publishButton).toBeEnabled();
   });
 
   test('(b) a well-formed non-2xx body (409 concurrency_conflict) is read regardless of status (unchanged, not a D1 defect)', async () => {

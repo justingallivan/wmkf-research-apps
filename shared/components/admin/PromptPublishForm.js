@@ -21,6 +21,17 @@ export function validateOutputSchemaText(value) {
   return { valid: true, issue: null };
 }
 
+// Mirrors prompts-publish-service.js validatePublishPayload: blank, or a JSON
+// object carrying a `variables` array.
+export function validateVariablesText(value) {
+  if (value === '') return { valid: true, issue: null };
+  const parsed = parseOutputSchema(value);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || !Array.isArray(parsed.variables)) {
+    return { valid: false, issue: 'Variables must be blank or a JSON object with a "variables" array.' };
+  }
+  return { valid: true, issue: null };
+}
+
 export function buildModelOptions(prompt, modelCatalog) {
   const nativeStructured = parseOutputSchema(prompt.outputSchema)?.generationMode === 'native-json-schema';
   const statuses = modelCatalog?.modelStatuses || {};
@@ -79,6 +90,7 @@ export default function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome
   const [systemPrompt, setSystemPrompt] = useState(prompt.systemPrompt || '');
   const [body, setBody] = useState(prompt.body || '');
   const [outputSchema, setOutputSchema] = useState(prompt.outputSchema || '');
+  const [variables, setVariables] = useState(prompt.variables || '');
   const [model, setModel] = useState(prompt.model || '');
   const initialMaxTokens = Number.isInteger(prompt.maxTokens) && prompt.maxTokens > 0 ? String(prompt.maxTokens) : '';
   const [maxTokensText, setMaxTokensText] = useState(initialMaxTokens);
@@ -88,6 +100,8 @@ export default function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome
   const nativeModelCompatible = !nativeStructured
     || modelOptions.some((option) => option.value === model && !option.disabled);
   const outputSchemaValidation = validateOutputSchemaText(outputSchema);
+  const variablesValidation = validateVariablesText(variables);
+  const variablesEdited = variables !== (prompt.variables || '');
 
   const modelCeiling = modelOutputCeiling(model, modelCatalog);
   const maxTokensValidation = validateMaxTokensInput(maxTokensText, modelCeiling);
@@ -96,6 +110,7 @@ export default function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome
     && body === (prompt.body || '')
     && systemPrompt === (prompt.systemPrompt || '')
     && outputSchema === (prompt.outputSchema || '')
+    && !variablesEdited
     && model === (prompt.model || ''));
   // A draft (no current version) can be published as-is: that IS the change.
   const unchanged = prompt.hasCurrent && !edited;
@@ -107,6 +122,7 @@ export default function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome
         body,
         systemPrompt,
         outputSchema,
+        variables: variablesEdited ? variables : undefined,
         model,
         maxTokens: maxTokensValidation.value,
         expectedVersion: prompt.version,
@@ -127,6 +143,8 @@ export default function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome
           body,
           systemPrompt,
           outputSchema,
+          // Omitted when untouched so the server carries the stored declaration forward.
+          ...(variablesEdited ? { variables } : {}),
           model,
           // Omitted when blank so the server keeps the stored budget.
           ...(maxTokensValidation.value != null ? { maxTokens: maxTokensValidation.value } : {}),
@@ -210,6 +228,25 @@ export default function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome
       )}
 
       <label className="block text-xs text-gray-700">
+        Variables <span className="text-gray-400">(JSON object with a &quot;variables&quot; array; blank for none)</span>
+        <textarea
+          value={variables}
+          onChange={(e) => setVariables(e.target.value)}
+          rows={8}
+          className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded text-sm font-mono text-xs"
+        />
+        <div className="mt-1 text-[10px] text-gray-400">
+          {variables.length} chars · Saved as written. Any {'{{placeholder}}'} the prompt uses but this list leaves out is added automatically as a required input.
+        </div>
+      </label>
+
+      {!variablesValidation.valid && (
+        <div className={`text-xs px-3 py-2 rounded border ${TONE.red}`}>
+          {variablesValidation.issue}
+        </div>
+      )}
+
+      <label className="block text-xs text-gray-700">
         System prompt <span className="text-gray-400">(the rules / instructions; blank for none)</span>
         <textarea
           value={systemPrompt}
@@ -255,6 +292,7 @@ export default function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome
             setBody(prompt.body || '');
             setSystemPrompt(prompt.systemPrompt || '');
             setOutputSchema(prompt.outputSchema || '');
+            setVariables(prompt.variables || '');
             setModel(prompt.model || '');
             setMaxTokensText(initialMaxTokens);
           }}
@@ -266,7 +304,7 @@ export default function PublishForm({ prompt, modelCatalog, onSuccess, onOutcome
         <button
           onClick={submit}
           disabled={submitting || !validation.valid || !outputSchemaValidation.valid
-            || !maxTokensValidation.valid || unchanged || !nativeModelCompatible}
+            || !variablesValidation.valid || !maxTokensValidation.valid || unchanged || !nativeModelCompatible}
           className="px-4 py-1.5 bg-gray-900 text-white text-sm font-medium rounded hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {submitting ? 'Publishing…' : `Publish v${(prompt.version ?? 0) + 1}`}
