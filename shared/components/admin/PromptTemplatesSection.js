@@ -45,7 +45,7 @@ const STATUS_COPY = {
   invalid_model:         { tone: 'red',   text: 'The selected model is not compatible with this prompt.' },
   invalid_max_tokens:    { tone: 'red',   text: 'Max tokens must be a positive whole number.' },
   invalid_output_schema: { tone: 'red',   text: 'The stored output schema is invalid.' },
-  invalid_variables:     { tone: 'red',   text: 'The stored prompt-variable declaration is invalid.' },
+  invalid_variables:     { tone: 'red',   text: 'The prompt variables are invalid.' },
   idempotency_key_reuse: { tone: 'red',   text: 'This edit changed after publishing began. Retry the edited payload.' },
   audit_unavailable:     { tone: 'red',   text: 'Audit table unavailable; refused to publish.' },
   failed:                { tone: 'red',   text: 'Publish failed. Check server logs.' },

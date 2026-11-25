@@ -114,6 +114,33 @@ describe('createPrompt', () => {
     expect(auditInserts()).toHaveLength(0);
   });
 
+  it('keeps supplied variable declarations as written and declares only the missing placeholders', async () => {
+    const supplied = JSON.stringify({
+      execution: { mode: 'shared-document-task' },
+      variables: [{ name: 'program', source: { kind: 'override', default: 'Research' }, required: false }],
+    });
+    await createPrompt(args({ variables: supplied }));
+    const stored = JSON.parse(aiPrompt.create.mock.calls[0][0].wmkf_ai_promptvariables);
+    expect(stored.execution).toEqual({ mode: 'shared-document-task' });
+    expect(stored.variables).toEqual([
+      { name: 'program', source: { kind: 'override', default: 'Research' }, required: false },
+      { name: 'budget_text', source: { kind: 'override' }, required: true },
+    ]);
+  });
+
+  it.each([
+    ['not a string', { variables: [] }],
+    ['no variables array', '{"execution":{}}'],
+    ['a duplicate name', JSON.stringify({ variables: [{ name: 'program' }, { name: 'program' }] })],
+  ])('rejects variables with %s before audit', async (_label, variables) => {
+    await expect(createPrompt(args({ variables }))).rejects.toMatchObject({
+      httpStatus: 400,
+      body: expect.objectContaining({ status: 'invalid_variables' }),
+    });
+    expect(auditInserts()).toHaveLength(0);
+    expect(aiPrompt.create).not.toHaveBeenCalled();
+  });
+
   it('rejects an example response pasted into the output schema before audit', async () => {
     await expect(createPrompt(args({ outputSchema: '{ "status": "pass", "fail", or "review" }' }))).rejects.toMatchObject({
       httpStatus: 400,

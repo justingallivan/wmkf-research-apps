@@ -216,7 +216,9 @@ audit 2026-09-18: 8 current prompts, e.g. `cycle-dossier.research-plan` on Opus 
   (**Manage groups**, setting `promptLibrary.groups`) are production-live
   (PR #613, merge `acab577bc`; owner smoke pending).
   Admin **Retire** (status Retired, blocked for Application caller) is production-live
-  (PR #616, merge `e77e80aba`). See
+  (PR #616, merge `e77e80aba`). Edit & publish and Add prompt show and edit the
+  Variables JSON (`wmkf_ai_promptvariables`) beside Output schema
+  [BRANCH-BUILT 2026-11-25, not deployed]. See
   `docs/plans/SHARED_PROMPT_LIBRARY_SCOPE_CHANGE_2026-11-02.md`.
 
 ## Standard Probe

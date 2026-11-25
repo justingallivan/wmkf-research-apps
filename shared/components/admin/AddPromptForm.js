@@ -10,7 +10,7 @@ import { requestEnvelope } from '../../utils/api-request';
 import { TONE, newRequestId, fmtInt } from './prompt-editor-utils';
 import { ADMIN_PROMPT_GROUPS, ADMIN_PROMPT_USAGES } from '../../config/adminPromptCatalog';
 import {
-  buildModelOptions, modelOutputCeiling, validateMaxTokensInput, validateOutputSchemaText,
+  buildModelOptions, modelOutputCeiling, validateMaxTokensInput, validateOutputSchemaText, validateVariablesText,
 } from './PromptPublishForm';
 
 // Mirrors createPrompt's name rule.
@@ -28,7 +28,7 @@ const USAGE_LABELS = {
 export default function AddPromptForm({ existingNames, modelCatalog, groups = ADMIN_PROMPT_GROUPS, onCreated, onOutcome, onCancel }) {
   const [values, setValues] = useState({
     name: '', title: '', description: '', group: '', section: '', usedBy: '', usage: 'unconnected',
-    systemPrompt: '', body: '', model: '', maxTokens: '', outputSchema: '',
+    systemPrompt: '', body: '', model: '', maxTokens: '', outputSchema: '', variables: '',
   });
   const [submitting, setSubmitting] = useState(false);
   const requestRef = useRef({ payloadKey: null, requestId: null });
@@ -42,6 +42,7 @@ export default function AddPromptForm({ existingNames, modelCatalog, groups = AD
   const { nativeStructured, options: modelOptions } = buildModelOptions({ model: null, outputSchema: values.outputSchema.trim() }, modelCatalog);
   const maxTokens = validateMaxTokensInput(values.maxTokens, modelOutputCeiling(values.model, modelCatalog));
   const outputSchema = validateOutputSchemaText(values.outputSchema.trim());
+  const variables = validateVariablesText(values.variables.trim());
   const placeholders = [...new Set([...`${values.systemPrompt}\n${values.body}`.matchAll(PLACEHOLDER_RE)].map((m) => m[1]))];
 
   const issues = [];
@@ -53,6 +54,7 @@ export default function AddPromptForm({ existingNames, modelCatalog, groups = AD
   if (values.body.trim()) issues.push(...validatePromptForSave(name, values.body).issues);
   if (!maxTokens.valid) issues.push(maxTokens.issue);
   if (!outputSchema.valid) issues.push(outputSchema.issue);
+  if (!variables.valid) issues.push(variables.issue);
   if (nativeStructured && !modelOptions.some((option) => option.value === values.model && !option.disabled)) {
     issues.push('This output schema uses native structured output: choose a compatible concrete model.');
   }
@@ -74,6 +76,7 @@ export default function AddPromptForm({ existingNames, modelCatalog, groups = AD
         systemPrompt: values.systemPrompt,
         body: values.body,
         outputSchema: values.outputSchema.trim(),
+        ...(values.variables.trim() ? { variables: values.variables.trim() } : {}),
         model: values.model,
         ...(maxTokens.value != null ? { maxTokens: maxTokens.value } : {}),
       };
@@ -184,6 +187,13 @@ export default function AddPromptForm({ existingNames, modelCatalog, groups = AD
         <textarea value={values.outputSchema} onChange={set('outputSchema')} rows={4} className={mono} />
         <span className="mt-1 block text-[10px] text-gray-400">
           Settings that tell the app how to read and store the reply. Leave blank unless a developer gives you one. This is not where an example of the answer goes.
+        </span>
+      </label>
+      <label className="block text-xs text-gray-700">
+        Variables <span className="text-gray-400">(JSON object with a &quot;variables&quot; array; usually blank)</span>
+        <textarea value={values.variables} onChange={set('variables')} rows={4} className={mono} />
+        <span className="mt-1 block text-[10px] text-gray-400">
+          Where each placeholder&apos;s value comes from, plus any defaults. Saved as written. Any placeholder above that this list leaves out is added automatically as a required input.
         </span>
       </label>
       {issues.length > 0 && (
