@@ -592,6 +592,18 @@ describe('POST recordSurfaced', () => {
     expect(options.revisions.get(candidateKey)).toBe('reviewed-revision');
   });
 
+  it('preserves an enrolled row’s identity and repair holds before the first contact receipt', async () => {
+    const candidate = { name: 'Held Pilot Reviewer' };
+    store.findCandidatesByKeys.mockResolvedValueOnce([{
+      candidateKey: reviewerCandidateKey(candidate), needsIdentification: true,
+      serverRepairReason: 'address_conflict', rosterUpdatedAt: 'held-revision',
+    }]);
+    await handler({ method: 'POST', body: { requestId: REQ, candidates: [candidate] } }, res());
+    const [, [row]] = store.recordSurfaced.mock.calls[0];
+    expect(row).toMatchObject({ needsIdentification: true, serverRepairReason: 'address_conflict' });
+    expect(row.contactOnlyVerification).toBeUndefined();
+  });
+
   it('binds contact-only evidence to the stored row, and holds a different incoming lead', async () => {
     const candidate = { name: 'Ordinary Reviewer', findProfileReview: { reason: 'search_ownership', disposition: 'staff_review' },
       contactEnrichment: { contactLeads: [{type: 'email', value: 'new@example.org', rejectedReason: 'ownership_unconfirmed'}] },
