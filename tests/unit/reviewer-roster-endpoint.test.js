@@ -773,11 +773,12 @@ describe('PATCH', () => {
     expect(r.statusCode).toBe(404);
     expect(store.saveFindContactOnly).not.toHaveBeenCalled();
   });
-  it('requires request-level edit access before reading or writing the held contact', async () => {
-    authorizeReviewerRequestMutation.mockRejectedValueOnce(new ServiceHttpError('Cannot edit request', {httpStatus: 403}));
+  it.each([403, 404, 502])('returns the public ownership-check failure %i before reading or writing the held contact', async status => {
+    authorizeReviewerRequestMutation.mockRejectedValueOnce(new ServiceHttpError('Internal detail', {httpStatus: status}));
     const r = res();
     await handler({ method: 'PATCH', body: saveLead }, r);
-    expect(r.statusCode).toBe(403);
+    expect(r.statusCode).toBe(status);
+    expect(r.body.error).not.toContain('Internal detail');
     expect(store.findCandidatesByKeys).not.toHaveBeenCalled();
     expect(store.saveFindContactOnly).not.toHaveBeenCalled();
   });
