@@ -10,12 +10,14 @@
  */
 
 import { useState } from 'react';
+import { normalizeAddress } from '../../../lib/utils/reviewer-address-trust';
 
 const SOURCE_LABELS = {
   claude_search: 'Claude web search',
   serp_search: 'Google search',
   institution_page: 'Institution page',
   orcid: 'ORCID',
+  scholarly_multi: 'Publication bylines',
   pubmed: 'PubMed',
   manual_probe: 'manual probe',
   // S387: contact carried over from a superseded duplicate roster row (see
@@ -29,6 +31,8 @@ export function leadSourceLabel(source) {
 }
 
 const REJECT_REASON_TEXT = {
+  orcid_institution_unconfirmed: 'Verify the ORCID record against the intended reviewer’s institutional profile.',
+  publication_institution_mismatch: 'The publications identify a different institution. Verify the researcher before using the address.',
   verified_domain_contradiction:
     'Found, but the email’s domain didn’t match this person’s verified institution — likely a different person. Verify before use.',
   name_mismatch:
@@ -63,15 +67,17 @@ const CONFIDENCE_RANK = { high: 0, medium: 1, low: 2, rejected: 3 };
  */
 export function visibleLeads(leads, hideValues = []) {
   const hidden = new Set((Array.isArray(hideValues) ? hideValues : []).filter(Boolean));
+  const hiddenEmails = new Set(Array.from(hidden, normalizeAddress).filter(Boolean));
   const seen = new Set();
   const out = [];
   for (const l of Array.isArray(leads) ? leads : []) {
     if (!l || !l.value) continue;
     const isPage = l.type === 'website' || l.type === 'faculty_page' || l.type === 'profile';
-    const redundantWithChip = hidden.has(l.value)
-      && (l.type === 'email' || (isPage && l.confidence !== 'rejected'));
+    const email = l.type === 'email' ? normalizeAddress(l.value) : null;
+    const redundantWithChip = email ? hiddenEmails.has(email)
+      : hidden.has(l.value) && (l.type === 'email' || (isPage && l.confidence !== 'rejected'));
     if (redundantWithChip) continue;
-    const key = `${l.type}:${l.value}`;
+    const key = `${l.type}:${email || l.value}`;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(l);
@@ -112,7 +118,7 @@ function LeadRow({ lead, onUse }) {
       {/* Slice 4: manage-only promotion. Sets the value as a MANUAL contact —
           stamped manual provenance, so the invite flow requires a quick check
           and explicit per-recipient acknowledgement before sending. */}
-      {onUse && (
+      {onUse && !['ownership_unconfirmed', 'profile_alternative', 'orcid_institution_unconfirmed', 'publication_institution_mismatch'].includes(lead.rejectedReason) && (
         <button
           type="button"
           onClick={() => onUse(lead)}

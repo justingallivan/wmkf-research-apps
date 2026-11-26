@@ -213,6 +213,20 @@ describe('removePreviousActiveSearchResults', () => {
 });
 
 describe('recordSurfaced', () => {
+  test('guards each ordinary refresh with the revision read for that candidate', async () => {
+    const revisions = new Map([['candidate:ann', 'revision-a'], ['candidate:bob', 'revision-b']]);
+    await store.recordSurfaced(REQ, [
+      { name: 'Ann Lee', candidateKey: 'candidate:ann' },
+      { name: 'Bob Roe', candidateKey: 'candidate:bob' },
+    ], { revisions });
+    for (const [index, revision] of ['revision-a', 'revision-b'].entries()) {
+      expect(sql.mock.calls[index].slice(1).filter(value => value === revision)).toHaveLength(2);
+      const [insert, update] = queryTextOf(index).split('ON CONFLICT');
+      expect(insert).toMatch(/EXISTS[\s\S]*updated_at::text[\s\S]*FOR UPDATE/);
+      expect(update).toMatch(/reviewer_find_roster.updated_at::text/);
+    }
+  });
+
   test('opt-in outcomes preserve every input index and distinguish invalid, unchanged, and failed rows', async () => {
     const priorMeasurement = process.env.REVIEWER_INSTITUTION_MEASUREMENT;
     process.env.REVIEWER_INSTITUTION_MEASUREMENT = 'off';

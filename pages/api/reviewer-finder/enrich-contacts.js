@@ -36,6 +36,8 @@ import {
 } from '../../../lib/services/reviewer-candidate-attestation';
 import { reconcileReviewerContacts } from '../../../lib/services/reviewer-contact-reconciliation';
 
+const { staffContactRequestEnabled } = require('../../../lib/services/contact-enrichment/staff-contact-pilot');
+
 const limiter = nextRateLimiter({ max: 10 });
 
 const { ContactEnrichmentService } = require('../../../lib/services/contact-enrichment-service');
@@ -110,6 +112,7 @@ export default async function handler(req, res) {
     // Enrich candidates with progress updates
     // All credentials sourced server-side (no browser pass-through)
     const results = await ContactEnrichmentService.enrichCandidates(candidates, {
+      staffConfirmedFind: staffContactRequestEnabled(requestId),
       credentials: {
         claudeApiKey: process.env.CLAUDE_API_KEY,
         orcidClientId: process.env.ORCID_CLIENT_ID,

@@ -541,7 +541,7 @@ test('prior request presentation time is shared across the candidate batch', asy
   jest.useRealTimers();
 });
 
-test('trusted ORCID mismatch records durable conflict state without changing either address', async () => {
+test.each([false, true])('trusted ORCID mismatch records a durable conflict (pilot held: %s)', async (held) => {
   const updateReviewer = jest.fn(async () => ({}));
   const rows = [candidate('Trusted Researcher', {
     identity: {
@@ -554,6 +554,13 @@ test('trusted ORCID mismatch records durable conflict state without changing eit
     emailPersistAllowed: true,
   })];
 
+  if (held) {
+    rows[0].isClaudeSuggestion = true;
+    rows[0].contactEnrichment.emailSource = 'serp_search';
+    rows[0].contactEnrichment.tierResults = {};
+    require('../../lib/services/contact-enrichment/staff-contact-pilot').holdFindContact(rows[0], rows[0]);
+    expect(rows[0].contactEnrichment.emailPersistAllowed).toBe(false);
+  }
   await reconcileReviewerContacts(rows, {
     requestId: '11111111-1111-1111-1111-111111111111',
     actingUserSystemId: 'system-user-1',
@@ -593,7 +600,7 @@ test('trusted ORCID mismatch records durable conflict state without changing eit
   expect(rows[0]).toMatchObject({
     addressConflictPending: true,
     contactEnrichment: {
-      email: 'found@example.edu',
+      email: held ? null : 'found@example.edu',
       addressConflictPending: true,
       dataverseContactEvidence: { status: 'review_required', reason: 'email_mismatch' },
     },

@@ -793,6 +793,7 @@ export default function ReviewerFindPanel({
           The manual-add card is passed as manualAddSlot so it renders BELOW the
           search and ABOVE the optional verify card. */}
       <ReviewerSearchSection
+        canSaveFindContact={canManage}
         requestId={requestId}
         blobUrl={doc.data?.blobUrl || null}
         proposalKey={doc.data?.picked || null}

@@ -375,6 +375,8 @@ export default function useReviewerSearchController({
     retryAddressCheck,
     requestAddressRepair,
     useLead,
+    saveFindContact,
+    reviewFindContact,
     openIdentityConfirmation,
     confirmIdentityContact,
   } = useReviewerContactActions({
@@ -509,6 +511,8 @@ export default function useReviewerSearchController({
     reviewAddressConflict,
     retryAddressCheck,
     useLead,
+    saveFindContact,
+    reviewFindContact,
     setEditingContact,
     persistManualContact,
     verifyAddressContact,

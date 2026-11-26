@@ -645,6 +645,9 @@ export function getCandidateEmailReadiness(candidate) {
       reason: 'Stored and newly found addresses conflict and require resolution',
     };
   }
+  if (candidate?.contactOnlyVerification?.email === email) {
+    return { level: 'high', action: 'ready', reason: 'Staff verified ownership of this email on an institutional page' };
+  }
   const receipt = candidate?.addressTrustReceipt;
   const addressChoiceEmail = typeof candidate?.addressChoice?.selectedEmail === 'string'
     ? candidate.addressChoice.selectedEmail.trim().toLowerCase()
@@ -747,7 +750,7 @@ export function mergeEnrichment(candidates, enrichmentResults) {
       // (Codex P2#1.)
       hasInstitutionCOI: e.coiRecomputed ? !!e.hasInstitutionCOI : c.hasInstitutionCOI,
       institutionCOIDetails: sanitizeInstitutionCOIDetails(e.coiRecomputed ? e.institutionCOIDetails : c.institutionCOIDetails),
-      email: e.email || c.email,
+      email: e.tierResults?.find_mailbox ? e.email : (e.email || c.email),
       // Defensive: a document-file URL (e.g. a paper PDF) must never ride through
       // the merge as a website. Sanitized at ingestion already; re-guarded here.
       website: ContactParser.sanitizeWebsiteForCandidate(e.website || c.website, c.name),

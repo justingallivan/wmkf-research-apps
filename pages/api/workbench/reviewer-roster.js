@@ -7,9 +7,9 @@
  * `reviewer-finder` grants both reach it.
  */
 
+import { ServiceHttpError } from '../../../lib/services/service-http-error';
 import { requireAppAccess } from '../../../lib/utils/auth';
 import {
-  ReviewerRosterError,
   getReviewerRoster,
   recordReviewerRosterCandidates,
   mutateReviewerRoster,
@@ -76,8 +76,8 @@ export default async function handler(req, res) {
 
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (error) {
-    if (error instanceof ReviewerRosterError) {
-      return res.status(error.httpStatus).json(error.body);
+    if (error instanceof ServiceHttpError) {
+      return res.status(error.httpStatus).json(error.body ?? { error: error.message });
     }
     console.error('reviewer-roster error:', error.message);
     return res.status(500).json({ error: 'Reviewer roster operation failed' });

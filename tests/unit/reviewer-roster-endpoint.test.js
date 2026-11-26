@@ -5,6 +5,11 @@
  * dispatch, and payload contracts. The store is mocked; `pruneCandidateForRoster`
  * runs for real (pure) so we also confirm the route prunes server-side.
  */
+jest.mock('../../lib/services/reviewer-request-authorization', () => ({
+  authorizeReviewerRequestMutation: jest.fn(async () => ({})),
+}));
+import { authorizeReviewerRequestMutation } from '../../lib/services/reviewer-request-authorization';
+import { ServiceHttpError } from '../../lib/services/service-http-error';
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn(async () => ({ profileId: 5 })) }));
 jest.mock('../../lib/services/reviewer-candidate-attestation', () => {
   const actual = jest.requireActual('../../lib/services/reviewer-candidate-attestation');
@@ -54,6 +59,7 @@ jest.mock('../../lib/services/reviewer-roster-store', () => ({
     candidateKey,
     ...updates,
   })),
+  saveFindContactOnly: jest.fn(async () => 'new-revision'),
   markSaved: jest.fn(async () => 1),
   findCandidateBySuggestion: jest.fn(async () => null),
   // S387: the roster route resolves an applicant row by its Dataverse ANCHOR, so an
@@ -564,6 +570,46 @@ describe('POST recordSurfaced', () => {
     });
   });
 
+  it.each([null, 'competing@example.edu'])('retains contact-only authority and relationship holds on refresh with %s', async (email) => {
+    const incoming = { name: 'Ordinary Find Reviewer', email };
+    const candidateKey = reviewerCandidateKey(incoming);
+    const verified = 'staff-confirmed@example.edu';
+    store.findCandidatesByKeys.mockResolvedValueOnce([{
+      candidateKey, email: verified, emailSource: 'manual', emailPersistAllowed: true,
+      addressTrustReceipt: { personConfirmed: true, email: verified },
+      manualContactFields: ['email'], hasCoauthorCOI: true, coauthorCOIStrength: 'likely',
+      coauthorships: [{ title: 'Existing work' }], hasInstitutionCOI: true,
+      rosterUpdatedAt: 'reviewed-revision',
+    }]);
+    await handler({ method: 'POST', body: { requestId: REQ, candidates: [incoming] } }, res());
+    const [, [row], options] = store.recordSurfaced.mock.calls[0];
+    expect(row).toMatchObject({
+      email: verified, hasCoauthorCOI: true, hasInstitutionCOI: true,
+      coauthorships: [{ title: 'Existing work' }], addressVerificationRequired: Boolean(email),
+      contactEnrichment: { email: verified, addressVerificationRequired: Boolean(email) },
+    });
+    expect(row.pdIdentityConfirmed).toBeFalsy();
+    expect(options.revisions.get(candidateKey)).toBe('reviewed-revision');
+  });
+
+  it('binds contact-only evidence to the stored row, and holds a different incoming lead', async () => {
+    const candidate = { name: 'Ordinary Reviewer', findProfileReview: { reason: 'search_ownership', disposition: 'staff_review' },
+      contactEnrichment: { contactLeads: [{type: 'email', value: 'new@example.org', rejectedReason: 'ownership_unconfirmed'}] },
+      contactOnlyVerification: { email: 'new@example.org', evidenceUrl: 'https://unverified.example.org' },
+    };
+    const evidence = { email: 'saved@example.org', actorProfileId: '5', evidenceUrl: 'https://example.org/staff' };
+    store.findCandidatesByKeys.mockResolvedValueOnce([{
+      candidateKey: reviewerCandidateKey(candidate), email: evidence.email, contactOnlyVerification: evidence,
+      needsIdentification: true, addressConflictPending: true, hasCoauthorCOI: true, rosterUpdatedAt: 'rev',
+    }]);
+    await handler({ method: 'POST', body: {requestId: REQ, candidates: [candidate]} }, res());
+    const [, [saved]] = store.recordSurfaced.mock.calls[0];
+    expect(saved).toMatchObject({email: evidence.email, contactOnlyVerification: evidence,
+      needsIdentification: true, addressConflictPending: true, hasCoauthorCOI: true, addressVerificationRequired: true});
+    expect(saved.addressTrustReceipt).toBeUndefined();
+    await handler({ method: 'POST', body: {requestId: REQ, candidates: [candidate]} }, res());
+    expect(store.recordSurfaced.mock.calls[1][1][0].contactOnlyVerification).toBeUndefined();
+  });
   it('preserves stored address blocks without carrying email persistence authority to a resurfaced card', async () => {
     const resurfaced = {
       name: 'Blocked Reviewer',
@@ -705,7 +751,73 @@ describe('POST recordSurfaced', () => {
   });
 });
 
+const previousEnrollment = process.env.J27_STAFF_CONTACT_REQUEST_IDS;
+  beforeEach(() => { process.env.J27_STAFF_CONTACT_REQUEST_IDS = REQ; });
+  afterEach(() => {
+    if (previousEnrollment === undefined) delete process.env.J27_STAFF_CONTACT_REQUEST_IDS;
+    else process.env.J27_STAFF_CONTACT_REQUEST_IDS = previousEnrollment;
+  });
 describe('PATCH', () => {
+  const held = {
+    name: 'Held Reviewer', rosterUpdatedAt: 'old', rosterStatus: 'active',
+    findProfileReview: { reason: 'search_ownership', disposition: 'staff_review' },
+    contactEnrichment: { contactLeads: [{ type: 'email', value: 'lead@example.org', rejectedReason: 'ownership_unconfirmed' }] },
+  };
+  const saveLead = { requestId: REQ, action: 'save_find_contact_only', candidateKey: 'candidate:held',
+    updates: { revision: 'old', email: 'lead@example.org', evidenceUrl: 'https://example.org/staff' } };
+
+  it('refuses contact-only saves outside enrollment before any row write', async () => {
+    delete process.env.J27_STAFF_CONTACT_REQUEST_IDS;
+    const r = res();
+    await handler({ method: 'PATCH', body: saveLead }, r);
+    expect(r.statusCode).toBe(404);
+    expect(store.saveFindContactOnly).not.toHaveBeenCalled();
+  });
+  it('requires request-level edit access before reading or writing the held contact', async () => {
+    authorizeReviewerRequestMutation.mockRejectedValueOnce(new ServiceHttpError('Cannot edit request', {httpStatus: 403}));
+    const r = res();
+    await handler({ method: 'PATCH', body: saveLead }, r);
+    expect(r.statusCode).toBe(403);
+    expect(store.findCandidatesByKeys).not.toHaveBeenCalled();
+    expect(store.saveFindContactOnly).not.toHaveBeenCalled();
+  });
+  it('records ownership evidence even when separate identity, relationship and CRM holds are present', async () => {
+    store.findCandidatesByKeys.mockResolvedValueOnce([{ ...held, needsIdentification: true,
+      addressConflictPending: true, hasInstitutionCOI: true, hasCoauthorCOI: true }]);
+    const r = res();
+    await handler({ method: 'PATCH', body: saveLead }, r);
+    expect(r.statusCode).toBe(200);
+    expect(store.saveFindContactOnly).toHaveBeenCalledWith(REQ, saveLead.candidateKey, 'old', expect.objectContaining({
+      email: 'lead@example.org', evidenceType: 'institution_page', evidenceUrl: 'https://example.org/staff',
+      actorProfileId: '5', requestId: REQ, candidateKey: saveLead.candidateKey,
+    }));
+    expect(r.body.contactOnlyVerification).not.toHaveProperty('personConfirmed');
+    expect(store.confirmIdentity).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { rosterUpdatedAt: 'new' }, { email: 'existing@example.org' }, { isApplicantRecommended: true },
+    { rosterStatus: 'excluded' }, { eligibilityStatus: 'deceased' }, { addressChoice: {decision: 'keep_stored'} },
+    { findProfileReview: { reason: 'search_ownership', disposition: 'contested_hold' } },
+  ])('rejects stale or protected contact lead %j', async flags => {
+    store.findCandidatesByKeys.mockResolvedValueOnce([{ ...held, ...flags }]);
+    const r = res();
+    await handler({ method: 'PATCH', body: saveLead }, r);
+    expect(r.statusCode).toBe(409);
+    expect(store.saveFindContactOnly).not.toHaveBeenCalled();
+  });
+  it('requires the institutional evidence URL and a matching revision at write time', async () => {
+    store.findCandidatesByKeys.mockResolvedValue([held]);
+    const invalid = res();
+    await handler({ method: 'PATCH', body: { ...saveLead, updates: { ...saveLead.updates, evidenceUrl: '' } } }, invalid);
+    expect(invalid.statusCode).toBe(400);
+    expect(store.saveFindContactOnly).not.toHaveBeenCalled();
+    store.saveFindContactOnly.mockResolvedValueOnce(null);
+    const stale = res();
+    await handler({ method: 'PATCH', body: saveLead }, stale);
+    expect(stale.statusCode).toBe(409);
+    store.findCandidatesByKeys.mockResolvedValue([]);
+  });
   it('exclude → setExcluded with the pruned candidate', async () => {
     const r = res();
     await handler({ method: 'PATCH', body: { requestId: REQ, action: 'exclude', candidate: { name: 'Bob Roe' } } }, r);

@@ -308,6 +308,13 @@ excluded no-ops become `blocked`; the roster does not govern the Dataverse
 engagement from Dataverse as a read-only overlay and does not rewrite either
 store.
 
+The prepared J27 staff pilot uses the existing candidate JSON and row revision. For an enrolled
+request, the contact-only PATCH checks the actor, the held lead and the exact row version.
+It writes the address and institutional source to the request-local row and carries
+the server-recorded receipt through Find refreshes. An email saved this way has
+`emailPersistAllowed: false`. The independent CRM and invitation gates still apply.
+See the [pilot rollout](../plans/J27_STAFF_CONTACT_ROLLOUT.md).
+
 ## Migration disposition / gotchas
 
 - Active/saved growth is bounded by a per-request row cap (v1). Durable excluded/ineligible/COI-ledger rows are not cap-evicted and therefore remain unbounded until the tracked TTL cleanup for closed requests is implemented (mirror `DatabaseService.cleanupExpiredCache`).
