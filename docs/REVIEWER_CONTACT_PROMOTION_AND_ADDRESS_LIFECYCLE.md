@@ -6,7 +6,7 @@ status: active
 summary: "Current reviewer contact-promotion contract plus remaining address-provenance and staleness decisions."
 canonical: false
 cataloged: 2026-07-30
-last_verified: 2026-08-10
+last_verified: 2026-11-26
 owner: product-engineering
 related:
   - docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md
@@ -53,12 +53,14 @@ ingestion also recognized Rotem Sorek and four other applicant referrals as
 existing linked reviewers with known email data. This verification did not send
 an invitation or exercise identity confirmation, decline, or acceptance.
 
-Sections 1, 2, 3 provenance, and 5 remain proposals unless explicitly marked
-resolved. The S388 source trace is retained as historical rationale and is not
-the current runtime contract. The current replacement design for the §1/§2
-staff-address problem and §5.3 contradiction affordance is
-`docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md` [DRAFT]; the older
-options below remain historical reasoning, not the recommended build order.
+Section 1 is resolved: staff exact-address verification now makes a reviewer
+sendable (§1 "Today"). Sections 2, 3 provenance, and 5 remain proposals unless
+explicitly marked resolved. The S388 source trace is retained as historical
+rationale and is not the current runtime contract. The staff-address and
+contradiction design that replaced the older options is
+`docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md`, which is
+production-live; read it for how much of §2 and §5.3 it covers. The older options
+below remain historical reasoning, not the recommended build order.
 
 Origin: S388, a UI-cleanup session on `codex/claude-ui-cleanup` that began with a
 Find-tab presentation complaint and traced the send gate through to contact
@@ -81,7 +83,7 @@ gated at send, then written into Dataverse as a canonical contact. Trust is
 tracked carefully at the start of that path and discarded at the end. One story,
 five points:
 
-1. A human attestation cannot reduce send friction (§1)
+1. A human attestation could not reduce send friction (§1; resolved by exact-address verification)
 2. …and permanently forecloses machine improvement of that address (§2)
 3. …then the contact write drops all provenance anyway (§3)
 4. …and promotion formerly occurred on send; it now occurs on acceptance (§4)
@@ -140,9 +142,49 @@ instead of inferring one from identity confirmation or string equality.
 
 ---
 
-## §1 — A staff identity attestation cannot reduce send friction
+## §1 — A staff identity attestation cannot reduce send friction [RESOLVED by exact-address verification]
 
-### Today [VERIFIED]
+### Today [VERIFIED 2026-11-26 via source]
+
+The problem below is resolved by the production-live address-trust work in
+`docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md` (decisions P1–P4).
+Staff can now attest the exact address, and that attestation does make the
+reviewer sendable without the per-recipient checkbox.
+
+- **Confirm flow.** "✓ This is the right person → edit & add" opens
+  `CandidateEditModal` in `confirmMode` with `requireAddressVerification`
+  (`shared/components/reviewers/search/SearchContactModals.js`). Staff must
+  tick both "This is the person I intend to add" and "<address> belongs to this
+  person — I checked the evidence below". They also pick the evidence type. A
+  corresponding-author publication or an institution page needs a link; "other
+  evidence" needs a note (`CandidateEditModal.js`, `handleSubmit`).
+- **Two server writes.** `confirmIdentityContact`
+  (`shared/components/reviewers/search/useReviewerContactActions.js`) first sends
+  roster `confirm_identity`. That still stamps `emailSource: 'manual'` on the
+  roster row (`lib/services/workbench/reviewer-roster-service.js`). It then calls
+  `verifyAddressContact` → `POST /api/workbench/reviewer-address-trust`
+  `verify_person_and_address` → `verifyPersonAndAddress`
+  (`lib/services/reviewer-address-trust-service.js`). That records
+  `emailSource: 'staff_verified'` with a versioned trust bundle for the exact
+  address.
+- **Send tier** (`emailConfidence`, `lib/utils/reviewer-invite.js`):
+  - **`ready`:** `staff_verified` with a valid bundle for the exact current
+    email.
+  - **`quick_check`:** legacy source-only `staff_verified` and `manual`.
+  - **`blocked`:** a pending address conflict (`address_conflict_pending`),
+    whatever the source.
+- **Other Find-card edits.** Editing a non-ready Find card asks for the same
+  exact-address verification (`requireAddressVerification` when readiness is
+  not `ready`).
+- **Manual add** (`lib/services/workbench/manual-reviewer-service.js`) still
+  stamps `manual`, which stays `quick_check`.
+
+### Historical S388 problem statement [HISTORICAL]
+
+Everything from here through "Superseded decision frame" records the S388
+runtime and reasoning. It is not the current contract.
+
+#### Then (S388)
 
 An identity-unresolved candidate is not selectable in the Find tab. The escape
 hatch is "✓ This is the right person → edit & add"
@@ -165,7 +207,7 @@ The displayed reason is "Manually entered — not verified against the reviewer'
 identity" (`reviewer-invite.js:192`). In this flow **both clauses are false**:
 the staffer did not type the address, and identity was just confirmed.
 
-### Why it was built this way
+#### Why it was built this way
 
 S387 made staff attestation `quick_check` and never `ready`, after an
 adversarial review that argued both sides. The rationale
@@ -175,7 +217,7 @@ that promoting it "would silently remove that recipient's send-time
 acknowledgement — and, because the person row is shared across requests, would
 remove it everywhere."
 
-### The cost that decision did not weigh
+#### The cost that decision did not weigh
 
 Owner report (S388): adding reviewers is among the largest staff complaints, and
 staff often abandon the flow and add reviewers manually. The manual path stamps
@@ -189,7 +231,7 @@ than "no evidence"; publication, COI, and enrichment context are what is lost.
 If friction systematically routes staff to a lesser path without changing the
 send outcome, it is producing worse decisions, not safer ones.
 
-### Assessment (Codex, S388)
+#### Assessment (Codex, S388)
 
 The S387 rationale targets **silent automated overwrite** of a human assertion.
 It does not transfer cleanly to an **explicit same-request human attestation**.
@@ -203,7 +245,7 @@ confidence and enforces per-recipient IDs at send
 `lib/services/review-manager/send-emails-service.js:447`) — but in this flow it
 surfaces no evidence the confirm modal did not already capture.
 
-### Options
+#### Options
 
 1. **Provenance-preserving only** — stop stamping `manual` when the address was
    not changed (§2.2). No friction change today; removes the permanent pin.
@@ -220,7 +262,7 @@ surfaces no evidence the confirm modal did not already capture.
    scope the waiver to that suggestion; expire it (~30 days); otherwise fall
    back to the checkbox.
 
-### §1.1 Failure modes any option must survive
+#### §1.1 Failure modes any option must survive
 
 - Wrong-person confirmation.
 - Correct person, wrong address — **the current checkbox says "correct person"
@@ -233,7 +275,7 @@ surfaces no evidence the confirm modal did not already capture.
 - Cross-request authorization: a person-scoped waiver silently applies for
   staffers who never saw the evidence.
 
-### Superseded decision frame [HISTORICAL]
+#### Superseded decision frame
 
 The 1 / 2 / 3R choice above is no longer the recommended implementation frame.
 The owner subsequently chose person-scoped trust, no calendar expiry,
@@ -263,11 +305,15 @@ Person rows are shared across requests rather than created per request:
 `potential-reviewer.upsertByEmail` reuses an existing row when the email matches
 (`lib/dataverse/adapters/potential-reviewer.js:295-303`).
 
-Because `confirmMode` stamps `manual` even on an unchanged address (§1),
-confirming a machine-found address pins it at `quick_check` **permanently and
-globally**. Concretely: an address found in PubMed and matched in Dataverse by
-exact email, then confirmed by a staffer, can never later be promoted to `ready`
-by an ORCID record or institutional page carrying the same address.
+In the S388 runtime, `confirmMode` stamped `manual` even on an unchanged address,
+which pinned a confirmed machine-found address at `quick_check` **permanently and
+globally**. The confirm flow no longer ends there. It finishes with an
+exact-address `staff_verified` bundle, which is `ready` (§1 "Today"). The upgrade
+lock (`emailSourceUpgradeAllowed`, `reviewer-invite.js:151-154`) still applies to
+every human-asserted source. So a `manual` address from another path, such as
+manual add, or a legacy source-only `staff_verified` row stays at `quick_check`
+until a staffer verifies the exact address. An ORCID record or institution page
+carrying the same address does not promote it.
 
 Nuance [VERIFIED]: terminal against *upgrades*, not immutable — `manual` and
 `search_contested` overwrite unconditionally as explicit safety assertions

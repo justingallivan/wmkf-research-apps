@@ -143,8 +143,12 @@ live**. Current production `ReviewerFindPanel`/`ReviewerSearchSection`
 behavior is the pre-rollout baseline: a warm roster read renders
 checkboxes on selectable rows, identity-gated rows are read-only with a
 confirm-identity affordance, and there is no reconcile button or per-card
-evidence-refresh control. The former automatic `useEffect` enrichment flow
-remains historical and must not be restored as a warm repair mechanism.
+evidence-refresh control. The automatic applicant-enrichment `useEffect` is
+part of that baseline and is live. It runs `enrichRecommended()` on load when
+the roster is loaded, the applicant cache is invalid, and at least one applicant
+recommendation is actionable [VERIFIED 2026-11-26 via
+`shared/components/reviewers/search/useApplicantReviewerEnrichment.js:107-117`].
+Do not extend it into a warm repair mechanism.
 
 **Historical Production defect — owner-accepted 2026-08-01; engagement
 projection subsequently deployed.**
