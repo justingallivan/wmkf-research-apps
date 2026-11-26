@@ -5,6 +5,9 @@
  * dispatch, and payload contracts. The store is mocked; `pruneCandidateForRoster`
  * runs for real (pure) so we also confirm the route prunes server-side.
  */
+jest.mock('../../lib/services/contact-enrichment/staff-contact-scope', () => ({
+  staffContactRequestEnabled: jest.fn(async () => true),
+}));
 jest.mock('../../lib/services/reviewer-request-authorization', () => ({
   authorizeReviewerRequestMutation: jest.fn(async () => ({})),
 }));
@@ -592,7 +595,7 @@ describe('POST recordSurfaced', () => {
     expect(options.revisions.get(candidateKey)).toBe('reviewed-revision');
   });
 
-  it('preserves an enrolled row’s identity and repair holds before the first contact receipt', async () => {
+  it('preserves a J27 Research row’s identity and repair holds before the first contact receipt', async () => {
     const candidate = { name: 'Held Pilot Reviewer' };
     store.findCandidatesByKeys.mockResolvedValueOnce([{
       candidateKey: reviewerCandidateKey(candidate), needsIdentification: true,
@@ -763,12 +766,6 @@ describe('POST recordSurfaced', () => {
   });
 });
 
-const previousEnrollment = process.env.J27_STAFF_CONTACT_REQUEST_IDS;
-  beforeEach(() => { process.env.J27_STAFF_CONTACT_REQUEST_IDS = REQ; });
-  afterEach(() => {
-    if (previousEnrollment === undefined) delete process.env.J27_STAFF_CONTACT_REQUEST_IDS;
-    else process.env.J27_STAFF_CONTACT_REQUEST_IDS = previousEnrollment;
-  });
 describe('PATCH', () => {
   const held = {
     name: 'Held Reviewer', rosterUpdatedAt: 'old', rosterStatus: 'active',
@@ -778,8 +775,8 @@ describe('PATCH', () => {
   const saveLead = { requestId: REQ, action: 'save_find_contact_only', candidateKey: 'candidate:held',
     updates: { revision: 'old', email: 'lead@example.org', evidenceUrl: 'https://example.org/staff' } };
 
-  it('refuses contact-only saves outside enrollment before any row write', async () => {
-    delete process.env.J27_STAFF_CONTACT_REQUEST_IDS;
+  it('refuses contact-only saves outside J27 Research before any row write', async () => {
+    require('../../lib/services/contact-enrichment/staff-contact-scope').staffContactRequestEnabled.mockResolvedValueOnce(false);
     const r = res();
     await handler({ method: 'PATCH', body: saveLead }, r);
     expect(r.statusCode).toBe(404);
