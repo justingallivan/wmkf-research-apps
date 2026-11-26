@@ -308,7 +308,7 @@ excluded no-ops become `blocked`; the roster does not govern the Dataverse
 engagement from Dataverse as a read-only overlay and does not rewrite either
 store.
 
-The prepared J27 staff pilot uses the existing candidate JSON and row revision. For an enrolled
+The J27 Research staff workflow uses the existing candidate JSON and row revision. For a qualifying
 request, the contact-only PATCH checks the actor, the held lead and the exact row version.
 It writes the address and institutional source to the request-local row and carries
 the server-recorded receipt through Find refreshes. An email saved this way has

@@ -18,6 +18,9 @@ const mockResolvePI = jest.fn();
 const mockFetchCoPIs = jest.fn();
 const mockListRepairRequests = jest.fn();
 
+jest.mock('../../lib/services/contact-enrichment/staff-contact-scope', () => ({
+  staffContactRequestEnabled: jest.fn(async () => false),
+}));
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: (...args) => mockRequireAppAccess(...args) }));
 jest.mock('../../lib/dataverse/core/context', () => ({ withDalContext: (...args) => mockWithDalContext(...args) }));
 jest.mock('../../lib/services/reviewer-institution-measurement', () => ({

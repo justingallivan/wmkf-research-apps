@@ -1,8 +1,10 @@
 # First 20 J27 proposals · staff-confirmed contact pilot
 
+This is the optional comparison protocol. For ordinary use, follow the [J27 Research staff workflow](J27_STAFF_CONTACT_ROLLOUT.md). PDs can run Find independently.
+
 The comparison starts with the first 20 distinct genuine Research submissions to GOApply opportunity 001024, by original submission time. The study unit is an initial Claude Find suggestion on a proposal. The decision under test is whether staff can save a verified contact for that exact person while retaining independent invitation holds. Existing primaries count in both workflows. Only an explicit staff decision can receive new clearance credit. There is no automated clearance, invite, CRM write or model call in the study runner.
 
-For production admission, named staff roles and rollback, use the [release checklist](J27_STAFF_CONTACT_ROLLOUT.md).
+
 
 ## Before the first Find
 

@@ -5,6 +5,9 @@
  * partial-return behavior. The service owns the abort mechanics; this route
  * must opt in and stream partial results as a compatible complete frame.
  */
+jest.mock('../../lib/services/contact-enrichment/staff-contact-scope', () => ({
+  staffContactRequestEnabled: jest.fn(async () => false),
+}));
 jest.mock('../../lib/utils/auth', () => ({
   requireAppAccess: jest.fn(async () => ({ profileId: 'profile-1' })),
 }));
@@ -51,6 +54,7 @@ jest.mock('../../lib/services/reviewer-contact-reconciliation', () => ({
   reconcileReviewerContacts: jest.fn(async (candidates) => candidates),
 }));
 
+import { staffContactRequestEnabled } from '../../lib/services/contact-enrichment/staff-contact-scope';
 import handler from '../../pages/api/reviewer-finder/enrich-contacts';
 import { ContactEnrichmentService } from '../../lib/services/contact-enrichment-service';
 import { mintAutomatedIdentityAttestation } from '../../lib/services/reviewer-candidate-attestation';
@@ -122,6 +126,19 @@ test('opts into partial abort results and streams partial complete metadata', as
   expect(reconcileReviewerContacts).toHaveBeenCalledWith(
     expect.any(Array),
     expect.objectContaining({ skip: true, requestId: null }),
+  );
+});
+
+test.each([true, false])('uses server-determined contact scope (%s) regardless of client options', async enabled => {
+  staffContactRequestEnabled.mockResolvedValueOnce(enabled);
+  ContactEnrichmentService.enrichCandidates.mockResolvedValueOnce({ enriched: [], stats: {} });
+  const requestId = '11111111-1111-1111-1111-111111111111';
+  await handler({ method: 'POST', body: {
+    requestId, candidates: [{ name: 'Dr. A' }], options: { staffConfirmedFind: !enabled },
+  } }, mockRes());
+  expect(staffContactRequestEnabled).toHaveBeenCalledWith(requestId);
+  expect(ContactEnrichmentService.enrichCandidates).toHaveBeenCalledWith(
+    expect.any(Array), expect.objectContaining({ staffConfirmedFind: enabled }),
   );
 });
 
