@@ -130,6 +130,39 @@ export default function useReviewerContactActions({
     setRosterNote(`${data.candidate.name || cand.name}: contact details saved to this request.`);
   }, [requestId, genRef, setManualContact, applyAuthoritativeRosterCandidate, setRosterNote]);
 
+  const reviewFindContact = useCallback(async (cand) => {
+    if (cand.rosterUpdatedAt) return cand;
+    const generation = genRef.current;
+    const { ok, data } = await requestEnvelope(
+      `/api/workbench/reviewer-roster?requestId=${encodeURIComponent(requestId)}`,
+      { method: 'GET', tolerantBody: true },
+    );
+    if (generation !== genRef.current) return null;
+    const row = ok && data.active?.find(item => candKey(item) === candKey(cand));
+    if (!row?.rosterUpdatedAt) throw new Error('Reload Find to review the saved lead.');
+    applyAuthoritativeRosterCandidate(candKey(cand), row);
+    return row;
+  }, [requestId, genRef, applyAuthoritativeRosterCandidate]);
+
+  const saveFindContact = useCallback(async (cand, email, evidenceUrl) => {
+    const generation = genRef.current;
+    const key = candKey(cand);
+    const { ok, data } = await requestEnvelope('/api/workbench/reviewer-roster', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, tolerantBody: true,
+      body: JSON.stringify({ requestId, candidateKey: key, action: 'save_find_contact_only',
+        updates: { email, evidenceUrl, revision: cand.rosterUpdatedAt } }),
+    });
+    if (generation !== genRef.current) return;
+    if (!ok || !data.contactOnlyVerification) throw new Error(data.error || 'Could not save the contact.');
+    const fields = { email: data.contactOnlyVerification.email, emailSource: 'manual', emailPersistAllowed: false };
+    const update = row => candKey(row) !== key ? row : {
+      ...row, ...fields, contactEnrichment: { ...row.contactEnrichment, ...fields },
+      contactOnlyVerification: data.contactOnlyVerification, rosterUpdatedAt: data.revision,
+    };
+    setCandidates(rows => rows.map(update));
+    setRosterActive(rows => rows.map(update));
+  }, [requestId, genRef, setCandidates, setRosterActive]);
+
   const verifyAddressContact = useCallback(async (cand, updates, evidence) => {
     if (!cand || !requestId) throw new Error('Reload this request before verifying an address.');
     const key = candKey(cand);
@@ -371,6 +404,8 @@ export default function useReviewerContactActions({
     setManualContact,
     persistManualContact,
     verifyAddressContact,
+    saveFindContact,
+    reviewFindContact,
     reviewAddressConflict,
     retryAddressCheck,
     requestAddressRepair,

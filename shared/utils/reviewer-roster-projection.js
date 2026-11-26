@@ -327,6 +327,14 @@ export function pruneCandidateForRoster(c) {
   if (!c || typeof c !== 'object') return c;
   const e = c.contactEnrichment || {};
   const provenance = buildReviewerProvenance(c);
+  const mailbox = e.tierResults?.find_mailbox || c.findProfileReview;
+  const searchReview = mailbox?.reason === 'search_ownership' &&
+    ['staff_review', 'contested_hold', 'identity_conflict'].includes(mailbox.disposition)
+    ? { reason: mailbox.reason, disposition: mailbox.disposition,
+        pages: (Array.isArray(mailbox.pages) ? mailbox.pages : []).filter(u => typeof u === 'string' &&
+          u.length <= 500 && /^https:\/\//i.test(u)).slice(0, 6),
+        ...(mailbox.profile?.email ? {profile:{email:String(mailbox.profile.email).slice(0,320)}} : {}) }
+    : null;
   const persistFlag = (name) => {
     if (c[name] === false || e[name] === false) return false;
     if (c[name] === true || e[name] === true) return true;
@@ -350,6 +358,7 @@ export function pruneCandidateForRoster(c) {
   const identityPersistAllowed = !identity || mayPersistIdentity(identity.status);
   const scholarPersistAllowed = identityPersistAllowed && !scholarSkipped;
   return {
+    ...(searchReview ? {findProfileReview:searchReview} : {}),
     // Render-safe persist flags consumed by save-candidates for roster-reloaded rows.
     identityPersistAllowed,
     scholarPersistAllowed,

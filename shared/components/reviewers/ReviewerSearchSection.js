@@ -78,6 +78,7 @@ export default function ReviewerSearchSection({
   onNavigate,
   manualAddSlot = null,
   canManage = true,
+  canSaveFindContact = canManage,
   repairCandidateKey = null,
 }) {
   const {
@@ -151,6 +152,8 @@ export default function ReviewerSearchSection({
     reviewAddressConflict,
     retryAddressCheck,
     useLead,
+    saveFindContact,
+    reviewFindContact,
     setEditingContact,
     persistManualContact,
     verifyAddressContact,
@@ -274,6 +277,8 @@ export default function ReviewerSearchSection({
           reviewAddressConflict={reviewAddressConflict}
           retryAddressCheck={retryAddressCheck}
           useLead={useLead}
+          saveFindContact={canSaveFindContact ? saveFindContact : undefined}
+          reviewFindContact={reviewFindContact}
           setEditingContact={setEditingContact}
           runSearch={runSearch}
           progress={progress}

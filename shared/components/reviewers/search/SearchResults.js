@@ -71,6 +71,8 @@ export default function SearchResults({
   reviewAddressConflict,
   retryAddressCheck,
   useLead,
+  saveFindContact,
+  reviewFindContact,
   setEditingContact,
   runSearch,
   progress,
@@ -191,6 +193,8 @@ export default function SearchResults({
                               return <CandidateCard
                                 key={candKey(c)}
                                 candidate={c}
+                                onSaveFindContact={canManage ? saveFindContact : undefined}
+                                onReviewFindContact={reviewFindContact}
                                 applicantListed={applicantListedFor(c)}
                                 previousResult={previousSearchKeys.has(candKey(c))}
                                 checked={selected.has(candKey(c))}
@@ -211,6 +215,8 @@ export default function SearchResults({
                             return <CandidateCard
                               key={candKey(c)}
                               candidate={c}
+                              onSaveFindContact={canManage ? saveFindContact : undefined}
+                              onReviewFindContact={reviewFindContact}
                               applicantListed={applicantListedFor(c)}
                               previousResult={previousSearchKeys.has(candKey(c))}
                               readOnly

@@ -3,7 +3,9 @@
  */
 import { useState, useEffect, useRef, useId } from 'react';
 import { AlertTriangle, CheckCircle2, Info, XCircle } from 'lucide-react';
+import { heldFindContactEmails } from '../../../../lib/utils/reviewer-address-trust';
 import ContactLeads from '../ContactLeads';
+import FindMailboxReview from '../FindMailboxReview';
 import { Button } from '../../Layout';
 import {
   getCandidateCardStatus,
@@ -68,7 +70,55 @@ function PaperList({ pubs }) {
 // view never decides selectability. `readOnly` renders without the Select
 // checkbox; `onExclude` adds Not a fit; `onPromote` adds Reconsider (the
 // collapsed Excluded section).
-export function CandidateCard({ candidate, applicantListed = null, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onAddToInvite, addingToInvite = false, onUseLead, onEdit, onConfirmIdentity, onRequestRepair, onReviewAddressConflict, onRetryAddressCheck, onRetryInstitution, canManage = true, repairAttention = false, repairRequest = null, repairRequestsUnavailable = false, onRetryRepairStatus }) {
+function FindContactSave({ candidate, onReview, onSave }) {
+  const [review, setReview] = useState(null);
+  const [email, setEmail] = useState('');
+  const [source, setSource] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const choices = heldFindContactEmails(candidate);
+  if (!choices.length || !onSave || !onReview) return null;
+  async function open() {
+    setBusy(true);
+    setError('');
+    try {
+      const row = await onReview(candidate);
+      if (!row) return;
+      const current = heldFindContactEmails(row);
+      if (!current.length) throw new Error('This lead has changed. Reload Find.');
+      setReview(row);
+      setEmail(current[0]);
+      setSource('');
+    } catch (err) { setError(err.message); }
+    finally { setBusy(false); }
+  }
+  async function submit(event) {
+    event.preventDefault();
+    setBusy(true);
+    setError('');
+    try { await onSave(review, email, source); }
+    catch (err) { setError(err.message); }
+    finally { setBusy(false); }
+  }
+  return <div className="mt-2 text-sm">
+    {review ? <form onSubmit={submit} className="space-y-2">
+      <label className="block">Reviewer email
+        <select className="block border rounded p-1" value={email} onChange={e => setEmail(e.target.value)}>
+          {heldFindContactEmails(review).map(value => <option key={value}>{value}</option>)}
+        </select>
+      </label>
+      <label className="block">Institutional page confirming ownership
+        <input type="url" required className="block w-full border rounded p-1" value={source}
+          onChange={e => setSource(e.target.value)} />
+      </label>
+      <button type="submit" className="text-blue-700 underline" disabled={busy}>Save verified email only</button>
+      <button type="button" className="ml-3" disabled={busy} onClick={() => setReview(null)}>Cancel</button>
+    </form> : <button type="button" className="text-blue-700 underline" disabled={busy} onClick={open}>Verify contact only</button>}
+    {error && <p role="alert">{error}</p>}
+  </div>;
+}
+
+export function CandidateCard({ candidate, applicantListed = null, checked, onToggle, readOnly = false, previousResult = false, onExclude, onPromote, onAddToInvite, addingToInvite = false, onUseLead, onSaveFindContact, onReviewFindContact, onEdit, onConfirmIdentity, onRequestRepair, onReviewAddressConflict, onRetryAddressCheck, onRetryInstitution, canManage = true, repairAttention = false, repairRequest = null, repairRequestsUnavailable = false, onRetryRepairStatus }) {
   const cardRef = useRef(null);
   const baseId = useId();
   const selectId = `${baseId}-select`;
@@ -675,13 +725,28 @@ export function CandidateCard({ candidate, applicantListed = null, checked, onTo
             </div>
           </details>
 
-          {!identityUnverified && (
-            <ContactLeads
-              leads={enr.contactLeads}
-              hideValues={[email, website]}
-              onUse={!readOnly && canManage && onUseLead ? (lead) => onUseLead(candidate, lead) : undefined}
-            />
+          {c.contactOnlyVerification?.email && c.contactOnlyVerification.email === email && (
+            <p className="mt-3 text-sm">Contact saved: {email}. <a className="text-blue-700 underline"
+              href={c.contactOnlyVerification.evidenceUrl} target="_blank" rel="noopener noreferrer">Ownership evidence</a></p>
           )}
+          <FindContactSave candidate={c} onReview={onReviewFindContact} onSave={onSaveFindContact} />
+          <FindMailboxReview
+            name={c.name}
+            institution={c.suggestedInstitution}
+            review={enr.tierResults?.find_mailbox || c.findProfileReview}
+            verifiedEmail={c.contactOnlyVerification?.email === email ? email : emailAction === 'ready' && c.addressTrustReceipt?.personConfirmed
+              && c.addressTrustReceipt.email === email ? email : null}
+            savedContact={Boolean(c.contactOnlyVerification?.email && c.contactOnlyVerification.email === email)}
+            leads={enr.contactLeads}
+          />
+
+          <ContactLeads
+            leads={identityUnverified
+              ? enr.contactLeads?.filter(l => ['ownership_unconfirmed', 'profile_alternative'].includes(l.rejectedReason))
+              : enr.contactLeads}
+            hideValues={[email, website]}
+            onUse={!identityUnverified && !readOnly && canManage && onUseLead ? (lead) => onUseLead(candidate, lead) : undefined}
+          />
 
           {blocking && (
             <p
