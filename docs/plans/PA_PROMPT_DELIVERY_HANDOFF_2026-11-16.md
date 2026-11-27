@@ -93,9 +93,9 @@ be separate prompts. Compliance and broader expertise matching scope are unresol
   ledger receipts remain. Shared SharePoint site is not a Sandbox site; only the
   dedicated TEST folder was written. No new cleanup performed during stop.
 - Policy expiry: November 18, 19:30 UTC. Source/response expiry November 17,
-  18:31:58.521 UTC; remaining content November 23 at that time. Physical scoped
-  cleanup remains due and is separate from restarting integration or deleting
-  receipts/infrastructure. Check the retained receipt and current state before action.
+  18:31:58.521 UTC; remaining content November 23 at that time. Content cleanup is
+  complete: batch 1 on 2026-11-17 and batch 2 on 2026-11-26, recorded below. Restarting
+  integration or deleting receipts/infrastructure remains a separate decision.
 - **Owner-approved content-expiry cleanup (Session 680, 2026-11-16).** Run the parked
   worktree's `scripts/run-summary-sandbox-http.cjs tick` once after 2026-11-17
   18:31:58 UTC and once after 2026-11-23 18:31:58 UTC. [VERIFIED via parked-branch
@@ -117,13 +117,29 @@ be separate prompts. Compliance and broader expertise matching scope are unresol
   [VERIFIED via runner output and `http-state.json`: ticks 6 of 8, no pending intent].
   The response does not report a deleted-row count; deletion is inferred from the
   worker code path, not read back from the database.
-- **Batch 2 (after 2026-11-23 18:31:58 UTC):** from the parked worktree, refresh the
-  token with `vercel env pull --environment=development --yes
-  /private/tmp/wmkf-summary-live-20261116/development.env` (run from the linked main
-  checkout; it writes only that file), then run `node scripts/run-summary-sandbox-http.cjs
-  expire` once. After the Nov 18 policy expiry, expect `disabled`. That result is
-  ambiguous: it is also what the worker returns if the Preview's pilot setting were
-  missing, in which case nothing is deleted.
+- **Batch 2: DONE 2026-11-26, by direct scoped delete (owner-authorized).** The planned
+  `expire` run was impossible: `/private/tmp/wmkf-summary-live-20261116` and the parked
+  worktree were gone. That directory held the only copy of the Preview's
+  deployment-scoped `CRON_SECRET` and pilot policy, and Vercel cannot return those
+  values. Instead, Claude used the owner's Neon CLI login to reach the
+  `pa-prompt-sandbox` branch (`br-icy-boat-af2c8cq6`, separate from `main`; it had been
+  archived).
+  - **Read-only check first.** Job `ccd99f2b-8d9f-4203-b296-f18ad90d6950` matched the
+    trial: environment `preview-sandbox`, the pilot ID, request ID and idempotency key
+    above, and task `proposal.executive-summary`.
+  - **Batch 1 is now confirmed.** No content row with the Nov 17 expiry remained, and
+    the job's `snapshot_content_id` row was already gone.
+  - **No dependent tables.** No foreign key references `prompt_job_content`.
+  - **Deleted in one transaction,** expecting exactly these counts:
+    - 4 rows from the Summary job (`configuration`, `result`, `audit`, `publication`).
+    - 6 rows each from the two Short Title jobs, `7e68cdfe-4dda-47f1-9163-7a3dc4b517f5`
+      and `d1008831-4266-4047-a25a-41178a631ebe` (`preflight.short-title`). The owner
+      extended the cleanup to them.
+  - **Result [VERIFIED via post-commit readback]:** 16 rows deleted, and
+    `prompt_job_content` is empty in that branch.
+  - **Left in place:** job, task, attempt and publication rows, and the fixtures (the
+    test PI link on 1000389 and the TEST-folder PDF). They wait for an owner decision.
+  - **Credentials:** the local connection-string file was deleted after use.
 - Private credentials/source/receipts under `/private/tmp/wmkf-summary-live-20261116`
   are not in Git and do not transfer between Macs. Do not copy credential files into
   handoff artifacts. Worktree directories are volatile; pushed branches preserve code.

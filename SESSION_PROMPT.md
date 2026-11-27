@@ -55,14 +55,12 @@ The full Session 695 handoff is retrievable with
    - The `cycle-dossier.entry` cache-read probe (owner OK).
    - The J27 list search hint for requests that aren't ready.
    Evidence: `git show dc6847a16:SESSION_PROMPT.md`.
-3. **Stale docs to fix with `/sweep`:**
-   - `docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md` §1: the
-     send-time rule predates S391.
-   - `docs/atlas/postgres-reviewer-find-roster.md:344`: says enrichment no
-     longer runs on load, but `useApplicantReviewerEnrichment.js` still does.
-4. **Executive Summary trial batch-2 cleanup** was scheduled for Nov 23 and is
-   now overdue. It is destructive. Steps: `git show dc6847a16:SESSION_PROMPT.md`
-   and `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md` ~95–128.
+3. **DONE 2026-11-26 (`5558ac1e1`): stale reviewer docs reconciled.** These were the
+   lifecycle doc §1 send tier and the Find on-load enrichment claims.
+4. **DONE 2026-11-26: Executive Summary trial batch-2 cleanup.** 16 expired
+   `prompt_job_content` rows were deleted from Neon `pa-prompt-sandbox` (the Summary
+   job plus two Short Title jobs, all owner-authorized). Receipt:
+   `docs/plans/PA_PROMPT_DELIVERY_HANDOFF_2026-11-16.md`, "Batch 2".
 5. **Production identity mode is `shadow`** (owner-set). Do not set `combined`
    without an approved cutover.
 
