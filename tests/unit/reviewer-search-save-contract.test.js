@@ -257,6 +257,8 @@ test('producer envelope: roster GET is the recovery snapshot after an ordinary u
     source_kind: 'literature_retrieved',
     candidate: { name: 'Ordinary Saved', candidateKey: 'roster:ordinary', suggestionId: 'SUGGESTION-1' },
   }] });
+  // No open staff discovery case for this ordinary saved row.
+  sql.mockResolvedValueOnce({ rows: [] });
   rosterStore.listForRequest.mockImplementationOnce(
     jest.requireActual('../../lib/services/reviewer-roster-store').listForRequest,
   );

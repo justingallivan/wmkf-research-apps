@@ -558,6 +558,10 @@ export default async function handler(req, res) {
     });
 
     // Generate reasoning for discovered candidates (second Claude call)
+    if (analysisResult.panelExpertise?.length) {
+      const limit = Math.max(1, Math.min(25, Number(analysisResult.reviewerCount) || 15));
+      discoveryResults.discovered = discoveryResults.discovered.slice(0, limit);
+    }
     let enhancedDiscovered = discoveryResults.discovered;
 
     if (generateReasoning && discoveryResults.discovered.length > 0) {

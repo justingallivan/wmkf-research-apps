@@ -23,7 +23,11 @@ import { loadModelOverrides } from '../../../lib/services/model-override-loader'
 import { DEFAULT_REVIEWER_COUNT } from '../../../shared/config/reviewerFinderPreferences';
 import { getReviewerTimeBudgetSeconds } from '../../../lib/services/reviewer-time-budget';
 import { withDalContext } from '../../../lib/dataverse/core/context';
-import { loadReviewerRequestContext } from '../../../lib/services/reviewer-request-context';
+import { loadReviewerRequestContext, mergeRequestContextIntoAnalysisResult } from '../../../lib/services/reviewer-request-context';
+
+import { readPanelExpertise, collectExpertisePage } from '../../../lib/services/reviewer-discovery-brief';
+import { authorizeReviewerRequestMutation } from '../../../lib/services/reviewer-request-authorization';
+import { openFindHandoff } from '../../../lib/services/reviewer-find-handoff';
 
 const limiter = nextRateLimiter({ max: 10 });
 
@@ -87,8 +91,16 @@ export default async function handler(req, res) {
     const { proposalText, blobUrl, additionalNotes, excludedNames, reviewerCount, requestId } = req.body;
     const trimmedRequestId = String(requestId || '').trim();
 
+    const mode = req.body.analysisMode ?? 'standard';
+    if (!['standard', 'fallback', 'expertise', 'staff'].includes(mode)
+      || (mode === 'fallback' && (!ClaudeReviewerService.FALLBACK_MODEL || ClaudeReviewerService.FALLBACK_MODEL === ClaudeReviewerService.MODEL))) {
+      sendEvent('error', { message: 'Choose a configured reviewer analysis model.' });
+      return res.end();
+    }
+    const pages = [];
+    let sourceLabel = 'section';
     const apiKey = process.env.CLAUDE_API_KEY;
-    if (!apiKey) {
+    if (!apiKey && mode !== 'staff') {
       sendEvent('error', { message: 'Claude API key not configured on server' });
       return res.end();
     }
@@ -99,6 +111,30 @@ export default async function handler(req, res) {
     }
 
     const userProfileId = access.profileId;
+    sendEvent('progress', { status: 'model_resolved', data: {
+      model: mode === 'fallback' ? ClaudeReviewerService.FALLBACK_MODEL : ClaudeReviewerService.MODEL,
+      fallbackModel: ClaudeReviewerService.FALLBACK_MODEL,
+    } });
+
+    const assignStaff = async () => {
+      await withDalContext('workbench-find-handoff-open', () => authorizeReviewerRequestMutation({
+        profileId: userProfileId, callerSystemId: access.session?.user?.dynamicsSystemuserId, requestIds: [trimmedRequestId],
+      }));
+      const settings = {
+        reviewerCount: Math.max(1, Math.min(25, Number(reviewerCount) || DEFAULT_REVIEWER_COUNT)),
+        additionalNotes: String(additionalNotes || '').slice(0, 5000),
+        excludeText: String(req.body.excludeText || '').slice(0, 12000),
+        referredSeedsText: String(req.body.referredSeedsText || '').slice(0, 5000),
+        referredBy: String(req.body.referredBy || '').slice(0, 400),
+        searchSources: Object.fromEntries(['pubmed', 'arxiv', 'biorxiv', 'chemrxiv'].map(key => [key, req.body.searchSources?.[key] === true])),
+      };
+      const handoff = await openFindHandoff(trimmedRequestId, userProfileId, settings);
+      sendEvent('error', { status: 'discovery_handoff', caseId: handoff.caseId, message: `Discovery remains open. ${handoff.owner} owns the staff search for this proposal.` });
+    };
+    if (mode === 'staff') {
+      await assignStaff();
+      return res.end();
+    }
 
     // Get proposal text
     let text = proposalText;
@@ -119,7 +155,10 @@ export default async function handler(req, res) {
         sendEvent('progress', { stage: 'processing', message: 'Extracting text from PDF...' });
         const pdfParse = (await import('pdf-parse')).default;
         const pdfBuffer = Buffer.from(await blobResponse.arrayBuffer());
-        const pdfData = await pdfParse(pdfBuffer);
+        const pdfData = await pdfParse(pdfBuffer, mode === 'expertise' ? {
+          pagerender: collectExpertisePage(pages),
+        } : undefined);
+        sourceLabel = 'page';
         text = pdfData.text;
 
       } else {
@@ -169,7 +208,30 @@ export default async function handler(req, res) {
       textLength: text.length
     });
 
-    const result = await ClaudeReviewerService.analyzeProposal(text, apiKey, {
+    let brief;
+    let result;
+    if (mode === 'expertise') {
+      sendEvent('progress', { message: 'Reading the proposal for panel expertise and checking source references…' });
+      brief = await readPanelExpertise({
+        pages: pages.length ? pages : [text],
+        complete: prompt => ClaudeReviewerService._callLLM({
+          prompt, apiKey, maxTokens: 1200, temperature: 0, userProfileId,
+          signal: deadlineController.signal, deadlineAt,
+        }),
+      });
+      if (!brief.topics) result = { success: false, status: brief.status };
+      else {
+        const terms = brief.topics.map(topic => topic.specialty);
+        result = mergeRequestContextIntoAnalysisResult({
+          success: true, reviewerSuggestions: [],
+          proposalInfo: { keywords: terms.join(', '), primaryResearchArea: terms[0] },
+        }, requestContext);
+        // Ranking needs expertise and trusted identities, not the narrative.
+        result.proposalInfo.abstract = terms.join(', ');
+      }
+    }
+    if (!result) result = await ClaudeReviewerService.analyzeProposal(text, apiKey, {
+      useFallback: mode === 'fallback',
       additionalNotes: additionalNotes || '',
       excludedNames: excludedNames || [],
       reviewerCount: reviewerCount || DEFAULT_REVIEWER_COUNT,
@@ -189,7 +251,9 @@ export default async function handler(req, res) {
     }
 
     if (!result.success) {
-      if (result.status === 'analysis_invalid') {
+      if (mode === 'expertise' && result.status === 'analysis_refused') {
+        await assignStaff();
+      } else if (result.status === 'analysis_invalid') {
         sendEvent('error', {
           status: 'analysis_invalid',
           retryable: true,
@@ -200,7 +264,7 @@ export default async function handler(req, res) {
         sendEvent('error', {
           status: 'analysis_refused',
           retryable: false,
-          message: 'The analysis model declined this request. Retrying is unlikely to help; this proposal needs an alternate analysis path. Please contact an administrator.',
+          message: 'The analysis model declined this request.',
           details: result,
         });
       } else {
@@ -211,6 +275,7 @@ export default async function handler(req, res) {
 
     sendEvent('result', {
       proposalInfo: result.proposalInfo,
+      ...(brief?.topics ? { panelExpertise: brief.topics, sourceLabel, reviewerCount: Math.max(1, Math.min(25, Number(reviewerCount) || DEFAULT_REVIEWER_COUNT)) } : {}),
       reviewerSuggestions: result.reviewerSuggestions,
       validation: result.validation,
     });

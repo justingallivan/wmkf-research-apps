@@ -16,3 +16,14 @@ test.each([{isClaudeSuggestion:false},{isClaudeSuggestion:true,isApplicantRecomm
   holdFindContact(origin, { contactEnrichment:ce });
   expect(ce.email).toBe('other@example.edu');
 });
+
+test.each(['serp_search', 'search_contested'])('a literature-sourced Find candidate holds a %s address', source => {
+  const email = 'author@example.edu';
+  const row = { provenance: { kind: 'literature_retrieved' }, email, contactEnrichment: {
+    email, emailSource: source, emailPersistAllowed: true, tierResults: {},
+  } };
+  holdFindContact(row, row);
+  expect(row.email).toBeNull();
+  expect(row.contactEnrichment.emailPersistAllowed).toBe(false);
+  expect(heldFindContactEmails(row)).toEqual(source === 'search_contested' ? [] : [email]);
+});

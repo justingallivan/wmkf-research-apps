@@ -47,6 +47,9 @@ jest.mock('../../lib/services/workbench/reviewer-roster-projection-service', () 
   reconcileRosterEngagement: (...args) => mockReconcile(...args),
   validateRosterPromotionEngagement: (...args) => mockValidatePromotion(...args),
 }));
+jest.mock('../../lib/services/reviewer-find-handoff', () => ({
+  getFindHandoff: jest.fn(async () => null), completeFindHandoff: jest.fn(),
+}));
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   listForRequest: jest.fn(),
   recordSurfaced: jest.fn(),

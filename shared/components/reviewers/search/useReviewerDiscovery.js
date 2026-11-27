@@ -55,7 +55,10 @@ export default function useReviewerDiscovery({
   setRosterLoaded,
   setRosterLoadFailed,
 }) {
-  const runSearch = useCallback(async () => {
+  const runSearch = useCallback(async (requestedMode) => {
+    const mode = typeof requestedMode === 'string' ? requestedMode : 'standard';
+    let models = {};
+    let analyzing = true;
     const myGen = genRef.current;
     if (!blobUrl || runningRef.current !== null || removingPrevious || noSourcesSelected || !rosterLoaded) return;
     runningRef.current = myGen;
@@ -81,6 +84,8 @@ export default function useReviewerDiscovery({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           blobUrl,
+          analysisMode: mode,
+          ...(['expertise', 'staff'].includes(mode) ? { excludeText, referredSeedsText, referredBy, searchSources } : {}),
           requestId: requestId || null,
           excludedNames: effectiveExcluded,
           reviewerCount,
@@ -92,6 +97,10 @@ export default function useReviewerDiscovery({
       let analysisTransportError = null;
       try {
         await readSseStream(aRes, ({ event, data }) => {
+          if (data?.status === 'model_resolved') models = data.data || {};
+          if (data?.data?.model && ['fallback', 'analysis_refused'].includes(data.status)) {
+            models = { ...models, model: data.data.model };
+          }
           if (event === 'error') { streamError = data || { message: 'Analysis failed' }; return; }
           if (data?.error) { streamError = { message: data.error, status: data.status, retryable: data.retryable }; return; }
           if (data?.message) pushProgress(data.message, myGen);
@@ -103,6 +112,7 @@ export default function useReviewerDiscovery({
       if (streamError) {
         const err = new Error(streamError.message || 'Analysis failed');
         err.status = streamError.status;
+        err.caseId = streamError.caseId;
         err.retryable = !!streamError.retryable;
         throw err;
       }
@@ -115,6 +125,7 @@ export default function useReviewerDiscovery({
       // content problem. Name the likely cause so the user knows to just retry.
       if (!analysisResult) throw new Error("The proposal analysis didn't finish — the connection timed out or dropped before results came back. Please run the search again.");
       if (genRef.current !== myGen) return; // context changed — abort
+      analyzing = false;
       setAnalysis(analysisResult);
 
       // 2. Discover + verify + rank across databases.
@@ -177,6 +188,9 @@ export default function useReviewerDiscovery({
       //    are blocked" claim would be false (Codex S210, Finding 3). The same
       //    filter applies to the unverified list so excluded names leak nowhere.
       const { kept, removed } = filterExcluded(ranked, effectiveExcluded);
+      if (mode === 'expertise' && !kept.length) {
+        throw new Error('No new eligible reviewer was found. Adjust the sources or assign a staff search.');
+      }
       setExcludedRemoved(removed.length);
       const unverifiedKept = filterExcluded(Array.isArray(unverifiedRaw) ? unverifiedRaw : [], effectiveExcluded).kept;
 
@@ -269,6 +283,7 @@ export default function useReviewerDiscovery({
       // and future search exclusions. Unverified suggestions stay ephemeral.
       // Both awaits are generation-guarded so an older run cannot replace a new
       // proposal's state; uncertain outcomes use read recovery, never POST replay.
+      let confirmedRecoveryRow = false;
       if (dedupedEnriched.length > 0 && requestId) {
         const pruned = dedupedEnriched.map(pruneCandidateForRoster);
         let postResponse = null;
@@ -334,7 +349,10 @@ export default function useReviewerDiscovery({
               if (outcome.status === 'failed' || outcome.status === 'invalid') warnings.add(inputIndex);
               const activeRow = key ? rowsByKey.get(key) : null;
               if (activeRow) {
-                if (!isDeceased) candidatesForCurrentRun.push(activeRow);
+                if (!isDeceased) {
+                  candidatesForCurrentRun.push(activeRow);
+                  confirmedRecoveryRow = true;
+                }
                 else warnings.add(inputIndex);
                 continue;
               }
@@ -371,6 +389,9 @@ export default function useReviewerDiscovery({
       // remove prior results while this POST is still in flight, and the two
       // operations can replace client roster state with competing snapshots.
       if (genRef.current !== myGen) return;
+      if (mode === 'expertise' && !confirmedRecoveryRow) {
+        throw new Error('No new reviewer could be confirmed in the roster. Check reviewer state or assign a staff search.');
+      }
       setPhase('results');
     } catch (e) {
       if (genRef.current === myGen) {
@@ -379,7 +400,7 @@ export default function useReviewerDiscovery({
           ? 'The reviewer search connection was interrupted before results arrived. Please run the search again.'
           : rawMessage;
         setError(message);
-        setErrorMeta({ status: e?.status, retryable: !!e?.retryable });
+        setErrorMeta({ status: e?.status, caseId: e?.caseId, retryable: !!e?.retryable, mode, models, analyzing });
         setPhase('error');
       }
     } finally {

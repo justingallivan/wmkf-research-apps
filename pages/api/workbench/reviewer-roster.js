@@ -34,7 +34,7 @@ export default async function handler(req, res) {
       if (typeof requestId !== 'string' || !GUID_RE.test(requestId)) {
         return res.status(400).json({ error: 'Valid requestId (GUID) is required' });
       }
-      const result = await getReviewerRoster({ requestId });
+      const result = await getReviewerRoster({ requestId, profileId: access.profileId });
       return res.status(200).json(result);
     }
 

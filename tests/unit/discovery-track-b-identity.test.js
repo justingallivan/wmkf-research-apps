@@ -5,6 +5,20 @@
 const { DiscoveryService } = require('../../lib/services/discovery-service');
 
 describe('DiscoveryService Track B identity merge gates', () => {
+  test('expertise recovery queries only enabled literature sources and ignores client-supplied query arrays', async () => {
+    const pubmed = jest.spyOn(DiscoveryService, 'searchPubMed').mockResolvedValue([]);
+    const arxiv = jest.spyOn(DiscoveryService, 'searchArXiv').mockResolvedValue([]);
+    try {
+      const opts = { searchPubmed: true, searchArxiv: false, searchBiorxiv: false, searchChemrxiv: false };
+      const analysis = { proposalInfo: {}, reviewerSuggestions: [], searchQueries: { pubmed: ['unused'] } };
+      await DiscoveryService.discover(analysis, opts);
+      expect(pubmed).not.toHaveBeenCalled();
+      await DiscoveryService.discover({ ...analysis, panelExpertise: [{ specialty: 'Astronomy', source: 2 }] }, opts);
+      expect(pubmed).toHaveBeenCalledWith(['Astronomy'], expect.any(Function));
+      expect(arxiv).not.toHaveBeenCalled();
+    } finally { pubmed.mockRestore(); arxiv.mockRestore(); }
+  });
+
   test('shared ORCID merges a discovered candidate into a needs-review Track A twin', () => {
     const out = DiscoveryService.mergeTrackBWithNeedsReviewBySharedOrcid(
       [{ name: 'Jane Roe', verificationStatus: 'unresolved', orcid: '0000-0002-1825-0097', sources: ['proposal_text'] }],
