@@ -92,7 +92,6 @@ export default function SearchResults({
     <>
       {(rosterNote || displayCandidates.length > 0 || rosterExcluded.length > 0 || rosterIneligible.length > 0 || rosterBlocked.length > 0 || phase === 'results' || phase === 'done') && (
         <div className="space-y-3 mt-3">
-          <IdentityComparisonPanel comparison={identityComparison} />
           {enrichNote && <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">{enrichNote}</div>}
           {incompleteCoiCandidates.length > 0 && (
             <div className="p-3 bg-amber-50 text-amber-800 rounded-lg text-sm">
@@ -376,6 +375,7 @@ export default function SearchResults({
               {rosterLoadFailed ? 'Retry reviewer state' : 'Run another search'}
             </button>
           )}
+          <IdentityComparisonPanel comparison={identityComparison} />
           {(phase === 'saving' || promotionNotice) && (
             <div
               role="status"

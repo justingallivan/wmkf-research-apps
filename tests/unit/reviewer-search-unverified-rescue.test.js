@@ -176,7 +176,11 @@ test('renders a named admin-only identity comparison from the discovery response
   const { rerender } = render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" />);
   fireEvent.click(await screen.findByRole('button', { name: 'Run reviewer search' }));
 
-  expect(await screen.findByText('Identity resolver comparison (admin)')).toBeInTheDocument();
+  const title = await screen.findByText('Identity resolver comparison (admin)');
+  const panel = title.closest('details');
+  expect(panel).not.toHaveAttribute('open');
+  fireEvent.click(title.closest('summary'));
+  expect(panel).toHaveAttribute('open');
   expect(screen.getByText('Different Reviewer')).toBeInTheDocument();
   expect(screen.getByText('Example University')).toBeInTheDocument();
   expect(screen.getByText(/Works-first corroborated an identity that Legacy missed/)).toBeInTheDocument();
