@@ -89,6 +89,9 @@ export default function ReviewerSearchSection({
     busy,
     savingCount,
     progress,
+    finishStaffDiscovery,
+    panelExpertise,
+    sourceLabel,
     identityComparison,
     selected,
     rosterExcluded,
@@ -216,6 +219,8 @@ export default function ReviewerSearchSection({
           excludedRaw={excludedRaw}
           error={error}
           errorMeta={errorMeta}
+          savedPool={savedPool}
+          finishStaffDiscovery={finishStaffDiscovery}
           promotionNotice={promotionNotice}
           previousSearchKeys={previousSearchKeys}
           rosterLoadFailed={rosterLoadFailed}
@@ -225,6 +230,11 @@ export default function ReviewerSearchSection({
           removingPrevious={removingPrevious}
           progress={progress}
         />
+        {panelExpertise?.length > 0 && <section className="my-3 text-sm">
+          <h3 className="font-medium">Panel expertise from the proposal</h3>
+          <ul>{panelExpertise.map(({ specialty, source }, index) =>
+            <li key={index}>{specialty} ({sourceLabel} {source})</li>)}</ul>
+        </section>}
         <SearchResults
           applicantRecommendations={recommended}
           rosterNote={rosterNote}

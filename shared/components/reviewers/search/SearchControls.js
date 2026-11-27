@@ -37,6 +37,8 @@ export default function SearchControls({
   excludedRaw,
   error,
   errorMeta,
+  finishStaffDiscovery,
+  savedPool,
   previousSearchKeys,
   promotionNotice,
   progress,
@@ -46,6 +48,12 @@ export default function SearchControls({
   rosterLoaded,
   removingPrevious,
 }) {
+  const refused = errorMeta?.status === 'analysis_refused';
+  const handoff = errorMeta?.status === 'discovery_handoff';
+  const expertiseRetry = refused || errorMeta?.mode === 'expertise';
+  const alternate = errorMeta?.models?.fallbackModel;
+  const canSwitch = errorMeta?.analyzing && !handoff && !expertiseRetry && errorMeta.mode !== 'staff'
+    && errorMeta.mode !== 'fallback' && (!errorMeta.models?.model || (alternate && alternate !== errorMeta.models.model));
   return (
     <>
       <div className="flex items-center justify-between mb-2">
@@ -194,7 +202,7 @@ export default function SearchControls({
               ) : errorMeta?.status === 'analysis_refused' ? (
                 <>
                   The analysis model declined this request.
-                  <span className="block text-xs mt-1">Retrying is unlikely to help. This proposal needs an alternate analysis path; please contact an administrator.</span>
+                  <span className="block text-xs mt-1">Find can read the proposal for panel expertise, then use those specialties to find reviewers.</span>
                 </>
               ) : (
                 <>
@@ -208,18 +216,36 @@ export default function SearchControls({
               )}
             </div>
           )}
+          {error && errorMeta?.models?.model && <p className="mb-2 text-xs text-gray-600">Analysis model: {errorMeta.models.model}</p>}
+          {expertiseRetry && errorMeta?.mode === 'expertise' && !handoff && <button type="button"
+            disabled={!rosterLoaded || removingPrevious} onClick={() => runSearch('staff')}
+            className="mr-3 px-3 py-2 border rounded-lg text-sm">Assign staff search to me</button>}
+          {handoff && <div className="my-2 text-sm">
+            <p>Use the manual reviewer form below to save a reviewer to Candidates. The case owner can then complete discovery.</p>
+            {(savedPool || []).filter(row => row.suggestionId).map(row => (
+              <button key={row.suggestionId} type="button" onClick={() => finishStaffDiscovery(row.suggestionId)}
+                className="my-2 mr-2 px-3 py-2 border rounded-lg">Complete discovery with {row.name}</button>
+            ))}
+          </div>}
+          {phase === 'idle' && !rosterLoadFailed && <button type="button"
+            disabled={noSourcesSelected || !rosterLoaded || removingPrevious} onClick={() => runSearch('expertise')}
+            className="mr-3 px-3 py-2 border rounded-lg text-sm">Find reviewers by proposal expertise</button>}
+          {canSwitch && <button type="button" disabled={noSourcesSelected || !rosterLoaded || removingPrevious}
+            onClick={() => runSearch('fallback')} className="mr-3 px-3 py-2 border rounded-lg text-sm">
+            Retry with {alternate || 'the configured alternate model'}
+          </button>}
           <button
             type="button"
-            onClick={rosterLoadFailed ? retryRosterLoad : runSearch}
-            disabled={!rosterLoadFailed && (noSourcesSelected || !rosterLoaded || removingPrevious || errorMeta?.status === 'analysis_refused')}
+            onClick={rosterLoadFailed ? retryRosterLoad : () => runSearch(expertiseRetry ? 'expertise' : 'standard')}
+            disabled={!rosterLoadFailed && (noSourcesSelected || !rosterLoaded || removingPrevious || handoff)}
             className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {rosterLoadFailed
               ? 'Retry reviewer state'
               : !rosterLoaded
               ? 'Loading existing candidates…'
-              : errorMeta?.status === 'analysis_refused'
-                ? 'Alternate analysis required'
+              : handoff ? 'Staff discovery open' : expertiseRetry
+                ? 'Find reviewers by proposal expertise'
                 : phase === 'error' ? 'Try again' : 'Run reviewer search'}
           </button>
         </div>

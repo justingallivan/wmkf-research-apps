@@ -40,6 +40,9 @@ jest.mock('../../lib/services/proposal-pi-identity', () => ({
 jest.mock('../../lib/services/proposal-participants', () => ({
   fetchCoPIs: (...args) => mockFetchCoPIs(...args),
 }));
+jest.mock('../../lib/services/reviewer-find-handoff', () => ({
+  getFindHandoff: jest.fn(async () => null), completeFindHandoff: jest.fn(),
+}));
 jest.mock('../../lib/services/reviewer-roster-store', () => ({
   listForRequest: jest.fn(async () => ({ active: [], excluded: [], ineligible: [], blocked: [], savedKeys: [], allNames: [] })),
   recordSurfaced: jest.fn(async (_requestId, candidates, options = {}) => (

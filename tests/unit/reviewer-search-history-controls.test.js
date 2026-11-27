@@ -944,7 +944,10 @@ test('a model refusal is shown as non-retryable guidance', async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'Run reviewer search' }));
 
   expect(await screen.findByText('The analysis model declined this request.')).toBeInTheDocument();
-  expect(screen.getByText(/This proposal needs an alternate analysis path/i)).toBeInTheDocument();
+  expect(screen.getByText(/read the proposal for panel expertise/i)).toBeInTheDocument();
   expect(screen.queryByText(/Use Try again to rerun the analysis/i)).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Alternate analysis required' })).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Find reviewers by proposal expertise' }));
+  const calls = global.fetch.mock.calls.filter(([url]) => url === '/api/reviewer-finder/analyze');
+  expect(JSON.parse(calls[1][1].body)).toMatchObject({ requestId: REQ, blobUrl: 'blob', analysisMode: 'expertise' });
+  await screen.findByRole('button', { name: 'Find reviewers by proposal expertise' });
 });

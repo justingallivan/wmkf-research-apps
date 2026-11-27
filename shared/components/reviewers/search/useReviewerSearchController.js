@@ -6,6 +6,8 @@ import {
   buildEngagedSavedIndex,
 } from '../../../utils/reviewer-rediscovery';
 import { DEFAULT_REVIEWER_COUNT } from '../../../config/reviewerFinderPreferences';
+import { requestEnvelope } from '../../../utils/api-request';
+import { parseExcludeList } from '../reviewer-search-logic';
 import { candKey } from './candidateKeys';
 import useReviewerRoster from './useReviewerRoster';
 import useReviewerRosterActions from './useReviewerRosterActions';
@@ -180,6 +182,22 @@ export default function useReviewerSearchController({
           const snapshot = await reloadRoster(myGen);
           if (genRef.current !== myGen) return;
           if (snapshot) {
+            const handoff = snapshot.findHandoff;
+            if (handoff) {
+              const settings = handoff.settings;
+              if (settings) {
+                setAdditionalNotes(settings.additionalNotes);
+                setReviewerCount(settings.reviewerCount);
+                setSearchSources(settings.searchSources);
+                setReferredSeedsText(settings.referredSeedsText);
+                setReferredBy(settings.referredBy);
+                setExcludeText([...new Set([...parseExcludeList(settings.excludeText), ...(excludedNames || [])])].join(', '));
+                excludeEditedRef.current = true;
+              }
+              setError(`Discovery remains open. ${handoff.owner} owns the staff search for this proposal.`);
+              setErrorMeta({ status: 'discovery_handoff', caseId: handoff.caseId });
+              setPhase('error');
+            }
             setRosterLoaded(true);
           } else {
             setRosterLoadFailed(true);
@@ -211,7 +229,25 @@ export default function useReviewerSearchController({
   // proposal), prefill the box — unless the user has already edited it.
   useEffect(() => {
     if (!excludeEditedRef.current) setExcludeText((excludedNames || []).join(', '));
-  }, [excludedNames]);
+    else if (errorMeta?.status === 'discovery_handoff' && excludedNames?.length) {
+      setExcludeText(previous => [...new Set([...parseExcludeList(previous), ...excludedNames])].join(', '));
+    }
+  }, [excludedNames, errorMeta?.status]);
+
+  const finishStaffDiscovery = async (suggestionId) => {
+    const generation = genRef.current;
+    try {
+      const { ok, data } = await requestEnvelope('/api/workbench/reviewer-roster', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: { requestId, action: 'complete_find_handoff', updates: { caseId: errorMeta?.caseId, suggestionId } },
+      });
+      if (genRef.current !== generation) return;
+      if (!ok || !data?.success) throw new Error(data?.error || 'Could not complete staff discovery.');
+      setErrorMeta(null); setError(null); setPhase('idle');
+    } catch (err) {
+      if (genRef.current === generation) setRosterNote(err.message);
+    }
+  };
 
   const pushProgress = useCallback((m, expectedGeneration = genRef.current) => {
     if (m && mountedRef.current && genRef.current === expectedGeneration) {
@@ -448,6 +484,9 @@ export default function useReviewerSearchController({
     busy,
     savingCount,
     progress,
+    finishStaffDiscovery,
+    panelExpertise: analysis?.panelExpertise,
+    sourceLabel: analysis?.sourceLabel,
     identityComparison,
     selected,
     rosterExcluded,
