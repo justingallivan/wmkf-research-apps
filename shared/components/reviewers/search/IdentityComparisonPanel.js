@@ -37,20 +37,9 @@ export function IdentityComparisonPanel({ comparison }) {
   const mode = comparison.resolverMode || 'unknown';
 
   return (
-    <div className="rounded-lg border border-purple-200 bg-purple-50 p-3 text-sm text-purple-950" data-testid="identity-comparison-panel">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <p className="font-semibold">Identity resolver comparison (admin)</p>
-          <p className="mt-0.5 text-xs text-purple-800">
-            {isPubMedDiagnostic
-              ? 'This search used PubMed results; Works-first is shown as an admin diagnostic only.'
-              : mode === 'shadow'
-              ? 'This search still used Legacy results; Combined is shown for evaluation only.'
-              : mode === 'combined'
-                ? 'Combined supplied the live identity decisions for this search.'
-                : `Resolver mode: ${mode}.`}
-          </p>
-        </div>
+    <details className="rounded-lg border border-purple-200 bg-purple-50 p-3 text-sm text-purple-950" data-testid="identity-comparison-panel">
+      <summary className="cursor-pointer">
+        <span className="font-semibold">Identity resolver comparison (admin)</span>{' · '}
         <span className="text-xs text-purple-700">
           {differences.length} difference{differences.length === 1 ? '' : 's'} of {rows.length}
           {isPubMedDiagnostic && failedComparisons.length > 0
@@ -58,7 +47,16 @@ export function IdentityComparisonPanel({ comparison }) {
             : null}
           {!isPubMedDiagnostic && <>{' '}· {changedOutcomes} combined outcome{changedOutcomes === 1 ? '' : 's'} changed</>}
         </span>
-      </div>
+      </summary>
+      <p className="mt-0.5 text-xs text-purple-800">
+        {isPubMedDiagnostic
+          ? 'This search used PubMed results; Works-first is shown as an admin diagnostic only.'
+          : mode === 'shadow'
+          ? 'This search still used Legacy results; Combined is shown for evaluation only.'
+          : mode === 'combined'
+            ? 'Combined supplied the live identity decisions for this search.'
+            : `Resolver mode: ${mode}.`}
+      </p>
 
       {displayedRows.length === 0 ? (
         <p className="mt-3 text-xs text-purple-800">
@@ -104,6 +102,6 @@ export function IdentityComparisonPanel({ comparison }) {
           : 'This named comparison exists only in the current browser response; durable telemetry remains pseudonymous.'}
         {comparison.runId ? ` Run ${comparison.runId}.` : ''}
       </p>
-    </div>
+    </details>
   );
 }
