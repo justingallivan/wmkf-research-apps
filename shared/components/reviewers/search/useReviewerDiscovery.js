@@ -97,7 +97,7 @@ export default function useReviewerDiscovery({
       let analysisTransportError = null;
       try {
         await readSseStream(aRes, ({ event, data }) => {
-          if (data?.status === 'model_resolved') models = data.data || {};
+          if (data?.status === 'model_resolved') models = { ...models, ...data.data };
           if (data?.data?.model && ['fallback', 'analysis_refused'].includes(data.status)) {
             models = { ...models, model: data.data.model };
           }
