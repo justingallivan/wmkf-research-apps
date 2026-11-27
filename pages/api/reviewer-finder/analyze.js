@@ -113,6 +113,7 @@ export default async function handler(req, res) {
     const userProfileId = access.profileId;
     sendEvent('progress', { status: 'model_resolved', data: {
       model: mode === 'fallback' ? ClaudeReviewerService.FALLBACK_MODEL : ClaudeReviewerService.MODEL,
+      primaryModel: ClaudeReviewerService.MODEL,
       fallbackModel: ClaudeReviewerService.FALLBACK_MODEL,
     } });
 

@@ -51,9 +51,12 @@ export default function SearchControls({
   const refused = errorMeta?.status === 'analysis_refused';
   const handoff = errorMeta?.status === 'discovery_handoff';
   const expertiseRetry = refused || errorMeta?.mode === 'expertise';
-  const alternate = errorMeta?.models?.fallbackModel;
-  const canSwitch = errorMeta?.analyzing && !handoff && !expertiseRetry && errorMeta.mode !== 'staff'
-    && errorMeta.mode !== 'fallback' && (!errorMeta.models?.model || (alternate && alternate !== errorMeta.models.model));
+  const { model, primaryModel, fallbackModel } = errorMeta?.models || {};
+  const switchToPrimary = refused && model === fallbackModel && primaryModel && primaryModel !== model;
+  const alternate = switchToPrimary ? primaryModel : fallbackModel;
+  const refusalChoice = refused && model && alternate && alternate !== model;
+  const canSwitch = refusalChoice || (errorMeta?.analyzing && !handoff && !expertiseRetry && errorMeta.mode !== 'staff'
+    && errorMeta.mode !== 'fallback' && (!errorMeta.models?.model || (alternate && alternate !== errorMeta.models.model)));
   return (
     <>
       <div className="flex items-center justify-between mb-2">
@@ -201,7 +204,10 @@ export default function SearchControls({
                 </>
               ) : errorMeta?.status === 'analysis_refused' ? (
                 <>
-                  The analysis model declined this request.
+                  {model ? `${model} declined this reviewer search.` : 'The analysis model declined this request.'}
+                  <span className="block text-xs mt-1">{refusalChoice
+                    ? 'You can retry the original search with the other model using your current settings.'
+                    : 'No other configured model is available for this retry.'}</span>
                   <span className="block text-xs mt-1">Find can read the proposal for panel expertise, then use those specialties to find reviewers.</span>
                 </>
               ) : (
@@ -231,7 +237,7 @@ export default function SearchControls({
             disabled={noSourcesSelected || !rosterLoaded || removingPrevious} onClick={() => runSearch('expertise')}
             className="mr-3 px-3 py-2 border rounded-lg text-sm">Find reviewers by proposal expertise</button>}
           {canSwitch && <button type="button" disabled={noSourcesSelected || !rosterLoaded || removingPrevious}
-            onClick={() => runSearch('fallback')} className="mr-3 px-3 py-2 border rounded-lg text-sm">
+            onClick={() => runSearch(switchToPrimary ? 'standard' : 'fallback')} className="mr-3 px-3 py-2 border rounded-lg text-sm">
             Retry with {alternate || 'the configured alternate model'}
           </button>}
           <button

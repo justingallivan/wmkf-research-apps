@@ -914,7 +914,7 @@ test('replaces a raw browser fetch error before analysis starts with retry guida
   expect(readSseStream).not.toHaveBeenCalled();
 });
 
-test('a model refusal is shown as non-retryable guidance', async () => {
+test('a refusal without model metadata offers the expertise search', async () => {
   global.fetch = jest.fn((url) => {
     const target = String(url);
     if (target.includes('/api/workbench/reviewer-roster?')) {
@@ -950,6 +950,34 @@ test('a model refusal is shown as non-retryable guidance', async () => {
   const calls = global.fetch.mock.calls.filter(([url]) => url === '/api/reviewer-finder/analyze');
   expect(JSON.parse(calls[1][1].body)).toMatchObject({ requestId: REQ, blobUrl: 'blob', analysisMode: 'expertise' });
   await screen.findByRole('button', { name: 'Find reviewers by proposal expertise' });
+});
+
+test.each([
+  ['primary', 'alternate', 'fallback'],
+  ['alternate', 'primary', 'standard'],
+])('after %s declines, staff can retry the original search with %s', async (declined, other, mode) => {
+  global.fetch = jest.fn(async url => String(url).includes('reviewer-roster?')
+    ? response({ success: true, active: [], excluded: [], allNames: [] })
+    : response({}));
+  readSseStream.mockImplementation(async (_response, emit) => {
+    emit({ event: 'progress', data: { status: 'model_resolved', data: {
+      model: 'primary', primaryModel: 'primary', fallbackModel: 'alternate',
+    } } });
+    emit({ event: 'progress', data: { status: 'analysis_refused', data: { model: declined } } });
+    emit({ event: 'error', data: { status: 'analysis_refused', message: 'Declined' } });
+  });
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" excludedNames={['Excluded Reviewer']} />);
+  fireEvent.change(screen.getByLabelText(/Additional context for Claude/), { target: { value: 'Prioritize imaging' } });
+  fireEvent.click(await screen.findByRole('button', { name: 'Run reviewer search' }));
+  await screen.findByText(declined + ' declined this reviewer search.');
+  const requests = () => global.fetch.mock.calls.filter(([url]) => url === '/api/reviewer-finder/analyze')
+    .map(([, options]) => JSON.parse(options.body));
+  expect(requests()).toHaveLength(1);
+  expect(screen.getByRole('button', { name: 'Find reviewers by proposal expertise' })).toBeEnabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Retry with ' + other }));
+  await screen.findByText(declined + ' declined this reviewer search.');
+  expect(requests()[1]).toEqual({ ...requests()[0], analysisMode: mode });
+  expect(requests()[1]).toMatchObject({ excludedNames: ['Excluded Reviewer'], additionalNotes: 'Prioritize imaging' });
 });
 
 test('a refusal can reach a saved literature reviewer with inspectable proposal references', async () => {
