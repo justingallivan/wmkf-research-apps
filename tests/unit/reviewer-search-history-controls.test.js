@@ -951,3 +951,52 @@ test('a model refusal is shown as non-retryable guidance', async () => {
   expect(JSON.parse(calls[1][1].body)).toMatchObject({ requestId: REQ, blobUrl: 'blob', analysisMode: 'expertise' });
   await screen.findByRole('button', { name: 'Find reviewers by proposal expertise' });
 });
+
+test('a refusal can reach a saved literature reviewer with inspectable proposal references', async () => {
+  let retained = [];
+  const events = [
+    ['error', { status: 'analysis_refused', message: 'Declined' }],
+    ['result', { proposalInfo: { keywords: 'astronomy' }, panelExpertise: [{ specialty: 'Astronomy', source: 3 }], sourceLabel: 'page' }],
+    ['result', { ranked: [generatedCandidate], unverified: [] }],
+    ['complete', { type: 'complete', results: [] }],
+  ];
+  readSseStream.mockImplementation(async (_res, emit) => {
+    const [event, data] = events.shift();
+    emit({ event, data });
+  });
+  global.fetch = jest.fn(async (url, options = {}) => {
+    if (url.includes('reviewer-roster?')) return response({ success: true, active: retained, allNames: retained.map(c => c.name) });
+    if (url.endsWith('reviewer-roster') && options.method === 'POST') {
+      retained = JSON.parse(options.body).candidates;
+      return savedReceipt(retained);
+    }
+    return response({});
+  });
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" excludedNames={['Excluded Reviewer']} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Run reviewer search' }));
+  await screen.findByText('The analysis model declined this request.');
+  fireEvent.click(screen.getByRole('button', { name: 'Find reviewers by proposal expertise' }));
+  await screen.findByText('Astronomy (page 3)');
+  await waitFor(() => expect(retained).toHaveLength(1));
+  expect(retained[0].name).toBe(generatedCandidate.name);
+  const searches = global.fetch.mock.calls.filter(([url]) => url.endsWith('/analyze'));
+  expect(JSON.parse(searches[1][1].body)).toMatchObject({ blobUrl: 'blob', requestId: REQ, analysisMode: 'expertise', excludedNames: ['Excluded Reviewer'] });
+});
+
+test('reloading a staff discovery case restores owner settings and requires a specific saved reviewer to close', async () => {
+  const handoff = { owner: 'Staff Owner', caseId: REQ, settings: {
+    reviewerCount: 7, additionalNotes: 'Review imaging', excludeText: 'Prior Reviewer', referredSeedsText: '',
+    referredBy: '', searchSources: { pubmed: true, arxiv: false, biorxiv: false, chemrxiv: false },
+  } };
+  global.fetch = jest.fn(async (url, options = {}) => options.method === 'PATCH'
+    ? response({ success: true })
+    : response({ success: true, active: [], allNames: [], findHandoff: handoff }));
+  render(<ReviewerSearchSection requestId={REQ} blobUrl="blob" proposalKey="proposal" savedPool={[{ suggestionId: 'saved-id', name: 'Chosen Reviewer' }]} />);
+  expect(await screen.findByText(/Staff Owner owns the staff search/)).toBeInTheDocument();
+  expect(screen.getByDisplayValue('Review imaging')).toBeInTheDocument();
+  expect(screen.getByDisplayValue('Prior Reviewer')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Complete discovery with Chosen Reviewer' }));
+  await screen.findByRole('button', { name: 'Run reviewer search' });
+  const patch = global.fetch.mock.calls.find(([, opts]) => opts?.method === 'PATCH');
+  expect(JSON.parse(patch[1].body)).toMatchObject({ requestId: REQ, updates: { caseId: REQ, suggestionId: 'saved-id' } });
+});
