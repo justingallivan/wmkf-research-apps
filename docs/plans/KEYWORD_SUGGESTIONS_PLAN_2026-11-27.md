@@ -3,7 +3,9 @@
 Prepared November 27, 2026; revised the same day after a Codex adversarial
 review (gpt-6-astra, verdict needs-attention: approval recovery, term
 reservation, existing-keyword compatibility, recipient policy) and a second
-review (post-claim recheck; server-verified reconcile denial). Status: **plan,
+review (post-claim recheck; server-verified reconcile denial) and a third
+(every create attempt timed and fenced; retired keywords not selectable;
+duplicate conflicts must be resolved before approval). Status: **plan,
 not built.** Owner decisions are
 dated; everything else is a proposal for review.
 
@@ -67,6 +69,7 @@ edit them.
 | `approval_term`, `approval_branch`, `approval_group`, `approval_keyword_id` | the approval payload, written once at the claim and never changed afterwards |
 | `outcome` | on `approved`: `created` or `linked_existing` |
 | `create_sent_at` | set (fenced) immediately before the first Dataverse create call; null means no create was ever sent |
+| `last_create_sent_at` | set (fenced) immediately before **every** create call, first or retry; the in-flight bound is measured from this |
 | `last_error`, `attempted_at` | last create attempt; for the recovery view |
 | `resolution` | on a resolved `reconcile`: `verified_created`, `verified_absent`, `retired_in_dynamics` |
 
@@ -80,8 +83,23 @@ The state machine is the safety contract:
 | `approving` | `pending` | the post-claim check finds a conflict **and `create_sent_at` is null** (no create was ever sent) |
 | `approving` | `reconcile` | the read-back finds a mismatch, a duplicate selectable discipline appears, or the outcome cannot be established |
 | `approving` | `approving` (resume) | a superuser resumes an interrupted approval (below) |
-| `reconcile` | `approved` | **server-verified**: the row with `approval_keyword_id` exists and matches the payload (`resolution = verified_created`), for example after Connor corrected it in Dynamics |
-| `reconcile` | `denied` | **server-verified only**, never on a superuser's word: either (a) no row with `approval_keyword_id` exists **and** `create_sent_at` is older than the create in-flight bound (15 minutes, longer than any Function timeout), so no create can still land (`verified_absent`); or (b) the row exists and is inactive in Dynamics (`retired_in_dynamics`). |
+| `reconcile` | `approved` | **server-verified**: a complete same-name check finds **exactly one** selectable discipline, it is the row with `approval_keyword_id`, and it matches the payload (`resolution = verified_created`); for example after Connor merged or retired a duplicate. An unchanged duplicate cannot be resolved. |
+| `reconcile` | `denied` | **server-verified only**, never on a superuser's word: either (a) no row with `approval_keyword_id` exists **and** `last_create_sent_at` is older than the create in-flight bound (`verified_absent`); or (b) the row exists and is inactive in Dynamics (`retired_in_dynamics`), which the picker and every approval check treat as not selectable. |
+
+**Sends stop at reconcile.** A create is sent only by a request that has just
+won the fenced "mark sent" update from `approving` (which bumps `version`). The
+move to `reconcile` also bumps `version`, so a Resume that started earlier loses
+its fenced update and sends nothing. A create already on the wire when
+reconcile begins is covered by the in-flight bound, measured from
+`last_create_sent_at`.
+
+**The in-flight bound.** The app's Dataverse client gives up after its request
+timeout, but that does not prove Dataverse has not committed. The bound must
+come from the upstream side: the build must record the Dataverse server-side
+request limit for this org and the client timeout, and set the bound to
+comfortably more than the larger (15 minutes is the working value) [ASSUMED:
+the server-side limit is well under 15 minutes; verify before build]. A
+`verified_absent` decision re-reads the id at decision time, after the bound.
 
 Deny from `pending` is the only unverified denial, and it is allowed only while
 `create_sent_at` is null. Once a create may have been sent, the suggestion can
@@ -106,9 +124,14 @@ fresh-install shape in `scripts/setup-database.js`, Atlas page for the table,
 
 One rule, used by the staff POST and by every approval step, and the same as the
 picker's eligibility (`lib/services/workbench/primary-discipline-service.js`
-`disciplineOptions`): a **selectable discipline** is a `wmkf_programlevel3` row
-with `wmkf_keywordtype` = Discipline (682090000) and a non-empty discipline
-branch. [VERIFIED via source, 2026-11-27] Name comparison is on `term_key`.
+`disciplineOptions`): a **selectable discipline** is an **active**
+(`statecode` 0) `wmkf_programlevel3` row with `wmkf_keywordtype` = Discipline
+(682090000) and a non-empty discipline branch. [VERIFIED via source after the
+active-state fix on this branch, 2026-11-27: `KEYWORD_SELECT` now includes
+`statecode`, and the picker and its save path refuse retired rows] Name
+comparison is on `term_key`. `listAll` still returns retired rows, because the
+proposal lists must place requests that already point at one; only new choices
+use this rule.
 
 | Same-name rows in the live Keywords table | Staff POST | Approval |
 |---|---|---|
@@ -200,7 +223,10 @@ re-runnable from what is already saved:
 7. **Resume** (an interrupted process, a lost response, or a failed Postgres
    finalization): a superuser's Resume claims the row with a fenced
    `approving` → `approving` update (new `version`, new `attempted_at`), then
-   runs step 6 first. If `create_sent_at` is null it continues from step 3.
+   runs step 6 first, with the same terminal rule as reconcile: it finalizes
+   `approved` only when a complete same-name check finds exactly one selectable
+   discipline and it is `approval_keyword_id`; more than one goes to `reconcile`.
+   If `create_sent_at` is null it continues from step 3.
    Only if the read-back finds no row does it create again, **with the frozen
    payload; the retry cannot change spelling or taxonomy.** Before re-creating,
    it repeats the authoritative check; a newly appeared selectable discipline
@@ -264,8 +290,12 @@ attributed to the superuser by impersonation, like the other Workbench writes.
   claim, end with one keyword (the second links it); a conflict found after the
   claim returns to `pending` only while `create_sent_at` is null.
 - Reconcile: denial refused while the keyword id exists and is active, and
-  refused while no row exists but `create_sent_at` is inside the in-flight
-  bound; a create that lands late is then found and resolves to approved; a
+  refused while no row exists but `last_create_sent_at` is inside the in-flight
+  bound; overlapping Resume calls followed by a move to reconcile send no further
+  create, and a denial is refused until the bound has passed from the latest
+  send; approval refused while two selectable same-name disciplines remain;
+  a retired keyword can be neither newly selected in the picker nor linked by
+  approval; a create that lands late is then found and resolves to approved; a
   mismatched existing row cannot be denied until it is retired in Dynamics.
 - Deny: no Dataverse call.
 
