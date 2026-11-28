@@ -2,7 +2,8 @@
 
 Prepared November 27, 2026; revised the same day after a Codex adversarial
 review (gpt-6-astra, verdict needs-attention: approval recovery, term
-reservation, existing-keyword compatibility, recipient policy). Status: **plan,
+reservation, existing-keyword compatibility, recipient policy) and a second
+review (post-claim recheck; server-verified reconcile denial). Status: **plan,
 not built.** Owner decisions are
 dated; everything else is a proposal for review.
 
@@ -65,7 +66,9 @@ edit them.
 | `decided_by_profile_id`, `decided_at`, `decision_note` | the superuser who claimed or decided |
 | `approval_term`, `approval_branch`, `approval_group`, `approval_keyword_id` | the approval payload, written once at the claim and never changed afterwards |
 | `outcome` | on `approved`: `created` or `linked_existing` |
+| `create_sent_at` | set (fenced) immediately before the first Dataverse create call; null means no create was ever sent |
 | `last_error`, `attempted_at` | last create attempt; for the recovery view |
+| `resolution` | on a resolved `reconcile`: `verified_created`, `verified_absent`, `retired_in_dynamics` |
 
 The state machine is the safety contract:
 
@@ -73,13 +76,18 @@ The state machine is the safety contract:
 |---|---|---|
 | `pending` | `approving` | superuser Approve; writes the payload in the same statement |
 | `pending` | `denied` | superuser Deny. **Deny is allowed only from `pending`.** |
-| `approving` | `approved` | read-back confirms a keyword with this id matching the payload |
-| `approving` | `reconcile` | the read-back finds a mismatch, or the outcome cannot be established |
+| `approving` | `approved` | read-back confirms a keyword with this id matching the payload, or the post-claim check links an existing selectable discipline |
+| `approving` | `pending` | the post-claim check finds a conflict **and `create_sent_at` is null** (no create was ever sent) |
+| `approving` | `reconcile` | the read-back finds a mismatch, a duplicate selectable discipline appears, or the outcome cannot be established |
 | `approving` | `approving` (resume) | a superuser resumes an interrupted approval (below) |
-| `reconcile` | `approved` / `denied` | a superuser resolves it after checking Dynamics, with a note |
+| `reconcile` | `approved` | **server-verified**: the row with `approval_keyword_id` exists and matches the payload (`resolution = verified_created`), for example after Connor corrected it in Dynamics |
+| `reconcile` | `denied` | **server-verified only**, never on a superuser's word: either (a) no row with `approval_keyword_id` exists **and** `create_sent_at` is older than the create in-flight bound (15 minutes, longer than any Function timeout), so no create can still land (`verified_absent`); or (b) the row exists and is inactive in Dynamics (`retired_in_dynamics`). |
 
-Nothing returns to `pending` once a create may have been sent, so a keyword that
-Dataverse created while its response was lost can never be denied afterwards.
+Deny from `pending` is the only unverified denial, and it is allowed only while
+`create_sent_at` is null. Once a create may have been sent, the suggestion can
+end only in a state the server has checked against Dynamics, so a keyword that
+Dataverse created while its response was lost can never be left selectable
+under a denied suggestion. The term stays reserved throughout `reconcile`.
 
 **Term reservation.** A partial unique index on `(keyword_type, term_key)` where
 `status IN ('pending', 'approving', 'reconcile')`. The term stays reserved from
@@ -154,8 +162,11 @@ branch. [VERIFIED via source, 2026-11-27] Name comparison is on `term_key`.
   - **Deny**: optional note. Pending only.
   - **Resume approval**: shown for `approving` rows whose `attempted_at` is
     older than 5 minutes.
-  - **Resolve**: shown for `reconcile` rows; approve (link a keyword id that
-    the server verifies) or deny, with a required note.
+  - **Resolve**: shown for `reconcile` rows, with a required note. The server
+    re-reads `approval_keyword_id` and offers only the transition the evidence
+    allows (verified match → approved; verified absent past the in-flight bound,
+    or retired in Dynamics → denied). Anything else stays `reconcile` with
+    what was found, for Connor.
 - `GET/POST /api/admin/keyword-suggestions[/id]`: `requireSuperuser`, fresh role
   check per request (`lib/utils/auth.js:461`). Every transition is version-fenced
   and must affect exactly one row; otherwise 409.
@@ -165,26 +176,35 @@ branch. [VERIFIED via source, 2026-11-27] Name comparison is on `term_key`.
 The two stores cannot share a transaction, so the design makes every step
 re-runnable from what is already saved:
 
-1. **Check** the live Keywords table with the rule above for the (possibly
-   edited) term. A selectable match: mark `approved`/`linked_existing` from
-   `pending` (fenced) and stop. A conflict: 409, stays `pending`.
+1. **Pre-check** the live Keywords table with the rule above for the (possibly
+   edited) term, so an obvious match or conflict is reported before claiming.
+   This check is advisory only.
 2. **Claim and freeze**: one fenced statement moves `pending` → `approving`,
    writes the payload (`approval_term`, `approval_branch`, `approval_group`) and
-   `approval_keyword_id`, rewrites `term_key`, sets `attempted_at`. The keyword
-   id is a UUID chosen here and saved before any Dataverse call.
-3. **Create** the row with that id and the frozen payload.
-4. **Read back** the id. If the row exists and its name, type, branch and group
+   `approval_keyword_id`, rewrites `term_key` (taking the edited term's
+   reservation), sets `attempted_at`. The keyword id is a UUID chosen here and
+   saved before any Dataverse call.
+3. **Authoritative check, with the reservation held**: repeat the complete
+   existing-keyword check. A selectable match: `approving` → `approved`,
+   `linked_existing` (fenced). A conflict: `approving` → `pending` (allowed
+   because `create_sent_at` is still null), 409. This closes the race where a
+   second approval's stale pre-check would create a second keyword after the
+   first finalized and released the term.
+4. **Mark sent**: set `create_sent_at` (fenced). From here the row can never
+   return to `pending`.
+5. **Create** the row with that id and the frozen payload.
+6. **Read back** the id. If the row exists and its name, type, branch and group
    match the payload, mark `approved`/`created` (fenced). If it exists and does
    not match, mark `reconcile`. If it does not exist, record `last_error` and
    leave `approving`.
-5. **Resume** (an interrupted process, a lost response, or a failed Postgres
+7. **Resume** (an interrupted process, a lost response, or a failed Postgres
    finalization): a superuser's Resume claims the row with a fenced
    `approving` → `approving` update (new `version`, new `attempted_at`), then
-   runs step 4 first. Only if the read-back finds no row does it run step 3 again,
-   **with the frozen payload; the retry cannot change spelling or taxonomy.**
-   Before re-creating, it re-runs the name check; a newly appeared selectable
-   discipline with that name moves the row to `reconcile` instead of creating a
-   second one.
+   runs step 6 first. If `create_sent_at` is null it continues from step 3.
+   Only if the read-back finds no row does it create again, **with the frozen
+   payload; the retry cannot change spelling or taxonomy.** Before re-creating,
+   it repeats the authoritative check; a newly appeared selectable discipline
+   with that name moves the row to `reconcile` instead of creating a second one.
 
 Concurrent external writers: Power Automate step 3 can coin the same name at
 any time, and nothing in the app can lock the Keywords table. The app therefore
@@ -239,7 +259,14 @@ attributed to the superuser by impersonation, like the other Workbench writes.
   finalization after a successful create is finalized by Resume; read-back
   mismatch goes to `reconcile`; a same-name selectable discipline appearing
   before a retry goes to `reconcile` without a second create; edited spelling
-  that collides with another reservation returns 409.
+  that collides with another reservation returns 409; two approvals converging
+  on one term, with the first finalizing between the second's pre-check and
+  claim, end with one keyword (the second links it); a conflict found after the
+  claim returns to `pending` only while `create_sent_at` is null.
+- Reconcile: denial refused while the keyword id exists and is active, and
+  refused while no row exists but `create_sent_at` is inside the in-flight
+  bound; a create that lands late is then found and resolves to approved; a
+  mismatched existing row cannot be denied until it is retired in Dynamics.
 - Deny: no Dataverse call.
 
 ## Gates
