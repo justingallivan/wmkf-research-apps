@@ -31,7 +31,7 @@ jest.mock('../../shared/components/workbench/OverviewTab', () => function Overvi
 });
 for (const name of ['ReviewersTab']) jest.mock(`../../shared/components/reviewers/${name}`, () => function TabStub() { return <div />; });
 for (const name of ['ReviewsTab', 'ProposalTab', 'StatusTab', 'AwardeeTab', 'InitialAssessmentTab', 'StaffDeliberationsTab', 'ReviewPanelTab', 'FinalWriteupTab']) {
-  jest.mock(`../../shared/components/workbench/${name}`, () => function TabStub() { return <div />; });
+  jest.mock(`../../shared/components/workbench/${name}`, () => ({ __esModule: true, default: function TabStub() { return <div />; }, FieldPrimer: function PrimerStub() { return <div />; } }));
 }
 
 import { WorkbenchRequest } from '../../pages/workbench/[requestId]';

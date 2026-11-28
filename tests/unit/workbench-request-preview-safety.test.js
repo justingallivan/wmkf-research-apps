@@ -40,7 +40,7 @@ jest.mock('../../shared/components/workbench/ReviewsTab', () => function Reviews
   return <div data-testid="reviews-tab" data-preview-read-only={String(props.previewReadOnly)} />;
 });
 
-jest.mock('../../shared/components/workbench/ProposalTab', () => function ProposalTabStub() { return <div />; });
+jest.mock('../../shared/components/workbench/ProposalTab', () => ({ __esModule: true, default: function ProposalTabStub() { return <div />; }, FieldPrimer: function PrimerStub() { return <div data-testid="field-primer" />; } }));
 jest.mock('../../shared/components/workbench/OverviewTab', () => function OverviewTabStub() { return <div />; });
 jest.mock('../../shared/components/workbench/StatusTab', () => function StatusTabStub() { return <div />; });
 jest.mock('../../shared/components/workbench/AwardeeTab', () => function AwardeeTabStub() { return <div />; });

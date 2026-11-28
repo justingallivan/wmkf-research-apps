@@ -1,7 +1,8 @@
 /**
  * Request Workbench Overview. In the phase layout it reads top to bottom:
- * request snapshot, abstract, Executive Summary (read-first), documents (staff
- * version visible, the rest folded), reviewer counts (folded), and last the
+ * request snapshot (with the short title), abstract with the applicant's summary
+ * answers folded under it, Executive Summary (read-first), keywords, documents
+ * (staff version visible, the rest folded), reviewer counts (folded), and last the
  * next-step card, which stays mounted because its reads feed the stage strip.
  * The legacy layout keeps its original order.
  */
@@ -12,6 +13,7 @@ import { StatusBadge } from './StatusTab';
 import J27Overview from './J27Overview';
 import RequestNarrativesCard from './RequestNarrativesCard';
 import { OverviewDocuments } from './ProposalTab';
+import { ApplicantAnswers, KeywordsCard } from './IntakeFields';
 import useReviewerProgress from './useReviewerProgress';
 
 const USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
@@ -182,16 +184,23 @@ export default function OverviewTab({ context, requestId, onSelectTab, j27Handof
   return (
     <div className="space-y-4">
       {context && (
-        <Section title="Request snapshot">{snapshotFields}</Section>
+        <Section title="Request snapshot">
+          {context.intake?.shortTitle && (
+            <p className="mb-4 text-sm text-gray-900"><span className="text-xs uppercase tracking-wide text-gray-400 mr-2">Short title</span>{context.intake.shortTitle}</p>
+          )}
+          {snapshotFields}
+        </Section>
       )}
       {context && (
         <Section title="Abstract">
           <p className="text-sm text-gray-700 whitespace-pre-wrap">
             {info.abstract || <span className="text-gray-500">No abstract on the request.</span>}
           </p>
+          <ApplicantAnswers intake={context.intake} />
         </Section>
       )}
       <RequestNarrativesCard requestId={requestId} readFirst />
+      {context && <KeywordsCard intake={context.intake} />}
       <OverviewDocuments requestId={requestId} />
       <details className="rounded-xl border border-gray-200 bg-white p-4">
         <summary className="cursor-pointer text-sm font-semibold">Reviewer counts</summary>

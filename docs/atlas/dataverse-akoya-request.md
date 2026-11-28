@@ -82,10 +82,21 @@ Content / abstract:
   `wmkf_summaryrisks`, `wmkf_summaryenablingadvances`, `wmkf_summarynewarea`,
   `wmkf_summarypeergroups`, `wmkf_summarypriorsupport`, `wmkf_summaryaiuse`. Created by
   hand in Production 2026-10-22 (W. M. Keck Foundation solution; owner-run metadata audit
-  2026-11-16); no app code reads them. Also applicant-entered, added the same day:
+  2026-11-16). Also applicant-entered, added the same day:
   `wmkf_pipublications` (up to 5 relevant team publications with DOIs) and
   `wmkf_iacucanimalmodels` (animal models requiring IACUC approval). Applicant text:
-  treat as untrusted if passed to prompts. Definitions: J27 application instructions
+  treat as untrusted if passed to prompts. **Read (display only) since 2026-11-27,
+  branch `claude/ui-items-2026-11-27`:** `resolve-request-service.js`
+  `loadIntakeFields` reads these ten plus the step-3 display fields
+  (`wmkf_wmkfprojectdescription`, `wmkf_ai_keywords`, `wmkf_ai_methodologies`,
+  `wmkf_ai_methodologysummary`, `wmkf_ai_teaminfo`, `wmkf_recommendationrationale`,
+  `wmkf_ai_fitassessment`, `wmkf_ai_fitrationale`, `wmkf_ai_riskflags`) in a second,
+  separately caught read for J27 read-model requests; a failed read (for example a
+  column absent from the sandbox) returns `intake: {status:'unavailable'}` and never
+  fails the request context. The Overview shows the short title, folded summary
+  answers and keywords; Initial Assessment shows Claude's intake findings. No writes.
+  Observed populated on Production test request 1003544 (owner-run probe
+  2026-11-27), except `wmkf_ai_riskflags`, which was empty. Definitions: J27 application instructions
   (see `docs/plans/J27_WORKBOOK_FIELD_MAP_2026-11-16.md`).
 - `wmkf_layabstract` and `wmkf_initialassessment` (optional plain-text Memo,
   100,000 characters each) — **[SCHEMA LIVE: historical owner-approved probe,

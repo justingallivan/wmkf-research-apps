@@ -283,7 +283,9 @@ describe('J27 read model (plan C7)', () => {
     // reads inside: drafts, Finals, presentations) = 5, plus one Postgres read (integrity).
     // No presentation exists in this setup, so its end is unverified and the stage says so (j27-read-model.js:246).
     expect(require('../../lib/services/workbench/program-scope-service').resolveDiscoveryScope).toHaveBeenCalledTimes(1);
-    expect(getById).toHaveBeenCalledTimes(1);
+    // The main read, plus the separately caught intake-field read (loadIntakeFields).
+    expect(getById).toHaveBeenCalledTimes(2);
+    expect(getById.mock.calls[1][1].select).toEqual(expect.arrayContaining(['wmkf_ai_keywords', 'wmkf_summaryscientificquestion']));
     expect(body.meetingDate).toBe('2027-06-10');
     // Memo waves are off in this env: their keys are not-provisioned and do not degrade; tier 2 is not loaded, so partial (plan C1, C3).
     expect(body.j27).toMatchObject({
@@ -295,6 +297,26 @@ describe('J27 read model (plan C7)', () => {
     expect(body.j27.tasks[1].detail).toEqual({ received: null, pastOfframpDate: true });
     expect(body.j27.input.reviewers).toEqual({ status: 'present', anySuggestion: true, counts: { status: 'not-loaded' } });
     expect(body.j27.input.calendar).toEqual({ status: 'present', offrampMeetingDate: '2027-03-15', reviewsDueDate: '2027-03-01', today: '2027-03-16' });
+  });
+  test('intake fields: present text, a choice label, and blanks as null', async () => {
+    getById.mockResolvedValueOnce(j27Row()).mockResolvedValueOnce(processAnnotations({
+      wmkf_wmkfprojectdescription: 'To locate old ice', wmkf_ai_teaminfo: '  ', wmkf_ai_fitassessment: 682090000,
+      'wmkf_ai_fitassessment@OData.Community.Display.V1.FormattedValue': 'Fit',
+    }));
+    const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
+    expect(body.intake).toMatchObject({ status: 'present', shortTitle: 'To locate old ice', personnel: null, fitAssessment: 'Fit', fieldKeywords: null });
+  });
+  test('a failed intake read marks the block unavailable and never fails resolution', async () => {
+    getById.mockResolvedValueOnce(j27Row()).mockRejectedValueOnce(new Error('Could not find a property named wmkf_summaryrisks'));
+    const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
+    expect(body.success).toBe(true);
+    expect(body.intake).toEqual({ status: 'unavailable' });
+    expect(body).toHaveProperty('j27');
+  });
+  test('a pre-2027 row makes no intake read and carries no intake block', async () => {
+    const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
+    expect(getById).toHaveBeenCalledTimes(1);
+    expect(body).not.toHaveProperty('intake');
   });
   test('the later facts come from the server by one load and the phase follows them', async () => {
     admits.mockReturnValue(true);

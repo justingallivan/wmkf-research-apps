@@ -23,7 +23,7 @@ jest.mock('../../shared/config/reviewerFinderPreferences', () => ({ readEmailSig
 jest.mock('../../shared/components/reviewers/reviewer-modes', () => ({ computeCanManage: () => true }));
 jest.mock('../../lib/dataverse/core/interlock', () => ({ classifyTarget: () => 'sandbox' }));
 jest.mock('../../shared/components/workbench/ReviewsTab', () => function Stub() { return <div />; });
-jest.mock('../../shared/components/workbench/ProposalTab', () => function Stub() { return <div />; });
+jest.mock('../../shared/components/workbench/ProposalTab', () => ({ __esModule: true, default: function Stub() { return <div />; }, FieldPrimer: function PrimerStub() { return <div data-testid="field-primer" />; } }));
 jest.mock('../../shared/components/workbench/StatusTab', () => function Stub() { return <div />; });
 jest.mock('../../shared/components/workbench/AwardeeTab', () => function Stub() { return <div />; });
 jest.mock('../../shared/components/workbench/InitialAssessmentRationale', () => function Stub() { return <div />; });

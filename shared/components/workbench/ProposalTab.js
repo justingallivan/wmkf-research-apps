@@ -229,7 +229,7 @@ function PrimerView({ envelope }) {
   );
 }
 
-function FieldPrimer({ requestId, initialRaw, exportMeta }) {
+export function FieldPrimer({ requestId, initialRaw, exportMeta }) {
   const [envelope, setEnvelope] = useState(() => parseFieldPrimerEnvelope(initialRaw));
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);

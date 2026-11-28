@@ -32,13 +32,13 @@ jest.mock('../../shared/components/reviewers/ReviewersTab', () => function Revie
   return <div data-testid="reviewers" data-context={context?.requestId || ''} data-can-manage={String(canManage)} />;
 });
 jest.mock('../../shared/components/workbench/ReviewsTab', () => function TabStub() { return <div />; });
-jest.mock('../../shared/components/workbench/ProposalTab', () => function ProposalStub(props) {
-  if (props.onProposalHref) {
-    const Proposal = jest.requireActual('../../shared/components/workbench/ProposalTab').default;
-    return <Proposal {...props} />;
-  }
-  return <div data-testid="proposal" data-context={props.context?.requestId || ''} />;
-});
+jest.mock('../../shared/components/workbench/ProposalTab', () => ({
+  __esModule: true,
+  default: function ProposalStub(props) {
+    return <div data-testid="proposal" data-context={props.context?.requestId || ''} />;
+  },
+  FieldPrimer: function PrimerStub({ requestId }) { return <div data-testid="field-primer" data-request={requestId} />; },
+}));
 jest.mock('../../shared/components/workbench/StatusTab', () => function StatusStub({ context }) { return <div data-testid="status" data-context={context?.requestId || ''} />; });
 jest.mock('../../shared/components/workbench/AwardeeTab', () => function AwardeeStub({ context }) { return <div data-testid="awardee" data-context={context?.requestId || ''} />; });
 jest.mock('../../shared/components/workbench/InitialAssessmentTab', () => function TabStub() { return <div data-testid="legacy-initial-assessment" />; });
@@ -256,21 +256,12 @@ test('J27 Initial Assessment hides the Word option and keeps the rationale draft
   expect(screen.getAllByRole('button', { name: 'Assessment', exact: true })).toHaveLength(1);
   expect(screen.queryByTestId('legacy-initial-assessment')).toBeNull();
   expect(screen.queryByRole('button', { name: 'Word assessment' })).toBeNull();
-  expect(screen.getByText('Proposal and AI intake findings').closest('details')).not.toHaveAttribute('open');
-  expect(screen.queryByRole('link', { name: /View proposal/ })).toBeNull();
-  await act(async () => {
-    pending.get('/api/workbench/proposal-documents?requestId=request-a')({
-      ok: true, json: async () => ({
-        success: true,
-        aiMaterials: [{
-          key: 'proposalNarrative', label: 'Proposal Narrative', found: true,
-          library: 'akoya_request', folder: 'request-a/AI Materials', name: 'Project-Narrative_1000369.pdf',
-        }],
-      }),
-    });
-  });
-  expect(screen.queryByRole('link', { name: /View proposal/ })).toBeNull();
-  expect(screen.getByText('Proposal and AI intake findings').closest('details')).not.toHaveAttribute('open');
+  // Phase layout: Claude's intake findings and the Field Primer come first; Scoring sits below them.
+  // The proposal and its documents live on the Overview, not here.
+  expect(screen.queryByText('Proposal and AI intake findings')).toBeNull();
+  expect(screen.queryByTestId('proposal')).toBeNull();
+  expect(screen.getByTestId('field-primer').compareDocumentPosition(screen.getByRole('heading', { name: 'Scoring', exact: true }))
+    & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   fireEvent.change(editor, { target: { value: 'Unsaved rationale' } });
 
   tabName = 'initial-writeup';

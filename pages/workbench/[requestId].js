@@ -32,7 +32,8 @@ import ReviewersTab from '../../shared/components/reviewers/ReviewersTab';
 import ReviewsTab from '../../shared/components/workbench/ReviewsTab';
 import { isChairsRecommendationEditable } from '../../shared/config/j27Scoring';
 import ScoringCard from '../../shared/components/workbench/ScoringCard';
-import ProposalTab from '../../shared/components/workbench/ProposalTab';
+import ProposalTab, { FieldPrimer } from '../../shared/components/workbench/ProposalTab';
+import { IntakeFindings } from '../../shared/components/workbench/IntakeFields';
 import IntegrityTab from '../../shared/components/workbench/IntegrityTab';
 import OverviewTab from '../../shared/components/workbench/OverviewTab';
 import AwardeeTab from '../../shared/components/workbench/AwardeeTab';
@@ -92,7 +93,6 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
   const routeKey = routeRequestId?.toLowerCase() || '';
   const [visitEditorRequestId, setVisitEditorRequestId] = useState(null);
   const [rationaleEditorRequestId, setRationaleEditorRequestId] = useState(null);
-  const [proposalLink, setProposalLink] = useState(null);
   // Step E (plan C7): facts the tabs already load, keyed by request so a
   // navigation never carries one request's reads into another's stage.
   const [j27Facts, setJ27Facts] = useState({ requestId: null });
@@ -208,11 +208,6 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
     : (tabParam && visibleTabKeys.has(tabParam) ? tabParam : 'overview');
   const reviewerSurfaceReadOnly = previewReadOnly && ['reviewers', 'reviews'].includes(activeTab);
   const editingInitialRationale = showInitialRationale && activeTab === 'proposal';
-  const updateProposalHref = useCallback((href) => {
-    if (routeStateRef.current.generation === routeGeneration) {
-      setProposalLink(href ? { href, generation: routeGeneration } : null);
-    }
-  }, [routeGeneration]);
 
 
   useEffect(() => {
@@ -385,13 +380,6 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
         </nav>
       )}
 
-      {showInitialRationale && (editingInitialRationale || rationaleEditorRequestId === routeRequestId) && (
-        <div hidden={!editingInitialRationale}>
-          <AssessmentForm key={routeRequestId} requestId={routeRequestId}
-            canManage={canManage && !previewReadOnly} onSaved={refreshPhaseIStatus}
-            proposalHref={proposalLink?.generation === routeGeneration ? proposalLink.href : null} />
-        </div>
-      )}
 
       {phaseLinkPending ? (
         <Card hover={false}>
@@ -432,39 +420,42 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
           phaseLayout={phaseLayout}
         />
       ) : activeTab === 'proposal' ? (
-        <>
-          {!showInitialRationale && isJ27ScopeCycle(visibleContext?.cycleCode) && (
-            <ScoringCard
-              key={`scoring:${routeRequestId}`}
-              context={visibleContext}
-              canManage={canManage && !previewReadOnly}
-              previewReadOnly={previewReadOnly}
-              refresh={refreshPhaseIStatus}
-              explicitSave={!phaseLayout}
-            />
-          )}
-          {showChairsRecommendation && isChairsRecommendationEditable(visibleContext.phaseIStatus) && (
-            <ScoringCard
-              key={`chairs-recommendation:${routeRequestId}`}
-              context={visibleContext}
-              canManage={canManage && !previewReadOnly}
-              refresh={refreshPhaseIStatus}
-              chairsRecommendation
-              automaticIntegrityEnabled={automaticIntegrityEnabled}
-            />
-          )}
-          {showInitialRationale ? (
-            <details key={routeRequestId} open={rawTabParam === 'proposal'}
-              className="rounded-xl border bg-white p-5">
-              <summary className="cursor-pointer font-semibold">Proposal and AI intake findings</summary>
-              <div className="mt-4">
-                <ProposalTab context={visibleContext} requestId={routeRequestId} onProposalHref={updateProposalHref} />
-              </div>
-            </details>
-          ) : (
+        phaseLayout ? (
+          // Phase layout: Claude's intake findings and the on-demand Field Primer;
+          // the scoring cards render below the switch so drafts survive tab changes.
+          <div className="space-y-4">
+            <IntakeFindings intake={visibleContext?.intake} />
+            {visibleContext && (
+              <Card hover={false}>
+                <FieldPrimer
+                  key={`field-primer:${routeRequestId}`}
+                  requestId={routeRequestId}
+                  initialRaw={visibleContext.aiContent?.fieldPrimer || null}
+                  exportMeta={{
+                    requestNumber: visibleContext.requestNumber || '',
+                    title: visibleContext.title || '',
+                    institution: visibleContext.institution || '',
+                    pi: visibleContext.proposalInfo?.pi || '',
+                  }}
+                />
+              </Card>
+            )}
+          </div>
+        ) : (
+          <>
+            {isJ27ScopeCycle(visibleContext?.cycleCode) && (
+              <ScoringCard
+                key={`scoring:${routeRequestId}`}
+                context={visibleContext}
+                canManage={canManage && !previewReadOnly}
+                previewReadOnly={previewReadOnly}
+                refresh={refreshPhaseIStatus}
+                explicitSave
+              />
+            )}
             <ProposalTab key={routeRequestId || ''} context={visibleContext} requestId={routeRequestId || ''} />
-          )}
-        </>
+          </>
+        )
       ) : activeTab === 'integrity' ? (
         <IntegrityTab key={routeRequestId || ''} requestId={routeRequestId || ''} />
       ) : activeTab === 'initial-writeup' ? (
@@ -540,6 +531,37 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
         <Card hover={false}>
           <p className="text-sm text-gray-500">This panel is coming in a later update.</p>
         </Card>
+      )}
+
+      {phaseLayout && !showInitialRationale && activeTab === 'proposal' && isJ27ScopeCycle(visibleContext?.cycleCode) && (
+        <div className="mt-4">
+          <ScoringCard
+            key={`scoring:${routeRequestId}`}
+            context={visibleContext}
+            canManage={canManage && !previewReadOnly}
+            previewReadOnly={previewReadOnly}
+            refresh={refreshPhaseIStatus}
+            explicitSave={false}
+          />
+        </div>
+      )}
+      {showInitialRationale && (editingInitialRationale || rationaleEditorRequestId === routeRequestId) && (
+        <div hidden={!editingInitialRationale} className="mt-4">
+          <AssessmentForm key={routeRequestId} requestId={routeRequestId}
+            canManage={canManage && !previewReadOnly} onSaved={refreshPhaseIStatus} />
+        </div>
+      )}
+      {showChairsRecommendation && activeTab === 'proposal' && isChairsRecommendationEditable(visibleContext.phaseIStatus) && (
+        <div className="mt-4">
+          <ScoringCard
+            key={`chairs-recommendation:${routeRequestId}`}
+            context={visibleContext}
+            canManage={canManage && !previewReadOnly}
+            refresh={refreshPhaseIStatus}
+            chairsRecommendation
+            automaticIntegrityEnabled={automaticIntegrityEnabled}
+          />
+        </div>
       )}
 
       {phaseLayout && (activeTab === 'staff-deliberations' || visitEditorRequestId === routeRequestId) && (
