@@ -59,6 +59,18 @@ test('Overview reads top to bottom: snapshot, abstract, Executive Summary, docum
   expect(screen.getByText('Applicant abstract')).toBeVisible();
 });
 
+test('the Overview shows the short title, folded applicant answers and keywords from the intake block', async () => {
+  renderOverview({ status: { intake: {
+    status: 'present', shortTitle: 'To locate million-year-old ice', scientificQuestion: 'Where does old ice survive?',
+    fieldKeywords: JSON.stringify({ schema: 'wmkf-keywords/1', primary: { term: 'Glaciology' }, secondary: [], objects: [], other: [] }),
+    methodsKeywords: JSON.stringify({ schema: 'wmkf-methods/1', methods: [{ term: 'Remote sensing' }] }),
+  } } });
+  expect(await screen.findByText('To locate million-year-old ice')).toBeVisible();
+  expect(screen.getByText('Applicant’s summary answers').closest('details')).not.toHaveAttribute('open');
+  expect(screen.getByText('Glaciology')).toBeVisible();
+  expect(screen.getByText('Remote sensing')).toBeVisible();
+});
+
 const documents = (staffVersion) => ({
   success: true, layout: 'single-submission', staffVersion,
   slots: [], phaseIIDocuments: [], aiMaterials: [], otherDocuments: [], errors: [],

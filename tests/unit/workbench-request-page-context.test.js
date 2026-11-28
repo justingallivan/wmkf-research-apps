@@ -241,7 +241,8 @@ test('J27 Initial Assessment hides the Word option and keeps the rationale draft
   const view = render(<WorkbenchRequest staffReviewSummary initialRationaleEnabled />);
   await act(async () => {
     pending.get('/api/workbench/resolve-request?requestId=request-a')({
-      ok: true, json: async () => ({ success: true, requestId: 'request-a', cycleCode: 'J27', phaseLayout: true, phaseIStatus: 100000004 }),
+      ok: true, json: async () => ({ success: true, requestId: 'request-a', cycleCode: 'J27', phaseLayout: true, phaseIStatus: 100000004,
+        intake: { status: 'present', methodology: 'Radar on rovers.' } }),
     });
   });
   await act(async () => {
@@ -262,6 +263,9 @@ test('J27 Initial Assessment hides the Word option and keeps the rationale draft
   expect(screen.queryByTestId('proposal')).toBeNull();
   expect(screen.getByTestId('field-primer').compareDocumentPosition(screen.getByRole('heading', { name: 'Scoring', exact: true }))
     & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.getByRole('heading', { name: 'Intake findings' }).compareDocumentPosition(screen.getByTestId('field-primer'))
+    & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.getByText('Radar on rovers.')).toBeVisible();
   fireEvent.change(editor, { target: { value: 'Unsaved rationale' } });
 
   tabName = 'initial-writeup';
