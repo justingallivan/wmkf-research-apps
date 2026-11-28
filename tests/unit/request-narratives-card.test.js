@@ -100,3 +100,37 @@ test('dirty reload is explicit and preserves draft when declined', async () => {
   await waitFor(() => expect(screen.getByLabelText('Executive Summary')).toHaveValue('Fresh saved text'));
   confirm.mockRestore();
 });
+
+test('read-first mode shows saved text, edits on request, and returns to text after a save', async () => {
+  render(<RequestNarrativesCard requestId="a" readFirst />);
+  expect(await screen.findByText('External abstract')).toBeInTheDocument();
+  expect(screen.queryByLabelText('Executive Summary')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Edit Executive Summary' }));
+  fireEvent.change(screen.getByLabelText('Executive Summary'), { target: { value: 'New summary' } });
+  requestJson.mockResolvedValueOnce({ success: true }).mockResolvedValueOnce({ ...record, version: 'W/"2"', lay_abstract: 'New summary' });
+  fireEvent.click(screen.getByText('Save request text'));
+  await waitFor(() => expect(requestJson).toHaveBeenCalledTimes(3));
+  expect(await screen.findByText('New summary')).toBeInTheDocument();
+  expect(screen.queryByLabelText('Executive Summary')).not.toBeInTheDocument();
+  expect(screen.getByText('Saved.')).toBeInTheDocument();
+});
+
+test('read-first cancel asks before discarding a draft and reloads the saved text', async () => {
+  const confirm = jest.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
+  render(<RequestNarrativesCard requestId="a" readFirst />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit Executive Summary' }));
+  fireEvent.change(screen.getByLabelText('Executive Summary'), { target: { value: 'Draft' } });
+  fireEvent.click(screen.getByText('Cancel'));
+  expect(screen.getByLabelText('Executive Summary')).toHaveValue('Draft');
+  fireEvent.click(screen.getByText('Cancel'));
+  expect(await screen.findByText('External abstract')).toBeInTheDocument();
+  expect(screen.queryByLabelText('Executive Summary')).not.toBeInTheDocument();
+  confirm.mockRestore();
+});
+
+test('read-first mode offers no Edit button to a read-only user', async () => {
+  requestJson.mockResolvedValueOnce({ ...record, canEdit: false });
+  render(<RequestNarrativesCard requestId="a" readFirst />);
+  expect(await screen.findByText('External abstract')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Edit Executive Summary' })).not.toBeInTheDocument();
+});

@@ -7,12 +7,15 @@ import { Button, Card } from '../Layout';
 const textValues = data => Object.fromEntries(Object.keys(REQUEST_NARRATIVE_FIELDS).map(key => [key, data[key] ?? '']));
 
 // The keyed editor also fences state before effects run on request navigation.
-export default function RequestNarrativesCard({ requestId }) {
-  return requestId ? <NarrativeEditor key={requestId} requestId={requestId} /> : null;
+// readFirst (phase-layout Overview) shows the saved text with an Edit button;
+// without it the editor is always open, as in the legacy layout.
+export default function RequestNarrativesCard({ requestId, readFirst = false }) {
+  return requestId ? <NarrativeEditor key={requestId} requestId={requestId} readFirst={readFirst} /> : null;
 }
 
-function NarrativeEditor({ requestId }) {
+function NarrativeEditor({ requestId, readFirst }) {
   const router = useRouter();
+  const [editing, setEditing] = useState(!readFirst);
   const [saved, setSaved] = useState(null);
   const [draft, setDraft] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -74,15 +77,17 @@ function NarrativeEditor({ requestId }) {
     };
   }, [dirty, router]);
 
-  async function reload() {
+  async function reload({ closeEditor = false } = {}) {
     if (pending.current) return;
-    if (dirty && !window.confirm('Discard your unsaved draft and reload the saved text?')) return;
+    const prompt = closeEditor ? 'Discard your unsaved request text?' : 'Discard your unsaved draft and reload the saved text?';
+    if (dirty && !window.confirm(prompt)) return;
     pending.current = true; setBusy(true);
     const token = ++generation.current;
     try {
       const data = await requestJson(url);
       if (token !== generation.current) return;
       setSaved(data); setDraft(textValues(data)); setError(''); setNotice(''); setNeedsReload(false);
+      if (closeEditor) setEditing(false);
     } catch (failure) {
       if (token === generation.current) setError(failure.message);
     } finally {
@@ -108,6 +113,7 @@ function NarrativeEditor({ requestId }) {
         const data = await requestJson(url);
         if (token !== generation.current) return;
         setSaved(data); setDraft(textValues(data)); setNeedsReload(false);
+        if (readFirst) setEditing(false);
       } catch {
         if (token === generation.current) setError('Saved, but the latest text could not be reloaded. Reload before editing again.');
       }
@@ -117,6 +123,24 @@ function NarrativeEditor({ requestId }) {
     } finally {
       if (token === generation.current) { pending.current = false; setBusy(false); }
     }
+  }
+
+  if (readFirst && !editing) {
+    return (
+      <Card hover={false}>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-base font-semibold text-gray-900">Executive Summary</h2>
+          {saved?.canEdit && <Button type="button" variant="secondary" size="sm"
+            aria-label="Edit Executive Summary" onClick={() => { setNotice(''); setEditing(true); }}>Edit</Button>}
+        </div>
+        {!saved && !error && <p role="status" className="mt-3 text-sm text-gray-500">Loading request text…</p>}
+        {saved && Object.keys(REQUEST_NARRATIVE_FIELDS).map(key => (
+          <p key={key} className="mt-3 whitespace-pre-wrap text-sm text-gray-700">{saved[key] || 'Not yet provided.'}</p>
+        ))}
+        {notice && <p role="status" className="mt-2 text-sm text-gray-700">{notice}</p>}
+        {error && <p role="alert" className="mt-2 text-sm text-red-700">{error}</p>}
+      </Card>
+    );
   }
 
   return (
@@ -137,7 +161,10 @@ function NarrativeEditor({ requestId }) {
         {saved.canEdit && <Button type="submit" loading={busy} disabled={!dirty || !saved.version || needsReload || busy}>Save request text</Button>}
         {dirty && <p className="text-sm text-gray-600">Unsaved changes</p>}
       </form>}
-      <div className="mt-3"><Button type="button" variant="secondary" disabled={busy} onClick={reload}>Reload saved text</Button></div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button type="button" variant="secondary" disabled={busy} onClick={() => reload()}>Reload saved text</Button>
+        {readFirst && <Button type="button" variant="secondary" disabled={busy} onClick={() => reload({ closeEditor: true })}>Cancel</Button>}
+      </div>
       {notice && <p role="status" className="mt-2 text-sm text-gray-700">{notice}</p>}
       {error && <p role="alert" className="mt-2 text-sm text-red-700">{error}</p>}
     </Card>

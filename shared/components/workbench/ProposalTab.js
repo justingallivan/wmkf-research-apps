@@ -392,7 +392,7 @@ function FieldPrimer({ requestId, initialRaw, exportMeta }) {
   );
 }
 
-function DocumentsSection({ requestId, docs, error }) {
+function DocumentsSection({ requestId, docs, error, hideStaffVersion = false }) {
   if (error) {
     return <p className="text-sm text-amber-600">Couldn’t load documents: {error}</p>;
   }
@@ -408,7 +408,7 @@ function DocumentsSection({ requestId, docs, error }) {
   return (
     <div className="space-y-4">
       {docs.boardWriteups?.length > 0 && <div><p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Final Board writeups</p><ul>{docs.boardWriteups.map(document => <li key={document.documentId} className="py-2"><a className="text-blue-700 underline" href={document.webUrl} target="_blank" rel="noreferrer">{document.cycle} — {document.filename}</a>{document.archivedAt && <span className="ml-2 text-xs text-gray-500">Archived {new Date(document.archivedAt).toLocaleDateString()}</span>}</li>)}</ul></div>}
-      {singleSubmission && docs.staffVersion && (
+      {!hideStaffVersion && singleSubmission && docs.staffVersion && (
         <div>
           <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Staff version</p>
           <div className="flex items-center justify-between gap-3 py-2">
@@ -536,6 +536,60 @@ function DocumentsSection({ requestId, docs, error }) {
         <p className="text-xs text-amber-600">Some document folders couldn’t be read.</p>
       )}
     </div>
+  );
+}
+
+/**
+ * Overview documents card (phase layout): the combined staff version stays
+ * visible; every other request document sits under one disclosure.
+ */
+export function OverviewDocuments({ requestId }) {
+  const [state, setState] = useState({ requestId: null, docs: null, error: null });
+  useEffect(() => {
+    if (!requestId) return undefined;
+    let cancelled = false;
+    requestEnvelope(`/api/workbench/proposal-documents?requestId=${encodeURIComponent(requestId)}`, { tolerantBody: true })
+      .then(({ ok: resOk, status: resStatus, data: body }) => {
+        if (!resOk || body?.success !== true) throw new Error(body?.error || `Failed to load documents (${resStatus})`);
+        if (!cancelled) setState({ requestId, docs: body, error: null });
+      })
+      .catch((e) => {
+        if (!cancelled) setState({ requestId, docs: null, error: e.message });
+      });
+    return () => { cancelled = true; };
+  }, [requestId]);
+
+  const current = state.requestId === requestId ? state : { docs: null, error: null };
+  const { docs, error } = current;
+  const staff = docs?.layout === 'single-submission' ? docs.staffVersion : null;
+  return (
+    <Section title="Documents">
+      {error ? (
+        <p className="text-sm text-amber-600">Couldn’t load documents: {error}</p>
+      ) : !docs ? (
+        <p className="text-sm text-gray-500">Loading documents…</p>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm text-gray-700 truncate">
+              <span className="font-medium text-gray-900">Staff version</span>
+              {staff?.found ? ` · ${staff.name}` : ''}
+            </span>
+            {staff?.found ? (
+              <DocActions requestId={requestId} file={staff} />
+            ) : (
+              <span className="text-xs text-gray-400">{staff ? 'not received yet' : 'not available for this request'}</span>
+            )}
+          </div>
+          <details>
+            <summary className="cursor-pointer text-sm font-medium text-gray-700">Additional documents</summary>
+            <div className="mt-3">
+              <DocumentsSection requestId={requestId} docs={docs} error={null} hideStaffVersion />
+            </div>
+          </details>
+        </div>
+      )}
+    </Section>
   );
 }
 

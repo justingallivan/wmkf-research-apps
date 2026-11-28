@@ -8,9 +8,10 @@ Status: merged to `main` at `1037d2dbd`, deployed and live-tested 2026-11-16 wit
 ## Current scope
 
 The Overview displays **Executive Summary**, using API key `lay_abstract` and
-Dataverse column `akoya_request.wmkf_layabstract`. It appears below the J27
-handoff guidance and above Request details; the legacy Overview also includes it.
-Staff with Workbench access can read. The assigned lead Program Director or a
+Dataverse column `akoya_request.wmkf_layabstract`. In the J27 phase layout it
+appears after the request snapshot and abstract, as saved text with an Edit
+button that opens the editor (owner, 2026-11-27); the legacy Overview keeps the
+always-open editor. Staff with Workbench access can read. The assigned lead Program Director or a
 superuser with a linked Dynamics actor can explicitly save or clear the text.
 
 This slice reuses the narrowed editor from `codex/power-automate-integration-2026-11-11`

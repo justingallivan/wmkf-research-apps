@@ -1,7 +1,9 @@
 /**
- * Request Workbench Overview. The J27 development layout leads with a
- * read-only handoff cue. Request details and the existing lightweight
- * reviewer rollup are still available below it.
+ * Request Workbench Overview. In the phase layout it reads top to bottom:
+ * request snapshot, abstract, Executive Summary (read-first), documents (staff
+ * version visible, the rest folded), reviewer counts (folded), and last the
+ * next-step card, which stays mounted because its reads feed the stage strip.
+ * The legacy layout keeps its original order.
  */
 
 import { useEffect } from 'react';
@@ -9,6 +11,7 @@ import { Card } from '../Layout';
 import { StatusBadge } from './StatusTab';
 import J27Overview from './J27Overview';
 import RequestNarrativesCard from './RequestNarrativesCard';
+import { OverviewDocuments } from './ProposalTab';
 import useReviewerProgress from './useReviewerProgress';
 
 const USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
@@ -100,6 +103,26 @@ export default function OverviewTab({ context, requestId, onSelectTab, j27Handof
   const artifacts = aiArtifacts(context?.aiContent);
   const anyArtifact = artifacts.some((a) => a.present);
 
+  const snapshotFields = context && (
+    <dl className="grid sm:grid-cols-2 gap-4">
+      <Field label="Principal Investigator">{info.pi}</Field>
+      <Field label="Co-Investigators">{coPIs.length ? coPIs.join(', ') : '—'}</Field>
+      <Field label="Institution">{context.institution}</Field>
+      <Field label="Board Meeting">{formatMeetingDate(context.meetingDate)}</Field>
+      <Field label="Requested Amount">{money(info.requestedAmount)}</Field>
+      <Field label="Total Project Budget">{money(info.totalProjectBudget)}</Field>
+      <Field label="Program">{context.grantProgram}</Field>
+      <Field label={j27Handoffs ? "Recorded request status" : "Status"}>
+        {context.requestStatus ? (
+          <span className="inline-flex items-center gap-2">
+            {context.requestStatus}
+            <StatusBadge statusClass={context.statusClass} />
+          </span>
+        ) : '—'}
+      </Field>
+    </dl>
+  );
+
   const details = (
     <div className={j27Handoffs ? "space-y-5 divide-y divide-gray-200 [&>section+section]:pt-5" : "space-y-4"}>
       {/* Snapshot */}
@@ -108,23 +131,7 @@ export default function OverviewTab({ context, requestId, onSelectTab, j27Handof
         embedded={j27Handoffs}
         action={!j27Handoffs && <TabLink onSelectTab={onSelectTab} tab="proposal">Open proposal →</TabLink>}
       >
-        <dl className="grid sm:grid-cols-2 gap-4">
-          <Field label="Principal Investigator">{info.pi}</Field>
-          <Field label="Co-Investigators">{coPIs.length ? coPIs.join(', ') : '—'}</Field>
-          <Field label="Institution">{context.institution}</Field>
-          <Field label="Board Meeting">{formatMeetingDate(context.meetingDate)}</Field>
-          <Field label="Requested Amount">{money(info.requestedAmount)}</Field>
-          <Field label="Total Project Budget">{money(info.totalProjectBudget)}</Field>
-          <Field label="Program">{context.grantProgram}</Field>
-          <Field label={j27Handoffs ? "Recorded request status" : "Status"}>
-            {context.requestStatus ? (
-              <span className="inline-flex items-center gap-2">
-                {context.requestStatus}
-                <StatusBadge statusClass={context.statusClass} />
-              </span>
-            ) : '—'}
-          </Field>
-        </dl>
+        {snapshotFields}
       </Section>}
 
       {/* AI artifacts */}
@@ -174,15 +181,27 @@ export default function OverviewTab({ context, requestId, onSelectTab, j27Handof
 
   return (
     <div className="space-y-4">
+      {context && (
+        <Section title="Request snapshot">{snapshotFields}</Section>
+      )}
+      {context && (
+        <Section title="Abstract">
+          <p className="text-sm text-gray-700 whitespace-pre-wrap">
+            {info.abstract || <span className="text-gray-500">No abstract on the request.</span>}
+          </p>
+        </Section>
+      )}
+      <RequestNarrativesCard requestId={requestId} readFirst />
+      <OverviewDocuments requestId={requestId} />
+      <details className="rounded-xl border border-gray-200 bg-white p-4">
+        <summary className="cursor-pointer text-sm font-semibold">Reviewer counts</summary>
+        <div className="mt-4"><ReviewerProgress state={reviewerProgress} showHint={false} /></div>
+      </details>
       <J27Overview key={requestId} context={context} requestId={requestId}
         reviewerProgress={reviewerProgress} onJ27Facts={onJ27Facts}
         onOpenReports={onSelectTab ? () => onSelectTab('reviews') : null}
+        onSelectTab={onSelectTab}
         initialRationaleEnabled={initialRationaleEnabled} chairsRecommendationEnabled={chairsRecommendationEnabled} meetingRosterEnabled={meetingRosterEnabled} />
-      <RequestNarrativesCard requestId={requestId} />
-      <details className="rounded-xl border border-gray-200 bg-white p-4">
-        <summary className="cursor-pointer text-sm font-semibold">Request details</summary>
-        <div className="mt-4">{details}</div>
-      </details>
     </div>
   );
 }

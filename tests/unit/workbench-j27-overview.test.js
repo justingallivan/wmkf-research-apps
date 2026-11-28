@@ -42,7 +42,36 @@ test('intake shows one instruction and keeps later-stage empty states out of the
   expect(screen.queryByRole('button', { name: 'Open Initial Assessment' })).toBeNull();
   expect(screen.queryByText('0 reports received')).toBeNull();
   expect(screen.queryByText(/Presentation assessment ·/)).toBeNull();
-  expect(screen.getByText('Request details')).toBeVisible();
+  expect(screen.getByRole('heading', { name: 'Request snapshot' })).toBeVisible();
+});
+
+test('Overview reads top to bottom: snapshot, abstract, Executive Summary, documents, counts, next step', async () => {
+  renderOverview({ status: { phaseIStatus: null, proposalInfo: { abstract: 'Applicant abstract' } } });
+  await screen.findByRole('heading', { name: /Initial assessment|Scoring decision|Marked|Reviewer reports|Staff review/ });
+  const order = ['Request snapshot', 'Abstract', 'Executive Summary', 'Documents']
+    .map((name) => screen.getByRole('heading', { name }));
+  const counts = screen.getByText('Reviewer counts');
+  const next = screen.getByRole('heading', { level: 2, name: /Initial assessment|Scoring decision|Marked|Reviewer reports|Staff review/ });
+  const sequence = [...order, counts, next];
+  for (let i = 1; i < sequence.length; i += 1) {
+    expect(sequence[i - 1].compareDocumentPosition(sequence[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  }
+  expect(screen.getByText('Applicant abstract')).toBeVisible();
+});
+
+test('the next-step card opens the tab its headline names', async () => {
+  const onSelectTab = jest.fn();
+  renderOverview({
+    onSelectTab,
+    status: { phaseIStatus: null },
+    reads: {
+      'reviewer-rollup': { success: true, counts: { received: 0 } },
+      'initial-assessment-rationale': { rationale: '' },
+      'staff-review-summary': { summary: '' },
+    },
+  });
+  fireEvent.click(await screen.findByRole('button', { name: 'Open Initial Assessment' }));
+  expect(onSelectTab).toHaveBeenCalledWith('initial-assessment');
 });
 
 test('a saved presentation assessment points to the Draft Writeup and preserves handoff evidence', async () => {

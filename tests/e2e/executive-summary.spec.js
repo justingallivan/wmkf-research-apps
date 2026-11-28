@@ -59,12 +59,19 @@ test('Executive Summary saves, clears, rejects stale edits and protects dirty na
   try {
     await page.goto(`/workbench/${ID}?tab=overview`);
     const box = page.getByLabel('Executive Summary', { exact: true });
+    // The J27 shell shows the saved text first; the legacy shell opens the editor.
+    const openEditor = async () => {
+      const edit = page.getByRole('button', { name: 'Edit Executive Summary' });
+      await expect(box.or(edit)).toBeVisible();
+      if (await edit.isVisible()) await edit.click();
+    };
+    await openEditor();
     await expect(box).toHaveValue(text);
     // The normal E2E server uses the legacy shell. A field-ready local server
     // also exercises the J27 shell without changing production settings.
     if (await page.getByRole('button', { name: 'Peer Review', exact: true }).count()) {
       await expect(page.getByRole('heading', { name: 'Initial assessment pending' })).toBeVisible();
-      await expect(page.getByText('Request details', { exact: true })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Request snapshot' })).toBeVisible();
     } else {
       await expect(page.getByRole('heading', { name: 'Request snapshot' })).toBeVisible();
     }
@@ -73,11 +80,13 @@ test('Executive Summary saves, clears, rejects stale edits and protects dirty na
     await page.getByRole('button', { name: 'Save request text' }).click();
     await expect(page.getByText('Saved.', { exact: true })).toBeVisible();
     await page.reload();
+    await openEditor();
     await expect(box).toHaveValue('Staff revision\nwith a second line.');
     await box.fill('');
     await page.getByRole('button', { name: 'Save request text' }).click();
     await expect(page.getByText('Saved.', { exact: true })).toBeVisible();
     await page.reload();
+    await openEditor();
     await expect(box).toHaveValue('');
     expect(text).toBeNull();
     await box.fill('Keep my draft');
