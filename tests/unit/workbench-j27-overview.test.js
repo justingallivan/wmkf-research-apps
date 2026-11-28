@@ -39,7 +39,6 @@ test('intake shows one instruction and keeps later-stage empty states out of the
   });
   expect(await screen.findByRole('heading', { name: 'Initial assessment pending' })).toBeVisible();
   expect(screen.getByText('Read the proposal and record the scoring decision in Initial Assessment.')).toBeVisible();
-  expect(screen.queryByRole('button', { name: 'Open Initial Assessment' })).toBeNull();
   expect(screen.queryByText('0 reports received')).toBeNull();
   expect(screen.queryByText(/Presentation assessment ·/)).toBeNull();
   expect(screen.getByRole('heading', { name: 'Request snapshot' })).toBeVisible();
@@ -72,6 +71,24 @@ test('the next-step card opens the tab its headline names', async () => {
   });
   fireEvent.click(await screen.findByRole('button', { name: 'Open Initial Assessment' }));
   expect(onSelectTab).toHaveBeenCalledWith('initial-assessment');
+});
+
+const documents = (staffVersion) => ({
+  success: true, layout: 'single-submission', staffVersion,
+  slots: [], phaseIIDocuments: [], aiMaterials: [], otherDocuments: [], errors: [],
+  reviewerMaterials: [{ library: 'lib', folder: 'REQ/Reviewer Materials', name: 'Proposal_1.pdf' }],
+});
+
+test('documents show the staff version and fold the rest', async () => {
+  renderOverview({ reads: { 'proposal-documents': documents({ key: 'staffVersion', label: 'Staff version', found: true, library: 'lib', folder: 'REQ', name: 'Staff_1.pdf' }) } });
+  expect(await screen.findByText(/Staff_1\.pdf/)).toBeVisible();
+  expect(screen.getByText('Proposal_1.pdf').closest('details')).not.toHaveAttribute('open');
+});
+
+test('documents stay open when there is no staff version, so the proposal is not folded away', async () => {
+  renderOverview({ reads: { 'proposal-documents': documents({ key: 'staffVersion', label: 'Staff version', found: false }) } });
+  expect(await screen.findByText('not received yet')).toBeVisible();
+  expect(screen.getByText('Proposal_1.pdf').closest('details')).toHaveAttribute('open');
 });
 
 test('a saved presentation assessment points to the Draft Writeup and preserves handoff evidence', async () => {

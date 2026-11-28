@@ -128,6 +128,14 @@ test('read-first cancel asks before discarding a draft and reloads the saved tex
   confirm.mockRestore();
 });
 
+test('read-first load failure offers a reload that recovers the saved text', async () => {
+  requestJson.mockRejectedValueOnce(new Error('Load failed'));
+  render(<RequestNarrativesCard requestId="a" readFirst />);
+  expect(await screen.findByText('Load failed')).toBeInTheDocument();
+  fireEvent.click(screen.getByText('Reload saved text'));
+  expect(await screen.findByText('External abstract')).toBeInTheDocument();
+});
+
 test('read-first mode offers no Edit button to a read-only user', async () => {
   requestJson.mockResolvedValueOnce({ ...record, canEdit: false });
   render(<RequestNarrativesCard requestId="a" readFirst />);

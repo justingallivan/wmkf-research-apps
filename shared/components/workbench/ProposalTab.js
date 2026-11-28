@@ -581,7 +581,8 @@ export function OverviewDocuments({ requestId }) {
               <span className="text-xs text-gray-400">{staff ? 'not received yet' : 'not available for this request'}</span>
             )}
           </div>
-          <details>
+          {/* Open when there is no staff version, so the proposal is never folded away. */}
+          <details open={!staff?.found}>
             <summary className="cursor-pointer text-sm font-medium text-gray-700">Additional documents</summary>
             <div className="mt-3">
               <DocumentsSection requestId={requestId} docs={docs} error={null} hideStaffVersion />

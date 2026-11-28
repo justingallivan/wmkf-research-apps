@@ -37,6 +37,7 @@ test('Executive Summary saves, clears, rejects stale edits and protects dirty na
       'GET /api/workbench/staff-review-summary': { summary: '' },
       'GET /api/workbench/staff-visit-assessment': { assessment: '' },
       'GET /api/workbench/meeting-roster': { presentation: null },
+      'GET /api/workbench/proposal-documents': { success: true, layout: 'single-submission', staffVersion: { key: 'staffVersion', label: 'Staff version', found: false }, slots: [], reviewerMaterials: [], phaseIIDocuments: [], aiMaterials: [], otherDocuments: [], errors: [] },
     };
     if (Object.hasOwn(responses, key)) return send(responses[key]);
     if (url.pathname === '/api/workbench/request-narratives' && req.method() === 'GET') {

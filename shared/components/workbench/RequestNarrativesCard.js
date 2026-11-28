@@ -139,6 +139,7 @@ function NarrativeEditor({ requestId, readFirst }) {
         ))}
         {notice && <p role="status" className="mt-2 text-sm text-gray-700">{notice}</p>}
         {error && <p role="alert" className="mt-2 text-sm text-red-700">{error}</p>}
+        {error && <div className="mt-3"><Button type="button" variant="secondary" disabled={busy} onClick={() => reload()}>Reload saved text</Button></div>}
       </Card>
     );
   }
