@@ -77,7 +77,7 @@ function NarrativeEditor({ requestId, readFirst }) {
     };
   }, [dirty, router]);
 
-  async function reload({ closeEditor = false } = {}) {
+  async function reload({ closeEditor = false, openEditor = false } = {}) {
     if (pending.current) return;
     const prompt = closeEditor ? 'Discard your unsaved request text?' : 'Discard your unsaved draft and reload the saved text?';
     if (dirty && !window.confirm(prompt)) return;
@@ -88,6 +88,9 @@ function NarrativeEditor({ requestId, readFirst }) {
       if (token !== generation.current) return;
       setSaved(data); setDraft(textValues(data)); setError(''); setNotice(''); setNeedsReload(false);
       if (closeEditor) setEditing(false);
+      // Edit starts from the current row version: another card's save on this
+      // page (for example the primary discipline) changes it.
+      if (openEditor) setEditing(true);
     } catch (failure) {
       if (token === generation.current) setError(failure.message);
     } finally {
@@ -131,7 +134,7 @@ function NarrativeEditor({ requestId, readFirst }) {
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-base font-semibold text-gray-900">Executive Summary</h2>
           {saved?.canEdit && <Button type="button" variant="secondary" size="sm"
-            aria-label="Edit Executive Summary" onClick={() => { setNotice(''); setEditing(true); }}>Edit</Button>}
+            aria-label="Edit Executive Summary" disabled={busy} onClick={() => reload({ openEditor: true })}>Edit</Button>}
         </div>
         {!saved && !error && <p role="status" className="mt-3 text-sm text-gray-500">Loading request text…</p>}
         {saved && Object.keys(REQUEST_NARRATIVE_FIELDS).map(key => (

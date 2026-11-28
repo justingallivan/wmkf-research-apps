@@ -1,8 +1,8 @@
 /**
  * Primary discipline (akoya_request.wmkf_programareaserved) on the phase-layout
  * Overview: the discipline in effect, Claude's intake pick when it differs, and
- * an editor any staff member can use (primary-discipline-service.js). Choosing
- * another discipline moves the proposal to that section of the proposal lists.
+ * an editor any staff member can use (primary-discipline-service.js). Proposal
+ * lists built after a change place the proposal in the new discipline's section.
  */
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '../Layout';
@@ -25,13 +25,16 @@ function Editor({ requestId, claudePrimary, claudeRunnerUp }) {
   const [notice, setNotice] = useState('');
   const generation = useRef(0);
 
-  async function load() {
+  // withOptions also re-reads the request version, so an edit always starts from
+  // the current row (another card's save on this page changes it).
+  async function load({ withOptions = false } = {}) {
     const token = ++generation.current;
     setBusy(true);
     try {
-      const data = await requestJson(`${endpoint}?requestId=${encodeURIComponent(requestId)}`);
+      const data = await requestJson(`${endpoint}?requestId=${encodeURIComponent(requestId)}${withOptions ? '&options=1' : ''}`);
       if (token !== generation.current) return;
       setState(data); setError('');
+      if (withOptions) { setChoice(data.current?.id || ''); setNotice(''); setEditing(true); }
     } catch (failure) {
       if (token === generation.current) setError(failure.message);
     } finally {
@@ -80,7 +83,7 @@ function Editor({ requestId, claudePrimary, claudeRunnerUp }) {
         <div className="flex flex-wrap items-center gap-3">
           <p className="text-sm font-medium text-gray-900">{current?.name || 'Not set'}</p>
           {state.canEdit && <Button type="button" variant="secondary" size="sm" aria-label="Change primary discipline"
-            onClick={() => { setChoice(current?.id || ''); setNotice(''); setEditing(true); }}>Change</Button>}
+            disabled={busy} onClick={() => load({ withOptions: true })}>Change</Button>}
         </div>
       )}
       {state && !editing && differs && <p className="mt-1 text-xs text-gray-500">Claude suggested: {claudePrimary}</p>}
@@ -101,7 +104,7 @@ function Editor({ requestId, claudePrimary, claudeRunnerUp }) {
               </optgroup>
             ))}
           </select>
-          <p className="text-xs text-gray-600">Saving moves this proposal to that discipline’s section of the proposal lists.</p>
+          <p className="text-xs text-gray-600">Proposal lists built after you save place this proposal in that discipline’s section.</p>
           <div className="flex gap-2">
             <Button type="submit" size="sm" loading={busy} disabled={busy || !choice || choice === current?.id}>Save discipline</Button>
             <Button type="button" variant="secondary" size="sm" disabled={busy} onClick={() => { setEditing(false); setError(''); }}>Cancel</Button>

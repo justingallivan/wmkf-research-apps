@@ -29,26 +29,30 @@ test('shows the current discipline and Claude’s pick when they differ, never t
 
 test('change saves the chosen discipline with the version, then shows it', async () => {
   requestJson.mockResolvedValueOnce(read({ id: GLACIOLOGY, name: 'Glaciology and Cryospheric Science' }))
+    .mockResolvedValueOnce({ ...read({ id: GLACIOLOGY, name: 'Glaciology and Cryospheric Science' }), version: 'W/"6"' })
     .mockResolvedValueOnce({ success: true })
     .mockResolvedValueOnce(read({ id: PALEO, name: 'Paleoclimatology' }));
   render(<PrimaryDiscipline requestId="r1" claudePrimary="Glaciology and Cryospheric Science" claudeRunnerUp="Paleoclimatology" />);
   fireEvent.click(await screen.findByRole('button', { name: 'Change primary discipline' }));
-  expect(screen.getByRole('group', { name: 'Suggested by Claude' })).toBeInTheDocument();
-  expect(screen.getByText(/moves this proposal/)).toBeInTheDocument();
+  expect(await screen.findByRole('group', { name: 'Suggested by Claude' })).toBeInTheDocument();
+  expect(screen.getByText(/Proposal lists built after you save/)).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('Primary discipline'), { target: { value: PALEO } });
   fireEvent.click(screen.getByText('Save discipline'));
-  await waitFor(() => expect(requestJson).toHaveBeenCalledTimes(3));
-  expect(requestJson.mock.calls[1]).toEqual(['/api/workbench/primary-discipline', { method: 'PATCH', body: { requestId: 'r1', version: 'W/"5"', disciplineId: PALEO } }]);
+  await waitFor(() => expect(requestJson).toHaveBeenCalledTimes(4));
+  // Change re-reads the request with the list, so the save uses the fresh version.
+  expect(requestJson.mock.calls[1][0]).toBe('/api/workbench/primary-discipline?requestId=r1&options=1');
+  expect(requestJson.mock.calls[2]).toEqual(['/api/workbench/primary-discipline', { method: 'PATCH', body: { requestId: 'r1', version: 'W/"6"', disciplineId: PALEO } }]);
   expect(await screen.findByText('Saved.')).toBeInTheDocument();
   expect(screen.getByText('Paleoclimatology')).toBeInTheDocument();
 });
 
 test('a conflict keeps the editor and offers a reload', async () => {
   requestJson.mockResolvedValueOnce(read({ id: GLACIOLOGY, name: 'Glaciology and Cryospheric Science' }))
+    .mockResolvedValueOnce(read({ id: GLACIOLOGY, name: 'Glaciology and Cryospheric Science' }))
     .mockRejectedValueOnce(new Error('The request changed.'));
   render(<PrimaryDiscipline requestId="r1" />);
   fireEvent.click(await screen.findByRole('button', { name: 'Change primary discipline' }));
-  fireEvent.change(screen.getByLabelText('Primary discipline'), { target: { value: PALEO } });
+  fireEvent.change(await screen.findByLabelText('Primary discipline'), { target: { value: PALEO } });
   fireEvent.click(screen.getByText('Save discipline'));
   expect(await screen.findByText('The request changed.')).toBeInTheDocument();
   expect(screen.getByLabelText('Primary discipline')).toBeInTheDocument();

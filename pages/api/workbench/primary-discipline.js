@@ -20,7 +20,7 @@ export default async function handler(req, res) {
     try {
       const callerSystemId = actorRefFromSession(access.session);
       const result = req.method === 'GET'
-        ? await readPrimaryDiscipline({ requestId, callerSystemId })
+        ? await readPrimaryDiscipline({ requestId, callerSystemId, withOptions: req.query.options === '1' })
         : await savePrimaryDiscipline({ requestId, callerSystemId, version: req.body?.version, disciplineId: req.body?.disciplineId });
       return res.status(200).json(result);
     } catch (error) {

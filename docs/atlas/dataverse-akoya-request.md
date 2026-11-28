@@ -306,11 +306,12 @@ Sample row had **364 total fields** (vendor + WMKF + standard Dataverse audit fi
   deployed, 2026-11-27) — writes ONLY the primary discipline lookup
   `wmkf_programareaserved` through `wmkf_ProgramAreaServed@odata.bind`
   (navigation property per owner-run metadata probe 2026-11-27), to a Discipline
-  row (`wmkf_keywordtype` 682090000) of `wmkf_programlevel3`. Any staff with
+  row (`wmkf_keywordtype` 682090000) with a discipline branch in `wmkf_programlevel3`. Any staff with
   Workbench access and a linked Dynamics identity (owner, 2026-11-27);
   impersonated, ETag-fenced, unchanged choice skips the PATCH. Power Automate
-  step 3 writes the same lookup with Claude's pick, and the proposal lists place
-  proposals by it (`list-snapshot-service.js` `SECTION_KEYWORD_LOOKUP`).
+  step 3 writes the same lookup with Claude's pick. Proposal lists built afterwards
+  place proposals by it (`list-snapshot-service.js` `SECTION_KEYWORD_LOOKUP`);
+  reviewer-suggestion rows keep the program area copied when they were saved.
 - `lib/services/phase-i-dynamics/summarize-service.js` — retained implementation, no active standalone route caller after retirement; when invoked, writes ONLY
   `wmkf_ai_summary` through `grantRequestAdapter.updateById`, with a pre-flight
   overwrite guard. The preserved legacy implementation defers structured extraction;

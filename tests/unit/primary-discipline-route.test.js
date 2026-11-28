@@ -22,6 +22,12 @@ test('PATCH passes the session identity, never a body-supplied one', async () =>
   expect(savePrimaryDiscipline).toHaveBeenCalledWith({ requestId: id, callerSystemId: 'trusted-actor', version: 'W/"1"', disciplineId: discipline });
 });
 
+test('GET asks for the picker list only with options=1', async () => {
+  await handler({ method: 'GET', query: { requestId: id } }, response());
+  await handler({ method: 'GET', query: { requestId: id, options: '1' } }, response());
+  expect(readPrimaryDiscipline.mock.calls.map(([args]) => args.withOptions)).toEqual([false, true]);
+});
+
 test('unauthenticated, invalid id and unsupported method never reach the service', async () => {
   requireAppAccess.mockResolvedValueOnce(null);
   await handler({ method: 'GET', query: { requestId: id } }, response());

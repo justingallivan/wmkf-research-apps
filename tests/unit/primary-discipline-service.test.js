@@ -13,9 +13,11 @@ const callerSystemId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 const GLACIOLOGY = 'e94bd184-a1e3-f111-84ea-6045bd04539e';
 const PALEO = 'ea4bd184-a1e3-f111-84ea-6045bd04539e';
 const METHOD = '2a41ea86-a7e3-f111-84ea-6045bd04539e';
+const COINED = '3b41ea86-a7e3-f111-84ea-6045bd04539e';
 const keywords = [
-  { wmkf_programlevel3id: PALEO, wmkf_name: 'Paleoclimatology', wmkf_keywordtype: 682090000, wmkf_keyworddisciplinegroup_formatted: 'Earth and Environmental Sciences' },
-  { wmkf_programlevel3id: GLACIOLOGY.toUpperCase(), wmkf_name: 'Glaciology and Cryospheric Science', wmkf_keywordtype: 682090000, wmkf_keyworddisciplinegroup_formatted: 'Earth and Environmental Sciences' },
+  { wmkf_programlevel3id: PALEO, wmkf_name: 'Paleoclimatology', wmkf_keywordtype: 682090000, wmkf_keyworddisciplinebranch_formatted: 'Earth Sciences', wmkf_keyworddisciplinegroup_formatted: 'Earth and Environmental Sciences' },
+  { wmkf_programlevel3id: GLACIOLOGY.toUpperCase(), wmkf_name: 'Glaciology and Cryospheric Science', wmkf_keywordtype: 682090000, wmkf_keyworddisciplinebranch_formatted: 'Earth Sciences', wmkf_keyworddisciplinegroup_formatted: 'Earth and Environmental Sciences' },
+  { wmkf_programlevel3id: COINED, wmkf_name: 'Coined discipline', wmkf_keywordtype: 682090000, wmkf_keyworddisciplinegroup_formatted: 'Earth and Environmental Sciences' },
   { wmkf_programlevel3id: METHOD, wmkf_name: 'Instrument development', wmkf_keywordtype: 682090001 },
 ];
 const row = { akoya_requestid: requestId, _wmkf_programareaserved_value: GLACIOLOGY, _wmkf_programareaserved_value_formatted: 'Glaciology and Cryospheric Science', _etag: 'W/"5"' };
@@ -29,8 +31,14 @@ beforeEach(() => {
   resolvePreviewReadOnly.mockReturnValue(false);
 });
 
-test('reads the current discipline and only Discipline keywords, sorted, without writing', async () => {
+test('a plain read returns the discipline in effect without the keyword list', async () => {
   const result = await readPrimaryDiscipline({ requestId, callerSystemId });
+  expect(result).not.toHaveProperty('options');
+  expect(listAll).not.toHaveBeenCalled();
+});
+
+test('with options: only branched Discipline keywords, sorted, without writing', async () => {
+  const result = await readPrimaryDiscipline({ requestId, callerSystemId, withOptions: true });
   expect(result).toMatchObject({ version: 'W/"5"', canEdit: true, current: { id: GLACIOLOGY, name: 'Glaciology and Cryospheric Science' } });
   expect(result.options.map((option) => option.name)).toEqual(['Glaciology and Cryospheric Science', 'Paleoclimatology']);
   expect(getById).toHaveBeenCalledWith(requestId, { select: 'akoya_requestid,_wmkf_programareaserved_value' });
@@ -48,7 +56,7 @@ test('an unchanged choice does not write', async () => {
   expect(updateById).not.toHaveBeenCalled();
 });
 
-test.each([[METHOD, 'a Method keyword'], ['99999999-9999-9999-9999-999999999999', 'an unknown id'], ['not-a-guid', 'a malformed id']])('refuses %s (%s)', async (disciplineId) => {
+test.each([[METHOD, 'a Method keyword'], [COINED, 'a coined discipline without a branch'], ['99999999-9999-9999-9999-999999999999', 'an unknown id'], ['not-a-guid', 'a malformed id']])('refuses %s (%s)', async (disciplineId) => {
   await expect(savePrimaryDiscipline({ requestId, callerSystemId, version: 'W/"5"', disciplineId })).rejects.toMatchObject({ httpStatus: 400 });
   expect(updateById).not.toHaveBeenCalled();
 });
@@ -78,5 +86,5 @@ test('no linked identity, read-only Preview, or impersonation off cannot write',
 
 test('an incomplete keyword list fails rather than offering a partial list', async () => {
   listAll.mockResolvedValue({ records: keywords, capped: true });
-  await expect(readPrimaryDiscipline({ requestId, callerSystemId })).rejects.toThrow('incomplete');
+  await expect(readPrimaryDiscipline({ requestId, callerSystemId, withOptions: true })).rejects.toThrow('incomplete');
 });
