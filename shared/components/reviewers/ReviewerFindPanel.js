@@ -8,9 +8,10 @@
  *      `disposition=recommended` candidate rows and to parse the free-text
  *      `wmkf_excludedreviewers` into clean names.
  *   2. Auto-loads the request's exact canonical reviewer proposal via
- *      `/api/reviewer-finder/load-proposal`, or replays a deliberate dropdown
- *      override from validated `?proposalFile=` navigation state (no PDF-upload
- *      entry in the Workbench and no filename-heuristic fallback).
+ *      `/api/reviewer-finder/load-proposal`, or replays a deliberate file choice
+ *      from validated `?proposalFile=` navigation state (no PDF-upload entry in
+ *      the Workbench and no filename-heuristic fallback). The file picker is
+ *      shown only when the load fails (missing or ambiguous standard file).
  *   3. Surfaces the applicant RECOMMENDED set (badged, now candidates), the
  *      applicant EXCLUDED set (per-request soft-block, badged), and the loaded
  *      proposal — and pre-computes the exclude list staff carry into a search.
@@ -470,16 +471,14 @@ export default function ReviewerFindPanel({
   const excludedRaw = data?.excludedRaw || null;
   const excludedParseFailed = data?.excludedParseFailed || false;
 
-  // File list for the deliberate historical/ad-hoc override picker — present
-  // on a successful load and, via the carried error, when the canonical file
-  // is absent. Proposal-classified files sort first.
-  const rawFiles = doc.data?.allFiles || doc.allFiles || [];
+  // File list for the picker shown when the proposal load fails (carried on
+  // the error). Proposal-classified files sort first.
+  const rawFiles = doc.allFiles || [];
   const availableFiles = [...rawFiles].sort((a, b) => {
     const ap = a.classification === 'proposal' ? 0 : 1;
     const bp = b.classification === 'proposal' ? 0 : 1;
     return ap - bp || String(a.name).localeCompare(String(b.name));
   });
-  const pickedKey = doc.data?.picked || null;
 
   // Manual reviewer add — rendered (by ReviewerSearchSection) BELOW the search and
   // ABOVE the optional verify card. State lives here; the JSX is passed down as a
@@ -727,13 +726,13 @@ export default function ReviewerFindPanel({
           exclusion text is shown as a disclosure under that box (ReviewerSearchSection).
           exclusionsUnavailable surfaces the parse-fail / load-fail case there. */}
 
-      {/* Proposal document (auto-loaded, with manual override) */}
-      <Card hover={false}>
-        <div className="flex items-center justify-between mb-2">
-          <p className="font-medium text-gray-900">Proposal document</p>
-          {doc.loading && <Spinner />}
-        </div>
-        {doc.error ? (
+      {/* Proposal document. A successful auto-load (or a validated saved
+          selection) is a single quiet line; the file picker appears only when
+          the load fails, since that is the only way to proceed when the
+          standard file is missing or ambiguous. */}
+      {doc.error ? (
+        <Card hover={false}>
+          <p className="font-medium text-gray-900 mb-2">Proposal document</p>
           <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
             {availableFiles.length > 0
               ? (doc.requestedFileKey
@@ -746,45 +745,45 @@ export default function ReviewerFindPanel({
               className="underline font-medium"
             >Retry</button>
           </div>
-        ) : doc.loading ? (
-          <p className="text-sm text-gray-500">Loading the request’s proposal from SharePoint…</p>
-        ) : doc.data ? (
-          <p className="text-sm text-gray-700">
-            Loaded {doc.requestedFileKey ? 'selected' : 'canonical reviewer'} proposal{' '}
-            <span className="font-medium">{doc.data.filename}</span>.
-          </p>
-        ) : (
-          <p className="text-sm text-gray-600">No proposal document found for this request.</p>
-        )}
-
-        {/* Deliberate override for historical/ad-hoc analysis. allFiles is
-            present on success and when the canonical file is absent. */}
-        {availableFiles.length > 0 && (
-          <div className="mt-3">
-            <label className="block text-xs text-gray-500 mb-1">
-              {doc.error ? 'Choose the proposal document' : 'Use a different proposal document'}
-            </label>
-            <select
-              className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white"
-              value={pickedKey || ''}
-              disabled={doc.loading}
-              onChange={(ev) => {
-                if (ev.target.value) loadProposal(ev.target.value, { persist: true });
-              }}
-            >
-              {!pickedKey && <option value="">Select a file…</option>}
-              {availableFiles.map((f) => {
-                const k = fileKeyOf(f);
-                return (
-                  <option key={k} value={k}>
-                    {f.name}{f.classification === 'proposal' ? '  ·  proposal' : ''}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-        )}
-      </Card>
+          {availableFiles.length > 0 && (
+            <div className="mt-3">
+              <label className="block text-xs text-gray-500 mb-1">Choose the proposal document</label>
+              <select
+                className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white"
+                value=""
+                disabled={doc.loading}
+                onChange={(ev) => {
+                  if (ev.target.value) loadProposal(ev.target.value, { persist: true });
+                }}
+              >
+                <option value="">Select a file…</option>
+                {availableFiles.map((f) => {
+                  const k = fileKeyOf(f);
+                  return (
+                    <option key={k} value={k}>
+                      {f.name}{f.classification === 'proposal' ? '  ·  proposal' : ''}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          )}
+        </Card>
+      ) : (
+        <p className="text-sm text-gray-600 flex items-center gap-2">
+          {doc.loading ? (
+            <>
+              <Spinner />
+              Loading the request’s proposal from SharePoint…
+            </>
+          ) : doc.data ? (
+            <>
+              {doc.requestedFileKey ? 'Selected proposal:' : 'Proposal:'}{' '}
+              <span className="font-medium text-gray-900">{doc.data.filename}</span>
+            </>
+          ) : 'No proposal document found for this request.'}
+        </p>
+      )}
 
       {/* In-panel candidate search — uses the proposal already loaded above and
           the applicant exclude list; saves into this request's candidate pool.

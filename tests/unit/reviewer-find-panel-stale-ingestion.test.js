@@ -163,7 +163,7 @@ test('a validated proposal override from navigation state is replayed on initial
   }));
   const loadCall = global.fetch.mock.calls.find(([url]) => url === '/api/reviewer-finder/load-proposal');
   expect(JSON.parse(loadCall[1].body)).toEqual({ requestId: REQ_A, fileKey });
-  expect(screen.getByText(/Loaded selected proposal/i)).toHaveTextContent('ProjectDescription.pdf');
+  expect(screen.getByText(/Selected proposal:/i)).toHaveTextContent('ProjectDescription.pdf');
 });
 
 test('a deliberate dropdown selection persists only after server validation and does not reload when navigation state catches up', async () => {
