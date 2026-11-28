@@ -168,7 +168,8 @@ export function WorkbenchRequest({ previewReadOnly = false, staffReviewSummary =
     && ['initial-assessment', 'peer-review', 'deliberations', 'final-assessment', 'overview', 'awardee'].includes(rawTabParam);
   const tabParam = rawTabParam ? (LEGACY_TAB_ALIASES[rawTabParam] || rawTabParam) : null;
   const legacySections = {
-    proposal: ['initial-assessment', 'proposal'],
+    // The proposal, its abstract and documents now live on the Overview.
+    proposal: ['overview', null],
     integrity: ['initial-assessment', 'integrity'],
     'initial-writeup': ['initial-assessment', 'assessment'],
     reviewers: ['peer-review', 'panel'],

@@ -191,7 +191,7 @@ test('sandbox requests outside J27 retain the existing navigation', async () => 
 });
 
 test.each([
-  ['proposal', 'Initial Assessment', 'Proposal'],
+  ['proposal', 'Overview', null],
   ['initial-writeup', 'Initial Assessment', 'Assessment'],
   ['reviewers', 'Peer Review', 'Reviewers'],
   ['review-panel', 'Peer Review', 'AI Review Panel'],
