@@ -14,19 +14,19 @@ function nextAction(context, handoff, progress, chairsRecommendationEnabled) {
   }
   if (context.phaseIStatus === SCORING_STATUS.no) {
     return { heading: 'Marked Not Scored',
-      detail: 'Review the reason for this decision in Initial Assessment.', tab: 'initial-assessment' };
+      detail: 'Review the reason for this decision in Initial Assessment.' };
   }
   if (context.phaseIStatus === CHAIRS_RECOMMENDATION_STATUS.no) {
     return { heading: 'Not recommended to Chairs',
-      detail: 'The recommendation is in Initial Assessment.', tab: 'initial-assessment' };
+      detail: 'The recommendation is in Initial Assessment.' };
   }
   if (handoff.visit) {
     return { heading: 'Presentation assessment saved',
-      detail: 'Final Assessment shows the Draft Writeup status and whether group review can start.', tab: 'final-assessment' };
+      detail: 'Final Assessment shows the Draft Writeup status and whether group review can start.' };
   }
   if (handoff.presentation) {
     return { heading: 'Presentation record available',
-      detail: 'Check the presentation, attendance, and staff assessment in Deliberations.', tab: 'deliberations' };
+      detail: 'Check the presentation, attendance, and staff assessment in Deliberations.' };
   }
   if (handoff.review) {
     return { heading: 'Staff review summary saved',
@@ -38,28 +38,20 @@ function nextAction(context, handoff, progress, chairsRecommendationEnabled) {
   }
   if (context.phaseIStatus === CHAIRS_RECOMMENDATION_STATUS.yes) {
     return { heading: 'Recommended to Chairs',
-      detail: 'Check Initial Assessment for the recommendation and integrity findings.', tab: 'initial-assessment' };
+      detail: 'Check Initial Assessment for the recommendation and integrity findings.' };
   }
   if (context.phaseIStatus !== SCORING_STATUS.yes) {
     if (handoff.rationale === false && isScoringEditable(context.phaseIStatus)) {
       return { heading: 'Initial assessment pending',
-        detail: 'Read the proposal and record the scoring decision in Initial Assessment.', tab: 'initial-assessment' };
+        detail: 'Read the proposal and record the scoring decision in Initial Assessment.' };
     }
     return { heading: 'Scoring decision to review',
-      detail: 'Check the decision and supporting evidence in Initial Assessment.', tab: 'initial-assessment' };
+      detail: 'Check the decision and supporting evidence in Initial Assessment.' };
   }
   return { heading: 'Marked Scored',
     detail: chairsRecommendationEnabled ? 'Record the recommendation to Chairs in Initial Assessment.'
-      : 'Check the reviewer roster and progress in Peer Review.',
-    tab: chairsRecommendationEnabled ? 'initial-assessment' : 'peer-review' };
+      : 'Check the reviewer roster and progress in Peer Review.' };
 }
-
-const TAB_LABEL = {
-  'initial-assessment': 'Initial Assessment',
-  'peer-review': 'Peer Review',
-  deliberations: 'Deliberations',
-  'final-assessment': 'Final Assessment',
-};
 
 function initialAssessmentDecision(context) {
   switch (context.phaseIStatus) {
@@ -80,7 +72,7 @@ function savedLabel(value) {
 }
 
 export default function J27Overview({ context, requestId, reviewerProgress,
-  initialRationaleEnabled, chairsRecommendationEnabled, meetingRosterEnabled, onOpenReports, onSelectTab = null, onJ27Facts = null }) {
+  initialRationaleEnabled, chairsRecommendationEnabled, meetingRosterEnabled, onOpenReports, onJ27Facts = null }) {
   const [loaded, setLoaded] = useState(null);
   useEffect(() => {
     const controller = new AbortController();
@@ -135,12 +127,6 @@ export default function J27Overview({ context, requestId, reviewerProgress,
         <button type="button" onClick={onOpenReports}
           className="mt-2 min-h-11 rounded-md text-sm font-semibold text-blue-800 underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-blue-600">
           Open Reports
-        </button>
-      )}
-      {!action?.reports && action?.tab && onSelectTab && (
-        <button type="button" onClick={() => onSelectTab(action.tab)}
-          className="mt-2 min-h-11 rounded-md text-sm font-semibold text-blue-800 underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-blue-600">
-          Open {TAB_LABEL[action.tab]}
         </button>
       )}
       {handoff && (

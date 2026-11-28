@@ -196,10 +196,6 @@ plan is final, if a deck is still wanted.
   purpose on 2026-11-07 ("Simplify J27 Overview and separate awardee
   work"), which this desk audit did not know. Wording and link polish is
   deferred until the underlying J27 work is done; revisit it then.
-- **Revisited 2026-11-27 (owner).** In the Overview reorder the owner chose a
-  layout with a button on the next-step card, so the card again opens the tab
-  its headline names ("Open Initial Assessment" and the like). The top strip
-  stays unlinked.
 
 ## 4. Questions only staff can answer
 

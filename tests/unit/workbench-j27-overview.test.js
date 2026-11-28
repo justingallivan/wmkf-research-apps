@@ -39,6 +39,7 @@ test('intake shows one instruction and keeps later-stage empty states out of the
   });
   expect(await screen.findByRole('heading', { name: 'Initial assessment pending' })).toBeVisible();
   expect(screen.getByText('Read the proposal and record the scoring decision in Initial Assessment.')).toBeVisible();
+  expect(screen.queryByRole('button', { name: /^Open / })).toBeNull();
   expect(screen.queryByText('0 reports received')).toBeNull();
   expect(screen.queryByText(/Presentation assessment ·/)).toBeNull();
   expect(screen.getByRole('heading', { name: 'Request snapshot' })).toBeVisible();
@@ -56,21 +57,6 @@ test('Overview reads top to bottom: snapshot, abstract, Executive Summary, docum
     expect(sequence[i - 1].compareDocumentPosition(sequence[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   }
   expect(screen.getByText('Applicant abstract')).toBeVisible();
-});
-
-test('the next-step card opens the tab its headline names', async () => {
-  const onSelectTab = jest.fn();
-  renderOverview({
-    onSelectTab,
-    status: { phaseIStatus: null },
-    reads: {
-      'reviewer-rollup': { success: true, counts: { received: 0 } },
-      'initial-assessment-rationale': { rationale: '' },
-      'staff-review-summary': { summary: '' },
-    },
-  });
-  fireEvent.click(await screen.findByRole('button', { name: 'Open Initial Assessment' }));
-  expect(onSelectTab).toHaveBeenCalledWith('initial-assessment');
 });
 
 const documents = (staffVersion) => ({

@@ -200,7 +200,6 @@ export default function OverviewTab({ context, requestId, onSelectTab, j27Handof
       <J27Overview key={requestId} context={context} requestId={requestId}
         reviewerProgress={reviewerProgress} onJ27Facts={onJ27Facts}
         onOpenReports={onSelectTab ? () => onSelectTab('reviews') : null}
-        onSelectTab={onSelectTab}
         initialRationaleEnabled={initialRationaleEnabled} chairsRecommendationEnabled={chairsRecommendationEnabled} meetingRosterEnabled={meetingRosterEnabled} />
     </div>
   );
