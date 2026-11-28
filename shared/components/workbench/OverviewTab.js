@@ -200,7 +200,7 @@ export default function OverviewTab({ context, requestId, onSelectTab, j27Handof
         </Section>
       )}
       <RequestNarrativesCard requestId={requestId} readFirst />
-      {context && <KeywordsCard intake={context.intake} />}
+      {context && <KeywordsCard intake={context.intake} requestId={requestId} />}
       <OverviewDocuments requestId={requestId} />
       <details className="rounded-xl border border-gray-200 bg-white p-4">
         <summary className="cursor-pointer text-sm font-semibold">Reviewer counts</summary>

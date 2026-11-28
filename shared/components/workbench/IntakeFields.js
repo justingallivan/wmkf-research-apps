@@ -7,6 +7,7 @@
  */
 import { Card } from '../Layout';
 import { parseFieldKeywords, parseMethodsKeywords } from '../../utils/intake-keywords';
+import PrimaryDiscipline from './PrimaryDiscipline';
 
 const UNAVAILABLE = 'Couldn’t load the intake fields for this request.';
 
@@ -67,14 +68,17 @@ function Chips({ items }) {
   );
 }
 
-/** Field and Methods keywords (Overview). */
-export function KeywordsCard({ intake }) {
+/** Primary discipline, then Field and Methods keywords (Overview). */
+export function KeywordsCard({ intake, requestId = null }) {
   if (!intake) return null;
   const field = intake.status === 'present' ? parseFieldKeywords(intake.fieldKeywords) : undefined;
   const methods = intake.status === 'present' ? parseMethodsKeywords(intake.methodsKeywords) : undefined;
   return (
     <Card hover={false}>
       <h2 className="text-base font-semibold text-gray-900 mb-3">Keywords</h2>
+      <div className="mb-4">
+        <PrimaryDiscipline requestId={requestId} claudePrimary={field?.primary || null} claudeRunnerUp={field?.runnerUp || null} />
+      </div>
       {intake.status === 'unavailable' ? (
         <p className="text-sm text-amber-600">{UNAVAILABLE}</p>
       ) : (
