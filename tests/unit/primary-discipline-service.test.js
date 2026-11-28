@@ -14,9 +14,11 @@ const GLACIOLOGY = 'e94bd184-a1e3-f111-84ea-6045bd04539e';
 const PALEO = 'ea4bd184-a1e3-f111-84ea-6045bd04539e';
 const METHOD = '2a41ea86-a7e3-f111-84ea-6045bd04539e';
 const COINED = '3b41ea86-a7e3-f111-84ea-6045bd04539e';
+const RETIRED = '4c41ea86-a7e3-f111-84ea-6045bd04539e';
 const keywords = [
-  { wmkf_programlevel3id: PALEO, wmkf_name: 'Paleoclimatology', wmkf_keywordtype: 682090000, wmkf_keyworddisciplinebranch_formatted: 'Earth Sciences', wmkf_keyworddisciplinegroup_formatted: 'Earth and Environmental Sciences' },
-  { wmkf_programlevel3id: GLACIOLOGY.toUpperCase(), wmkf_name: 'Glaciology and Cryospheric Science', wmkf_keywordtype: 682090000, wmkf_keyworddisciplinebranch_formatted: 'Earth Sciences', wmkf_keyworddisciplinegroup_formatted: 'Earth and Environmental Sciences' },
+  { wmkf_programlevel3id: PALEO, wmkf_name: 'Paleoclimatology', wmkf_keywordtype: 682090000, statecode: 0, wmkf_keyworddisciplinebranch_formatted: 'Earth Sciences', wmkf_keyworddisciplinegroup_formatted: 'Earth and Environmental Sciences' },
+  { wmkf_programlevel3id: GLACIOLOGY.toUpperCase(), wmkf_name: 'Glaciology and Cryospheric Science', wmkf_keywordtype: 682090000, statecode: 0, wmkf_keyworddisciplinebranch_formatted: 'Earth Sciences', wmkf_keyworddisciplinegroup_formatted: 'Earth and Environmental Sciences' },
+  { wmkf_programlevel3id: RETIRED, wmkf_name: 'Retired discipline', wmkf_keywordtype: 682090000, statecode: 1, wmkf_keyworddisciplinebranch_formatted: 'Earth Sciences', wmkf_keyworddisciplinegroup_formatted: 'Earth and Environmental Sciences' },
   { wmkf_programlevel3id: COINED, wmkf_name: 'Coined discipline', wmkf_keywordtype: 682090000, wmkf_keyworddisciplinegroup_formatted: 'Earth and Environmental Sciences' },
   { wmkf_programlevel3id: METHOD, wmkf_name: 'Instrument development', wmkf_keywordtype: 682090001 },
 ];
@@ -56,7 +58,7 @@ test('an unchanged choice does not write', async () => {
   expect(updateById).not.toHaveBeenCalled();
 });
 
-test.each([[METHOD, 'a Method keyword'], [COINED, 'a coined discipline without a branch'], ['99999999-9999-9999-9999-999999999999', 'an unknown id'], ['not-a-guid', 'a malformed id']])('refuses %s (%s)', async (disciplineId) => {
+test.each([[METHOD, 'a Method keyword'], [COINED, 'a coined discipline without a branch'], [RETIRED, 'a retired discipline'], ['99999999-9999-9999-9999-999999999999', 'an unknown id'], ['not-a-guid', 'a malformed id']])('refuses %s (%s)', async (disciplineId) => {
   await expect(savePrimaryDiscipline({ requestId, callerSystemId, version: 'W/"5"', disciplineId })).rejects.toMatchObject({ httpStatus: 400 });
   expect(updateById).not.toHaveBeenCalled();
 });

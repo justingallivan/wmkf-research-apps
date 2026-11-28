@@ -305,8 +305,9 @@ Sample row had **364 total fields** (vendor + WMKF + standard Dataverse audit fi
   `/api/workbench/primary-discipline` (branch `claude/ui-items-2026-11-27`, not
   deployed, 2026-11-27) — writes ONLY the primary discipline lookup
   `wmkf_programareaserved` through `wmkf_ProgramAreaServed@odata.bind`
-  (navigation property per owner-run metadata probe 2026-11-27), to a Discipline
-  row (`wmkf_keywordtype` 682090000) with a discipline branch in `wmkf_programlevel3`. Any staff with
+  (navigation property per owner-run metadata probe 2026-11-27), to an active
+  (`statecode` 0) Discipline row (`wmkf_keywordtype` 682090000) with a discipline
+  branch in `wmkf_programlevel3`. Any staff with
   Workbench access and a linked Dynamics identity (owner, 2026-11-27);
   impersonated, ETag-fenced, unchanged choice skips the PATCH. Power Automate
   step 3 writes the same lookup with Claude's pick. Proposal lists built afterwards
