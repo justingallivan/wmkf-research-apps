@@ -1,6 +1,9 @@
 # Keyword suggestions: staff ask, a superuser decides
 
-Prepared November 27, 2026. Status: **plan, not built.** Owner decisions are
+Prepared November 27, 2026; revised the same day after a Codex adversarial
+review (gpt-6-astra, verdict needs-attention: approval recovery, term
+reservation, existing-keyword compatibility, recipient policy). Status: **plan,
+not built.** Owner decisions are
 dated; everything else is a proposal for review.
 
 ## Why
@@ -50,25 +53,61 @@ edit them.
 |---|---|
 | `id` | UUID primary key |
 | `keyword_type` | `'discipline'` only for now; `CHECK` constraint |
-| `term` | trimmed, 1-100 characters (Dataverse `wmkf_name` limit to be probed) |
+| `term` | the staff member's text, trimmed, 1-100 characters (Dataverse `wmkf_name` limit to be probed) |
+| `term_key` | `lower(btrim(term))`; the reservation key (see below) |
 | `note` | optional staff note, up to 1,000 characters |
 | `request_id` | the akoya_request GUID the suggestion came from |
 | `request_number` | for display and email; never trusted for authorization |
 | `suggested_by_profile_id` | from the session, never from the body |
 | `created_at` | |
-| `status` | `pending` / `approved` / `denied`; `CHECK` constraint |
-| `decided_by_profile_id`, `decided_at`, `decision_note` | set once |
-| `created_keyword_id` | the new `wmkf_programlevel3id` on approve |
-| `created_keyword_branch`, `created_keyword_group` | the choice labels used |
+| `status` | `pending` / `approving` / `approved` / `denied` / `reconcile`; `CHECK` constraint |
+| `version` | integer, incremented by every status change; every transition is `WHERE id = $1 AND version = $2` |
+| `decided_by_profile_id`, `decided_at`, `decision_note` | the superuser who claimed or decided |
+| `approval_term`, `approval_branch`, `approval_group`, `approval_keyword_id` | the approval payload, written once at the claim and never changed afterwards |
+| `outcome` | on `approved`: `created` or `linked_existing` |
+| `last_error`, `attempted_at` | last create attempt; for the recovery view |
 
-Uniqueness: one pending suggestion per normalized term
-(`lower(btrim(term))`) via a partial unique index on `status = 'pending'`, so a
-second staff member's identical suggestion links to the existing one instead of
-emailing again.
+The state machine is the safety contract:
+
+| From | To | Who / when |
+|---|---|---|
+| `pending` | `approving` | superuser Approve; writes the payload in the same statement |
+| `pending` | `denied` | superuser Deny. **Deny is allowed only from `pending`.** |
+| `approving` | `approved` | read-back confirms a keyword with this id matching the payload |
+| `approving` | `reconcile` | the read-back finds a mismatch, or the outcome cannot be established |
+| `approving` | `approving` (resume) | a superuser resumes an interrupted approval (below) |
+| `reconcile` | `approved` / `denied` | a superuser resolves it after checking Dynamics, with a note |
+
+Nothing returns to `pending` once a create may have been sent, so a keyword that
+Dataverse created while its response was lost can never be denied afterwards.
+
+**Term reservation.** A partial unique index on `(keyword_type, term_key)` where
+`status IN ('pending', 'approving', 'reconcile')`. The term stays reserved from
+suggestion until the outcome is final, so a second suggestion for the same term
+during an approval cannot be inserted: the staff POST catches the unique violation
+and links the staff member to the existing suggestion (no second email). When a
+superuser edits the spelling at approval, the claim also rewrites `term_key` to
+the edited term in the same statement; a unique violation there returns 409
+("another suggestion already reserves that term").
 
 Migration rules: numbered SQL file, manifest regenerated (`npm run prebuild`),
 fresh-install shape in `scripts/setup-database.js`, Atlas page for the table,
 `check:migrations-manifest`, `check:atlas`.
+
+### What counts as an existing keyword
+
+One rule, used by the staff POST and by every approval step, and the same as the
+picker's eligibility (`lib/services/workbench/primary-discipline-service.js`
+`disciplineOptions`): a **selectable discipline** is a `wmkf_programlevel3` row
+with `wmkf_keywordtype` = Discipline (682090000) and a non-empty discipline
+branch. [VERIFIED via source, 2026-11-27] Name comparison is on `term_key`.
+
+| Same-name rows in the live Keywords table | Staff POST | Approval |
+|---|---|---|
+| none | accept | create (below) |
+| exactly one selectable discipline | refuse, naming it ("choose it in the list") | `approved`, `outcome = linked_existing`, nothing created; the superuser's taxonomy choice is not applied |
+| a Method or Object of Study, or a Discipline without a branch (for example a Claude-coined Needs Review row), and no selectable discipline | accept, and note "a same-name keyword exists but is not a selectable discipline" | **conflict**: 409 with what was found; the suggestion stays `pending`. The superuser denies it, or has the existing row classified in Dynamics (with Connor) and approves again. Reclassifying an existing row from the app is out of scope. |
+| more than one selectable discipline | refuse, naming them | conflict as above |
 
 ### Staff side
 
@@ -77,19 +116,24 @@ fresh-install shape in `scripts/setup-database.js`, Atlas page for the table,
   optional note). Submitting does not change the request's discipline.
 - `POST /api/workbench/keyword-suggestions`: `requireAppAccess('reviewers')`,
   `withDalContext`, session profile id, GUID-validated `requestId`, term/note
-  length limits. Before inserting it checks the term against the live Keywords
-  table (case-insensitive name match on any keyword type) and refuses an exact
-  existing keyword with a message naming it. Returns the suggestion id and
-  whether it joined an existing pending suggestion.
+  length limits, the existing-keyword rule above (a complete keyword list is
+  required; an incomplete read refuses rather than guessing), then the insert
+  (reservation conflict = join the existing suggestion). Returns the suggestion id
+  and whether it joined one. Email only for a new suggestion.
 
 ### Email to superusers
 
-- Sent through `NotificationService.sendAdminEmail` with a new category
-  `keyword-suggestions`. With no configured recipients for that category or
-  `default`, it falls back to the active superuser roster
-  (`lib/services/alert-recipients.js` `getSuperuserRoster`), which is the owner's
-  "all superusers". [VERIFIED via source; the fallback order is in the module
-  header] Admins can later narrow it in `/admin` → Alert Recipients.
+- Recipients: the active superuser roster, resolved explicitly with
+  `NotificationService.getAdminRecipients()` (`lib/services/notification-service.js:162-164`,
+  which returns `AlertRecipients.getSuperuserRoster()`), and passed as
+  `explicitRecipients` to `sendAdminEmail` **with no `category`**. With no
+  category, `sendAdminEmail` sends to the explicit list only
+  (`notification-service.js:173-205`), so a configured `default` alert list can
+  neither replace the superusers nor add non-superusers. [VERIFIED via source,
+  2026-11-27] Changing the audience later is a separate owner decision.
+- If the roster lookup fails it returns an empty list
+  (`alert-recipients.js` `getSuperuserRoster` catch) and `sendAdminEmail` skips
+  the send with a log line; the suggestion is still saved and listed.
 - Content: the term, the request number and title, who suggested it, the note,
   and one link to `/admin/keyword-suggestions/<id>`. Applicant text is not in
   the email beyond the title.
@@ -100,36 +144,55 @@ fresh-install shape in `scripts/setup-database.js`, Atlas page for the table,
 
 ### Superuser side
 
-- `/admin` gets a "Keyword suggestions" section: pending first, then decided,
-  with term, request, who, when and status.
-- `/admin/keyword-suggestions/[id]`: the suggestion, the request link, and:
+- `/admin` gets a "Keyword suggestions" section: `reconcile` and stalled
+  `approving` first, then `pending`, then decided.
+- `/admin/keyword-suggestions/[id]`: the suggestion, the request link, any
+  same-name keywords found, and:
   - **Approve**: the superuser picks a discipline branch and a discipline group
-    from the Keywords table's choice options, may edit the term's spelling, and
-    confirms. The server creates one `wmkf_programlevel3` row (fields below),
-    then marks the suggestion approved with the new id.
-  - **Deny**: optional note; marks it denied.
+    from the Keywords table's choice options, may edit the spelling, and
+    confirms.
+  - **Deny**: optional note. Pending only.
+  - **Resume approval**: shown for `approving` rows whose `attempted_at` is
+    older than 5 minutes.
+  - **Resolve**: shown for `reconcile` rows; approve (link a keyword id that
+    the server verifies) or deny, with a required note.
 - `GET/POST /api/admin/keyword-suggestions[/id]`: `requireSuperuser`, fresh role
-  check per request (`lib/utils/auth.js:461`).
-- First decision wins: the decision `UPDATE ... WHERE id = $1 AND status =
-  'pending'` must affect exactly one row; otherwise 409 "already decided".
+  check per request (`lib/utils/auth.js:461`). Every transition is version-fenced
+  and must affect exactly one row; otherwise 409.
 
 ### Approve: the Dataverse write
 
-Order matters because the two stores cannot share a transaction:
+The two stores cannot share a transaction, so the design makes every step
+re-runnable from what is already saved:
 
-1. Claim the row: `UPDATE keyword_suggestions SET status = 'approving',
-   decided_by_profile_id = ..., decided_at = now() WHERE id = $1 AND status =
-   'pending'` (one row or 409). Add `approving` to the status `CHECK`.
-2. Re-check the Keywords table for an exact name match (another path may have
-   added it since). If found, record that id, mark approved, create nothing.
-3. Create the row with a deterministic id derived from the suggestion id, so a
-   retry after a lost response cannot create a duplicate (a create that returns
-   "already exists" for that id is treated as success).
-4. Mark `approved` with `created_keyword_id`.
-5. On a create failure, return the row to `pending` with the error recorded, so
-   it can be retried; never leave it `approving` silently. A row found in
-   `approving` older than a few minutes is shown to superusers as "approval
-   interrupted, retry".
+1. **Check** the live Keywords table with the rule above for the (possibly
+   edited) term. A selectable match: mark `approved`/`linked_existing` from
+   `pending` (fenced) and stop. A conflict: 409, stays `pending`.
+2. **Claim and freeze**: one fenced statement moves `pending` → `approving`,
+   writes the payload (`approval_term`, `approval_branch`, `approval_group`) and
+   `approval_keyword_id`, rewrites `term_key`, sets `attempted_at`. The keyword
+   id is a UUID chosen here and saved before any Dataverse call.
+3. **Create** the row with that id and the frozen payload.
+4. **Read back** the id. If the row exists and its name, type, branch and group
+   match the payload, mark `approved`/`created` (fenced). If it exists and does
+   not match, mark `reconcile`. If it does not exist, record `last_error` and
+   leave `approving`.
+5. **Resume** (an interrupted process, a lost response, or a failed Postgres
+   finalization): a superuser's Resume claims the row with a fenced
+   `approving` → `approving` update (new `version`, new `attempted_at`), then
+   runs step 4 first. Only if the read-back finds no row does it run step 3 again,
+   **with the frozen payload; the retry cannot change spelling or taxonomy.**
+   Before re-creating, it re-runs the name check; a newly appeared selectable
+   discipline with that name moves the row to `reconcile` instead of creating a
+   second one.
+
+Concurrent external writers: Power Automate step 3 can coin the same name at
+any time, and nothing in the app can lock the Keywords table. The app therefore
+detects rather than prevents: after a successful create, it lists same-name rows
+again; more than one selectable discipline with that name moves the suggestion
+to `reconcile` and the admin view shows both ids for Connor to merge. The fixed
+id only prevents the app from creating its own duplicate on a retry; it does not
+make names unique.
 
 Fields to write (all **unverified until the metadata probe below**):
 `wmkf_name`, `wmkf_keywordtype` = Discipline (682090000 [VERIFIED via owner-run
@@ -139,9 +202,11 @@ the parent grant program (Research) link, and `wmkf_needsreview` = No.
 Required before building: an owner-run, read-only metadata probe of
 `wmkf_programlevel3` for the choice options of branch and group, the type and
 navigation property of `wmkf_parentgrantprogram`, the type of
-`wmkf_needsreview`, `wmkf_name` maximum length, whether the app identity may
-create rows in this table, and whether a caller-supplied primary key is
-accepted.
+`wmkf_needsreview`, `wmkf_name` maximum length, and whether the table accepts a
+caller-supplied primary key. **A read-only probe cannot prove the write.** Before
+the build is considered done, rehearse one create under the impersonated
+superuser identity on Production (Mode D, owner-run), including a deliberately
+repeated create with the same id, and retire the test row with Connor.
 
 This is a new production write: Tier 2
 (`docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md` §4, §10). The write is
@@ -157,14 +222,24 @@ attributed to the superuser by impersonation, like the other Workbench writes.
 
 ## Tests
 
-- Staff POST: session identity only, GUID and length validation, existing
-  keyword refused, duplicate pending suggestion joins instead of emailing again.
-- Email: category, fallback to superusers, link only, failure keeps the row.
-- Admin routes: non-superuser refused; first decision wins (two racing
-  decisions, exactly one succeeds).
-- Approve: claim, re-check, deterministic create, mark approved; create failure
-  returns to pending; a retry after a lost create response makes no duplicate;
-  an exact existing name creates nothing.
+- Staff POST: session identity only; GUID and length validation; every row of the
+  existing-keyword table above (none, one selectable, Method, unclassified
+  Discipline, several same-name rows); incomplete keyword list refuses; a
+  suggestion while another is `approving` for the same term joins it instead of
+  inserting or emailing.
+- Email: recipients are exactly the superuser roster even with a non-empty
+  `default` alert list and a category list containing non-superusers; roster
+  failure skips the send and keeps the row.
+- Admin routes: non-superuser refused; every transition version-fenced; two
+  racing decisions, exactly one succeeds; Deny refused for `approving` and
+  `approved`.
+- Approve: lost create response (row exists, response failed) ends `approved`
+  after Resume, never `pending` or `denied`; process termination after the claim
+  is resumable; a Resume cannot change the frozen payload; failed Postgres
+  finalization after a successful create is finalized by Resume; read-back
+  mismatch goes to `reconcile`; a same-name selectable discipline appearing
+  before a retry goes to `reconcile` without a second create; edited spelling
+  that collides with another reservation returns 409.
 - Deny: no Dataverse call.
 
 ## Gates
